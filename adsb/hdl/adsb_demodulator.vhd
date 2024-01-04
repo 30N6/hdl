@@ -44,7 +44,7 @@ architecture rtl of adsb_demodulator is
   constant PREAMBLE_LENGTH            : natural := 64;  -- 8 MHz sampling rate assumed
   constant PREAMBLE_FILTER_BIT_WIDTH  : natural := IQ_WIDTH + 2;
 
-  signal r_data_reset         : std_logic;
+  signal w_data_rst           : std_logic;
 
   signal r_adc_valid          : std_logic;
   signal r_adc_data_i         : signed(IQ_WIDTH - 1 downto 0);
@@ -60,15 +60,28 @@ architecture rtl of adsb_demodulator is
 
 begin
 
+  i_reset : entity common_lib.reset_extender
+  generic map (
+    RESET_LENGTH => 2*PREAMBLE_LENGTH
+  )
+  port map (
+    Clk     => Data_clk,
+    Rst_in  => Data_rst,
+    Rst_out => w_data_rst
+  );
+
+  r_data_reset  <= Data_rst;
+
   process(Data_clk)
   begin
     if rising_edge(Data_clk) then
-      r_data_reset  <= Data_rst;
       r_adc_valid   <= Adc_valid;
       r_adc_data_i  <= Adc_data_i(IQ_WIDTH - 1 downto 0);
       r_adc_data_q  <= Adc_data_q(IQ_WIDTH - 1 downto 0);
     end if;
   end process;
+
+  --TODO: clear filter pipeline on reset
 
   i_mag_approx : entity dsp_lib.mag_approximation
   generic map (
@@ -95,6 +108,7 @@ begin
   )
   port map (
     Clk           => Data_clk,
+    Rst           => w_data_rst,
 
     Input_valid   => w_mag_valid,
     Input_data    => w_mag_data,
@@ -113,6 +127,7 @@ begin
   )
   port map (
     Clk           => Data_clk,
+    Rst           => w_data_rst,
 
     Input_valid   => w_mag_valid,
     Input_data    => w_mag_data,

@@ -2,19 +2,16 @@
 
 import math::*;
 
-interface iq_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
-  logic                             valid = 0;
-  logic signed [DATA_WIDTH - 1 : 0] data_i;
-  logic signed [DATA_WIDTH - 1 : 0] data_q;
+interface mag_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
+  logic                       valid;
+  logic [DATA_WIDTH - 1 : 0]  data;
 
-  task write(input logic signed [DATA_WIDTH - 1 : 0] d_i, logic signed [DATA_WIDTH - 1 : 0] d_q);
-    data_i <= d_i;
-    data_q <= d_q;
-    valid  <= 1;
+  task write(input logic [DATA_WIDTH - 1 : 0] d);
+    data  <= d;
+    valid <= 1;
     @(posedge Clk);
-    valid  <= 0;
-    data_i <= 'x;
-    data_q <= 'x;
+    data  <= 'x;
+    valid <= 0;
   endtask
 endinterface
 
@@ -32,22 +29,26 @@ interface mag_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
   endtask
 endinterface
 
-module mag_approximation_tb;
+module filter_moving_avg_tb;
   parameter time CLK_HALF_PERIOD = 4ns;
-  parameter DATA_WIDTH = 14;
+  parameter INPUT_WIDTH = 14;
+  parameter OUTPUT_WIDTH = 16;
+  parameter WINDOW_LENGTH = 64;
 
   typedef struct
   {
-    logic [DATA_WIDTH - 1 : 0] data;
+    logic [OUTPUT_WIDTH - 1 : 0] data;
   } expect_t;
 
   logic Clk;
   logic Rst;
 
-  iq_tx_intf  #(.DATA_WIDTH(DATA_WIDTH)) tx_intf (.*);
-  mag_rx_intf #(.DATA_WIDTH(DATA_WIDTH)) rx_intf (.*);
+  mag_tx_intf #(.DATA_WIDTH(INPUT_WIDTH)) tx_intf (.*);
+  mag_rx_intf #(.DATA_WIDTH(OUTPUT_WIDTH)) rx_intf (.*);
 
   expect_t expected_data [$];
+  logic [INPUT_WIDTH - 1:0] filter_data [WINDOW_LENGTH - 1:0];
+  int num_received = 0;
 
   initial begin
     Clk = 0;
@@ -59,22 +60,24 @@ module mag_approximation_tb;
 
   initial begin
     Rst = 1;
-    repeat(10) @(posedge Clk);
+    repeat(100) @(posedge Clk);
     Rst = 0;
   end
 
-  mag_approximation
+  filter_moving_avg
   #(
-    .DATA_WIDTH(DATA_WIDTH),
-    .LATENCY(1)
+    .WINDOW_LENGTH (WINDOW_LENGTH),
+    .LATENCY       (WINDOW_LENGTH + 1),
+    .INPUT_WIDTH   (INPUT_WIDTH),
+    .OUTPUT_WIDTH  (OUTPUT_WIDTH)
   )
   dut
   (
     .Clk          (Clk),
+    .Rst          (Rst),
 
     .Input_valid  (tx_intf.valid),
-    .Input_i      (tx_intf.data_i),
-    .Input_q      (tx_intf.data_q),
+    .Input_data   (tx_intf.data),
 
     .Output_valid (rx_intf.valid),
     .Output_data  (rx_intf.data)
@@ -83,11 +86,11 @@ module mag_approximation_tb;
   task automatic wait_for_reset();
     do begin
       @(posedge Clk);
-    end while (!Rst);
+    end while (Rst);
   endtask
 
   initial begin
-    automatic logic [DATA_WIDTH - 1 : 0] read_data;
+    automatic logic [OUTPUT_WIDTH - 1 : 0] read_data;
 
     wait_for_reset();
 
@@ -98,6 +101,7 @@ module mag_approximation_tb;
       end else begin
         $error("%0t: error -- data mismatch: expected = %X  actual = %X", $time, expected_data[0].data, read_data);
       end
+      num_received++;
       expected_data.pop_front();
     end
   end
@@ -112,22 +116,23 @@ module mag_approximation_tb;
     end
   end
 
-  function automatic int clamp_magnitude(int v, int bits);
-    if (v > (2**bits - 1)) begin
-      return 2**bits - 1;
-    end else begin
-      return v;
-    end
-  endfunction;
+  function automatic int process_filter_sample(int d);
+    parameter ACCUM_WIDTH = INPUT_WIDTH + $clog2(WINDOW_LENGTH);
+    logic [ACCUM_WIDTH - 1:0] accum;
 
-  function automatic int mag_approx_model(int i, int q);
-    int i_abs = clamp_magnitude(math::iabs(i), DATA_WIDTH - 1);
-    int q_abs = clamp_magnitude(math::iabs(q), DATA_WIDTH - 1);
-    int v_min = math::imin(i_abs, q_abs);
-    int v_max = math::imax(i_abs, q_abs);
-    int r = v_max + (3 * v_min)/8;
-    //$display("%0t: mag_approx_model: i=%0d q=%0d v_min=%0d v_max=%0d r=%0d", $time, i, q, v_min, v_max, r);
-    return r;
+    for(int i = WINDOW_LENGTH-1; i > 0; i--) begin
+      filter_data[i] = filter_data[i - 1];
+    end
+    filter_data[0] = d;
+
+    accum = 0;
+    for (int i = 0; i < WINDOW_LENGTH; i++) begin
+      accum += filter_data[i];
+    end
+
+    //$display("%0t: process_filter_sample: d=%0d post_accum=%0d ret=%0d", $time, d, accum, accum[ACCUM_WIDTH - 1 : ACCUM_WIDTH - OUTPUT_WIDTH]);
+
+    return accum[ACCUM_WIDTH - 1 : ACCUM_WIDTH - OUTPUT_WIDTH];
   endfunction
 
   task automatic standard_tests();
@@ -137,18 +142,24 @@ module mag_approximation_tb;
       int max_write_delay = $urandom_range(5);
       int wait_cycles;
 
-      $display("%0t: Running test %0d: max_write_delay = %0d", $time, i_test, max_write_delay);
+      repeat(10) @(posedge Clk);
+
+      for (int i = 0; i < WINDOW_LENGTH; i++) begin
+        filter_data[i] = 0;
+      end
+
+      $display("%0t: Test %0d started: max_write_delay = %0d", $time, i_test, max_write_delay);
 
       for ( int i_iteration = 0; i_iteration < 10000; i_iteration++ ) begin
         expect_t e;
-        bit signed [DATA_WIDTH - 1 : 0] input_i = $urandom_range(2**DATA_WIDTH - 1, 0);
-        bit signed [DATA_WIDTH - 1 : 0] input_q = $urandom_range(2**DATA_WIDTH - 1, 0);
-        int approx_mag  = mag_approx_model(input_i, input_q);
+        bit [INPUT_WIDTH - 1 : 0] input_mag = $urandom_range(2**INPUT_WIDTH - 1, 0);
 
-        e.data = approx_mag;
+        int filtered_mag = process_filter_sample(input_mag);
+
+        e.data = filtered_mag;
         expected_data.push_back(e);
 
-        tx_intf.write(input_i, input_q);
+        tx_intf.write(input_mag);
         repeat($urandom_range(max_write_delay)) @(posedge(Clk));
       end
 
@@ -158,6 +169,12 @@ module mag_approximation_tb;
         wait_cycles++;
       end
       assert (wait_cycles < 1e5) else $error("Timeout while waiting for expected queue to empty during standard test %0d.", i_test);
+
+      $display("%0t: Test %0d finished: num_received = %0d", $time, i_test, num_received);
+
+      Rst = 1;
+      repeat(100) @(posedge Clk);
+      Rst = 0;
     end
   endtask
 

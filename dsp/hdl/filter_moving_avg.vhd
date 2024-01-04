@@ -15,24 +15,30 @@ generic (
 );
 port (
   Clk           : in  std_logic;
+  Rst           : in  std_logic;
 
   Input_valid   : in  std_logic;
-  Input_data    : in  unsigned(DATA_WIDTH - 1 downto 0);
+  Input_data    : in  unsigned(INPUT_WIDTH - 1 downto 0);
 
   Output_valid  : out std_logic;
-  Output_data   : out unsigned(DATA_WIDTH - 1 downto 0)
+  Output_data   : out unsigned(OUTPUT_WIDTH - 1 downto 0)
 );
 end entity filter_moving_avg;
 
 architecture rtl of filter_moving_avg is
 
+  type input_data_array_t is array (natural range <>) of unsigned(INPUT_WIDTH - 1 downto 0);
+
   constant WINDOW_BIT_WIDTH : natural := clog2(WINDOW_LENGTH);
   constant ACCUM_WIDTH      : natural := INPUT_WIDTH + WINDOW_BIT_WIDTH;  --TODO: extra bit needed? make sure the "overflow" case is tested
 
-  type input_data_array_t is array (natural range <>) of unsigned(DATA_WIDTH - 1 downto 0);
+  signal r_rst              : std_logic;
 
-  signal m_data_pipe        : input_data_array_t(WINDOW_LENGTH - 1 downto 0) := (others => (others => '0'));
-  signal w_delayed_data     : unsigned(DATA_WIDTH - 1 downto 0);
+  signal w_input_valid      : std_logic;
+  signal w_input_data       : unsigned(INPUT_WIDTH - 1 downto 0);
+
+  signal m_data_pipe        : input_data_array_t(WINDOW_LENGTH - 1 downto 0);
+  signal w_delayed_data     : unsigned(INPUT_WIDTH - 1 downto 0);
 
   signal r_accumulator      : unsigned(ACCUM_WIDTH - 1 downto 0);
   signal r_output_valid     : std_logic;
@@ -58,8 +64,18 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (Input_valid = '1') then
-        m_data_pipe <= m_data_pipe(WINDOW_LENGTH - 2) & Input_data;
+      r_rst <= Rst;
+    end if;
+  end process;
+
+  w_input_valid <= Input_valid  when (r_rst = '0') else '1';
+  w_input_data  <= Input_data   when (r_rst = '0') else (others => '0');
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (w_input_valid = '1') then
+        m_data_pipe <= m_data_pipe(WINDOW_LENGTH - 2 downto 0) & w_input_data;
       end if;
     end if;
   end process;
@@ -70,13 +86,18 @@ begin
     variable v_accum : unsigned(ACCUM_WIDTH - 1 downto 0);
   begin
     if rising_edge(Clk) then
-      r_output_valid  <= Input_valid;
+      if (r_rst = '1') then
+        r_output_valid  <= '0';
+        r_accumulator   <= (others => '0');
+      else
+        r_output_valid  <= Input_valid;
 
-      if (Input_valid = '1') then
-        v_accum       := r_accumulator;
-        v_accum       := v_accum + Input_data;
-        v_accum       := v_accum - w_delayed_data;
-        r_accumulator <= v_accum;
+        if (Input_valid = '1') then
+          v_accum       := r_accumulator;
+          v_accum       := v_accum + Input_data;
+          v_accum       := v_accum - w_delayed_data;
+          r_accumulator <= v_accum;
+        end if;
       end if;
     end if;
   end process;
