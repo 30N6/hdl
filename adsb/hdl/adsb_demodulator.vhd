@@ -40,16 +40,23 @@ end entity adsb_demodulator;
 
 architecture rtl of adsb_demodulator is
 
-  constant AXI_FIFO_DEPTH : natural := 64;
+  constant AXI_FIFO_DEPTH             : natural := 64;
+  constant PREAMBLE_LENGTH            : natural := 64;  -- 8 MHz sampling rate assumed
+  constant PREAMBLE_FILTER_BIT_WIDTH  : natural := IQ_WIDTH + 2;
 
-  signal r_data_reset     : std_logic;
+  signal r_data_reset         : std_logic;
 
-  signal r_adc_valid      : std_logic;
-  signal r_adc_data_i     : signed(IQ_WIDTH - 1 downto 0);
-  signal r_adc_data_q     : signed(IQ_WIDTH - 1 downto 0);
+  signal r_adc_valid          : std_logic;
+  signal r_adc_data_i         : signed(IQ_WIDTH - 1 downto 0);
+  signal r_adc_data_q         : signed(IQ_WIDTH - 1 downto 0);
 
-  signal w_mag_valid      : std_logic;
-  signal w_mag_data       : unsigned(IQ_WIDTH - 1 downto 0);
+  signal w_mag_valid          : std_logic;
+  signal w_mag_data           : unsigned(IQ_WIDTH - 1 downto 0);
+
+  signal w_filtered_sn_valid  : std_logic;
+  signal w_filtered_sn_data   : unsigned(PREAMBLE_FILTER_BIT_WIDTH - 1 downto 0);
+  signal w_filtered_s_valid   : std_logic;
+  signal w_filtered_s_data    : unsigned(PREAMBLE_FILTER_BIT_WIDTH - 1 downto 0);
 
 begin
 
@@ -78,6 +85,41 @@ begin
     Output_data   => w_mag_data
   );
 
+  -- preamble: signal + noise
+  i_filter_s_plus_n : entity dsp_lib.filter_moving_avg
+  generic map (
+    WINDOW_LENGTH => PREAMBLE_LENGTH,
+    LATENCY       => PREAMBLE_LENGTH + 1,
+    INPUT_WIDTH   => IQ_WIDTH,
+    OUTPUT_WIDTH  => PREAMBLE_FILTER_BIT_WIDTH
+  )
+  port map (
+    Clk           => Data_clk,
+
+    Input_valid   => w_mag_valid,
+    Input_data    => w_mag_data,
+
+    Output_valid  => w_filtered_sn_valid,
+    Output_data   => w_filtered_sn_data
+  );
+
+  -- preamble: signal only
+  i_filter_s : entity dsp_lib.mode_s_preamble_correlator
+  generic map (
+    WINDOW_LENGTH => PREAMBLE_LENGTH,
+    LATENCY       => PREAMBLE_LENGTH + 1,
+    INPUT_WIDTH   => IQ_WIDTH,
+    OUTPUT_WIDTH  => PREAMBLE_FILTER_BIT_WIDTH
+  )
+  port map (
+    Clk           => Data_clk,
+
+    Input_valid   => w_mag_valid,
+    Input_data    => w_mag_data,
+
+    Output_valid  => w_filtered_s_valid,
+    Output_data   => w_filtered_s_data
+  );
 
 
   process(Data_clk)
