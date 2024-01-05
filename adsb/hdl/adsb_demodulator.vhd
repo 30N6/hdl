@@ -41,8 +41,12 @@ end entity adsb_demodulator;
 architecture rtl of adsb_demodulator is
 
   constant AXI_FIFO_DEPTH             : natural := 64;
-  constant PREAMBLE_LENGTH            : natural := 64;  -- 8 MHz sampling rate assumed
-  constant PREAMBLE_FILTER_BIT_WIDTH  : natural := IQ_WIDTH + 2;
+  constant PREAMBLE_LENGTH            : natural := 64;            -- 8 MHz sampling rate assumed
+  constant PREAMBLE_SN_WIDTH          : natural := IQ_WIDTH;      -- scale the output by 1/64 for a total gain of 1
+  constant PREAMBLE_S_WIDTH           : natural := IQ_WIDTH + 2;  -- scale the output by 1/16 for a total gain of 1
+  constant MAG_FILTER_LENGTH          : natural := 4;             -- 0.5 us matched filter
+  constant FILTERED_MAG_WIDTH         : natural := IQ_WIDTH + clog2(MAG_FILTER_LENGTH);
+  constant SSNR_THRESHOLD             : natural := 2;
 
   constant PREAMBLE_DATA              : std_logic_vector(0 to PREAMBLE_LENGTH-1) := "1111000011110000000000000000111100001111000000000000000000000000";
 
@@ -56,9 +60,9 @@ architecture rtl of adsb_demodulator is
   signal w_mag_data           : unsigned(IQ_WIDTH - 1 downto 0);
 
   signal w_filtered_sn_valid  : std_logic;
-  signal w_filtered_sn_data   : unsigned(PREAMBLE_FILTER_BIT_WIDTH - 1 downto 0);
+  signal w_filtered_sn_data   : unsigned(PREAMBLE_SN_WIDTH - 1 downto 0);
   signal w_filtered_s_valid   : std_logic;
-  signal w_filtered_s_data    : unsigned(PREAMBLE_FILTER_BIT_WIDTH - 1 downto 0);
+  signal w_filtered_s_data    : unsigned(PREAMBLE_S_WIDTH - 1 downto 0);
 
 begin
 
@@ -106,7 +110,7 @@ begin
     WINDOW_LENGTH => PREAMBLE_LENGTH,
     LATENCY       => PREAMBLE_LENGTH + 1,
     INPUT_WIDTH   => IQ_WIDTH,
-    OUTPUT_WIDTH  => PREAMBLE_FILTER_BIT_WIDTH
+    OUTPUT_WIDTH  => PREAMBLE_SN_WIDTH
   )
   port map (
     Clk           => Data_clk,
@@ -126,7 +130,7 @@ begin
     CORRELATION_DATA    => PREAMBLE_DATA,
     LATENCY             => PREAMBLE_LENGTH + 1,
     INPUT_WIDTH         => IQ_WIDTH,
-    OUTPUT_WIDTH        => PREAMBLE_FILTER_BIT_WIDTH  -- scales the output by 1/16 for a total preamble gain of 1
+    OUTPUT_WIDTH        => PREAMBLE_S_WIDTH
   )
   port map (
     Clk           => Data_clk,
@@ -154,6 +158,32 @@ begin
     Output_valid  => w_delayed_mag_valid,
     Output_data   => w_delayed_mag_data
   );
+
+  i_preamble_detector : entity adsb_lib.preamble_detector
+  generic map (
+    MAG_WIDTH             => IQ_WIDTH,
+    MOVING_AVG_WIDTH      => PREAMBLE_SN_WIDTH,
+    CORRELATOR_WIDTH      => PREAMBLE_S_WIDTH,
+    FILTERED_MAG_WIDTH    => FILTERED_MAG_WIDTH,
+    MAG_FILTER_LENGTH     => MAG_FILTER_LENGTH
+  )
+  port map (
+    Clk                   => Data_clk,
+    Rst                   => w_data_rst,
+
+    Mag_valid             => w_delayed_mag_valid,
+    Mag_data              => w_delayed_mag_data,
+    Moving_avg_valid      => w_filtered_sn_valid,
+    Moving_avg_data       => w_filtered_sn_data,
+    Correlator_valid      => w_filtered_s_valid,
+    Correlator_data       => w_filtered_s_data,
+
+    Output_valid          =>
+    Output_start          =>
+    Output_filtered_mag   =>
+    Output_preamble_corr  =>
+  );
+
 
   process(Data_clk)
   begin
