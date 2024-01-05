@@ -124,7 +124,7 @@ begin
   generic map (
     CORRELATION_LENGTH  => PREAMBLE_LENGTH,
     CORRELATION_DATA    => PREAMBLE_DATA,
-    LATENCY             => PREAMBLE_LENGTH, + 1,
+    LATENCY             => PREAMBLE_LENGTH + 1,
     INPUT_WIDTH         => IQ_WIDTH,
     OUTPUT_WIDTH        => PREAMBLE_FILTER_BIT_WIDTH  -- scales the output by 1/16 for a total preamble gain of 1
   )
@@ -139,6 +139,21 @@ begin
     Output_data   => w_filtered_s_data
   );
 
+  -- delayed magnitude to match preamble correlator
+  i_delayed_mag : entity dsp_lib.pipeline_delay
+  generic map (
+    DATA_WIDTH    => IQ_WIDTH,
+    LATENCY       => PREAMBLE_LENGTH + 1
+  )
+  port map (
+    Clk           => Data_clk,
+
+    Input_valid   => w_mag_valid,
+    Input_data    => w_mag_data,
+
+    Output_valid  => w_delayed_mag_valid,
+    Output_data   => w_delayed_mag_data
+  );
 
   process(Data_clk)
   begin
