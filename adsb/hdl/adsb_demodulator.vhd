@@ -44,6 +44,8 @@ architecture rtl of adsb_demodulator is
   constant PREAMBLE_LENGTH            : natural := 64;  -- 8 MHz sampling rate assumed
   constant PREAMBLE_FILTER_BIT_WIDTH  : natural := IQ_WIDTH + 2;
 
+  constant PREAMBLE_DATA              : std_logic_vector(0 to PREAMBLE_LENGTH-1) := "1111000011110000000000000000111100001111000000000000000000000000";
+
   signal w_data_rst           : std_logic;
 
   signal r_adc_valid          : std_logic;
@@ -118,12 +120,13 @@ begin
   );
 
   -- preamble: signal only
-  i_filter_s : entity dsp_lib.mode_s_preamble_correlator
+  i_filter_s : entity dsp_lib.correlator_simple
   generic map (
-    WINDOW_LENGTH => PREAMBLE_LENGTH,
-    LATENCY       => PREAMBLE_LENGTH + 1,
-    INPUT_WIDTH   => IQ_WIDTH,
-    OUTPUT_WIDTH  => PREAMBLE_FILTER_BIT_WIDTH
+    CORRELATION_LENGTH  => PREAMBLE_LENGTH,
+    CORRELATION_DATA    => PREAMBLE_DATA,
+    LATENCY             => PREAMBLE_LENGTH, + 1,
+    INPUT_WIDTH         => IQ_WIDTH,
+    OUTPUT_WIDTH        => PREAMBLE_FILTER_BIT_WIDTH  -- scales the output by 1/16 for a total preamble gain of 1
   )
   port map (
     Clk           => Data_clk,

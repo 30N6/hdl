@@ -9,6 +9,7 @@ package common_pkg is
   function clog2_min1bit(v : natural) return natural;
   function and_reduce(v : unsigned) return std_logic;
   function or_reduce(v : unsigned) return std_logic;
+  function resize_up(v : unsigned; n : natural) return unsigned;
 
 end package common_pkg;
 
@@ -61,5 +62,16 @@ package body common_pkg is
   begin
     return to_stdlogic(v = 0);
   end function;
+
+  function resize_up(v : unsigned; n : natural) return unsigned is
+    variable r : unsigned(n - 1 downto 0);
+  begin
+    assert (n >= v'length)
+      report "resize_up: attempting to size down"
+      severity failure;
+    r := resize(v, n);
+    return r;
+  end function;
+
 
 end package body common_pkg;
