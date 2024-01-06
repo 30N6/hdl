@@ -58,10 +58,8 @@ end
 
 
 message_data = [];
-msg_bin = [];
 crc_matched_msgs = [];
 
-sample_v = zeros(length(mag_filtered), 1);
 for ii = preamble_det_fi.'
     if ii > (length(mag_filtered) - 120*8)
         continue
@@ -87,33 +85,24 @@ for ii = preamble_det_fi.'
     msg = check_ads_b_crc(msg);
 
 
-    [msg_preamble, msg_df, d] = process_message(msg);
+    [msg_preamble, msg_df, ~] = process_message(msg);
     msg.preamble = int(msg_preamble);
     msg.df = int(msg_df);
 
     if msg.final_crc_valid
         figure(3); plot(msg.data_raw(9:end), 'o'); hold on; plot(msg.bit_threshold(9:end)); hold off;
-        msg.data_slice = mag_filtered(ii - 1000 : ii + 2000);
+        msg.data_slice = y(ii - 500 : ii + 1500, :);
         crc_matched_msgs = [crc_matched_msgs; msg];
     end
 
-    ads_b_filter = 0;
-    if ~ads_b_filter %|| ((msg.preamble == 192) && (msg.df == 17))
-        for jj = 1:120
-            bit_index = ii + 8*(jj-1) + 4 - 1;
-            sample_v(bit_index) = 1;        
-        end
-    end
-
     message_data = [message_data; msg];
-    msg_bin = [msg_bin; d];       
 end
 
 fh_output_iq = fopen("adsb_test_data_2023_12_29_iq.txt", "w");
 fh_output_msg = fopen("adsb_test_data_2023_12_29_msg.txt", "w");
 for msg = crc_matched_msgs.'
     for ii = 1:length(msg.data_slice)
-        fprintf(fh_output_iq, "%0.8f\n", msg.data_slice(ii));
+        fprintf(fh_output_iq, "%0.8f %0.8f\n", msg.data_slice(ii, 1), msg.data_slice(ii, 2));
     end
     fprintf(fh_output_msg, "%s\n", dec2hex(bin_to_dec(msg.data_bits(9:end))));
 end

@@ -43,15 +43,15 @@ end entity adsb_demodulator;
 
 architecture rtl of adsb_demodulator is
 
-  constant AXI_FIFO_DEPTH             : natural := 64;
-  constant PREAMBLE_LENGTH            : natural := 64;            -- 8 MHz sampling rate assumed    --TODO: move to package
-  constant PREAMBLE_SN_WIDTH          : natural := IQ_WIDTH;      -- scale the output by 1/64 for a total gain of 1
-  constant PREAMBLE_S_WIDTH           : natural := IQ_WIDTH + 2;  -- scale the output by 1/16 for a total gain of 1
-  constant MAG_FILTER_LENGTH          : natural := 4;             -- 0.5 us matched filter
-  constant FILTERED_MAG_WIDTH         : natural := IQ_WIDTH + clog2(MAG_FILTER_LENGTH);
-  constant SSNR_THRESHOLD             : natural := 2;
+  constant AXI_FIFO_DEPTH         : natural := 64;
+  constant PREAMBLE_LENGTH        : natural := 64;            -- 8 MHz sampling rate assumed    --TODO: move to package
+  constant PREAMBLE_SN_WIDTH      : natural := IQ_WIDTH;      -- scale the output by 1/64 for a total gain of 1
+  constant PREAMBLE_S_WIDTH       : natural := IQ_WIDTH + 2;  -- scale the output by 1/16 for a total gain of 1
+  constant MAG_FILTER_LENGTH      : natural := 4;             -- 0.5 us matched filter
+  constant FILTERED_MAG_WIDTH     : natural := IQ_WIDTH + clog2(MAG_FILTER_LENGTH);
+  constant SSNR_THRESHOLD         : natural := 2;
 
-  constant PREAMBLE_DATA              : std_logic_vector(0 to PREAMBLE_LENGTH-1) := "1111000011110000000000000000111100001111000000000000000000000000";
+  constant PREAMBLE_DATA          : std_logic_vector(0 to PREAMBLE_LENGTH-1) := "1111000011110000000000000000111100001111000000000000000000000000";
 
   signal w_rst_from_config        : std_logic;
   signal w_combined_rst           : std_logic;
