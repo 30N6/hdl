@@ -71,6 +71,8 @@ architecture rtl of adsb_demodulator is
   signal w_filtered_sn_data       : unsigned(PREAMBLE_SN_WIDTH - 1 downto 0);
   signal w_filtered_s_valid       : std_logic;
   signal w_filtered_s_data        : unsigned(PREAMBLE_S_WIDTH - 1 downto 0);
+  signal w_delayed_mag_valid      : std_logic;
+  signal w_delayed_mag_data       : unsigned(IQ_WIDTH - 1 downto 0);
 
   signal w_detector_valid         : std_logic;
   signal w_detector_start         : std_logic;
@@ -133,7 +135,8 @@ begin
 
   i_mag_approx : entity dsp_lib.mag_approximation
   generic map (
-    INPUT_WIDTH => IQ_WIDTH
+    DATA_WIDTH  => IQ_WIDTH,
+    LATENCY     => 0
   )
   port map (
     Clk           => Data_clk,
@@ -207,7 +210,8 @@ begin
     MOVING_AVG_WIDTH      => PREAMBLE_SN_WIDTH,
     CORRELATOR_WIDTH      => PREAMBLE_S_WIDTH,
     FILTERED_MAG_WIDTH    => FILTERED_MAG_WIDTH,
-    MAG_FILTER_LENGTH     => MAG_FILTER_LENGTH
+    MAG_FILTER_LENGTH     => MAG_FILTER_LENGTH,
+    SSNR_THRESHOLD        => SSNR_THRESHOLD
   )
   port map (
     Clk                   => Data_clk,
@@ -270,7 +274,7 @@ begin
     Message_preamble_s  => w_sampler_preamble_s,
     Message_preamble_sn => w_sampler_preamble_sn,
     Message_crc_match   => w_sampler_crc_match,
-    Message_timestamp   => w_sampler_timestamp
+    Message_timestamp   => w_sampler_timestamp,
 
     Axis_ready          => w_reporter_axis_ready,
     Axis_valid          => w_reporter_axis_valid,
@@ -324,7 +328,7 @@ begin
   )
   port map (
     Clk            => Data_clk,
-    Rst            => Rst,
+    Rst            => Data_rst,
 
     Axis_ready     => w_config_axis_ready,
     Axis_valid     => w_config_axis_valid,

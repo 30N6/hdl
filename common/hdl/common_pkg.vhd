@@ -9,7 +9,9 @@ package common_pkg is
   function clog2_min1bit(v : natural) return natural;
   function and_reduce(v : unsigned) return std_logic;
   function or_reduce(v : unsigned) return std_logic;
+  function or_reduce(v : std_logic_vector) return std_logic;
   function resize_up(v : unsigned; n : natural) return unsigned;
+  function shift_right(v : std_logic_vector; n : natural) return std_logic_vector;
 
 end package common_pkg;
 
@@ -63,6 +65,11 @@ package body common_pkg is
     return to_stdlogic(v = 0);
   end function;
 
+  function or_reduce(v : std_logic_vector) return std_logic is
+  begin
+    return to_stdlogic(unsigned(v) = 0);
+  end function;
+
   function resize_up(v : unsigned; n : natural) return unsigned is
     variable r : unsigned(n - 1 downto 0);
   begin
@@ -73,5 +80,9 @@ package body common_pkg is
     return r;
   end function;
 
+  function shift_right(v : std_logic_vector; n : natural) return std_logic_vector is
+  begin
+    return std_logic_vector(shift_right(unsigned(v), n));
+  end function;
 
 end package body common_pkg;

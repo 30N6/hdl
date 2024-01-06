@@ -102,14 +102,12 @@ begin
   begin
     if rising_edge(Clk) then
       if (r_report_pending = '0') then
-        r_report_packed <= pack(w_report_packed);
+        r_report_packed <= pack(w_report_data);
       elsif (Axis_ready = '1') then
         r_report_packed <= shift_right(r_report_packed, AXI_DATA_WIDTH);
       end if;
     end if;
   end process;
-
-  w_report_packed <= pack(r_report_data);
 
   Axis_valid <= r_report_pending;
   Axis_last  <= to_stdlogic(r_report_word_index = (REPORT_TRANSFER_COUNT - 1));

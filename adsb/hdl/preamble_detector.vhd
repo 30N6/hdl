@@ -53,7 +53,7 @@ architecture rtl of preamble_detector is
   signal r_det_pipe_corr_data   : corr_data_array_t(DETECTION_PIPE_DEPTH - 1 downto 0);
   signal r_det_pipe_avg_data    : avg_data_array_t(DETECTION_PIPE_DEPTH - 1 downto 0);
   signal r_det_valid            : std_logic;
-  signal w_det_pipe_corr_gt     : corr_data_array_t(DETECTION_PIPE_DEPTH - 2 downto 0);
+  signal w_det_pipe_corr_gt     : std_logic_vector(DETECTION_PIPE_DEPTH - 2 downto 0);
 
   signal w_filtered_mag_data    : unsigned(FILTERED_MAG_WIDTH - 1 downto 0);
   signal w_filtered_mag_valid   : std_logic;

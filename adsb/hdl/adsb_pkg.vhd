@@ -13,6 +13,7 @@ package adsb_pkg is
 
   constant ADSB_REPORT_MAGIC_NUM  : std_logic_vector(31 downto 0) := x"AD5B0001";
   constant ADSB_REPORT_WIDTH      : natural := 352;
+
   type adsb_report_t is record
     magic_num     : std_logic_vector(31 downto 0);
     sequence_num  : unsigned(31 downto 0);
@@ -26,16 +27,16 @@ package adsb_pkg is
     padding       : std_logic_vector(15 downto 0);
   end record;
 
-  constant ADSB_CONFIG_MAGIC_NUM  : std_logic_vector(31 downto 0) := x"ADSB0101";
+  constant ADSB_CONFIG_MAGIC_NUM  : std_logic_vector(31 downto 0) := x"AD5B0101";
   constant ADSB_CONFIG_WIDTH      : natural := 64;
-  constant adsb_config_t is record
+
+  type adsb_config_t is record
     magic_num     : std_logic_vector(31 downto 0);
     reset         : std_logic_vector(7 downto 0);
     enable        : std_logic_vector(7 downto 0);
 
     padding       : std_logic_vector(15 downto 0);
   end record;
-
 
   function pack(v : adsb_report_t) return std_logic_vector;
   function unpack(v : std_logic_vector) return adsb_config_t;

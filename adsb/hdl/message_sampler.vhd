@@ -36,7 +36,7 @@ port (
   Output_preamble_s   : out unsigned(PREAMBLE_S_WIDTH - 1 downto 0);
   Output_preamble_sn  : out unsigned(PREAMBLE_SN_WIDTH - 1 downto 0);
   Output_crc_match    : out std_logic;
-  Output_timestamp    : out timestamp_t;
+  Output_timestamp    : out timestamp_t
 );
 end entity message_sampler;
 
@@ -50,11 +50,13 @@ architecture rtl of message_sampler is
   type state_t is
   (
     S_IDLE,
-    S_WAIT_START
+    S_WAIT_START,
     S_SAMPLE,
     S_WAIT_SAMPLE,
     S_DONE
   );
+
+  signal s_state                : state_t;
 
   signal r_enable               : std_logic;
 
@@ -84,7 +86,7 @@ begin
     OUTPUT_WIDTH  => AVG_MAG_WIDTH
   )
   port map (
-    Clk           => Data_clk,
+    Clk           => Clk,
     Rst           => Rst,
 
     Input_valid   => Input_valid,

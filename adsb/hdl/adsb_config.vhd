@@ -82,9 +82,9 @@ begin
         Rst_out <= '0';
         Enable  <= '0';
       else
-        if (r_config_valid = '1') then
-          Rst_out <= w_config_unpacked.reset;
-          Enable  <= w_config_unpacked.enable;
+        if (r_config_valid = '1') then  --TODO: check magic num
+          Rst_out <= w_config_unpacked.reset(0);
+          Enable  <= w_config_unpacked.enable(0);
         end if;
       end if;
     end if;
