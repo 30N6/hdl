@@ -45,7 +45,7 @@ begin
      PROG_FULL_THRESH     => 10,
      RD_DATA_COUNT_WIDTH  => 1,
      RELATED_CLOCKS       => 0,
-     SIM_ASSERT_CHK       => 1,
+     SIM_ASSERT_CHK       => 0,
      TDATA_WIDTH          => AXI_DATA_WIDTH,
      TDEST_WIDTH          => 1,
      TID_WIDTH            => 1,

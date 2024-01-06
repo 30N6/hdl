@@ -44,7 +44,6 @@ architecture rtl of message_sampler is
 
   constant MESSAGE_START_DELAY      : natural := 32 + 4; -- 32 cycles for preamble, 4 cycles to sample in the middle of each bit
   constant CYCLES_PER_BIT           : natural := 8;
-  constant AVG_MAG_WIDTH            : natural := FILTERED_MAG_WIDTH - clog2(PREAMBLE_LENGTH);
   constant DYNAMIC_THRESHOLD_CYCLE  : natural := 8; -- switch to the dynamic threshold after a while
 
   type state_t is
@@ -71,8 +70,8 @@ architecture rtl of message_sampler is
 
   signal r_sample_wait_count    : unsigned(clog2(CYCLES_PER_BIT) - 1 downto 0);
 
-  signal w_avg_filtered_mag     : unsigned(AVG_MAG_WIDTH - 1 downto 0);
-  signal r_bit_threshold        : unsigned(AVG_MAG_WIDTH - 1 downto 0);
+  signal w_avg_filtered_mag     : unsigned(FILTERED_MAG_WIDTH - 1 downto 0);
+  signal r_bit_threshold        : unsigned(FILTERED_MAG_WIDTH - 1 downto 0);
   signal w_sampled_bit          : std_logic;
 
 begin
@@ -83,7 +82,7 @@ begin
     WINDOW_LENGTH => PREAMBLE_LENGTH,
     LATENCY       => PREAMBLE_LENGTH + 1,
     INPUT_WIDTH   => FILTERED_MAG_WIDTH,
-    OUTPUT_WIDTH  => AVG_MAG_WIDTH
+    OUTPUT_WIDTH  => FILTERED_MAG_WIDTH
   )
   port map (
     Clk           => Clk,
@@ -198,7 +197,7 @@ begin
       if (r_message_bit_count < DYNAMIC_THRESHOLD_CYCLE) then
         r_bit_threshold <= resize_up(r_latched_preamble_s(PREAMBLE_S_WIDTH - 2 downto 0), FILTERED_MAG_WIDTH);   --TODO: check scaling
       else
-        r_bit_threshold <= '0' & w_avg_filtered_mag(AVG_MAG_WIDTH - 2 downto 0);
+        r_bit_threshold <= '0' & w_avg_filtered_mag(FILTERED_MAG_WIDTH - 2 downto 0);
       end if;
     end if;
   end process;

@@ -131,8 +131,6 @@ begin
     end if;
   end process;
 
-  --TODO: clear filter pipeline on reset
-
   i_mag_approx : entity dsp_lib.mag_approximation
   generic map (
     DATA_WIDTH  => IQ_WIDTH,

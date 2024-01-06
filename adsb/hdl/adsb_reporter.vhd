@@ -39,7 +39,7 @@ architecture rtl of adsb_reporter is
 
   signal r_sequence_num         : unsigned(31 downto 0);
 
-  signal r_report_pending       : std_logic;
+  signal r_report_pending       : std_logic := '0';
   signal r_report_word_index    : unsigned(clog2(REPORT_TRANSFER_COUNT) - 1 downto 0);
   signal w_report_data          : adsb_report_t;
   signal r_report_packed        : std_logic_vector(ADSB_REPORT_WIDTH - 1 downto 0);
@@ -67,7 +67,9 @@ begin
         r_report_word_index <= (others => '-');
       else
         if (r_report_pending = '0') then
-          r_report_pending    <= Message_valid;
+          if (Message_valid = '1') then
+            r_report_pending  <= Message_valid;
+          end if;
           r_report_word_index <= (others => '0');
         elsif (Axis_ready = '1') then
           if (r_report_word_index < (REPORT_TRANSFER_COUNT - 1)) then

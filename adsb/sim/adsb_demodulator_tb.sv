@@ -250,7 +250,9 @@ module adsb_demodulator_tb;
   initial
   begin
     wait_for_reset();
+    repeat(200) @(posedge Clk);
     write_config();
+    repeat(100) @(posedge Clk);
     standard_tests();
     repeat(100) @(posedge Clk);
     $finish;
