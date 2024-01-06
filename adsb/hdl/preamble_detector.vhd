@@ -41,6 +41,7 @@ end entity preamble_detector;
 architecture rtl of preamble_detector is
 
   constant DETECTION_PIPE_DEPTH : natural := MAG_FILTER_LENGTH + 1;
+  constant SSNR_THRESH          : unsigned(clog2(SSNR_THRESHOLD) - 1 downto 0) := to_unsigned(SSNR_THRESHOLD, clog2(SSNR_THRESHOLD));
 
   type corr_data_array_t        is array (natural range <>) of unsigned(CORRELATOR_WIDTH - 1 downto 0);
   type avg_data_array_t         is array (natural range <>) of unsigned(MOVING_AVG_WIDTH - 1 downto 0);
@@ -60,7 +61,7 @@ architecture rtl of preamble_detector is
 
 begin
 
-  w_sn_threshold      <= SSNR_THRESHOLD * Moving_avg_data;
+  w_sn_threshold      <= SSNR_THRESH * Moving_avg_data;
   w_ssnr_exceeded     <= to_stdlogic(Correlator_data >= w_sn_threshold);
   w_preamble_detected <= Moving_avg_valid and Correlator_valid and w_ssnr_exceeded;
 

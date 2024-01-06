@@ -75,16 +75,14 @@ module adsb_demodulator_tb;
   logic Clk, Axi_clk;
   logic Rst, Axi_rst;
 
-  adc_tx_intf                               adc_tx_intf (.Clk(Clk));
-  axi_tx_intf #(.DATA_WIDTH(INPUT_WIDTH))   cfg_tx_intf (.Clk(Axi_clk));
-  axi_rx_intf #(.DATA_WIDTH(OUTPUT_WIDTH))  rpt_rx_intf (.Clk(Axi_clk));
+  adc_tx_intf                                     adc_tx_intf (.Clk(Clk));
+  axi_tx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  cfg_tx_intf (.Clk(Axi_clk));
+  axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf (.Clk(Axi_clk));
 
-  expect_t                      expected_data [$];
-  logic [INPUT_WIDTH - 1:0]     filter_data [WINDOW_LENGTH - 1:0];
-  int                           num_received = 0;
-
-  logic r_axi_rx_ready;
-  logic w_axi_rx_valid;
+  expect_t  expected_data [$];
+  int       num_received = 0;
+  logic     r_axi_rx_ready;
+  logic     w_axi_rx_valid;
 
   initial begin
     Clk = 0;
@@ -156,12 +154,12 @@ module adsb_demodulator_tb;
   endtask
 
   task automatic write_config();
-    bit [ADSB_CONFIG_WIDTH - 1 : 0] config_data [] = {64'h00000001AD5B0101, 64'h00000100AD5B0101};
+    bit [adsb_config_width - 1 : 0] config_data [] = {64'h00000001AD5B0101, 64'h00000100AD5B0101};
 
     for (int i = 0; i < config_data.size(); i++) begin
       logic [AXI_DATA_WIDTH - 1 : 0] axi_data [$];
       for (int j = 0; j < ($size(config_data[i]) / AXI_DATA_WIDTH); j++) begin
-        axi_data.push_back(config_data[AXI_DATA_WIDTH*j +: AXI_DATA_WIDTH]);
+        axi_data.push_back(config_data[j][AXI_DATA_WIDTH*j +: AXI_DATA_WIDTH]);
       end
       cfg_tx_intf.write(axi_data);
       repeat(200) @(posedge Axi_clk);
@@ -190,7 +188,7 @@ module adsb_demodulator_tb;
     wait_for_reset();
 
     forever begin
-      rx_intf.read(read_data);
+      rpt_rx_intf.read(read_data);
       if (data_match(read_data, expected_data[0].data)) begin
         //$display("%0t: data match - %X", $time, read_data);
       end else begin
@@ -220,21 +218,17 @@ module adsb_demodulator_tb;
 
       repeat(10) @(posedge Clk);
 
-      for (int i = 0; i < WINDOW_LENGTH; i++) begin
-        filter_data[i] = 0;
-      end
-
       $display("%0t: Test %0d started: max_write_delay = %0d", $time, i_test, max_write_delay);
 
       for ( int i_iteration = 0; i_iteration < 10000; i_iteration++ ) begin
         expect_t e;
-        bit signed [DATA_WIDTH - 1 : 0] input_i = $urandom_range(2**IQ_WIDTH - 1, 0);
-        bit signed [DATA_WIDTH - 1 : 0] input_q = $urandom_range(2**IQ_WIDTH - 1, 0);
+        bit signed [IQ_WIDTH - 1 : 0] input_i = $urandom_range(2**IQ_WIDTH - 1, 0);
+        bit signed [IQ_WIDTH - 1 : 0] input_q = $urandom_range(2**IQ_WIDTH - 1, 0);
 
         //e.data = filtered_mag;
         //expected_data.push_back(e);
 
-        tx_intf.write(input_i, input_q);
+        adc_tx_intf.write(input_i, input_q);
         repeat($urandom_range(max_write_delay)) @(posedge(Clk));
       end
 

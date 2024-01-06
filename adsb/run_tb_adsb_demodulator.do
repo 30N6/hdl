@@ -2,11 +2,16 @@
 # for each new project. There should be no need to
 # modify the rest of the script.
 
-set tb_lib    adsb_lib
-set tb_name   adsb_demodulator_tb
-set top_level $tb_lib.$tb_name
+set tb_lib      adsb_lib
+set tb_name     adsb_demodulator_tb
+set top_level   $tb_lib.$tb_name
+
+set xilinx_dir  C:/Xilinx/Vivado/2022.2/data/verilog/src
 
 set library_file_list [list \
+  glbl [list \
+    $xilinx_dir/glbl.v \
+  ] \
   common_lib [list \
     ../common/hdl/common_pkg.vhd \
     ../common/hdl/math_pkg.vhd \
@@ -41,6 +46,7 @@ set incdir_list [list \
   ../dsp/hdl \
   ../dsp/sim \
   ../axi/hdl \
+  $xilinx_dir \
 ]
 
 # After sourcing the script from ModelSim for the
@@ -90,9 +96,9 @@ foreach {library file_list} $library_file_list {
   foreach file $file_list {
     if { $last_compile_time < [file mtime $file] } {
       if [regexp {.vhdl?$} $file] {
-        vcom -2008 -work $library $file
+        vcom -2008 -mixedsvvh -work $library $file
       } else {
-        vlog +define+SIM -sv -timescale "1 ns / 1 ns" {*}[split $vlog_lib_str] -work $library $file {*}[split $incdir_str " "]
+        vlog +define+SIM -sv -mixedsvvh -timescale "1 ns / 1 ns" {*}[split $vlog_lib_str] -work $library $file {*}[split $incdir_str " "]
       }
       set last_compile_time 0
     }
@@ -101,7 +107,7 @@ foreach {library file_list} $library_file_list {
 set last_compile_time $time_now
 
 # Load the simulation
-vsim $top_level
+vsim $top_level glbl.glbl
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all

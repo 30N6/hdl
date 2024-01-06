@@ -92,8 +92,8 @@ begin
     w_report_data.magic_num     <= ADSB_REPORT_MAGIC_NUM;
     w_report_data.sequence_num  <= r_sequence_num;
     w_report_data.timestamp     <= Message_timestamp;
-    w_report_data.preamble_s    <= Message_preamble_s;
-    w_report_data.preamble_sn   <= Message_preamble_sn;
+    w_report_data.preamble_s    <= resize_up(Message_preamble_s, w_report_data.preamble_s'length);
+    w_report_data.preamble_sn   <= resize_up(Message_preamble_sn, w_report_data.preamble_sn'length);
     w_report_data.message_crc   <= (0 => Message_crc_match, others => '0');
     w_report_data.message_data  <= Message_data;
   end process;

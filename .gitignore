@@ -1,5 +1,7 @@
 */*_lib/*
-*/*.ini*
-*/*.wlf
 */transcript
 */wave.do
+*glbl*
+*.vstf
+*.wlf
+*.ini
