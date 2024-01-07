@@ -21,9 +21,7 @@ package adsb_pkg is
     preamble_s    : unsigned(31 downto 0);
     preamble_sn   : unsigned(31 downto 0);
     message_crc   : std_logic_vector(31 downto 0);
-    message_data  : adsb_message_t;
-
-    padding       : std_logic_vector(15 downto 0);
+    message_data  : std_logic_vector(127 downto 0);
   end record;
 
   constant ADSB_CONFIG_MAGIC_NUM  : std_logic_vector(31 downto 0) := x"AD5B0101";
@@ -60,7 +58,7 @@ package body adsb_pkg is
     r(159 downto 128) := std_logic_vector(v.preamble_s);
     r(191 downto 160) := std_logic_vector(v.preamble_sn);
     r(223 downto 192) := v.message_crc;
-    r(335 downto 224) := v.message_data;
+    r(351 downto 224) := v.message_data;
     return r;
   end function;
 

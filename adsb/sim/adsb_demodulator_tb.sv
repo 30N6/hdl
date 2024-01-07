@@ -79,6 +79,20 @@ module adsb_demodulator_tb;
     logic [AXI_DATA_WIDTH - 1 : 0] data [$];
   } expect_t;
 
+  typedef struct packed
+  {
+    bit [31:0]                        magic_num;
+    bit [31:0]                        sequence_num;
+    bit [63:0]                        timestamp;
+    bit [31:0]                        preamble_s;
+    bit [31:0]                        preamble_sn;
+    bit [31:0]                        message_crc;
+    bit [adsb_message_width - 1 : 0]  message_data;
+    bit [15:0]                        padding;
+  } adsb_report_packed_t;
+
+  typedef bit [$bits(adsb_report_packed_t) - 1 : 0] adsb_report_bits_t;
+
   logic Clk, Axi_clk;
   logic Rst, Axi_rst;
 
@@ -176,16 +190,29 @@ module adsb_demodulator_tb;
   endtask
 
   function automatic bit data_match(logic [AXI_DATA_WIDTH - 1 : 0] a [$], logic [AXI_DATA_WIDTH - 1 : 0] b []);
+    adsb_report_packed_t report_a = unpack_report(a);
+    adsb_report_packed_t report_b = unpack_report(b);
+
     if (a.size() != b.size()) begin
       $display("%0t: size mismatch: a=%0d b=%0d", $time, a.size(), b.size());
       return 0;
     end
 
-    for (int i = 0; i < a.size(); i++) begin
-      if (a[i] !== b[i]) begin
-        $display("%0t: data mismatch: a[%0d]=%0X b[%0d]=%0X", $time, i, a[i], i, b[i]);
-        return 0;
-      end
+    $display("a[0]=%X b[0]=%X", a[0], b[0]);
+
+    if (report_a.magic_num !== report_b.magic_num) begin
+      $display("magic_num mismatch: %X %X", report_a.magic_num, report_b.magic_num);
+      return 0;
+    end
+
+    if (report_a.sequence_num !== report_b.sequence_num) begin
+      $display("sequence_num mismatch: %X %X", report_a.sequence_num, report_b.sequence_num);
+      return 0;
+    end
+
+    if (report_a.message_data !== report_b.message_data) begin
+      $display("message_data mismatch: %X %X", report_a.message_data, report_b.message_data);
+      return 0;
     end
 
     return 1;
@@ -198,6 +225,7 @@ module adsb_demodulator_tb;
 
     forever begin
       rpt_rx_intf.read(read_data);
+
       if (data_match(read_data, expected_data[0].data)) begin
         //$display("%0t: data match - %X", $time, read_data);
       end else begin
@@ -218,9 +246,49 @@ module adsb_demodulator_tb;
     end
   end
 
-  function automatic expect_t populate_report(output_msg);
+  function automatic expect_t populate_report(bit [adsb_message_width - 1 : 0] output_msg);
     expect_t r;
+    static int seq_num = 0;
+
+    adsb_report_packed_t report;
+    adsb_report_bits_t packed_report;
+
+    report.magic_num     = 32'hAD5B0001;
+    report.sequence_num  = seq_num;
+    report.timestamp     = 0;
+    report.preamble_s    = 0;
+    report.preamble_sn   = 0;
+    report.message_crc   = 1;
+    report.message_data  = output_msg;
+
+    packed_report = adsb_report_bits_t'(report);
+    for (int i = 0; i < $size(packed_report)/AXI_DATA_WIDTH; i++) begin
+      r.data.push_front(packed_report[i*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
+    end
+
+    $display("report: %p", report);
+    $display("packed_report: %p", packed_report);
+    $display("axi report: %p [0]", r.data, r.data[0]);
+
+    seq_num++;
+
     return r;
+  endfunction
+
+  function automatic adsb_report_packed_t unpack_report(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
+    adsb_report_packed_t report;
+    adsb_report_bits_t packed_report;
+
+    $display("unpack_report: data=%p", data);
+
+    for (int i = 0; i < $size(packed_report)/AXI_DATA_WIDTH; i++) begin
+      packed_report[i*AXI_DATA_WIDTH +: AXI_DATA_WIDTH] = data.pop_back();
+    end
+
+    $display("unpack_report: packed=%X", packed_report);
+
+    report = adsb_report_packed_t'(packed_report);
+    return report;
   endfunction
 
   task automatic standard_test();

@@ -106,6 +106,8 @@ foreach {library file_list} $library_file_list {
 }
 set last_compile_time $time_now
 
+#TODO: non-gui mode
+
 # Load the simulation
 vsim $top_level glbl.glbl
 set NumericStdNoWarnings 1

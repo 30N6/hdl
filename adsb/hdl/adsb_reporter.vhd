@@ -44,6 +44,8 @@ architecture rtl of adsb_reporter is
   signal w_report_data          : adsb_report_t;
   signal r_report_packed        : std_logic_vector(ADSB_REPORT_WIDTH - 1 downto 0);
 
+  signal w_padded_message       : std_logic_vector(w_report_data.message_data'length - 1 downto 0);
+
 begin
 
   process(Clk)
@@ -84,6 +86,8 @@ begin
     end if;
   end process;
 
+  w_padded_message <= Message_data & x"0000";
+
   process(all)
   begin
     w_report_data.magic_num     <= ADSB_REPORT_MAGIC_NUM;
@@ -92,7 +96,7 @@ begin
     w_report_data.preamble_s    <= resize_up(Message_preamble_s, w_report_data.preamble_s'length);
     w_report_data.preamble_sn   <= resize_up(Message_preamble_sn, w_report_data.preamble_sn'length);
     w_report_data.message_crc   <= (0 => Message_crc_match, others => '0');
-    w_report_data.message_data  <= Message_data;
+    w_report_data.message_data  <= byteswap(w_padded_message, AXI_DATA_WIDTH);
   end process;
 
   process(Clk)

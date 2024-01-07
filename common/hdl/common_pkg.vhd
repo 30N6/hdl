@@ -11,7 +11,9 @@ package common_pkg is
   function or_reduce(v : unsigned) return std_logic;
   function or_reduce(v : std_logic_vector) return std_logic;
   function resize_up(v : unsigned; n : natural) return unsigned;
+  function resize_up(v : std_logic_vector; n : natural) return std_logic_vector;
   function shift_right(v : std_logic_vector; n : natural) return std_logic_vector;
+  function byteswap(v : std_logic_vector; w : natural) return std_logic_vector;
 
 end package common_pkg;
 
@@ -80,9 +82,29 @@ package body common_pkg is
     return r;
   end function;
 
+  function resize_up(v : std_logic_vector; n : natural) return std_logic_vector is
+  begin
+    return std_logic_vector(resize(unsigned(v), n));
+  end function;
+
   function shift_right(v : std_logic_vector; n : natural) return std_logic_vector is
   begin
     return std_logic_vector(shift_right(unsigned(v), n));
+  end function;
+
+  function byteswap(v : std_logic_vector; w : natural) return std_logic_vector is
+    variable r : std_logic_vector(v'length - 1 downto 0);
+    variable j : natural;
+  begin
+    assert (v'length mod w = 0)
+      report "input length must be divisible by w."
+      severity failure;
+
+    for i in 0 to (r'length / w - 1) loop
+      j := v'length / w - i - 1;
+      r(w * (i + 1) - 1 downto w * i) := v(w * (j + 1) - 1 downto w * j);
+    end loop;
+    return r;
   end function;
 
 end package body common_pkg;

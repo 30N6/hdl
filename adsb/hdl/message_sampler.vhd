@@ -45,6 +45,7 @@ architecture rtl of message_sampler is
   constant MESSAGE_START_DELAY      : natural := PREAMBLE_LENGTH;
   constant CYCLES_PER_BIT           : natural := 8;
   constant DYNAMIC_THRESHOLD_CYCLE  : natural := 8; -- switch to the dynamic threshold after a while
+  constant IDLE_WAIT_CYCLES         : natural := 16;
 
   type state_t is
   (
@@ -52,7 +53,8 @@ architecture rtl of message_sampler is
     S_WAIT_START,
     S_SAMPLE,
     S_WAIT_SAMPLE,
-    S_DONE
+    S_DONE,
+    S_WAIT_IDLE
   );
 
   signal s_state                : state_t;
@@ -69,6 +71,7 @@ architecture rtl of message_sampler is
   signal r_message_data         : adsb_message_t;
 
   signal r_sample_wait_count    : unsigned(clog2(CYCLES_PER_BIT) - 1 downto 0);
+  signal r_idle_wait_count      : unsigned(clog2(IDLE_WAIT_CYCLES) - 1 downto 0);
 
   signal w_avg_filtered_mag     : unsigned(FILTERED_MAG_WIDTH - 1 downto 0);
   signal r_bit_threshold        : unsigned(FILTERED_MAG_WIDTH - 1 downto 0);
@@ -138,7 +141,14 @@ begin
           end if;
 
         when S_DONE =>
-          s_state <= S_IDLE;
+          s_state <= S_WAIT_IDLE;
+
+        when S_WAIT_IDLE =>
+          if (r_idle_wait_count = (IDLE_WAIT_CYCLES - 2)) then
+            s_state <= S_IDLE;
+          else
+            s_state <= S_WAIT_IDLE;
+          end if;
 
         end case;
       end if;
@@ -187,6 +197,17 @@ begin
         r_sample_wait_count <= (others => '0');
       else
         r_sample_wait_count <= r_sample_wait_count + 1;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (s_state = S_DONE) then
+        r_idle_wait_count <= (others => '0');
+      else
+        r_idle_wait_count <= r_idle_wait_count + 1;
       end if;
     end if;
   end process;

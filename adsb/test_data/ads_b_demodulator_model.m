@@ -89,7 +89,7 @@ for ii = preamble_det_fi.'
     msg.preamble = int(msg_preamble);
     msg.df = int(msg_df);
 
-    if msg.final_crc_valid
+    if msg.final_crc_valid && (msg.ssnr_db > 7)
         figure(3); plot(msg.data_raw(9:end), 'o'); hold on; plot(msg.bit_threshold(9:end)); hold off;
         msg.data_slice = y(ii - 500 : ii + 1500, :);
         crc_matched_msgs = [crc_matched_msgs; msg];
