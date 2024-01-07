@@ -49,7 +49,7 @@ architecture rtl of adsb_demodulator is
   constant PREAMBLE_S_WIDTH       : natural := IQ_WIDTH + 2;  -- scale the output by 1/16 for a total gain of 1
   constant MAG_FILTER_LENGTH      : natural := 4;             -- 0.5 us matched filter
   constant FILTERED_MAG_WIDTH     : natural := IQ_WIDTH + clog2(MAG_FILTER_LENGTH);
-  constant SSNR_THRESHOLD         : natural := 2;
+  constant SSNR_THRESHOLD         : unsigned(1 downto 0) := "10";
 
   constant PREAMBLE_DATA          : std_logic_vector(0 to PREAMBLE_LENGTH-1) := "1111000011110000000000000000111100001111000000000000000000000000";
 
@@ -194,6 +194,7 @@ begin
   )
   port map (
     Clk           => Data_clk,
+    Rst           => w_extended_rst,
 
     Input_valid   => w_mag_valid,
     Input_data    => w_mag_data,

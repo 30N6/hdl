@@ -9,6 +9,7 @@ generic (
 );
 port (
   Clk           : in  std_logic;
+  Rst           : in  std_logic;
 
   Input_valid   : in  std_logic;
   Input_data    : in  unsigned(DATA_WIDTH - 1 downto 0);
@@ -22,8 +23,13 @@ architecture rtl of pipeline_delay is
 
   type data_array_t is array (natural range <>) of unsigned(DATA_WIDTH - 1 downto 0);
 
-  signal r_pipe_data      : data_array_t(LATENCY - 1 downto 0);
-  signal r_output_valid   : std_logic;
+  signal r_rst          : std_logic;
+
+  signal w_input_valid  : std_logic;
+  signal w_input_data   : unsigned(DATA_WIDTH - 1 downto 0);
+
+  signal r_pipe_data    : data_array_t(LATENCY - 1 downto 0);
+  signal r_output_valid : std_logic;
 
   --TODO: SRL attribute?
 
@@ -36,10 +42,20 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      r_rst <= Rst;
+    end if;
+  end process;
+
+  w_input_valid <= Input_valid  when (r_rst = '0') else '1';
+  w_input_data  <= Input_data   when (r_rst = '0') else (others => '0');
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
       r_output_valid <= Input_valid;
 
-      if (Input_valid = '1') then
-        r_pipe_data <= r_pipe_data(LATENCY - 2 downto 0) & Input_data;
+      if (w_input_valid = '1') then
+        r_pipe_data <= r_pipe_data(LATENCY - 2 downto 0) & w_input_data;
       end if;
     end if;
   end process;

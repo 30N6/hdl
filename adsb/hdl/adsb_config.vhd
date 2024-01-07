@@ -60,9 +60,10 @@ begin
   begin
     if rising_edge(Clk) then
       if (r_transfer_pending = '0') then
-        r_transfer_index  <= (others => '0');
-        r_config_data     <= (others => '0');
-        r_config_valid    <= '0';
+        r_transfer_index                            <= to_unsigned(1, r_transfer_index'length);
+        r_config_data                               <= (others => '0');
+        r_config_valid                              <= '0';
+        r_config_data(AXI_DATA_WIDTH - 1 downto 0)  <= Axis_data;
       elsif (Axis_valid = '1') then
         r_config_valid <= to_stdlogic(r_transfer_index = (CONFIG_TRANSFER_COUNT - 1));
         if (r_transfer_index < CONFIG_TRANSFER_COUNT) then

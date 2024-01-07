@@ -42,7 +42,7 @@ end entity message_sampler;
 
 architecture rtl of message_sampler is
 
-  constant MESSAGE_START_DELAY      : natural := 32 + 4; -- 32 cycles for preamble, 4 cycles to sample in the middle of each bit
+  constant MESSAGE_START_DELAY      : natural := PREAMBLE_LENGTH;
   constant CYCLES_PER_BIT           : natural := 8;
   constant DYNAMIC_THRESHOLD_CYCLE  : natural := 8; -- switch to the dynamic threshold after a while
 
@@ -117,7 +117,7 @@ begin
           end if;
 
         when S_WAIT_START =>
-          if (r_start_wait_count = (MESSAGE_START_DELAY - 1)) then
+          if (r_start_wait_count = (MESSAGE_START_DELAY - 2)) then
             s_state <= S_SAMPLE;
           else
             s_state <= S_WAIT_START;
@@ -131,7 +131,7 @@ begin
           end if;
 
         when S_WAIT_SAMPLE =>
-          if (r_sample_wait_count = (CYCLES_PER_BIT - 1)) then
+          if (r_sample_wait_count = (CYCLES_PER_BIT - 2)) then
             s_state <= S_SAMPLE;
           else
             s_state <= S_WAIT_SAMPLE;
@@ -194,10 +194,10 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (r_message_bit_count < DYNAMIC_THRESHOLD_CYCLE) then
-        r_bit_threshold <= resize_up(r_latched_preamble_s(PREAMBLE_S_WIDTH - 2 downto 0), FILTERED_MAG_WIDTH);   --TODO: check scaling
+      if (r_message_bit_count <= DYNAMIC_THRESHOLD_CYCLE) then
+        r_bit_threshold <= resize_up(r_latched_preamble_s(PREAMBLE_S_WIDTH - 2 downto 0) & '0', FILTERED_MAG_WIDTH); -- scaled threshold: 0.5*preamble_s
       else
-        r_bit_threshold <= '0' & w_avg_filtered_mag(FILTERED_MAG_WIDTH - 2 downto 0);
+        r_bit_threshold <= w_avg_filtered_mag(FILTERED_MAG_WIDTH - 1 downto 0);
       end if;
     end if;
   end process;

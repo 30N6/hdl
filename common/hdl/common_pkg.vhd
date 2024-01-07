@@ -62,12 +62,12 @@ package body common_pkg is
 
   function or_reduce(v : unsigned) return std_logic is
   begin
-    return to_stdlogic(v = 0);
+    return to_stdlogic(v /= 0);
   end function;
 
   function or_reduce(v : std_logic_vector) return std_logic is
   begin
-    return to_stdlogic(unsigned(v) = 0);
+    return to_stdlogic(unsigned(v) /= 0);
   end function;
 
   function resize_up(v : unsigned; n : natural) return unsigned is

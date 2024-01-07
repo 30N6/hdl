@@ -33,7 +33,7 @@ interface axi_tx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
 
       do begin
         @(posedge Clk);
-      end while (ready);
+      end while (!ready);
 
       valid <= 0;
       data  <= 'x;
@@ -66,6 +66,13 @@ module adsb_demodulator_tb;
   parameter time AXI_CLK_HALF_PERIOD  = 5ns;
   parameter IQ_WIDTH                  = 14;
   parameter AXI_DATA_WIDTH            = 32;
+  parameter MSG_WIDTH                 = 112;
+
+  typedef struct
+  {
+    real d_i;
+    real d_q;
+  } adc_data_t;
 
   typedef struct
   {
@@ -79,10 +86,11 @@ module adsb_demodulator_tb;
   axi_tx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  cfg_tx_intf (.Clk(Axi_clk));
   axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf (.Clk(Axi_clk));
 
-  expect_t  expected_data [$];
-  int       num_received = 0;
-  logic     r_axi_rx_ready;
-  logic     w_axi_rx_valid;
+  adc_data_t  input_data [$];
+  expect_t    expected_data [$];
+  int         num_received = 0;
+  logic       r_axi_rx_ready;
+  logic       w_axi_rx_valid;
 
   initial begin
     Clk = 0;
@@ -155,14 +163,15 @@ module adsb_demodulator_tb;
 
   task automatic write_config();
     bit [adsb_config_width - 1 : 0] config_data [] = {64'h00000001AD5B0101, 64'h00000100AD5B0101};
+    @(posedge Axi_clk)
 
     for (int i = 0; i < config_data.size(); i++) begin
       logic [AXI_DATA_WIDTH - 1 : 0] axi_data [$];
       for (int j = 0; j < ($size(config_data[i]) / AXI_DATA_WIDTH); j++) begin
-        axi_data.push_back(config_data[j][AXI_DATA_WIDTH*j +: AXI_DATA_WIDTH]);
+        axi_data.push_back(config_data[i][AXI_DATA_WIDTH*j +: AXI_DATA_WIDTH]);
       end
       cfg_tx_intf.write(axi_data);
-      repeat(200) @(posedge Axi_clk);
+      repeat(10) @(posedge Axi_clk);
     end
   endtask
 
@@ -209,42 +218,50 @@ module adsb_demodulator_tb;
     end
   end
 
-  task automatic standard_tests();
-    parameter NUM_TESTS = 20;
+  function automatic expect_t populate_report(output_msg);
+    expect_t r;
+    return r;
+  endfunction
 
-    for ( int i_test = 0; i_test < NUM_TESTS; i_test++ ) begin
-      int max_write_delay = $urandom_range(5);
-      int wait_cycles;
+  task automatic standard_test();
+    string str_iq [$];
+    string str_msg [$];
+    string line;
+    adc_data_t adc_data;
+    bit [MSG_WIDTH - 1 : 0] output_msg;
+    int fd_test_iq  = $fopen("./test_data/adsb_test_data_2023_12_29_iq.txt", "r");
+    int fd_test_msg = $fopen("./test_data/adsb_test_data_2023_12_29_msg.txt", "r");
+    int max_write_delay = 5;
 
-      repeat(10) @(posedge Clk);
 
-      $display("%0t: Test %0d started: max_write_delay = %0d", $time, i_test, max_write_delay);
+    while ($fscanf(fd_test_iq, "%f %f", adc_data.d_i, adc_data.d_q) == 2) begin
+      input_data.push_back(adc_data);
+    end
+    $fclose(fd_test_iq);
 
-      for ( int i_iteration = 0; i_iteration < 10000; i_iteration++ ) begin
-        expect_t e;
-        bit signed [IQ_WIDTH - 1 : 0] input_i = $urandom_range(2**IQ_WIDTH - 1, 0);
-        bit signed [IQ_WIDTH - 1 : 0] input_q = $urandom_range(2**IQ_WIDTH - 1, 0);
+    while ($fscanf(fd_test_msg, "%X", output_msg) == 1) begin
+      expected_data.push_back(populate_report(output_msg));
+    end
+    $fclose(fd_test_msg);
 
-        //e.data = filtered_mag;
-        //expected_data.push_back(e);
+    $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
+    foreach (input_data[i]) begin
+      bit signed [IQ_WIDTH - 1 : 0] input_i = input_data[i].d_i * (2**(IQ_WIDTH-1));
+      bit signed [IQ_WIDTH - 1 : 0] input_q = input_data[i].d_q * (2**(IQ_WIDTH-1));
+      adc_tx_intf.write(input_i, input_q);
+      //repeat($urandom_range(max_write_delay)) @(posedge(Clk));
+    end
 
-        adc_tx_intf.write(input_i, input_q);
-        repeat($urandom_range(max_write_delay)) @(posedge(Clk));
-      end
-
-      wait_cycles = 0;
+    begin
+      int wait_cycles = 0;
       while ((expected_data.size() != 0) && (wait_cycles < 1e5)) begin
         @(posedge Clk);
         wait_cycles++;
       end
-      assert (wait_cycles < 1e5) else $error("Timeout while waiting for expected queue to empty during standard test %0d.", i_test);
-
-      $display("%0t: Test %0d finished: num_received = %0d", $time, i_test, num_received);
-
-      Rst = 1;
-      repeat(100) @(posedge Clk);
-      Rst = 0;
+      assert (wait_cycles < 1e5) else $error("Timeout while waiting for expected queue to empty during test.");
     end
+
+    $display("%0t: Test finished: num_received = %0d", $time, num_received);
   endtask
 
   initial
@@ -253,7 +270,7 @@ module adsb_demodulator_tb;
     repeat(200) @(posedge Clk);
     write_config();
     repeat(100) @(posedge Clk);
-    standard_tests();
+    standard_test();
     repeat(100) @(posedge Clk);
     $finish;
   end

@@ -80,14 +80,9 @@ begin
             r_report_word_index <= (others => '-');
           end if;
         end if;
-
-        if (Message_valid = '1') then
-          r_sequence_num <= r_sequence_num + 1;
-        end if;
       end if;
     end if;
   end process;
-
 
   process(all)
   begin
