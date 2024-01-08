@@ -44,7 +44,7 @@ architecture rtl of message_sampler is
 
   constant MESSAGE_START_DELAY      : natural := PREAMBLE_LENGTH;
   constant CYCLES_PER_BIT           : natural := 8;
-  constant DYNAMIC_THRESHOLD_CYCLE  : natural := 8; -- switch to the dynamic threshold after a while
+  constant DYNAMIC_THRESHOLD_CYCLE  : natural := 8; -- switch to the dynamic threshold after the moving average has stabilized
   constant IDLE_WAIT_CYCLES         : natural := 16;
 
   type state_t is
