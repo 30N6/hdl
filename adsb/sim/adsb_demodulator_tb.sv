@@ -3,12 +3,12 @@
 import math::*;
 import adsb_pkg::*;
 
-interface adc_tx_intf (input logic Clk);
+interface adc_tx_intf #(parameter ADC_WIDTH) (input logic Clk);
   logic                             valid = 0;
-  logic signed [15 : 0] data_i;
-  logic signed [15 : 0] data_q;
+  logic signed [ADC_WIDTH - 1 : 0] data_i;
+  logic signed [ADC_WIDTH - 1 : 0] data_q;
 
-  task write(input logic signed [15 : 0] d_i, logic signed [15 : 0] d_q);
+  task write(input logic signed [ADC_WIDTH - 1 : 0] d_i, logic signed [ADC_WIDTH - 1 : 0] d_q);
     data_i <= d_i;
     data_q <= d_q;
     valid  <= 1;
@@ -64,6 +64,7 @@ endinterface
 module adsb_demodulator_tb;
   parameter time DATA_CLK_HALF_PERIOD = 8ns;
   parameter time AXI_CLK_HALF_PERIOD  = 5ns;
+  parameter ADC_WIDTH                 = 16;
   parameter IQ_WIDTH                  = 14;
   parameter AXI_DATA_WIDTH            = 32;
   parameter MSG_WIDTH                 = 112;
@@ -96,7 +97,7 @@ module adsb_demodulator_tb;
   logic Clk, Axi_clk;
   logic Rst, Axi_rst;
 
-  adc_tx_intf                                     adc_tx_intf (.Clk(Clk));
+  adc_tx_intf #(.ADC_WIDTH(ADC_WIDTH))            adc_tx_intf (.Clk(Clk));
   axi_tx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  cfg_tx_intf (.Clk(Axi_clk));
   axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf (.Clk(Axi_clk));
 
@@ -141,6 +142,7 @@ module adsb_demodulator_tb;
   adsb_demodulator
   #(
     .AXI_DATA_WIDTH (AXI_DATA_WIDTH),
+    .ADC_WIDTH      (ADC_WIDTH),
     .IQ_WIDTH       (IQ_WIDTH)
   )
   dut
@@ -314,8 +316,8 @@ module adsb_demodulator_tb;
 
     $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
     foreach (input_data[i]) begin
-      bit signed [IQ_WIDTH - 1 : 0] input_i = input_data[i].d_i * (2**(IQ_WIDTH-1));
-      bit signed [IQ_WIDTH - 1 : 0] input_q = input_data[i].d_q * (2**(IQ_WIDTH-1));
+      bit signed [ADC_WIDTH - 1 : 0] input_i = input_data[i].d_i * (2**(ADC_WIDTH-1));
+      bit signed [ADC_WIDTH - 1 : 0] input_q = input_data[i].d_q * (2**(ADC_WIDTH-1));
       adc_tx_intf.write(input_i, input_q);
       //repeat($urandom_range(max_write_delay)) @(posedge(Clk));
     end

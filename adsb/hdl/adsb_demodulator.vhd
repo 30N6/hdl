@@ -15,6 +15,7 @@ library adsb_lib;
 entity adsb_demodulator is
 generic (
   AXI_DATA_WIDTH  : natural;
+  ADC_WIDTH       : natural;
   IQ_WIDTH        : natural
 );
 port (
@@ -22,8 +23,8 @@ port (
   Data_rst        : in  std_logic;
 
   Adc_valid       : in  std_logic;
-  Adc_data_i      : in  signed(15 downto 0);
-  Adc_data_q      : in  signed(15 downto 0);
+  Adc_data_i      : in  signed(ADC_WIDTH - 1 downto 0);
+  Adc_data_q      : in  signed(ADC_WIDTH - 1 downto 0);
 
   S_axis_clk      : in  std_logic;
   S_axis_resetn   : in  std_logic;
@@ -126,8 +127,8 @@ begin
   begin
     if rising_edge(Data_clk) then
       r_adc_valid   <= Adc_valid;
-      r_adc_data_i  <= Adc_data_i(IQ_WIDTH - 1 downto 0);
-      r_adc_data_q  <= Adc_data_q(IQ_WIDTH - 1 downto 0);
+      r_adc_data_i  <= Adc_data_i(ADC_WIDTH - 1 downto (ADC_WIDTH - IQ_WIDTH));
+      r_adc_data_q  <= Adc_data_q(ADC_WIDTH - 1 downto (ADC_WIDTH - IQ_WIDTH));
     end if;
   end process;
 
