@@ -29,10 +29,11 @@ set library_file_list [list \
     ] \
   adsb_lib [list \
     ./hdl/adsb_pkg.vhd \
-    ./hdl/preamble_detector.vhd \
-    ./hdl/message_sampler.vhd \
+    ./hdl/adsb_crc.vhd \
     ./hdl/adsb_reporter.vhd \
     ./hdl/adsb_config.vhd \
+    ./hdl/preamble_detector.vhd \
+    ./hdl/message_sampler.vhd \
     ./hdl/adsb_demodulator.vhd \
     ./sim/adsb_demodulator_tb.sv \
     ] \

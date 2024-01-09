@@ -16,6 +16,7 @@ GENERIC_DEPS += ../dsp/hdl/mag_approximation.vhd
 GENERIC_DEPS += ../dsp/hdl/pipeline_delay.vhd
 GENERIC_DEPS += ./hdl/adsb_pkg.vhd
 GENERIC_DEPS += ./hdl/adsb_config.vhd
+GENERIC_DEPS += ./hdl/adsb_crc.vhd
 GENERIC_DEPS += ./hdl/preamble_detector.vhd
 GENERIC_DEPS += ./hdl/message_sampler.vhd
 GENERIC_DEPS += ./hdl/adsb_reporter.vhd

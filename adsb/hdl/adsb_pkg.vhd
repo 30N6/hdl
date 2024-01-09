@@ -10,6 +10,8 @@ package adsb_pkg is
   constant ADSB_MESSAGE_WIDTH : natural := 112;
   subtype adsb_message_t is std_logic_vector(ADSB_MESSAGE_WIDTH - 1 downto 0);
 
+  constant ADSB_CRC_WIDTH : natural := 24;
+
   constant ADSB_REPORT_MAGIC_NUM  : std_logic_vector(31 downto 0) := x"AD5B0001";
   constant ADSB_REPORT_WIDTH      : natural := 352;
 

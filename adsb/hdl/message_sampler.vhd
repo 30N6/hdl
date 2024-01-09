@@ -53,7 +53,7 @@ architecture rtl of message_sampler is
     S_WAIT_START,
     S_SAMPLE,
     S_WAIT_SAMPLE,
-    S_DONE,
+    S_MSG_DONE,
     S_WAIT_IDLE
   );
 
@@ -76,6 +76,10 @@ architecture rtl of message_sampler is
   signal w_avg_filtered_mag     : unsigned(FILTERED_MAG_WIDTH - 1 downto 0);
   signal r_bit_threshold        : unsigned(FILTERED_MAG_WIDTH - 1 downto 0);
   signal w_sampled_bit          : std_logic;
+
+  signal w_message_valid        : std_logic;
+  signal w_crc_valid            : std_logic;
+  signal w_crc_remainder        : std_logic_vector(ADSB_CRC_WIDTH - 1 downto 0);
 
 begin
 
@@ -128,7 +132,7 @@ begin
 
         when S_SAMPLE =>
           if (r_message_bit_count = (ADSB_MESSAGE_WIDTH - 1)) then
-            s_state <= S_DONE;
+            s_state <= S_MSG_DONE;
           else
             s_state <= S_WAIT_SAMPLE;
           end if;
@@ -140,7 +144,7 @@ begin
             s_state <= S_WAIT_SAMPLE;
           end if;
 
-        when S_DONE =>
+        when S_MSG_DONE =>
           s_state <= S_WAIT_IDLE;
 
         when S_WAIT_IDLE =>
@@ -204,7 +208,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (s_state = S_DONE) then
+      if (s_state = S_MSG_DONE) then
         r_idle_wait_count <= (others => '0');
       else
         r_idle_wait_count <= r_idle_wait_count + 1;
@@ -225,14 +229,27 @@ begin
 
   w_sampled_bit <= to_stdlogic(Input_filtered_mag > r_bit_threshold);
 
+  w_message_valid <= to_stdlogic(s_state = S_MSG_DONE);
+
+  i_crc : entity adsb_lib.adsb_crc
+  port map (
+    Clk               => Clk,
+
+    Input_valid       => w_message_valid,
+    Input_data        => r_message_data,
+
+    Output_valid      => w_crc_valid,
+    Output_remainder  => w_crc_remainder
+  );
+
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Output_valid        <= to_stdlogic(s_state = S_DONE);
+      Output_valid        <= w_crc_valid;
       Output_message_data <= r_message_data;
       Output_preamble_s   <= r_latched_preamble_s;
       Output_preamble_sn  <= r_latched_preamble_sn;
-      Output_crc_match    <= '1'; --TODO: crc check
+      Output_crc_match    <= not(or_reduce(w_crc_remainder));
       Output_timestamp    <= r_latched_timestamp;
     end if;
   end process;

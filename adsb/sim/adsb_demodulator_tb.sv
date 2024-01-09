@@ -212,6 +212,11 @@ module adsb_demodulator_tb;
       return 0;
     end
 
+    if (report_a.message_crc !== report_b.message_crc) begin
+      $display("message_crc mismatch: %X %X", report_a.message_crc, report_b.message_crc);
+      return 0;
+    end
+
     if (report_a.message_data !== report_b.message_data) begin
       $display("message_data mismatch: %X %X", report_a.message_data, report_b.message_data);
       return 0;

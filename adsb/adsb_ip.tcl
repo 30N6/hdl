@@ -15,6 +15,7 @@ custom_ip_files adsb [list \
   {"../dsp/hdl/mag_approximation.vhd"   "dsp_lib"}      \
   {"../dsp/hdl/pipeline_delay.vhd"      "dsp_lib"}      \
   {"./hdl/adsb_config.vhd"              "adsb_lib"}     \
+  {"./hdl/adsb_crc.vhd"                 "adsb_lib"}     \
   {"./hdl/adsb_demodulator.vhd"         "adsb_lib"}     \
   {"./hdl/adsb_pkg.vhd"                 "adsb_lib"}     \
   {"./hdl/adsb_reporter.vhd"            "adsb_lib"}     \
