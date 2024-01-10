@@ -5,3 +5,10 @@
 *.vstf
 *.wlf
 *.ini
+*.cache
+*.log
+*.xpr
+*.hw
+*component.xml
+*.jou
+*xgui
