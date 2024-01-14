@@ -13,16 +13,18 @@ generic (
   AXI_DATA_WIDTH : natural
 );
 port (
-  Clk         : in  std_logic;
-  Rst         : in  std_logic;
+  Clk                   : in  std_logic;
+  Rst                   : in  std_logic;
 
-  Axis_ready  : out std_logic;
-  Axis_valid  : in  std_logic;
-  Axis_last   : in  std_logic;
-  Axis_data   : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  Axis_ready            : out std_logic;
+  Axis_valid            : in  std_logic;
+  Axis_last             : in  std_logic;
+  Axis_data             : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
 
-  Rst_out     : out std_logic;
-  Enable      : out std_logic
+  Rst_out               : out std_logic;
+  Enable                : out std_logic;
+  Crc_filter            : out std_logic;
+  Preamble_s_threshold  : out unsigned(PREAMBLE_S_THRESHOLD_WIDTH - 1 downto 0)
 );
 end entity adsb_config;
 
@@ -38,6 +40,7 @@ architecture rtl of adsb_config is
   signal r_config_valid         : std_logic;
 
   signal w_config_unpacked      : adsb_config_t;
+  signal w_magic_num_match      : std_logic;
 
 begin
 
@@ -75,17 +78,22 @@ begin
   end process;
 
   w_config_unpacked <= unpack(r_config_data);
+  w_magic_num_match <= to_stdlogic(w_config_unpacked.magic_num = ADSB_CONFIG_MAGIC_NUM);
 
   process(Clk)
   begin
     if rising_edge(Clk) then
       if (Rst = '1') then
-        Rst_out <= '0';
-        Enable  <= '0';
+        Rst_out              <= '0';
+        Enable               <= '0';
+        Crc_filter           <= '-';
+        Preamble_s_threshold <= (others => '-');
       else
-        if (r_config_valid = '1') then  --TODO: check magic num
-          Rst_out <= w_config_unpacked.reset(0);
-          Enable  <= w_config_unpacked.enable(0);
+        if ((r_config_valid = '1') and (w_magic_num_match = '1')) then
+          Rst_out              <= w_config_unpacked.reset(0);
+          Enable               <= w_config_unpacked.enable(0);
+          Crc_filter           <= w_config_unpacked.crc_filter(0);
+          Preamble_s_threshold <= w_config_unpacked.preamble_s_threshold;
         end if;
       end if;
     end if;

@@ -7,6 +7,8 @@ package adsb_pkg is
   constant TIMESTAMP_WIDTH    : natural := 64;
   subtype timestamp_t is unsigned(TIMESTAMP_WIDTH - 1 downto 0);
 
+  constant PREAMBLE_S_THRESHOLD_WIDTH : natural := 8;
+
   constant ADSB_MESSAGE_WIDTH : natural := 112;
   subtype adsb_message_t is std_logic_vector(ADSB_MESSAGE_WIDTH - 1 downto 0);
 
@@ -30,11 +32,11 @@ package adsb_pkg is
   constant ADSB_CONFIG_WIDTH      : natural := 64;
 
   type adsb_config_t is record
-    magic_num     : std_logic_vector(31 downto 0);
-    reset         : std_logic_vector(7 downto 0);
-    enable        : std_logic_vector(7 downto 0);
-
-    padding       : std_logic_vector(15 downto 0);
+    magic_num             : std_logic_vector(31 downto 0);
+    reset                 : std_logic_vector(7 downto 0);
+    enable                : std_logic_vector(7 downto 0);
+    crc_filter            : std_logic_vector(7 downto 0);
+    preamble_s_threshold  : unsigned(PREAMBLE_S_THRESHOLD_WIDTH - 1 downto 0);
   end record;
 
   function pack(v : adsb_report_t) return std_logic_vector;
@@ -67,9 +69,11 @@ package body adsb_pkg is
   function unpack(v : std_logic_vector) return adsb_config_t is
     variable r : adsb_config_t;
   begin
-    r.magic_num := v(31 downto 0);
-    r.reset     := v(39 downto 32);
-    r.enable    := v(47 downto 40);
+    r.magic_num             := v(31 downto 0);
+    r.reset                 := v(39 downto 32);
+    r.enable                := v(47 downto 40);
+    r.crc_filter            := v(55 downto 48);
+    r.preamble_s_threshold  := unsigned(v(PREAMBLE_S_THRESHOLD_WIDTH + 56 - 1 downto 56));
     return r;
   end function;
 

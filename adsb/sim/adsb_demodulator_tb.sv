@@ -178,7 +178,7 @@ module adsb_demodulator_tb;
   endtask
 
   task automatic write_config();
-    bit [adsb_config_width - 1 : 0] config_data [] = {64'h00000001AD5B0101, 64'h00000100AD5B0101};
+    bit [adsb_config_width - 1 : 0] config_data [] = {64'h00000001AD5B0101, 64'h05010100AD5B0101};
     @(posedge Axi_clk)
 
     for (int i = 0; i < config_data.size(); i++) begin

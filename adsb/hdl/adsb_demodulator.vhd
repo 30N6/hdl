@@ -54,10 +54,13 @@ architecture rtl of adsb_demodulator is
 
   constant PREAMBLE_DATA          : std_logic_vector(0 to PREAMBLE_LENGTH-1) := "1111000011110000000000000000111100001111000000000000000000000000";
 
-  signal w_rst_from_config        : std_logic;
+  signal w_config_rst             : std_logic;
   signal w_combined_rst           : std_logic;
   signal w_extended_rst           : std_logic;
+
   signal w_enable                 : std_logic;
+  signal w_crc_filter             : std_logic;
+  signal w_preamble_s_threshold   : unsigned(PREAMBLE_S_THRESHOLD_WIDTH - 1 downto 0);
 
   signal r_timestamp              : timestamp_t;
 
@@ -100,7 +103,7 @@ architecture rtl of adsb_demodulator is
 
 begin
 
-  w_combined_rst <= Data_rst or w_rst_from_config;
+  w_combined_rst <= Data_rst or w_config_rst;
 
   i_reset : entity common_lib.reset_extender
   generic map (
@@ -206,16 +209,19 @@ begin
 
   i_preamble_detector : entity adsb_lib.preamble_detector
   generic map (
-    MAG_WIDTH             => IQ_WIDTH,
-    MOVING_AVG_WIDTH      => PREAMBLE_SN_WIDTH,
-    CORRELATOR_WIDTH      => PREAMBLE_S_WIDTH,
-    FILTERED_MAG_WIDTH    => FILTERED_MAG_WIDTH,
-    MAG_FILTER_LENGTH     => MAG_FILTER_LENGTH,
-    SSNR_THRESHOLD        => SSNR_THRESHOLD
+    MAG_WIDTH                   => IQ_WIDTH,
+    MOVING_AVG_WIDTH            => PREAMBLE_SN_WIDTH,
+    CORRELATOR_WIDTH            => PREAMBLE_S_WIDTH,
+    CORRELATOR_THRESHOLD_WIDTH  => PREAMBLE_S_THRESHOLD_WIDTH,
+    FILTERED_MAG_WIDTH          => FILTERED_MAG_WIDTH,
+    MAG_FILTER_LENGTH           => MAG_FILTER_LENGTH,
+    SSNR_THRESHOLD              => SSNR_THRESHOLD
   )
   port map (
     Clk                   => Data_clk,
     Rst                   => w_extended_rst,
+
+    Correlator_threshold  => w_preamble_s_threshold,
 
     Mag_valid             => w_delayed_mag_valid,
     Mag_data              => w_delayed_mag_data,
@@ -268,6 +274,8 @@ begin
   port map (
     Clk                 => Data_clk,
     Rst                 => w_extended_rst,
+
+    Crc_filter          => w_crc_filter,
 
     Message_valid       => w_sampler_valid,
     Message_data        => w_sampler_message_data,
@@ -327,16 +335,18 @@ begin
     AXI_DATA_WIDTH => AXI_DATA_WIDTH
   )
   port map (
-    Clk            => Data_clk,
-    Rst            => Data_rst,
+    Clk                   => Data_clk,
+    Rst                   => Data_rst,
 
-    Axis_ready     => w_config_axis_ready,
-    Axis_valid     => w_config_axis_valid,
-    Axis_last      => w_config_axis_last,
-    Axis_data      => w_config_axis_data,
+    Axis_ready            => w_config_axis_ready,
+    Axis_valid            => w_config_axis_valid,
+    Axis_last             => w_config_axis_last,
+    Axis_data             => w_config_axis_data,
 
-    Rst_out        => w_rst_from_config,
-    Enable         => w_enable
+    Rst_out               => w_config_rst,
+    Enable                => w_enable,
+    Crc_filter            => w_crc_filter,
+    Preamble_s_threshold  => w_preamble_s_threshold
   );
 
 end architecture rtl;

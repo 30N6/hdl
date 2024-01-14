@@ -18,6 +18,8 @@ port (
   Clk                 : in  std_logic;
   Rst                 : in  std_logic;
 
+  Crc_filter          : in  std_logic;
+
   Message_valid       : in  std_logic;
   Message_data        : in  adsb_message_t;
   Message_preamble_s  : in  unsigned(PREAMBLE_S_WIDTH - 1 downto 0);
@@ -37,6 +39,9 @@ architecture rtl of adsb_reporter is
   constant REPORT_TRANSFER_COUNT  : natural := (ADSB_REPORT_WIDTH + AXI_DATA_WIDTH - 1) / AXI_DATA_WIDTH;
   constant REPORT_PADDED_WIDTH    : natural := REPORT_TRANSFER_COUNT * AXI_DATA_WIDTH;
 
+  signal r_crc_filter           : std_logic;
+  signal w_message_valid        : std_logic;
+
   signal r_sequence_num         : unsigned(31 downto 0);
 
   signal r_report_pending       : std_logic := '0';
@@ -51,10 +56,19 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      r_crc_filter <= Crc_filter;
+    end if;
+  end process;
+
+  w_message_valid <= Message_valid and (not(r_crc_filter) or Message_crc_match);
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
       if (Rst = '1') then
         r_sequence_num <= (others => '0');
       else
-        if (Message_valid = '1') then
+        if (w_message_valid = '1') then
           r_sequence_num <= r_sequence_num + 1;
         end if;
       end if;
@@ -69,8 +83,8 @@ begin
         r_report_word_index <= (others => '-');
       else
         if (r_report_pending = '0') then
-          if (Message_valid = '1') then
-            r_report_pending  <= Message_valid;
+          if (w_message_valid = '1') then
+            r_report_pending  <= '1';
           end if;
           r_report_word_index <= (others => '0');
         elsif (Axis_ready = '1') then

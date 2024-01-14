@@ -10,16 +10,19 @@ library dsp_lib;
 
 entity preamble_detector is
 generic (
-  MAG_WIDTH             : natural;
-  MOVING_AVG_WIDTH      : natural;
-  CORRELATOR_WIDTH      : natural;
-  FILTERED_MAG_WIDTH    : natural;
-  MAG_FILTER_LENGTH     : natural;
-  SSNR_THRESHOLD        : unsigned
+  MAG_WIDTH                   : natural;
+  MOVING_AVG_WIDTH            : natural;
+  CORRELATOR_WIDTH            : natural;
+  CORRELATOR_THRESHOLD_WIDTH  : natural;
+  FILTERED_MAG_WIDTH          : natural;
+  MAG_FILTER_LENGTH           : natural;
+  SSNR_THRESHOLD              : unsigned
 );
 port (
   Clk                   : in  std_logic;
   Rst                   : in  std_logic;
+
+  Correlator_threshold  : in  unsigned(CORRELATOR_THRESHOLD_WIDTH - 1 downto 0);
 
   Mag_valid             : in  std_logic;
   Mag_data              : in  unsigned(MAG_WIDTH - 1 downto 0);
@@ -45,8 +48,11 @@ architecture rtl of preamble_detector is
   type corr_data_array_t        is array (natural range <>) of unsigned(CORRELATOR_WIDTH - 1 downto 0);
   type avg_data_array_t         is array (natural range <>) of unsigned(MOVING_AVG_WIDTH - 1 downto 0);
 
+  signal r_correlator_threshold : unsigned(CORRELATOR_THRESHOLD_WIDTH - 1 downto 0);
+
   signal w_sn_threshold         : unsigned(MOVING_AVG_WIDTH + SSNR_THRESHOLD'length - 1 downto 0);
   signal w_ssnr_exceeded        : std_logic;
+  signal w_correlator_detected  : std_logic;
   signal w_preamble_detected    : std_logic;
 
   signal r_det_pipe_valid       : std_logic_vector(DETECTION_PIPE_DEPTH - 1 downto 0);
@@ -60,9 +66,17 @@ architecture rtl of preamble_detector is
 
 begin
 
-  w_sn_threshold      <= SSNR_THRESHOLD * Moving_avg_data;
-  w_ssnr_exceeded     <= to_stdlogic(Correlator_data >= w_sn_threshold);
-  w_preamble_detected <= Moving_avg_valid and Correlator_valid and w_ssnr_exceeded;
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_correlator_threshold <= Correlator_threshold;
+    end if;
+  end process;
+
+  w_sn_threshold        <= SSNR_THRESHOLD * Moving_avg_data;
+  w_ssnr_exceeded       <= to_stdlogic(Correlator_data >= w_sn_threshold);
+  w_correlator_detected <= to_stdlogic(Correlator_data >= r_correlator_threshold);
+  w_preamble_detected   <= Moving_avg_valid and Correlator_valid and w_ssnr_exceeded and w_correlator_detected;
 
   i_mag_filter : entity dsp_lib.filter_moving_avg
   generic map (
