@@ -7,6 +7,7 @@ package common_pkg is
   type unsigned_array_t         is array (natural range <>) of unsigned;
   type std_logic_vector_array_t is array (natural range <>) of std_logic_vector;
   type natural_array_t          is array (natural range <>) of natural;
+  type integer_array_t          is array (natural range <>) of integer;
 
   function to_stdlogic(e : boolean) return std_logic;
   function clog2(v : natural) return natural;

@@ -8,7 +8,7 @@ library common_lib;
 
 library mem_lib;
 
-entity fft_32_4x is
+entity fft_32 is
 generic (
   INPUT_DATA_WIDTH  : natural;
   OUTPUT_DATA_WIDTH : natural;
@@ -32,18 +32,18 @@ port (
 
   Error_input_overflow  : out std_logic
 );
-end entity fft_32_4x;
+end entity fft_32;
 
-architecture rtl of fft_32_4x is
+architecture rtl of fft_32 is
 
   constant DATA_INDEX_WIDTH   : natural := Input_data_index'length;
-  constant S0_DATA_WIDTH      : natural := 2*INPUT_DATA_WIDTH;
+  constant S4_DATA_WIDTH      : natural := 2*INPUT_DATA_WIDTH;
   constant FFT4_OUTPUT_WIDTH  : natural := INPUT_DATA_WIDTH + 2;
-  constant S1_DATA_WIDTH      : natural := 2*FFT4_OUTPUT_WIDTH;
 
-  constant NUM_S0_READ_CYCLES : natural := 32;
-  constant NUM_S0_PIPE_STAGES : natural := 3;
-  constant S0_READ_INDEX      : natural_array_t(0 to NUM_S0_CYCLES-1) := (0, 8, 16, 24,   4, 12, 20, 28,    2, 10, 18, 26,    6, 14, 22, 30,    1, 9, 17, 25,   5, 13, 21, 29,    3, 11, 19, 27,    7, 15, 23, 31);
+  constant S1_DATA_WIDTH      : natural := 2*FFT4_OUTPUT_WIDTH;
+  constant NUM_S4_READ_CYCLES : natural := 32;
+  constant NUM_S4_PIPE_STAGES : natural := 3;
+  constant S4_READ_INDEX      : natural_array_t(0 to NUM_S4_CYCLES-1) := (0, 8, 16, 24,   4, 12, 20, 28,    2, 10, 18, 26,    6, 14, 22, 30,    1, 9, 17, 25,   5, 13, 21, 29,    3, 11, 19, 27,    7, 15, 23, 31);
 
   type s0_state_t is
   (
@@ -52,19 +52,19 @@ architecture rtl of fft_32_4x is
     S_DONE
   );
 
-  signal r_s0_wr_en     : std_logic;
-  signal r_s0_wr_addr   : std_logic_vector(DATA_INDEX_WIDTH - 1 downto 0);
-  signal r_s0_wr_data   : std_logic_vector(S0_DATA_WIDTH - 1 downto 0);
-  signal r_s0_start     : std_logic;
+  signal r_s4_wr_en     : std_logic;
+  signal r_s4_wr_addr   : std_logic_vector(DATA_INDEX_WIDTH - 1 downto 0);
+  signal r_s4_wr_data   : std_logic_vector(S4_DATA_WIDTH - 1 downto 0);
+  signal r_s4_start     : std_logic;
 
-  signal w_s0_rd_addr   : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
-  signal w_s0_rd_data   : std_logic_vector(S0_DATA_WIDTH - 1 downto 0);
+  signal w_s4_rd_addr   : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+  signal w_s4_rd_data   : std_logic_vector(S4_DATA_WIDTH - 1 downto 0);
 
-  signal w_s0_rd_index  : unsigned(clog2(NUM_S0_CYCLES) - 1 downto 0);
-  signal r_s0_rd_index  : unsigned_array_t(NUM_S0_PIPE_STAGES - 1 downto 0)(clog2(NUM_S0_CYCLES) - 1 downto 0);
-  signal r_s0_active    : std_logic_vector(NUM_S0_PIPE_STAGES - 1 downto 0);
-  signal r_s0_done      : std_logic_vector(NUM_S0_PIPE_STAGES - 1 downto 0);
-  signal s_s0_state     : std_logic;
+  signal w_s4_rd_index  : unsigned(clog2(NUM_S4_CYCLES) - 1 downto 0);
+  signal r_s4_rd_index  : unsigned_array_t(NUM_S4_PIPE_STAGES - 1 downto 0)(clog2(NUM_S4_CYCLES) - 1 downto 0);
+  signal r_s4_active    : std_logic_vector(NUM_S4_PIPE_STAGES - 1 downto 0);
+  signal r_s4_done      : std_logic_vector(NUM_S4_PIPE_STAGES - 1 downto 0);
+  signal s_s4_state     : std_logic;
 
   signal r_fft4_input_valid   : std_logic;
   signal r_fft4_input_data_i  : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
@@ -97,14 +97,14 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_s0_wr_en    <= Input_data_valid;
-      r_s0_wr_addr  <= Input_data_index;
-      r_s0_wr_data  <= std_logic_vector(Input_data_i & Input_data_q);
-      r_s0_start    <= Input_calc_start;
+      r_s4_wr_en    <= Input_data_valid;
+      r_s4_wr_addr  <= Input_data_index;
+      r_s4_wr_data  <= std_logic_vector(Input_data_i & Input_data_q);
+      r_s4_start    <= Input_calc_start;
     end if;
   end process;
 
-  w_s0_rd_addr <= to_unsigned(S0_READ_INDEX(to_integer(r_s0_rd_index(0))), DATA_INDEX_WIDTH);
+  w_s4_rd_addr <= to_unsigned(S0_READ_INDEX(to_integer(r_s4_rd_index(0))), DATA_INDEX_WIDTH);
 
   i_buffer_s0 : entity mem_lib.ram_sdp
   generic map (
@@ -251,6 +251,31 @@ begin
     Rd_reg_ce => '1',
     Rd_addr   => w_s1_rd_addr(i),
     Rd_data   => w_s1_rd_data(i)
+  );
+
+  entity fft_32_radix2_stage is
+  generic (
+    DATA_INDEX_WIDTH  : natural;
+    INPUT_DATA_WIDTH  : natural;
+    OUTPUT_DATA_WIDTH : natural;
+    STAGE_INDEX       : natural
+  );
+  port (
+    Clk                   : in  std_logic;
+    Rst                   : in  std_logic;
+
+    Input_data_valid      : in  std_logic;
+    Input_data_last       : in  std_logic;
+    Input_data_index      : in  unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+    Input_data_i          : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
+    Input_data_q          : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
+
+    Output_data_valid     : out std_logic;
+    Output_data_index     : out unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+    Output_data_i         : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
+    Output_data_q         : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
+
+    Error_input_overflow  : out std_logic
   );
 
 
