@@ -4,6 +4,10 @@ use ieee.numeric_std.all;
 
 package common_pkg is
 
+  type unsigned_array_t         is array (natural range <>) of unsigned;
+  type std_logic_vector_array_t is array (natural range <>) of std_logic_vector;
+  type natural_array_t          is array (natural range <>) of natural;
+
   function to_stdlogic(e : boolean) return std_logic;
   function clog2(v : natural) return natural;
   function clog2_min1bit(v : natural) return natural;
