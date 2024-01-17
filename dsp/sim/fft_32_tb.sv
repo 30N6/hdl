@@ -147,7 +147,7 @@ module fft_32_tb;
     if ( expected_data.size() != 0 ) begin
       $error("Unexpected data remaining in queue:");
       while ( expected_data.size() != 0 ) begin
-        $display("%X", expected_data[0].data);
+        $display("%p", expected_data[0].data);
         void'(expected_data.pop_front());
       end
     end

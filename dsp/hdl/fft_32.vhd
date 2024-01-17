@@ -11,6 +11,8 @@ library mem_lib;
 library dsp_lib;
   use dsp_lib.dsp_pkg.all;
 
+  --TODO: 12 bit ADC data
+
 entity fft_32 is
 generic (
   INPUT_DATA_WIDTH  : natural;
@@ -86,28 +88,27 @@ architecture rtl of fft_32 is
   signal w_fft4_serial_q        : signed(FFT4_OUTPUT_WIDTH - 1 downto 0);
   signal w_fft4_serial_index    : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
   signal w_fft4_serial_last     : std_logic;
-  signal w_fft4_error_overflow  : std_logic; --TODO: use
 
   signal w_fft8_output_valid    : std_logic;
   signal w_fft8_output_i        : signed(FFT8_OUTPUT_WIDTH - 1 downto 0);
   signal w_fft8_output_q        : signed(FFT8_OUTPUT_WIDTH - 1 downto 0);
   signal w_fft8_output_index    : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
   signal w_fft8_output_last     : std_logic;
-  signal w_fft8_error_overflow  : std_logic; --TODO: use
 
   signal w_fft16_output_valid   : std_logic;
   signal w_fft16_output_i       : signed(FFT16_OUTPUT_WIDTH - 1 downto 0);
   signal w_fft16_output_q       : signed(FFT16_OUTPUT_WIDTH - 1 downto 0);
   signal w_fft16_output_index   : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
   signal w_fft16_output_last    : std_logic;
-  signal w_fft16_error_overflow : std_logic; --TODO: use
 
   signal w_fft32_output_valid   : std_logic;
   signal w_fft32_output_i       : signed(FFT32_OUTPUT_WIDTH - 1 downto 0);
   signal w_fft32_output_q       : signed(FFT32_OUTPUT_WIDTH - 1 downto 0);
   signal w_fft32_output_index   : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
   signal w_fft32_output_last    : std_logic;
-  signal w_fft32_error_overflow : std_logic; --TODO: use
+
+  signal w_fft_error_overflow   : std_logic_vector(4 downto 0);
+  signal r_fft_error_overflow   : std_logic_vector(4 downto 0);
 
 begin
 
@@ -172,6 +173,8 @@ begin
       end if;
     end if;
   end process;
+
+  w_fft_error_overflow(0) <= r_input_wr_valid and (not(r_input_active) or to_stdlogic(r_input_index = (DATA_CYCLES - 1)));
 
   process(Clk)
   begin
@@ -247,7 +250,7 @@ begin
     Output_index          => w_fft4_serial_index,
     Output_last           => w_fft4_serial_last,
 
-    Error_input_overflow  => w_fft4_error_overflow
+    Error_input_overflow  => w_fft_error_overflow(1)
   );
 
   i_fft_8 : entity dsp_lib.fft_32_radix2_stage
@@ -273,7 +276,7 @@ begin
     Output_index          => w_fft8_output_index,
     Output_last           => w_fft8_output_last,
 
-    Error_input_overflow  => w_fft8_error_overflow
+    Error_input_overflow  => w_fft_error_overflow(2)
   );
 
   i_fft_16 : entity dsp_lib.fft_32_radix2_stage
@@ -299,7 +302,7 @@ begin
     Output_index          => w_fft16_output_index,
     Output_last           => w_fft16_output_last,
 
-    Error_input_overflow  => w_fft16_error_overflow
+    Error_input_overflow  => w_fft_error_overflow(3)
   );
 
   i_fft_32 : entity dsp_lib.fft_32_radix2_stage
@@ -325,7 +328,21 @@ begin
     Output_index          => w_fft32_output_index,
     Output_last           => w_fft32_output_last,
 
-    Error_input_overflow  => w_fft32_error_overflow
+    Error_input_overflow  => w_fft_error_overflow(4)
   );
+
+  Output_valid <= w_fft32_output_valid;
+  Output_i     <= w_fft32_output_i; --TODO: trim
+  Output_q     <= w_fft32_output_q; --TODO: trim
+  Output_index <= w_fft32_output_index;
+  Output_last  <= w_fft32_output_last;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_fft_error_overflow <= w_fft_error_overflow;
+      Error_input_overflow <= or_reduce(r_fft_error_overflow);
+    end if;
+  end process;
 
 end architecture rtl;

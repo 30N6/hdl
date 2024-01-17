@@ -123,8 +123,9 @@ begin
   end process;
 
   Output_valid <= r2_valid;
-  Output_index <= r2_index;
   Output_i     <= r2_output_i(OUTPUT_SUM_WIDTH - 1 downto (OUTPUT_SUM_WIDTH - OUTPUT_DATA_WIDTH));
   Output_q     <= r2_output_q(OUTPUT_SUM_WIDTH - 1 downto (OUTPUT_SUM_WIDTH - OUTPUT_DATA_WIDTH));
+  Output_index <= r2_index;
+  Output_last  <= r2_last;
 
 end architecture rtl;

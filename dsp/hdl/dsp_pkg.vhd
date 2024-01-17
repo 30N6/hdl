@@ -31,8 +31,8 @@ package body dsp_pkg is
     variable v_full_signed : signed(input_width - 1 downto 0);
     variable v_result : signed_array_t(int_array'length - 1 downto 0)(output_width - 1 downto 0);
   begin
-    assert (output_width >= input_width)
-      report "output_width expected to be greater than or equal to the input_width."
+    assert (output_width <= input_width)
+      report "output_width expected to be less than or equal to the input_width."
       severity failure;
 
     for i in 0 to (int_array'length - 1) loop
