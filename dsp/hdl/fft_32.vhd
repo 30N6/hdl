@@ -54,10 +54,10 @@ architecture rtl of fft_32 is
 
   signal r_rst                  : std_logic;
 
-  signal r_input_wr_valid          : std_logic;
-  signal r_input_wr_addr        : std_logic_vector(DATA_INDEX_WIDTH - 1 downto 0);
+  signal r_input_wr_valid       : std_logic;
+  signal r_input_wr_addr        : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
   signal r_input_wr_data        : std_logic_vector(INPUT_MEM_DATA_WIDTH - 1 downto 0);
-  signal r_input_wr_last          : std_logic;
+  signal r_input_wr_last        : std_logic;
 
   signal w_input_rd_addr        : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
   signal w_input_rd_data        : std_logic_vector(INPUT_MEM_DATA_WIDTH - 1 downto 0);
@@ -127,7 +127,7 @@ begin
     if rising_edge(Clk) then
       r_input_wr_valid  <= Input_valid;
       r_input_wr_addr   <= Input_index;
-      r_input_wr_data   <= std_logic_vector(Input_i & Input_q);
+      r_input_wr_data   <= std_logic_vector(Input_i) & std_logic_vector(Input_q);
       r_input_wr_last   <= Input_last;
     end if;
   end process;
@@ -137,7 +137,7 @@ begin
   i_buffer_s0 : entity mem_lib.ram_sdp
   generic map (
     ADDR_WIDTH  => DATA_INDEX_WIDTH,
-    DATA_WIDTH  => S0_DATA_WIDTH,
+    DATA_WIDTH  => INPUT_MEM_DATA_WIDTH,
     LATENCY     => 2
   )
   port map (
@@ -188,7 +188,9 @@ begin
       if (r_input_active_pipe(NUM_INPUT_PIPE_STAGES - 1) = '1') then
         for i in 0 to 3 loop
           if (r_input_index_pipe(NUM_INPUT_PIPE_STAGES - 1)(1 downto 0) = i) then
-            (r_fft4_input_data_i(i), r_fft4_input_data_q(i)) <= w_input_rd_data;
+
+            r_fft4_input_i(i) <= signed(w_input_rd_data(INPUT_MEM_DATA_WIDTH - 1 downto (INPUT_MEM_DATA_WIDTH - INPUT_DATA_WIDTH)));
+            r_fft4_input_q(i) <= signed(w_input_rd_data(INPUT_DATA_WIDTH - 1 downto 0));
           end if;
         end loop;
       end if;
@@ -234,8 +236,8 @@ begin
     Rst                   => r_rst,
 
     Input_valid           => w_fft4_output_valid,
-    Input_i               => w_fft4_output_data_i,
-    Input_q               => w_fft4_output_data_q,
+    Input_i               => w_fft4_output_i,
+    Input_q               => w_fft4_output_q,
     Input_index           => w_fft4_output_index,
     Input_last            => w_fft4_output_last,
 
@@ -248,7 +250,7 @@ begin
     Error_input_overflow  => w_fft4_error_overflow
   );
 
-  i_fft_8 : entity fft_32_radix2_stage
+  i_fft_8 : entity dsp_lib.fft_32_radix2_stage
   generic map (
     DATA_INDEX_WIDTH  => DATA_INDEX_WIDTH,
     INPUT_DATA_WIDTH  => FFT4_OUTPUT_WIDTH,
@@ -274,7 +276,7 @@ begin
     Error_input_overflow  => w_fft8_error_overflow
   );
 
-  i_fft_16 : entity fft_32_radix2_stage
+  i_fft_16 : entity dsp_lib.fft_32_radix2_stage
   generic map (
     DATA_INDEX_WIDTH  => DATA_INDEX_WIDTH,
     INPUT_DATA_WIDTH  => FFT8_OUTPUT_WIDTH,
@@ -300,7 +302,7 @@ begin
     Error_input_overflow  => w_fft16_error_overflow
   );
 
-  i_fft_32 : entity fft_32_radix2_stage
+  i_fft_32 : entity dsp_lib.fft_32_radix2_stage
   generic map (
     DATA_INDEX_WIDTH  => DATA_INDEX_WIDTH,
     INPUT_DATA_WIDTH  => FFT16_OUTPUT_WIDTH,

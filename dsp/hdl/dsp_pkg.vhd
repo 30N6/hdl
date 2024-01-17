@@ -8,7 +8,7 @@ library common_lib;
 package dsp_pkg is
 
   function invert_sign(v : signed) return signed;
-  function int_to_signed_array(v : integer_array_t; input_width : natural; output_width : natural) return signed_array_t;
+  function int_to_signed_array(int_array : integer_array_t; input_width : natural; output_width : natural) return signed_array_t;
 
 end package dsp_pkg;
 
@@ -16,8 +16,8 @@ package body dsp_pkg is
 
   function invert_sign(v : signed) return signed is
     variable r      : signed(v'length - 1 downto 0);
-    constant V_MAX  : signed(v'length - 1 downto 0) := ((v'length - 1) => 0, others => '1');
-    constant V_MIN  : signed(v'length - 1 downto 0) := ((v'length - 1) => 1, others => '0');
+    constant V_MAX  : signed(v'length - 1 downto 0) := ((v'length - 1) => '0', others => '1');
+    constant V_MIN  : signed(v'length - 1 downto 0) := ((v'length - 1) => '1', others => '0');
   begin
     if (v = V_MAX) then
       r := V_MIN;

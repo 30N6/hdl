@@ -8,6 +8,8 @@ library common_lib;
 
 library mem_lib;
 
+library dsp_lib;
+
 entity fft_32_radix2_stage is
 generic (
   DATA_INDEX_WIDTH  : natural;
@@ -49,7 +51,7 @@ architecture rtl of fft_32_radix2_stage is
   constant READ_INDEX_B_S32       : natural_array_t(0 to DATA_CYCLES-1) := (16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,   16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31);
 
   signal w_buf_wr_data            : std_logic_vector(BUFFER_DATA_WIDTH - 1 downto 0);
-  signal w_buf_rd_addr            : std_logic_vector_array_t(1 downto 0)(DATA_INDEX_WIDTH - 1 downto 0);
+  signal w_buf_rd_addr            : unsigned_array_t(1 downto 0)(DATA_INDEX_WIDTH - 1 downto 0);
   signal w_buf_rd_data            : std_logic_vector_array_t(1 downto 0)(BUFFER_DATA_WIDTH - 1 downto 0);
   signal w_buf_rd_data_i          : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
   signal w_buf_rd_data_q          : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
@@ -90,19 +92,19 @@ begin
     end if;
   end process;
 
-  w_buf_wr_data <= std_logic_vector(Input_i & Input_q);
+  w_buf_wr_data <= std_logic_vector(Input_i) & std_logic_vector(Input_q);
 
   process(all)
   begin
     if (STAGE_INDEX = 8) then
-      w_buf_rd_addr(0) <= READ_INDEX_A_S8(to_integer(r_calc_index));
-      w_buf_rd_addr(1) <= READ_INDEX_B_S8(to_integer(r_calc_index));
+      w_buf_rd_addr(0) <= to_unsigned(READ_INDEX_A_S8(to_integer(r_calc_index)), DATA_INDEX_WIDTH);
+      w_buf_rd_addr(1) <= to_unsigned(READ_INDEX_B_S8(to_integer(r_calc_index)), DATA_INDEX_WIDTH);
     elsif (STAGE_INDEX = 16) then
-      w_buf_rd_addr(0) <= READ_INDEX_A_S16(to_integer(r_calc_index));
-      w_buf_rd_addr(1) <= READ_INDEX_B_S16(to_integer(r_calc_index));
+      w_buf_rd_addr(0) <= to_unsigned(READ_INDEX_A_S16(to_integer(r_calc_index)), DATA_INDEX_WIDTH);
+      w_buf_rd_addr(1) <= to_unsigned(READ_INDEX_B_S16(to_integer(r_calc_index)), DATA_INDEX_WIDTH);
     else
-      w_buf_rd_addr(0) <= READ_INDEX_A_S32(to_integer(r_calc_index));
-      w_buf_rd_addr(1) <= READ_INDEX_B_S32(to_integer(r_calc_index));
+      w_buf_rd_addr(0) <= to_unsigned(READ_INDEX_A_S32(to_integer(r_calc_index)), DATA_INDEX_WIDTH);
+      w_buf_rd_addr(1) <= to_unsigned(READ_INDEX_B_S32(to_integer(r_calc_index)), DATA_INDEX_WIDTH);
     end if;
   end process;
 
@@ -110,7 +112,7 @@ begin
     i_buffer : entity mem_lib.ram_sdp
     generic map (
       ADDR_WIDTH  => DATA_INDEX_WIDTH,
-      DATA_WIDTH  => S1_DATA_WIDTH,
+      DATA_WIDTH  => BUFFER_DATA_WIDTH,
       LATENCY     => 2
     )
     port map (
@@ -126,19 +128,20 @@ begin
       Rd_data   => w_buf_rd_data(i)
     );
 
-    (w_buf_rd_data_i(i), w_buf_rd_data_q(i)) <= signed(w_buf_rd_data(i));
+    w_buf_rd_data_i(i) <= signed(w_buf_rd_data(i)(BUFFER_DATA_WIDTH - 1 downto (BUFFER_DATA_WIDTH - INPUT_DATA_WIDTH)));
+    w_buf_rd_data_q(i) <= signed(w_buf_rd_data(i)(INPUT_DATA_WIDTH - 1 downto 0));
   end generate g_buffer;
 
   i_twiddle_mem : entity dsp_lib.fft_32_twiddle_mem
   generic map (
     STAGE_INDEX => STAGE_INDEX,
-    DATA_WIDTH  => --TODO
+    DATA_WIDTH  => TWIDDLE_DATA_WIDTH,
     LATENCY     => 2
   )
   port map (
     Clk                 => Clk,
 
-    Read_index          => w_buf_rd_addr,
+    Read_index          => r_calc_index,
     Read_data_c         => w_twiddle_fac_c,
     Read_data_c_plus_d  => w_twiddle_fac_c_plus_d,
     Read_data_d_minus_c => w_twiddle_fac_d_minus_c
@@ -159,6 +162,7 @@ begin
     INPUT_DATA_WIDTH    => INPUT_DATA_WIDTH,
     OUTPUT_DATA_WIDTH   => OUTPUT_DATA_WIDTH,
     TWIDDLE_DATA_WIDTH  => TWIDDLE_DATA_WIDTH,
+    DATA_INDEX_WIDTH    => DATA_INDEX_WIDTH,
     LATENCY             => 3
   )
   port map (

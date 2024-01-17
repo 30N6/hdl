@@ -70,7 +70,7 @@ begin
       w_input_q_x_plus_j(i)   <= Input_i(i);
 
       w_input_i_x_minus_j(i)  <= Input_q(i);
-      w_input_q_x_minus_j(i)  <= invert_signed(Input_i(i));
+      w_input_q_x_minus_j(i)  <= invert_sign(Input_i(i));
     end loop;
   end process;
 
@@ -89,13 +89,10 @@ begin
   process(all)
   begin
     for i in 0 to 3 loop
-      w_output_valid <= Input_valid;
-      w_output_index <= Input_index;
-
       w_output_trimmed_i(i) <= (others => '0');
-      w_output_trimmed_i(i)(OUTPUT_DATA_WIDTH - 1 downto (OUTPUT_DATA_WIDTH - ACTUAL_OUTPUT_DATA_WIDTH)) <= w_output_i(INPUT_DATA_WIDTH + 1 downto (INPUT_DATA_WIDTH + 2 - ACTUAL_OUTPUT_DATA_WIDTH));
+      w_output_trimmed_i(i)(OUTPUT_DATA_WIDTH - 1 downto (OUTPUT_DATA_WIDTH - ACTUAL_OUTPUT_DATA_WIDTH)) <= w_output_i(i)(INPUT_DATA_WIDTH + 1 downto (INPUT_DATA_WIDTH + 2 - ACTUAL_OUTPUT_DATA_WIDTH));
       w_output_trimmed_q(i) <= (others => '0');
-      w_output_trimmed_q(i)(OUTPUT_DATA_WIDTH - 1 downto (OUTPUT_DATA_WIDTH - ACTUAL_OUTPUT_DATA_WIDTH)) <= w_output_q(INPUT_DATA_WIDTH + 1 downto (INPUT_DATA_WIDTH + 2 - ACTUAL_OUTPUT_DATA_WIDTH));
+      w_output_trimmed_q(i)(OUTPUT_DATA_WIDTH - 1 downto (OUTPUT_DATA_WIDTH - ACTUAL_OUTPUT_DATA_WIDTH)) <= w_output_q(i)(INPUT_DATA_WIDTH + 1 downto (INPUT_DATA_WIDTH + 2 - ACTUAL_OUTPUT_DATA_WIDTH));
     end loop;
   end process;
 
@@ -107,7 +104,7 @@ begin
     Output_index  <= Input_index;
     Output_last   <= Input_last;
 
-  else if (LATENCY = 1) generate
+  elsif (LATENCY = 1) generate
 
     process(Clk)
     begin

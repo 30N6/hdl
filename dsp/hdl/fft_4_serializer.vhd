@@ -20,13 +20,13 @@ port (
   Input_last            : in  std_logic;
   Input_i               : in  signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
   Input_q               : in  signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
-  Input_index           : in  unsigned(INDEX_WIDTH - 1 downto 0);
+  Input_index           : in  unsigned(DATA_INDEX_WIDTH - 1 downto 0);
 
   Output_valid          : out std_logic;
   Output_last           : out std_logic;
   Output_i              : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
   Output_q              : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
-  Output_index          : out unsigned(INDEX_WIDTH - 1 downto 0);
+  Output_index          : out unsigned(DATA_INDEX_WIDTH - 1 downto 0);
 
   Error_input_overflow  : out std_logic
 );
@@ -36,8 +36,8 @@ architecture rtl of fft_4_serializer is
 
   signal r_input_last       : std_logic;
   signal r_input_index      : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
-  signal r_input_i          : signed_array_t(3 downto 0)(FFT4_OUTPUT_WIDTH - 1 downto 0);
-  signal r_input_q          : signed_array_t(3 downto 0)(FFT4_OUTPUT_WIDTH - 1 downto 0);
+  signal r_input_i          : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r_input_q          : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
   signal r_output_valid     : std_logic;
   signal r_output_sub_index : unsigned(1 downto 0);
@@ -80,7 +80,7 @@ begin
   Output_last   <= r_input_last and to_stdlogic(r_output_sub_index = 3);
   Output_index  <= r_input_index(DATA_INDEX_WIDTH - 1 downto 2) & r_output_sub_index;
   Output_i      <= r_input_i(to_integer(r_output_sub_index));
-  Output_q      <= r_input_q(to_integer(r_output_sub_index)));
+  Output_q      <= r_input_q(to_integer(r_output_sub_index));
 
   process(Clk)
   begin

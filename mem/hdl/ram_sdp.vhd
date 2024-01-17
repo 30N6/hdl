@@ -55,7 +55,7 @@ begin
 
     Rd_data <= m_ram(to_integer(Rd_addr));
 
-  else if (LATENCY = 1) generate
+  elsif (LATENCY = 1) generate
 
     process(Clk)
     begin
@@ -66,7 +66,7 @@ begin
       end if;
     end process;
 
-  else if (LATENCY = 2) generate
+  elsif (LATENCY = 2) generate
 
     process(Clk)
     begin
