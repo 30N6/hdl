@@ -174,7 +174,7 @@ begin
     end if;
   end process;
 
-  w_fft_error_overflow(0) <= r_input_wr_valid and (not(r_input_active) or to_stdlogic(r_input_index = (DATA_CYCLES - 1)));
+  w_fft_error_overflow(0) <= r_input_wr_valid and r_input_active and to_stdlogic(r_input_index /= (DATA_CYCLES - 1));
 
   process(Clk)
   begin

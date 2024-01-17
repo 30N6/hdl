@@ -187,7 +187,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Error_input_overflow <= Input_valid and r_calc_active;
+      Error_input_overflow <= Input_valid and r_calc_active and to_stdlogic(r_calc_index /= (2**DATA_INDEX_WIDTH - 1));
     end if;
   end process;
 

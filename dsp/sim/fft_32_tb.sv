@@ -11,7 +11,7 @@ typedef struct {
 } fft_32_transfer_t;
 
 interface fft_32_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
-  logic                       valid;
+  logic                       valid = 0;
   logic [DATA_WIDTH - 1 : 0]  data_i;
   logic [DATA_WIDTH - 1 : 0]  data_q;
   logic [4 : 0]               index;

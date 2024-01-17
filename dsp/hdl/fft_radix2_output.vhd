@@ -48,6 +48,9 @@ architecture rtl of fft_radix2_output is
 
   constant OUTPUT_SUM_WIDTH : natural := INPUT_DATA_WIDTH + TWIDDLE_DATA_WIDTH + 2;
 
+  signal w_input_resized_i  : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH downto 0);
+  signal w_input_resized_q  : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH downto 0);
+
   signal r0_valid           : std_logic;
   signal r0_index           : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
   signal r0_last            : std_logic;
@@ -81,6 +84,14 @@ begin
     report "Invalid latency."
     severity failure;
 
+  process(all)
+  begin
+    for i in 0 to 1 loop
+      w_input_resized_i(i) <= resize_up(Input_i(i), INPUT_DATA_WIDTH + 1);
+      w_input_resized_q(i) <= resize_up(Input_q(i), INPUT_DATA_WIDTH + 1);
+    end loop;
+  end process;
+
   process(Clk)
   begin
     if rising_edge(Clk) then
@@ -89,7 +100,7 @@ begin
       r0_last             <= Input_last;
 
       r0_chan1_c          <= Input_twiddle_c;
-      r0_chan1_a_plus_b   <= Input_i(1) + Input_q(1);
+      r0_chan1_a_plus_b   <= w_input_resized_i(1) + w_input_resized_q(1);
 
       r0_chan1_a          <= Input_i(1);
       r0_chan1_d_minus_c  <= Input_twiddle_d_minus_c;
