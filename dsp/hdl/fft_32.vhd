@@ -8,6 +8,9 @@ library common_lib;
 
 library mem_lib;
 
+library dsp_lib;
+  use dsp_lib.dsp_pkg.all;
+
 entity fft_32 is
 generic (
   INPUT_DATA_WIDTH  : natural;
@@ -18,75 +21,93 @@ port (
   Clk                   : in  std_logic;
   Rst                   : in  std_logic;
 
-  Input_data_valid      : in  std_logic;
-  Input_data_index      : in  unsigned(4 downto 0);
-  Input_data_i          : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
-  Input_data_q          : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
-  Input_calc_start      : in  std_logic;
+  Input_valid           : in  std_logic;
+  Input_i               : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
+  Input_q               : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
+  Input_index           : in  unsigned(4 downto 0);
+  Input_last            : in  std_logic;
 
-  Output_data_valid     : out std_logic;
-  Output_data_index     : out unsigned(4 downto 0);
-  Output_data_i         : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
-  Output_data_q         : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
-  Output_data_last      : out std_logic;
+  Output_valid          : out std_logic;
+  Output_i              : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
+  Output_q              : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
+  Output_index          : out unsigned(4 downto 0);
+  Output_last           : out std_logic;
 
-  Error_input_overflow  : out std_logic
+  Error_input_overflow  : out std_logic --TODO: use
 );
 end entity fft_32;
 
 architecture rtl of fft_32 is
 
-  constant DATA_INDEX_WIDTH   : natural := Input_data_index'length;
-  constant S4_DATA_WIDTH      : natural := 2*INPUT_DATA_WIDTH;
-  constant FFT4_OUTPUT_WIDTH  : natural := INPUT_DATA_WIDTH + 2;
+  constant DATA_CYCLES            : natural := 32;
+  constant DATA_INDEX_WIDTH       : natural := clog2(DATA_CYCLES);
 
-  constant S1_DATA_WIDTH      : natural := 2*FFT4_OUTPUT_WIDTH;
-  constant NUM_S4_READ_CYCLES : natural := 32;
-  constant NUM_S4_PIPE_STAGES : natural := 3;
-  constant S4_READ_INDEX      : natural_array_t(0 to NUM_S4_CYCLES-1) := (0, 8, 16, 24,   4, 12, 20, 28,    2, 10, 18, 26,    6, 14, 22, 30,    1, 9, 17, 25,   5, 13, 21, 29,    3, 11, 19, 27,    7, 15, 23, 31);
+  constant INPUT_MEM_DATA_WIDTH   : natural := 2*INPUT_DATA_WIDTH;
 
-  type s0_state_t is
-  (
-    S_IDLE,
-    S_ACTIVE,
-    S_DONE
-  );
+  constant FFT4_OUTPUT_WIDTH      : natural := INPUT_DATA_WIDTH + 2;
+  constant FFT8_OUTPUT_WIDTH      : natural := FFT4_OUTPUT_WIDTH + 1;
+  constant FFT16_OUTPUT_WIDTH     : natural := FFT8_OUTPUT_WIDTH + 1;
+  constant FFT32_OUTPUT_WIDTH     : natural := FFT16_OUTPUT_WIDTH + 1;
 
-  signal r_s4_wr_en     : std_logic;
-  signal r_s4_wr_addr   : std_logic_vector(DATA_INDEX_WIDTH - 1 downto 0);
-  signal r_s4_wr_data   : std_logic_vector(S4_DATA_WIDTH - 1 downto 0);
-  signal r_s4_start     : std_logic;
+  constant NUM_INPUT_PIPE_STAGES  : natural := 2;
+  constant INPUT_READ_INDEX       : natural_array_t(0 to DATA_CYCLES-1) := (0, 8, 16, 24,   4, 12, 20, 28,    2, 10, 18, 26,    6, 14, 22, 30,    1, 9, 17, 25,   5, 13, 21, 29,    3, 11, 19, 27,    7, 15, 23, 31);
 
-  signal w_s4_rd_addr   : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
-  signal w_s4_rd_data   : std_logic_vector(S4_DATA_WIDTH - 1 downto 0);
+  signal r_rst                  : std_logic;
 
-  signal w_s4_rd_index  : unsigned(clog2(NUM_S4_CYCLES) - 1 downto 0);
-  signal r_s4_rd_index  : unsigned_array_t(NUM_S4_PIPE_STAGES - 1 downto 0)(clog2(NUM_S4_CYCLES) - 1 downto 0);
-  signal r_s4_active    : std_logic_vector(NUM_S4_PIPE_STAGES - 1 downto 0);
-  signal r_s4_done      : std_logic_vector(NUM_S4_PIPE_STAGES - 1 downto 0);
-  signal s_s4_state     : std_logic;
+  signal r_input_wr_valid          : std_logic;
+  signal r_input_wr_addr        : std_logic_vector(DATA_INDEX_WIDTH - 1 downto 0);
+  signal r_input_wr_data        : std_logic_vector(INPUT_MEM_DATA_WIDTH - 1 downto 0);
+  signal r_input_wr_last          : std_logic;
 
-  signal r_fft4_input_valid   : std_logic;
-  signal r_fft4_input_data_i  : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
-  signal r_fft4_input_data_q  : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
-  signal r_fft4_input_index   : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+  signal w_input_rd_addr        : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+  signal w_input_rd_data        : std_logic_vector(INPUT_MEM_DATA_WIDTH - 1 downto 0);
 
-  signal w_fft4_output_valid  : std_logic;
-  signal w_fft4_output_data_i : signed_array_t(3 downto 0)(FFT4_OUTPUT_WIDTH - 1 downto 0);
-  signal w_fft4_output_data_q : signed_array_t(3 downto 0)(FFT4_OUTPUT_WIDTH - 1 downto 0);
-  signal w_fft4_output_index  : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+  signal r_input_active         : std_logic;
+  signal r_input_index          : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
 
-  signal r_fft4_output_index  : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
-  signal r_fft4_output_data_i : signed_array_t(3 downto 0)(FFT4_OUTPUT_WIDTH - 1 downto 0);
-  signal r_fft4_output_data_q : signed_array_t(3 downto 0)(FFT4_OUTPUT_WIDTH - 1 downto 0);
+  signal r_input_index_pipe     : unsigned_array_t(NUM_INPUT_PIPE_STAGES - 1 downto 0)(DATA_INDEX_WIDTH - 1 downto 0);
+  signal r_input_active_pipe    : std_logic_vector(NUM_INPUT_PIPE_STAGES - 1 downto 0);
+  signal r_input_last_pipe      : std_logic_vector(NUM_INPUT_PIPE_STAGES - 1 downto 0);
 
-  signal r_s1_wr_en           : std_logic;
-  signal r_s1_wr_sub_index    : unsigned(1 downto 0);
-  signal w_s1_rd_addr         : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
-  signal w_s1_wr_data         : std_logic_vector(S1_DATA_WIDTH - 1 downto 0);
+  signal r_fft4_input_valid     : std_logic;
+  signal r_fft4_input_i         : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r_fft4_input_q         : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r_fft4_input_index     : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+  signal r_fft4_input_last      : std_logic;
 
-  signal w_s1_rd_addr         : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
-  signal w_s1_rd_data         : std_logic_vector(S1_DATA_WIDTH - 1 downto 0);
+  signal w_fft4_output_valid    : std_logic;
+  signal w_fft4_output_i        : signed_array_t(3 downto 0)(FFT4_OUTPUT_WIDTH - 1 downto 0);
+  signal w_fft4_output_q        : signed_array_t(3 downto 0)(FFT4_OUTPUT_WIDTH - 1 downto 0);
+  signal w_fft4_output_index    : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+  signal w_fft4_output_last     : std_logic;
+
+  signal w_fft4_serial_valid    : std_logic;
+  signal w_fft4_serial_i        : signed(FFT4_OUTPUT_WIDTH - 1 downto 0);
+  signal w_fft4_serial_q        : signed(FFT4_OUTPUT_WIDTH - 1 downto 0);
+  signal w_fft4_serial_index    : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+  signal w_fft4_serial_last     : std_logic;
+  signal w_fft4_error_overflow  : std_logic; --TODO: use
+
+  signal w_fft8_output_valid    : std_logic;
+  signal w_fft8_output_i        : signed(FFT8_OUTPUT_WIDTH - 1 downto 0);
+  signal w_fft8_output_q        : signed(FFT8_OUTPUT_WIDTH - 1 downto 0);
+  signal w_fft8_output_index    : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+  signal w_fft8_output_last     : std_logic;
+  signal w_fft8_error_overflow  : std_logic; --TODO: use
+
+  signal w_fft16_output_valid   : std_logic;
+  signal w_fft16_output_i       : signed(FFT16_OUTPUT_WIDTH - 1 downto 0);
+  signal w_fft16_output_q       : signed(FFT16_OUTPUT_WIDTH - 1 downto 0);
+  signal w_fft16_output_index   : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+  signal w_fft16_output_last    : std_logic;
+  signal w_fft16_error_overflow : std_logic; --TODO: use
+
+  signal w_fft32_output_valid   : std_logic;
+  signal w_fft32_output_i       : signed(FFT32_OUTPUT_WIDTH - 1 downto 0);
+  signal w_fft32_output_q       : signed(FFT32_OUTPUT_WIDTH - 1 downto 0);
+  signal w_fft32_output_index   : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+  signal w_fft32_output_last    : std_logic;
+  signal w_fft32_error_overflow : std_logic; --TODO: use
 
 begin
 
@@ -97,14 +118,21 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_s4_wr_en    <= Input_data_valid;
-      r_s4_wr_addr  <= Input_data_index;
-      r_s4_wr_data  <= std_logic_vector(Input_data_i & Input_data_q);
-      r_s4_start    <= Input_calc_start;
+      r_rst <= Rst;
     end if;
   end process;
 
-  w_s4_rd_addr <= to_unsigned(S0_READ_INDEX(to_integer(r_s4_rd_index(0))), DATA_INDEX_WIDTH);
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_input_wr_valid  <= Input_valid;
+      r_input_wr_addr   <= Input_index;
+      r_input_wr_data   <= std_logic_vector(Input_i & Input_q);
+      r_input_wr_last   <= Input_last;
+    end if;
+  end process;
+
+  w_input_rd_addr <= to_unsigned(INPUT_READ_INDEX(to_integer(r_input_index)), DATA_INDEX_WIDTH);
 
   i_buffer_s0 : entity mem_lib.ram_sdp
   generic map (
@@ -115,168 +143,187 @@ begin
   port map (
     Clk       => Clk,
 
-    Wr_en     => r_s0_wr_en,
-    Wr_addr   => r_s0_wr_addr,
-    Wr_data   => r_s0_wr_data,
+    Wr_en     => r_input_wr_valid,
+    Wr_addr   => r_input_wr_addr,
+    Wr_data   => r_input_wr_data,
 
     Rd_en     => '1',
     Rd_reg_ce => '1',
-    Rd_addr   => w_s0_rd_addr,
-    Rd_data   => w_s0_rd_data
+    Rd_addr   => w_input_rd_addr,
+    Rd_data   => w_input_rd_data
   );
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (Rst = '1') then
-        s_s0_state <= S_IDLE;
+      if (r_rst = '1') then
+        r_input_index   <= (others => '0');
+        r_input_active  <= '0';
       else
-        case s_s0_state is
-        when S_IDLE =>
-          if (r_s0_start = '1') then
-            s_state <= S_ACTIVE;
-          else
-            s_state <= S_IDLE;
+        if ((r_input_wr_valid = '1') and (r_input_wr_last = '1')) then
+          r_input_active  <= '1';
+          r_input_index   <= (others => '0');
+        else
+          if (r_input_index = (DATA_CYCLES - 1)) then
+            r_input_active <= '0';
           end if;
-        when S_ACTIVE =>
-          if (r_s0_rd_index(0) = (NUM_S0_READ_CYCLES - 1)) then
-            s_state <= S_DONE;
-          else
-            s_state <= S_IDLE;
-          end if;
-        when S_DONE =>
-          s_state <= S_IDLE;
-        end case;
+          r_input_index <= r_input_index + 1;
+        end if;
       end if;
     end if;
   end process;
 
-  process(all)
+  process(Clk)
   begin
-    if (s_state = S_IDLE) then
-      w_s0_rd_index <= (others => '0');
-    else
-      w_s0_rd_index <= r_s0_rd_index(0) + 1;
+    if rising_edge(Clk) then
+      r_input_index_pipe  <= r_input_index_pipe(NUM_INPUT_PIPE_STAGES - 2 downto 0)   & r_input_index;
+      r_input_active_pipe <= r_input_active_pipe(NUM_INPUT_PIPE_STAGES - 2 downto 0)  & r_input_active;
+      r_input_last_pipe   <= r_input_last_pipe(NUM_INPUT_PIPE_STAGES - 2 downto 0)    & to_stdlogic(r_input_index = (DATA_CYCLES-1));
     end if;
   end process;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_s0_rd_index <= r_s0_rd_index(NUM_S0_PIPE_STAGES - 2 downto 0) & w_s0_rd_index;
-      r_s0_active   <= r_s0_active(NUM_S0_PIPE_STAGES - 2 downto 0)   & to_stdlogic(s_s0_state = S_ACTIVE);
-      r_s0_done     <= r_s0_done(NUM_S0_PIPE_STAGES - 2 downto 0)     & to_stdlogic(s_s0_state = S_DONE);
-    end if;
-  end process;
-
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      if (r_s0_active(NUM_S0_PIPE_STAGES - 1) = '1') then
+      if (r_input_active_pipe(NUM_INPUT_PIPE_STAGES - 1) = '1') then
         for i in 0 to 3 loop
-          if (r_s0_rd_index(NUM_S0_PIPE_STAGES - 1)(1 downto 0) = i) then
-            (r_fft4_input_data_i(i), r_fft4_input_data_q(i)) <= w_s0_rd_data;
+          if (r_input_index_pipe(NUM_INPUT_PIPE_STAGES - 1)(1 downto 0) = i) then
+            (r_fft4_input_data_i(i), r_fft4_input_data_q(i)) <= w_input_rd_data;
           end if;
         end loop;
       end if;
 
-      r_fft4_input_index  <= r_s0_rd_index(NUM_S0_PIPE_STAGES - 1)(clog2(NUM_S0_CYCLES) - 1 downto 2) & "00";
-      r_fft4_input_valid  <= r_s0_active(NUM_S0_PIPE_STAGES - 1) and to_stdlogic(r_s0_rd_index(NUM_S0_PIPE_STAGES - 1)(1 downto 0) = 3);
+      r_fft4_input_valid  <= r_input_active_pipe(NUM_INPUT_PIPE_STAGES - 1) and to_stdlogic(r_input_index_pipe(NUM_INPUT_PIPE_STAGES - 1)(1 downto 0) = 3);
+      r_fft4_input_index  <= r_input_index_pipe(NUM_INPUT_PIPE_STAGES - 1)(DATA_INDEX_WIDTH - 1 downto 2) & "00";
+      r_fft4_input_last   <= r_input_last_pipe(NUM_INPUT_PIPE_STAGES - 1);
     end if;
   end process;
 
-  i_fft_4 : entity dsp_lib.fft_4
+  i_fft_4_calc : entity dsp_lib.fft_4
   generic map (
     INPUT_DATA_WIDTH  => INPUT_DATA_WIDTH,
-    OUTPUT_DATA_WIDTH => INPUT_DATA_WIDTH + 2,
+    OUTPUT_DATA_WIDTH => FFT4_OUTPUT_WIDTH,
+    DATA_INDEX_WIDTH  => DATA_INDEX_WIDTH,
     LATENCY           => 0
   )
   port map (
     Clk               => Clk,
 
-    Input_data_valid  => r_fft4_input_valid,
-    Input_data_i      => r_fft4_input_data_i,
-    Input_data_q      => r_fft4_input_data_q,
+    --TODO: fft control struct: valid, index, last, tag
+    Input_valid       => r_fft4_input_valid,
+    Input_i           => r_fft4_input_i,
+    Input_q           => r_fft4_input_q,
     Input_index       => r_fft4_input_index,
+    Input_last        => r_fft4_input_last,
 
-    Output_data_valid => w_fft4_output_valid,
-    Output_data_i     => w_fft4_output_data_i,
-    Output_data_q     => w_fft4_output_data_q,
-    Output_index      => w_fft4_output_index
+    Output_valid      => w_fft4_output_valid,
+    Output_i          => w_fft4_output_i,
+    Output_q          => w_fft4_output_q,
+    Output_index      => w_fft4_output_index,
+    Output_last       => w_fft4_output_last
   );
 
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      if (w_fft4_output_valid = '1') then
-        r_fft4_output_index  <= w_fft4_output_index;
-        r_fft4_output_data_i <= w_fft4_output_data_i;
-        r_fft4_output_data_q <= w_fft4_output_data_q;
-      end if;
-    end if;
-  end process;
-
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      if (w_fft4_output_valid = '1') then
-        r_s1_wr_en        <= '1';
-        r_s1_wr_sub_index <= (others => '0');
-      else
-        if (r_s1_wr_sub_index = 3) then
-          r_s1_wr_en      <= '0';
-        end if;
-        r_s1_wr_sub_index <= r_s1_wr_sub_index + 1;
-      end if;
-    end if;
-  end process;
-
-  w_s1_rd_addr <= r_fft4_output_index(DATA_INDEX_WIDTH - 1 downto 2) & r_s1_wr_sub_index;
-  w_s1_wr_data <= (r_fft4_output_data_i(to_integer(r_s1_wr_sub_index)), r_fft4_output_data_q(to_integer(r_s1_wr_sub_index)));
-
-  i_buffer_s1 : entity mem_lib.ram_sdp
+  i_ff4_serializer : entity dsp_lib.fft_4_serializer
   generic map (
-    ADDR_WIDTH  => DATA_INDEX_WIDTH,
-    DATA_WIDTH  => S1_DATA_WIDTH,
-    LATENCY     => 2
+    INPUT_DATA_WIDTH  => FFT4_OUTPUT_WIDTH,
+    OUTPUT_DATA_WIDTH => FFT4_OUTPUT_WIDTH,
+    DATA_INDEX_WIDTH  => DATA_INDEX_WIDTH
   )
   port map (
-    Clk       => Clk,
+    Clk                   => Clk,
+    Rst                   => r_rst,
 
-    Wr_en     => r_s1_wr_en,
-    Wr_addr   => w_s1_rd_addr,
-    Wr_data   => w_s1_wr_data,
+    Input_valid           => w_fft4_output_valid,
+    Input_i               => w_fft4_output_data_i,
+    Input_q               => w_fft4_output_data_q,
+    Input_index           => w_fft4_output_index,
+    Input_last            => w_fft4_output_last,
 
-    Rd_en     => '1',
-    Rd_reg_ce => '1',
-    Rd_addr   => w_s1_rd_addr(i),
-    Rd_data   => w_s1_rd_data(i)
+    Output_valid          => w_fft4_serial_valid,
+    Output_i              => w_fft4_serial_i,
+    Output_q              => w_fft4_serial_q,
+    Output_index          => w_fft4_serial_index,
+    Output_last           => w_fft4_serial_last,
+
+    Error_input_overflow  => w_fft4_error_overflow
   );
 
-  entity fft_32_radix2_stage is
-  generic (
-    DATA_INDEX_WIDTH  : natural;
-    INPUT_DATA_WIDTH  : natural;
-    OUTPUT_DATA_WIDTH : natural;
-    STAGE_INDEX       : natural
+  i_fft_8 : entity fft_32_radix2_stage
+  generic map (
+    DATA_INDEX_WIDTH  => DATA_INDEX_WIDTH,
+    INPUT_DATA_WIDTH  => FFT4_OUTPUT_WIDTH,
+    OUTPUT_DATA_WIDTH => FFT8_OUTPUT_WIDTH,
+    STAGE_INDEX       => 8
+  )
+  port map (
+    Clk                   => Clk,
+    Rst                   => r_rst,
+
+    Input_valid           => w_fft4_serial_valid,
+    Input_i               => w_fft4_serial_i,
+    Input_q               => w_fft4_serial_q,
+    Input_index           => w_fft4_serial_index,
+    Input_last            => w_fft4_serial_last,
+
+    Output_valid          => w_fft8_output_valid,
+    Output_i              => w_fft8_output_i,
+    Output_q              => w_fft8_output_q,
+    Output_index          => w_fft8_output_index,
+    Output_last           => w_fft8_output_last,
+
+    Error_input_overflow  => w_fft8_error_overflow
   );
-  port (
-    Clk                   : in  std_logic;
-    Rst                   : in  std_logic;
 
-    Input_data_valid      : in  std_logic;
-    Input_data_last       : in  std_logic;
-    Input_data_index      : in  unsigned(DATA_INDEX_WIDTH - 1 downto 0);
-    Input_data_i          : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
-    Input_data_q          : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
+  i_fft_16 : entity fft_32_radix2_stage
+  generic map (
+    DATA_INDEX_WIDTH  => DATA_INDEX_WIDTH,
+    INPUT_DATA_WIDTH  => FFT8_OUTPUT_WIDTH,
+    OUTPUT_DATA_WIDTH => FFT16_OUTPUT_WIDTH,
+    STAGE_INDEX       => 16
+  )
+  port map (
+    Clk                   => Clk,
+    Rst                   => r_rst,
 
-    Output_data_valid     : out std_logic;
-    Output_data_index     : out unsigned(DATA_INDEX_WIDTH - 1 downto 0);
-    Output_data_i         : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
-    Output_data_q         : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
+    Input_valid           => w_fft8_output_valid,
+    Input_i               => w_fft8_output_i,
+    Input_q               => w_fft8_output_q,
+    Input_index           => w_fft8_output_index,
+    Input_last            => w_fft8_output_last,
 
-    Error_input_overflow  : out std_logic
+    Output_valid          => w_fft16_output_valid,
+    Output_i              => w_fft16_output_i,
+    Output_q              => w_fft16_output_q,
+    Output_index          => w_fft16_output_index,
+    Output_last           => w_fft16_output_last,
+
+    Error_input_overflow  => w_fft16_error_overflow
   );
 
+  i_fft_32 : entity fft_32_radix2_stage
+  generic map (
+    DATA_INDEX_WIDTH  => DATA_INDEX_WIDTH,
+    INPUT_DATA_WIDTH  => FFT16_OUTPUT_WIDTH,
+    OUTPUT_DATA_WIDTH => FFT32_OUTPUT_WIDTH,
+    STAGE_INDEX       => 32
+  )
+  port map (
+    Clk                   => Clk,
+    Rst                   => r_rst,
+
+    Input_valid           => w_fft16_output_valid,
+    Input_i               => w_fft16_output_i,
+    Input_q               => w_fft16_output_q,
+    Input_index           => w_fft16_output_index,
+    Input_last            => w_fft16_output_last,
+
+    Output_valid          => w_fft32_output_valid,
+    Output_i              => w_fft32_output_i,
+    Output_q              => w_fft32_output_q,
+    Output_index          => w_fft32_output_index,
+    Output_last           => w_fft32_output_last,
+
+    Error_input_overflow  => w_fft32_error_overflow
+  );
 
 end architecture rtl;

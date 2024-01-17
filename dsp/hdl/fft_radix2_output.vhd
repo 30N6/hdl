@@ -26,18 +26,18 @@ generic (
 port (
   Clk                     : in  std_logic;
 
-  Input_data_valid        : in  std_logic;
-  Input_data_index        : in  unsigned(DATA_INDEX_WIDTH - 1 downto 0);
-  Input_data_i            : in  signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
-  Input_data_q            : in  signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  Input_valid             : in  std_logic;
+  Input_index             : in  unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+  Input_i                 : in  signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  Input_q                 : in  signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
   Input_twiddle_c         : in  signed(TWIDDLE_DATA_WIDTH - 1 downto 0);
   Input_twiddle_c_plus_d  : in  signed(TWIDDLE_DATA_WIDTH downto 0);
   Input_twiddle_d_minus_c : in  signed(TWIDDLE_DATA_WIDTH downto 0);
 
-  Output_data_valid       : out std_logic;
-  Output_data_index       : out unsigned(DATA_INDEX_WIDTH - 1 downto 0);
-  Output_data_i           : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
-  Output_data_q           : out signed(OUTPUT_DATA_WIDTH - 1 downto 0)
+  Output_valid            : out std_logic;
+  Output_index            : out unsigned(DATA_INDEX_WIDTH - 1 downto 0);
+  Output_i                : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
+  Output_q                : out signed(OUTPUT_DATA_WIDTH - 1 downto 0)
 );
 end entity fft_radix2_output;
 
@@ -78,16 +78,16 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r0_valid            <= Input_data_valid;
-      r0_index            <= Input_data_index;
+      r0_valid            <= Input_valid;
+      r0_index            <= Input_index;
 
       r0_chan1_c          <= Input_twiddle_c;
-      r0_chan1_a_plus_b   <= Input_data_i(1) + Input_data_q(1);
+      r0_chan1_a_plus_b   <= Input_i(1) + Input_q(1);
 
-      r0_chan1_a          <= Input_data_i(1);
+      r0_chan1_a          <= Input_i(1);
       r0_chan1_d_minus_c  <= Input_twiddle_d_minus_c;
 
-      r0_chan1_b          <= Input_data_q(1);
+      r0_chan1_b          <= Input_q(1);
       r0_chan1_c_plus_d   <= Input_twiddle_c_plus_d;
     end if;
   end process;
@@ -113,9 +113,9 @@ begin
     end if;
   end process;
 
-  Output_data_valid <= r2_valid;
-  Output_data_index <= r2_index;
-  Output_data_i     <= r2_output_i(OUTPUT_SUM_WIDTH - 1 downto (OUTPUT_SUM_WIDTH - OUTPUT_DATA_WIDTH));
-  Output_data_q     <= r2_output_q(OUTPUT_SUM_WIDTH - 1 downto (OUTPUT_SUM_WIDTH - OUTPUT_DATA_WIDTH));
+  Output_valid <= r2_valid;
+  Output_index <= r2_index;
+  Output_i     <= r2_output_i(OUTPUT_SUM_WIDTH - 1 downto (OUTPUT_SUM_WIDTH - OUTPUT_DATA_WIDTH));
+  Output_q     <= r2_output_q(OUTPUT_SUM_WIDTH - 1 downto (OUTPUT_SUM_WIDTH - OUTPUT_DATA_WIDTH));
 
 end architecture rtl;
