@@ -1,53 +1,60 @@
 `timescale 1ns/1ps
 
 import math::*;
+import dsp_pkg::*;
 
 typedef struct {
   int data_i;
   int data_q;
   int index;
   bit last;
+  bit reverse;
+  int tag;
   int delay;
 } fft_32_transfer_t;
 
 interface fft_32_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
-  logic                             valid = 0;
+  fft32_control_t                   control;
   logic signed [DATA_WIDTH - 1 : 0] data_i;
   logic signed [DATA_WIDTH - 1 : 0] data_q;
-  logic [4 : 0]                     index;
-  logic                             last;
+
+  task clear();
+    control.valid       <= 0;
+    control.last        <= 'x;
+    control.reverse     <= 'x;
+    control.data_index  <= 'x;
+    control.tag         <= 'x;
+  endtask
 
   task write(input fft_32_transfer_t tx);
-    data_i  <= tx.data_i;
-    data_q  <= tx.data_q;
-    index   <= tx.index;
-    last    <= tx.last;
-    valid   <= 1;
+    data_i              <= tx.data_i;
+    data_q              <= tx.data_q;
+    control.data_index  <= tx.index;
+    control.last        <= tx.last;
+    control.reverse     <= tx.reverse;
+    control.tag         <= tx.tag;
+    control.valid       <= 1;
     @(posedge Clk);
-    data_i  <= 'x;
-    data_q  <= 'x;
-    index   <= 'x;
-    last    <= 'x;
-    valid   <= 0;
+    clear();
     repeat (tx.delay) @(posedge Clk);
   endtask
 endinterface
 
 interface fft_32_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
-  logic                             valid;
+  fft32_control_t                   control;
   logic signed [DATA_WIDTH - 1 : 0] data_i;
   logic signed [DATA_WIDTH - 1 : 0] data_q;
-  logic [4 : 0]                     index;
-  logic                             last;
 
   task read(output fft_32_transfer_t d);
     logic v;
     do begin
       d.data_i  <= data_i;
       d.data_q  <= data_q;
-      d.index   <= index;
-      d.last    <= last;
-      v         <= valid;
+      d.index   <= control.data_index;
+      d.last    <= control.last;
+      d.reverse <= control.reverse;
+      d.tag     <= control.tag;
+      v         <= control.valid;
       @(posedge Clk);
     end while (v !== 1);
   endtask
@@ -90,25 +97,20 @@ module fft_32_tb;
 
   fft_32 #(
     .INPUT_DATA_WIDTH  (INPUT_WIDTH),
-    .OUTPUT_DATA_WIDTH (OUTPUT_WIDTH),
-    .IFFT_MODE         (0)
+    .OUTPUT_DATA_WIDTH (OUTPUT_WIDTH)
   )
   dut
   (
     .Clk                   (Clk),
     .Rst                   (Rst),
 
-    .Input_valid           (tx_intf.valid),
+    .Input_control         (tx_intf.control),
     .Input_i               (tx_intf.data_i),
     .Input_q               (tx_intf.data_q),
-    .Input_index           (tx_intf.index),
-    .Input_last            (tx_intf.last),
 
-    .Output_valid          (rx_intf.valid),
+    .Output_control        (rx_intf.control),
     .Output_i              (rx_intf.data_i),
     .Output_q              (rx_intf.data_q),
-    .Output_index          (rx_intf.index),
-    .Output_last           (rx_intf.last),
 
     .Error_input_overflow  (w_error)
   );
@@ -134,11 +136,24 @@ module fft_32_tb;
     real threshold = 0.0001 * (2**OUTPUT_WIDTH - 1);
     //$display("a=%p b=%p d_i=%0d d_q=%0d diff=%f threshold=%f", a, b, d_i, d_q, diff, threshold);
 
-    if (diff < threshold) begin
-      return 1;
-    end else begin
+    if (diff > threshold) begin
       return 0;
     end
+
+    if (a.last !== b.last) begin
+      return 0;
+    end
+    if (a.index !== b.index) begin
+      return 0;
+    end
+    if (a.reverse !== b.reverse) begin
+      return 0;
+    end
+    if (a.tag !== b.tag) begin
+      return 0;
+    end
+
+    return 1;
   endfunction
 
   initial begin
@@ -168,9 +183,8 @@ module fft_32_tb;
     end
   end
 
-  task automatic standard_tests();
+  task automatic standard_tests(string fn_in, string fn_out, bit reverse);
     int max_frame_delay = 64;
-    int min_frame_delay = 32;
     int max_sample_delay = $urandom_range(5);
     int wait_cycles;
     fft_32_transfer_t tx_queue[$];
@@ -179,25 +193,33 @@ module fft_32_tb;
     int d_i, d_q;
     int frame_index;
     int current_max_sample_delay = 0;
+    int tx_tag [*];
 
-    int fd_test_in  = $fopen("./test_data/fft_test_data_2024_01_16_fwd_in.txt", "r");
-    int fd_test_out = $fopen("./test_data/fft_test_data_2024_01_16_fwd_out.txt", "r");
+    int fd_test_in  = $fopen(fn_in, "r");
+    int fd_test_out = $fopen(fn_out, "r");
 
     repeat(10) @(posedge Clk);
-    $display("%0t: Standard test started: max_frame_delay=%0d min_frame_delay=%0d max_sample_delay=%0d", $time, max_frame_delay, min_frame_delay, max_sample_delay);
+    $display("%0t: Standard test started: max_frame_delay=%0d max_sample_delay=%0d", $time, max_frame_delay, max_sample_delay);
 
     while ($fscanf(fd_test_in, "%d %d %d %d %d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q) == 5) begin
       //$display("input_transfer: frame=%0d index=%0d last=%0d d_i=%0d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q);
-      transfer_data.data_i = d_i;
-      transfer_data.data_q = d_q;
+      if (!tx_tag.exists(frame_index)) begin
+        tx_tag[frame_index] = $urandom_range(255, 0);
+      end
+      transfer_data.tag     = tx_tag[frame_index];
+      transfer_data.reverse = reverse;
+      transfer_data.data_i  = d_i;
+      transfer_data.data_q  = d_q;
       tx_queue.push_back(transfer_data);
     end
     $fclose(fd_test_in);
 
     while ($fscanf(fd_test_out, "%d %d %d %d %d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q) == 5) begin
       expect_t e;
-      transfer_data.data_i = d_i;
-      transfer_data.data_q = d_q;
+      transfer_data.tag     = tx_tag[frame_index];
+      transfer_data.reverse = reverse;
+      transfer_data.data_i  = d_i;
+      transfer_data.data_q  = d_q;
       e.data = transfer_data;
       e.frame_index = frame_index;
       expected_data.push_back(e);
@@ -210,9 +232,9 @@ module fft_32_tb;
       transfer_data = tx_queue.pop_front();
       tx_intf.write(transfer_data);
       if (transfer_data.last) begin
-        int frame_delay = ($urandom_range(99) < 20) ? min_frame_delay : $urandom_range(max_frame_delay, min_frame_delay);
+        int frame_delay = ($urandom_range(99) < 50) ? 0 : $urandom_range(max_frame_delay, 0);
         repeat (frame_delay) @(posedge Clk);
-        current_max_sample_delay = ($urandom_range(99) < 20) ? 0 : $urandom_range(max_sample_delay);
+        current_max_sample_delay = ($urandom_range(99) < 50) ? 0 : $urandom_range(max_sample_delay);
       end else begin
         repeat (current_max_sample_delay) @(posedge Clk);
       end
@@ -235,7 +257,9 @@ module fft_32_tb;
   initial
   begin
     wait_for_reset();
-    standard_tests();
+    standard_tests("./test_data/fft_test_data_2024_01_16_forward_in.txt", "./test_data/fft_test_data_2024_01_16_forward_out.txt", 0);
+    repeat(100) @(posedge Clk);
+    standard_tests("./test_data/fft_test_data_2024_01_18_reverse_in.txt", "./test_data/fft_test_data_2024_01_18_reverse_out.txt", 1);
     repeat(100) @(posedge Clk);
     $finish;
   end

@@ -15,23 +15,18 @@ entity fft_4 is
 generic (
   INPUT_DATA_WIDTH  : natural;
   OUTPUT_DATA_WIDTH : natural;
-  DATA_INDEX_WIDTH  : natural;
   LATENCY           : natural
 );
 port (
-  Clk           : in  std_logic;
+  Clk             : in  std_logic;
 
-  Input_valid   : in  std_logic;
-  Input_i       : in  signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
-  Input_q       : in  signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
-  Input_index   : in  unsigned(DATA_INDEX_WIDTH - 1 downto 0);
-  Input_last    : in  std_logic;
+  Input_control   : in  fft32_control_t;
+  Input_i         : in  signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  Input_q         : in  signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
-  Output_valid  : out std_logic;
-  Output_i      : out signed_array_t(3 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
-  Output_q      : out signed_array_t(3 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
-  Output_index  : out unsigned(DATA_INDEX_WIDTH - 1 downto 0);
-  Output_last   : out std_logic
+  Output_control  : out fft32_control_t;
+  Output_i        : out signed_array_t(3 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  Output_q        : out signed_array_t(3 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0)
 );
 end entity fft_4;
 
@@ -104,22 +99,18 @@ begin
 
   g_output : if (LATENCY = 0) generate
 
-    Output_valid  <= Input_valid;
-    Output_i      <= w_output_trimmed_i;
-    Output_q      <= w_output_trimmed_q;
-    Output_index  <= Input_index;
-    Output_last   <= Input_last;
+    Output_control  <= Input_control;
+    Output_i        <= w_output_trimmed_i;
+    Output_q        <= w_output_trimmed_q;
 
   elsif (LATENCY = 1) generate
 
     process(Clk)
     begin
       if rising_edge(Clk) then
-        Output_valid  <= Input_valid;
-        Output_i      <= w_output_trimmed_i;
-        Output_q      <= w_output_trimmed_q;
-        Output_index  <= Input_index;
-        Output_last   <= Input_last;
+        Output_control  <= Input_control;
+        Output_i        <= w_output_trimmed_i;
+        Output_q        <= w_output_trimmed_q;
       end if;
     end process;
 

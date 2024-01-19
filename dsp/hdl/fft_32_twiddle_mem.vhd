@@ -18,7 +18,7 @@ generic (
 port (
   Clk                 : in  std_logic;
 
-  Read_index          : in  unsigned(4 downto 0);
+  Read_index          : in  unsigned(FFT32_DATA_INDEX_WIDTH - 1 downto 0);
   Read_data_c         : out signed(DATA_WIDTH - 1 downto 0);
   Read_data_c_plus_d  : out signed(DATA_WIDTH downto 0);
   Read_data_d_minus_c : out signed(DATA_WIDTH downto 0)
