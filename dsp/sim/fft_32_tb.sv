@@ -180,8 +180,8 @@ module fft_32_tb;
     int frame_index;
     int current_max_sample_delay = 0;
 
-    int fd_test_in  = $fopen("./test_data/fft_test_data_2024_01_16_in.txt", "r");
-    int fd_test_out = $fopen("./test_data/fft_test_data_2024_01_16_out.txt", "r");
+    int fd_test_in  = $fopen("./test_data/fft_test_data_2024_01_16_fwd_in.txt", "r");
+    int fd_test_out = $fopen("./test_data/fft_test_data_2024_01_16_fwd_out.txt", "r");
 
     repeat(10) @(posedge Clk);
     $display("%0t: Standard test started: max_frame_delay=%0d min_frame_delay=%0d max_sample_delay=%0d", $time, max_frame_delay, min_frame_delay, max_sample_delay);
@@ -212,7 +212,7 @@ module fft_32_tb;
       if (transfer_data.last) begin
         int frame_delay = ($urandom_range(99) < 20) ? min_frame_delay : $urandom_range(max_frame_delay, min_frame_delay);
         repeat (frame_delay) @(posedge Clk);
-        current_max_sample_delay = ($urandom_range(99) < 20) ? 0 : $urandom_range(max_sample_delay);        
+        current_max_sample_delay = ($urandom_range(99) < 20) ? 0 : $urandom_range(max_sample_delay);
       end else begin
         repeat (current_max_sample_delay) @(posedge Clk);
       end
