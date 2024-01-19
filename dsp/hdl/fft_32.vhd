@@ -11,8 +11,6 @@ library mem_lib;
 library dsp_lib;
   use dsp_lib.dsp_pkg.all;
 
-  --TODO: 12 bit ADC data
-
 entity fft_32 is
 generic (
   INPUT_DATA_WIDTH  : natural;
@@ -332,8 +330,8 @@ begin
   );
 
   Output_valid <= w_fft32_output_valid;
-  Output_i     <= w_fft32_output_i; --TODO: trim
-  Output_q     <= w_fft32_output_q; --TODO: trim
+  Output_i     <= w_fft32_output_i(FFT32_OUTPUT_WIDTH - 1 downto (FFT32_OUTPUT_WIDTH - OUTPUT_DATA_WIDTH));
+  Output_q     <= w_fft32_output_q(FFT32_OUTPUT_WIDTH - 1 downto (FFT32_OUTPUT_WIDTH - OUTPUT_DATA_WIDTH));
   Output_index <= w_fft32_output_index;
   Output_last  <= w_fft32_output_last;
 

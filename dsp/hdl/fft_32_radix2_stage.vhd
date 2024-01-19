@@ -41,6 +41,7 @@ architecture rtl of fft_32_radix2_stage is
 
   constant BUFFER_DATA_WIDTH  : natural := 2*INPUT_DATA_WIDTH;
   constant TWIDDLE_DATA_WIDTH : natural := 17;
+  constant TWIDDLE_FRAC_WIDTH : natural := 16;
 
   constant DATA_CYCLES            : natural := 32;
   constant READ_INDEX_A_S8        : natural_array_t(0 to DATA_CYCLES-1) := (0, 1, 2, 3,   0, 1, 2, 3,   8, 9, 10, 11,     8, 9, 10, 11,       16, 17, 18, 19,   16, 17, 18, 19,   24, 25, 26, 27,   24, 25, 26, 27);
@@ -162,6 +163,7 @@ begin
     INPUT_DATA_WIDTH    => INPUT_DATA_WIDTH,
     OUTPUT_DATA_WIDTH   => OUTPUT_DATA_WIDTH,
     TWIDDLE_DATA_WIDTH  => TWIDDLE_DATA_WIDTH,
+    TWIDDLE_FRAC_WIDTH  => TWIDDLE_FRAC_WIDTH,
     DATA_INDEX_WIDTH    => DATA_INDEX_WIDTH,
     LATENCY             => 3
   )

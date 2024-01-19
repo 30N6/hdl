@@ -85,7 +85,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Error_input_overflow <= Input_valid and (not(r_output_valid) or to_stdlogic(r_output_sub_index = 3));
+      Error_input_overflow <= Input_valid and r_output_valid and to_stdlogic(r_output_sub_index /= 3);
     end if;
   end process;
 

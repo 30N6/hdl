@@ -29,7 +29,7 @@ package body dsp_pkg is
 
   function int_to_signed_array(int_array : integer_array_t; input_width : natural; output_width : natural) return signed_array_t is
     variable v_full_signed : signed(input_width - 1 downto 0);
-    variable v_result : signed_array_t(int_array'length - 1 downto 0)(output_width - 1 downto 0);
+    variable v_result : signed_array_t(0 to int_array'length - 1)(output_width - 1 downto 0);
   begin
     assert (output_width <= input_width)
       report "output_width expected to be less than or equal to the input_width."
@@ -38,6 +38,7 @@ package body dsp_pkg is
     for i in 0 to (int_array'length - 1) loop
       v_full_signed := to_signed(int_array(i), input_width);
       v_result(i)   := v_full_signed(input_width - 1 downto (input_width - output_width));
+      --report "int_to_signed_array: i=" & integer'image(i) & " - " & integer'image(int_array(i)) & " " & to_hstring(v_full_signed) & " " & to_hstring(v_result(i));
     end loop;
     return v_result;
   end function;

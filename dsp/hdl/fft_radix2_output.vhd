@@ -21,6 +21,7 @@ generic (
   INPUT_DATA_WIDTH    : natural;
   OUTPUT_DATA_WIDTH   : natural;
   TWIDDLE_DATA_WIDTH  : natural;
+  TWIDDLE_FRAC_WIDTH  : natural;
   DATA_INDEX_WIDTH    : natural;
   LATENCY             : natural
 );
@@ -46,14 +47,14 @@ end entity fft_radix2_output;
 
 architecture rtl of fft_radix2_output is
 
-  constant OUTPUT_SUM_WIDTH : natural := INPUT_DATA_WIDTH + TWIDDLE_DATA_WIDTH + 2;
-
-  signal w_input_resized_i  : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH downto 0);
-  signal w_input_resized_q  : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH downto 0);
+  constant K_WIDTH                : natural := INPUT_DATA_WIDTH + TWIDDLE_DATA_WIDTH + 1;
+  constant OUTPUT_SCALED_WIDTH    : natural := K_WIDTH + 2; -- k + k + d
 
   signal r0_valid           : std_logic;
   signal r0_index           : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
   signal r0_last            : std_logic;
+  signal r0_chan0_i         : signed(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r0_chan0_q         : signed(INPUT_DATA_WIDTH - 1 downto 0);
   signal r0_chan1_a         : signed(INPUT_DATA_WIDTH - 1 downto 0);
   signal r0_chan1_b         : signed(INPUT_DATA_WIDTH - 1 downto 0);
   signal r0_chan1_a_plus_b  : signed(INPUT_DATA_WIDTH downto 0);
@@ -64,33 +65,27 @@ architecture rtl of fft_radix2_output is
   signal r1_valid           : std_logic;
   signal r1_index           : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
   signal r1_last            : std_logic;
-  signal r1_k1              : signed(INPUT_DATA_WIDTH + TWIDDLE_DATA_WIDTH downto 0); -- k1 = c * (a+b)
-  signal r1_k2              : signed(INPUT_DATA_WIDTH + TWIDDLE_DATA_WIDTH downto 0); -- k2 = a * (d-c)
-  signal r1_k3              : signed(INPUT_DATA_WIDTH + TWIDDLE_DATA_WIDTH downto 0); -- k3 = b * (c+d)
+  signal r1_chan0_scaled_i  : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r1_chan0_scaled_q  : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r1_k1              : signed(K_WIDTH - 1 downto 0); -- k1 = c * (a+b)
+  signal r1_k2              : signed(K_WIDTH - 1 downto 0); -- k2 = a * (d-c)
+  signal r1_k3              : signed(K_WIDTH - 1 downto 0); -- k3 = b * (c+d)
 
   signal r2_valid           : std_logic;
   signal r2_index           : unsigned(DATA_INDEX_WIDTH - 1 downto 0);
   signal r2_last            : std_logic;
-  signal r2_output_i        : signed(OUTPUT_SUM_WIDTH - 1 downto 0);
-  signal r2_output_q        : signed(OUTPUT_SUM_WIDTH - 1 downto 0);
+  signal r2_output_scaled_i : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
+  signal r2_output_scaled_q : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
 
 begin
 
-  assert (OUTPUT_DATA_WIDTH <= (INPUT_DATA_WIDTH + TWIDDLE_DATA_WIDTH + 2))
-    report "Invalid output width."
+  assert (OUTPUT_DATA_WIDTH = (INPUT_DATA_WIDTH + 1))
+    report "Invalid output width - expecting 1 bit of growth per stage."
     severity failure;
 
   assert (LATENCY = 3)
     report "Invalid latency."
     severity failure;
-
-  process(all)
-  begin
-    for i in 0 to 1 loop
-      w_input_resized_i(i) <= resize_up(Input_i(i), INPUT_DATA_WIDTH + 1);
-      w_input_resized_q(i) <= resize_up(Input_q(i), INPUT_DATA_WIDTH + 1);
-    end loop;
-  end process;
 
   process(Clk)
   begin
@@ -99,8 +94,11 @@ begin
       r0_index            <= Input_index;
       r0_last             <= Input_last;
 
+      r0_chan0_i          <= Input_i(0);
+      r0_chan0_q          <= Input_q(0);
+
       r0_chan1_c          <= Input_twiddle_c;
-      r0_chan1_a_plus_b   <= w_input_resized_i(1) + w_input_resized_q(1);
+      r0_chan1_a_plus_b   <= resize_up(Input_i(1), INPUT_DATA_WIDTH + 1) + Input_q(1);
 
       r0_chan1_a          <= Input_i(1);
       r0_chan1_d_minus_c  <= Input_twiddle_d_minus_c;
@@ -113,29 +111,31 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r1_valid  <= r0_valid;
-      r1_index  <= r0_index;
-      r1_last   <= r0_last;
-      r1_k1     <= r0_chan1_c * r0_chan1_a_plus_b;
-      r1_k2     <= r0_chan1_a * r0_chan1_d_minus_c;
-      r1_k3     <= r0_chan1_b * r0_chan1_c_plus_d;
+      r1_valid          <= r0_valid;
+      r1_index          <= r0_index;
+      r1_last           <= r0_last;
+      r1_chan0_scaled_i <= shift_left(resize_up(r0_chan0_i, INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH), TWIDDLE_FRAC_WIDTH);
+      r1_chan0_scaled_q <= shift_left(resize_up(r0_chan0_q, INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH), TWIDDLE_FRAC_WIDTH);
+      r1_k1             <= r0_chan1_c * r0_chan1_a_plus_b;
+      r1_k2             <= r0_chan1_a * r0_chan1_d_minus_c;
+      r1_k3             <= r0_chan1_b * r0_chan1_c_plus_d;
     end if;
   end process;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r2_valid    <= r1_valid;
-      r2_index    <= r1_index;
-      r2_last     <= r1_last;
-      r2_output_i <= r1_k1 - r1_k3;
-      r2_output_q <= r1_k1 + r1_k2;
+      r2_valid            <= r1_valid;
+      r2_index            <= r1_index;
+      r2_last             <= r1_last;
+      r2_output_scaled_i  <= resize_up(r1_chan0_scaled_i, OUTPUT_SCALED_WIDTH) + r1_k1 - r1_k3;
+      r2_output_scaled_q  <= resize_up(r1_chan0_scaled_q, OUTPUT_SCALED_WIDTH) + r1_k1 + r1_k2;
     end if;
   end process;
 
   Output_valid <= r2_valid;
-  Output_i     <= r2_output_i(OUTPUT_SUM_WIDTH - 1 downto (OUTPUT_SUM_WIDTH - OUTPUT_DATA_WIDTH));
-  Output_q     <= r2_output_q(OUTPUT_SUM_WIDTH - 1 downto (OUTPUT_SUM_WIDTH - OUTPUT_DATA_WIDTH));
+  Output_i     <= r2_output_scaled_i(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
+  Output_q     <= r2_output_scaled_q(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
   Output_index <= r2_index;
   Output_last  <= r2_last;
 

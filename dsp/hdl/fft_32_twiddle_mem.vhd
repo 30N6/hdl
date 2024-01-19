@@ -32,8 +32,10 @@ architecture rtl of fft_32_twiddle_mem is
   constant INIT_WIDTH_C_PLUS_D  : natural := 24;
   constant INIT_WIDTH_D_MINUS_C : natural := 24;
 
+  --TODO: cleanup - remove int to signed conversions
   function initialize_w_c return signed_array_t is
     variable r : integer_array_t(0 to NUM_CYCLES-1);
+    variable s : signed_array_t(0 to NUM_CYCLES-1)(DATA_WIDTH - 1 downto 0);
   begin
     if (STAGE_INDEX = 8) then
       r := (4194303, 2965821, 0, -2965821, -4194304, -2965821, 0, 2965821, 4194303, 2965821, 0, -2965821, -4194304, -2965821, 0, 2965821, 4194303, 2965821, 0, -2965821, -4194304, -2965821, 0, 2965821, 4194303, 2965821, 0, -2965821, -4194304, -2965821, 0, 2965821);
@@ -45,7 +47,10 @@ architecture rtl of fft_32_twiddle_mem is
       report "Invalid stage index."
       severity failure;
     end if;
-    return int_to_signed_array(r, INIT_WIDTH_C, DATA_WIDTH);
+    --report "initialize_w_c: stage=" & integer'image(STAGE_INDEX) & "  r(0,1,2)= " & integer'image(r(0)) & " " & integer'image(r(1)) & " " & integer'image(r(2));
+    s := int_to_signed_array(r, INIT_WIDTH_C, DATA_WIDTH);
+    --report "initialize_w_c: s(0,1,2)= " & to_hstring(s(0)) & " " & to_hstring(s(1)) & " " & to_hstring(s(2));
+    return s;
   end function;
 
   function initialize_w_c_plus_d return signed_array_t is
@@ -86,6 +91,9 @@ architecture rtl of fft_32_twiddle_mem is
   constant W_C_PLUS_D           : signed_array_t(0 to NUM_CYCLES-1)(DATA_WIDTH     downto 0) := initialize_w_c_plus_d;
   constant W_D_MINUS_C          : signed_array_t(0 to NUM_CYCLES-1)(DATA_WIDTH     downto 0) := initialize_w_d_minus_c;
 
+  signal w_read_data_c          : signed(DATA_WIDTH - 1 downto 0);
+  signal w_read_data_c_plus_d   : signed(DATA_WIDTH downto 0);
+  signal w_read_data_d_minus_c  : signed(DATA_WIDTH downto 0);
   signal r_read_data_c          : signed(DATA_WIDTH - 1 downto 0);
   signal r_read_data_c_plus_d   : signed(DATA_WIDTH downto 0);
   signal r_read_data_d_minus_c  : signed(DATA_WIDTH downto 0);
@@ -104,20 +112,24 @@ begin
     report "Unsupported data width"
     severity failure;
 
+  w_read_data_c         <= W_C(to_integer(Read_index));
+  w_read_data_c_plus_d  <= W_C_PLUS_D(to_integer(Read_index));
+  w_read_data_d_minus_c <= W_D_MINUS_C(to_integer(Read_index));
+
   g_output : if (LATENCY = 0) generate
 
-    Read_data_c         <= W_C(to_integer(Read_index));
-    Read_data_c_plus_d  <= W_C_PLUS_D(to_integer(Read_index));
-    Read_data_d_minus_c <= W_D_MINUS_C(to_integer(Read_index));
+    Read_data_c         <= w_read_data_c;
+    Read_data_c_plus_d  <= w_read_data_c_plus_d;
+    Read_data_d_minus_c <= w_read_data_d_minus_c;
 
   elsif (LATENCY = 1) generate
 
     process(Clk)
     begin
       if rising_edge(Clk) then
-        Read_data_c         <= W_C(to_integer(Read_index));
-        Read_data_c_plus_d  <= W_C_PLUS_D(to_integer(Read_index));
-        Read_data_d_minus_c <= W_D_MINUS_C(to_integer(Read_index));
+        Read_data_c         <= w_read_data_c;
+        Read_data_c_plus_d  <= w_read_data_c_plus_d;
+        Read_data_d_minus_c <= w_read_data_d_minus_c;
       end if;
     end process;
 
@@ -126,9 +138,9 @@ begin
     process(Clk)
     begin
       if rising_edge(Clk) then
-        r_read_data_c         <= W_C(to_integer(Read_index));
-        r_read_data_c_plus_d  <= W_C_PLUS_D(to_integer(Read_index));
-        r_read_data_d_minus_c <= W_D_MINUS_C(to_integer(Read_index));
+        r_read_data_c         <= w_read_data_c;
+        r_read_data_c_plus_d  <= w_read_data_c_plus_d;
+        r_read_data_d_minus_c <= w_read_data_d_minus_c;
       end if;
     end process;
 

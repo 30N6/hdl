@@ -11,11 +11,11 @@ typedef struct {
 } fft_32_transfer_t;
 
 interface fft_32_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
-  logic                       valid = 0;
-  logic [DATA_WIDTH - 1 : 0]  data_i;
-  logic [DATA_WIDTH - 1 : 0]  data_q;
-  logic [4 : 0]               index;
-  logic                       last;
+  logic                             valid = 0;
+  logic signed [DATA_WIDTH - 1 : 0] data_i;
+  logic signed [DATA_WIDTH - 1 : 0] data_q;
+  logic [4 : 0]                     index;
+  logic                             last;
 
   task write(input fft_32_transfer_t tx);
     data_i  <= tx.data_i;
@@ -34,11 +34,11 @@ interface fft_32_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
 endinterface
 
 interface fft_32_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
-  logic                       valid;
-  logic [DATA_WIDTH - 1 : 0]  data_i;
-  logic [DATA_WIDTH - 1 : 0]  data_q;
-  logic [4 : 0]               index;
-  logic                       last;
+  logic                             valid;
+  logic signed [DATA_WIDTH - 1 : 0] data_i;
+  logic signed [DATA_WIDTH - 1 : 0] data_q;
+  logic [4 : 0]                     index;
+  logic                             last;
 
   task read(output fft_32_transfer_t d);
     logic v;
@@ -61,6 +61,7 @@ module fft_32_tb;
   typedef struct
   {
     fft_32_transfer_t data;
+    int frame_index;
   } expect_t;
 
   logic Clk;
@@ -126,6 +127,20 @@ module fft_32_tb;
     end while (Rst);
   endtask
 
+  function automatic bit compare_fft_data(fft_32_transfer_t a, fft_32_transfer_t b);
+    int d_i = a.data_i - b.data_i;
+    int d_q = a.data_q - b.data_q;
+    real diff = $sqrt($pow($itor(d_i), 2.0) + $pow($itor(d_q), 2.0));
+    real threshold = 0.0001 * (2**OUTPUT_WIDTH - 1);
+    //$display("a=%p b=%p d_i=%0d d_q=%0d diff=%f threshold=%f", a, b, d_i, d_q, diff, threshold);
+
+    if (diff < threshold) begin
+      return 1;
+    end else begin
+      return 0;
+    end
+  endfunction
+
   initial begin
     automatic fft_32_transfer_t read_data;
 
@@ -133,10 +148,10 @@ module fft_32_tb;
 
     forever begin
       rx_intf.read(read_data);
-      if ( read_data == expected_data[0].data ) begin
-        //$display("%0t: data match - %X", $time, read_data);
+      if (compare_fft_data(read_data, expected_data[0].data)) begin
+        //$display("%0t: data match - frame=%0d - %p", $time, expected_data[0].frame_index, read_data);
       end else begin
-        $error("%0t: error -- data mismatch: expected = %p  actual = %p", $time, expected_data[0].data, read_data);
+        $error("%0t: error -- data mismatch: frame=%0d   expected = %p  actual = %p", $time, expected_data[0].frame_index, expected_data[0].data, read_data);
       end
       num_received++;
       void'(expected_data.pop_front());
@@ -155,13 +170,15 @@ module fft_32_tb;
 
   task automatic standard_tests();
     int max_frame_delay = 64;
-    int min_frame_delay = 10; //TODO: try back to back
+    int min_frame_delay = 32;
     int max_sample_delay = $urandom_range(5);
     int wait_cycles;
     fft_32_transfer_t tx_queue[$];
     fft_32_transfer_t rx_queue[$];
     fft_32_transfer_t transfer_data;
-    real d_i, d_q;
+    int d_i, d_q;
+    int frame_index;
+    int current_max_sample_delay = 0;
 
     int fd_test_in  = $fopen("./test_data/fft_test_data_2024_01_16_in.txt", "r");
     int fd_test_out = $fopen("./test_data/fft_test_data_2024_01_16_out.txt", "r");
@@ -169,27 +186,35 @@ module fft_32_tb;
     repeat(10) @(posedge Clk);
     $display("%0t: Standard test started: max_frame_delay=%0d min_frame_delay=%0d max_sample_delay=%0d", $time, max_frame_delay, min_frame_delay, max_sample_delay);
 
-    while ($fscanf(fd_test_in, "%d %d %f %f", transfer_data.index, transfer_data.last, d_i, d_q) == 4) begin
-      transfer_data.data_i = $rtoi(d_i * (2**INPUT_WIDTH - 1));
-      transfer_data.data_q = $rtoi(d_q * (2**INPUT_WIDTH - 1));
+    while ($fscanf(fd_test_in, "%d %d %d %d %d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q) == 5) begin
+      //$display("input_transfer: frame=%0d index=%0d last=%0d d_i=%0d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q);
+      transfer_data.data_i = d_i;
+      transfer_data.data_q = d_q;
       tx_queue.push_back(transfer_data);
     end
     $fclose(fd_test_in);
 
-    while ($fscanf(fd_test_out, "%d %d %f %f", transfer_data.index, transfer_data.last, d_i, d_q) == 4) begin
+    while ($fscanf(fd_test_out, "%d %d %d %d %d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q) == 5) begin
       expect_t e;
-      transfer_data.data_i = $rtoi(d_i * (2**OUTPUT_WIDTH - 1));
-      transfer_data.data_q = $rtoi(d_q * (2**OUTPUT_WIDTH - 1));
+      transfer_data.data_i = d_i;
+      transfer_data.data_q = d_q;
       e.data = transfer_data;
+      e.frame_index = frame_index;
       expected_data.push_back(e);
     end
     $fclose(fd_test_out);
 
-    foreach (tx_queue[i]) begin
+    $display("%0t: TX queue size = %0d", $time, tx_queue.size());
+
+    while (tx_queue.size() > 0) begin
       transfer_data = tx_queue.pop_front();
       tx_intf.write(transfer_data);
       if (transfer_data.last) begin
-        repeat ($urandom_range(max_frame_delay, min_frame_delay)) @(posedge Clk);
+        int frame_delay = ($urandom_range(99) < 20) ? min_frame_delay : $urandom_range(max_frame_delay, min_frame_delay);
+        repeat (frame_delay) @(posedge Clk);
+        current_max_sample_delay = ($urandom_range(99) < 20) ? 0 : $urandom_range(max_sample_delay);        
+      end else begin
+        repeat (current_max_sample_delay) @(posedge Clk);
       end
     end
 

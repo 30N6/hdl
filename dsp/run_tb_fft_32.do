@@ -88,9 +88,9 @@ foreach {library file_list} $library_file_list {
   foreach file $file_list {
     if { $last_compile_time < [file mtime $file] } {
       if [regexp {.vhdl?$} $file] {
-        vcom -2008 -mixedsvvh -work $library $file
+        vcom -2008 -mixedsvvh -suppress 12110 -work $library $file
       } else {
-        vlog +define+SIM -sv -mixedsvvh -timescale "1 ns / 1 ns" {*}[split $vlog_lib_str] -work $library $file {*}[split $incdir_str " "]
+        vlog +define+SIM -sv -mixedsvvh -suppress 12110 -timescale "1 ns / 1 ns" {*}[split $vlog_lib_str] -work $library $file {*}[split $incdir_str " "]
       }
       set last_compile_time 0
     }
@@ -101,7 +101,7 @@ set last_compile_time $time_now
 #TODO: non-gui mode
 
 # Load the simulation
-vsim $top_level glbl.glbl
+vsim -suppress 12110 $top_level glbl.glbl
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all
