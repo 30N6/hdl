@@ -147,7 +147,7 @@ begin
     generic map (
       ADDR_WIDTH  => MEM_ADDR_WIDTH,
       DATA_WIDTH  => BUFFER_DATA_WIDTH,
-      LATENCY     => 2
+      LATENCY     => MEM_READ_LATENCY
     )
     port map (
       Clk       => Clk,
@@ -170,7 +170,7 @@ begin
   generic map (
     STAGE_INDEX => STAGE_INDEX,
     DATA_WIDTH  => TWIDDLE_DATA_WIDTH,
-    LATENCY     => 2
+    LATENCY     => MEM_READ_LATENCY
   )
   port map (
     Clk                 => Clk,
