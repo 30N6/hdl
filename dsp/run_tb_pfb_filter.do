@@ -3,7 +3,7 @@
 # modify the rest of the script.
 
 set tb_lib      dsp_lib
-set tb_name     pfb_32_filter_tb
+set tb_name     pfb_filter_tb
 set top_level   $tb_lib.$tb_name
 
 set xilinx_dir  C:/Xilinx/Vivado/2022.2/data/verilog/src
@@ -22,8 +22,8 @@ set library_file_list [list \
     ./hdl/pfb_filter_buffer.vhd \
     ./hdl/pfb_filter_mult.vhd \
     ./hdl/pfb_filter_stage.vhd \
-    ./hdl/pfb_32_filter.vhd \
-    ./sim/pfb_32_filter_tb.sv \
+    ./hdl/pfb_filter.vhd \
+    ./sim/pfb_filter_tb.sv \
     ] \
 ]
 

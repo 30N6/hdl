@@ -60,15 +60,17 @@ begin
   begin
     if rising_edge(Clk) then
       if (Input_valid = '1') then
-        r_input_valid   <= (others => '1');
-        r_input_curr_iq <= Input_curr_iq;
-        r_input_prev_iq <= Input_prev_iq;
+        r_input_valid     <= (others => '1');
+        r_input_curr_iq   <= Input_curr_iq;
+        r_input_prev_iq   <= Input_prev_iq;
+        r_input_sub_index <= "1";
       else
         r_input_valid      <= r_input_valid(0)   & '0';
         r_input_curr_iq(1) <= r_input_curr_iq(0);
-        r_input_curr_iq(0) <= (others => '-');
+        r_input_curr_iq(0) <= (others => '0');
         r_input_prev_iq(1) <= r_input_prev_iq(0);
-        r_input_prev_iq(0) <= (others => '-');
+        r_input_prev_iq(0) <= (others => '0');
+        r_input_sub_index  <= "0";
       end if;
 
       if (Input_valid = '1') then
@@ -113,17 +115,18 @@ begin
       r_mult_data       <= w_mult_data;
       r_mult_index      <= w_mult_index;
       r_mult_sub_index  <= w_mult_sub_index;
+
+      --TODO: PSL assert
+      assert ((Output_valid /= '1') or ((r_mult_valid = '1') and (w_mult_index = r_mult_index) and (r_mult_sub_index = 1)))
+        report "Unexpected data from multiplier." & to_hstring(unsigned'("0" & r_mult_valid)) & " " & to_hstring(w_mult_index) & " " & to_hstring(r_mult_index) & " " & to_hstring(r_mult_sub_index)
+        severity failure;
     end if;
   end process;
 
-  Output_valid  <= w_mult_valid and to_stdlogic(w_mult_sub_index = 1);
+  Output_valid  <= w_mult_valid and to_stdlogic(w_mult_sub_index = 0);
   Output_index  <= w_mult_index;
   Output_iq(0)  <= w_mult_data;
   Output_iq(1)  <= r_mult_data;
-
-  assert ((Output_valid = '0') or ((r_mult_valid = '1') and (w_mult_index = r_mult_index) and (r_mult_sub_index = 0)))
-    report "Unexpected data from multiplier."
-    severity failure;
 
   process(Clk)
   begin

@@ -94,7 +94,7 @@ begin
     end if;
   end process;
 
-  w1_mult_scaled <= shift_left(r1_mult_result, INPUT_B_FRAC_WIDTH);
+  w1_mult_scaled <= r1_mult_result(MULT_RESULT_WIDTH - 1 downto INPUT_B_FRAC_WIDTH);  --shift_left(r1_mult_result, INPUT_B_FRAC_WIDTH);
 
   process(Clk)
   begin
