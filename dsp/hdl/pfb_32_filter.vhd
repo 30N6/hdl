@@ -6,8 +6,6 @@ library common_lib;
   use common_lib.common_pkg.all;
   use common_lib.math_pkg.all;
 
-library mem_lib;
-
 library dsp_lib;
   use dsp_lib.dsp_pkg.all;
 
@@ -96,19 +94,19 @@ architecture rtl of pfb_32_filter is
   function get_coefs_for_stage(stage : natural) return signed_array_t is
     variable r : signed_array_t(NUM_COEFS_PER_CHANNEL - 1 downto 0)(COEF_WIDTH - 1 downto 0);
   begin
-    for in 0 to (NUM_COEFS_PER_CHANNEL - 1) loop
+    for i in 0 to (NUM_COEFS_PER_CHANNEL - 1) loop
       r(i) := COEF_DATA(i * NUM_CHANNELS + stage);
     end loop;
     return r;
   end function;
 
-  type stage_iq_array_t is array (natural range <>) of signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
-
-  signal r_rst                : std_logic;
+  subtype iq_output_data_t is signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  type stage_iq_array_t is array (natural range <>) of iq_output_data_t;
+  --type stage_iq_array_t is array (natural range <>) of signed(3 downto 0);
 
   signal r_input_valid        : std_logic;
   signal r_input_index        : unsigned(4 downto 0);
-  signal r_input_i            : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r_input_iq           : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
   signal w_stage_prev_iq      : stage_iq_array_t(NUM_COEFS_PER_CHANNEL - 1);
   signal w_stage_output_valid : std_logic_vector(NUM_COEFS_PER_CHANNEL - 1 downto 0);
@@ -117,13 +115,6 @@ architecture rtl of pfb_32_filter is
   signal w_stage_overflow     : std_logic_vector(NUM_COEFS_PER_CHANNEL - 1 downto 0);
 
 begin
-
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      r_rst <= Rst;
-    end if;
-  end process;
 
   process(Clk)
   begin
@@ -139,7 +130,8 @@ begin
     generic map (
       NUM_CHANNELS        => NUM_CHANNELS,
       CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
-      COEF_DATA           => get_coefs_for_channel(i),
+      COEF_WIDTH          => COEF_WIDTH,
+      COEF_DATA           => get_coefs_for_stage(i),
       INPUT_DATA_WIDTH    => INPUT_DATA_WIDTH,
       OUTPUT_DATA_WIDTH   => OUTPUT_DATA_WIDTH
     )

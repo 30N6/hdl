@@ -37,7 +37,7 @@ port (
   Output_valid      : out std_logic;
   Output_index      : out unsigned(INDEX_WIDTH - 1 downto 0);
   Output_sub_index  : out unsigned(SUB_INDEX_WIDTH - 1 downto 0);
-  Output_data       : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
+  Output_data       : out signed(OUTPUT_DATA_WIDTH - 1 downto 0)
 );
 end entity pfb_filter_mult;
 
@@ -99,8 +99,8 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r2_valid      <= r1_input_valid;
-      r2_index      <= r1_input_index;
+      r2_valid      <= r1_valid;
+      r2_index      <= r1_index;
       r2_sub_index  <= r1_sub_index;
       r2_sum        <= resize_up(w1_mult_scaled, OUTPUT_DATA_WIDTH) + r1_input_c;
     end if;

@@ -13,7 +13,8 @@ entity pfb_filter_stage is
 generic (
   NUM_CHANNELS        : natural;
   CHANNEL_INDEX_WIDTH : natural;
-  COEF_DATA           : signed_array_t(NUM_CHANNELS - 1 downto 0)(COEF_WIDTH - 1 downto 0)
+  COEF_WIDTH          : natural;
+  COEF_DATA           : signed_array_t(NUM_CHANNELS - 1 downto 0)(COEF_WIDTH - 1 downto 0);
   INPUT_DATA_WIDTH    : natural;
   OUTPUT_DATA_WIDTH   : natural
 );
@@ -29,7 +30,7 @@ port (
   Output_index          : out unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   Output_iq             : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
-  Error_input_overflow  : out std_logic;
+  Error_input_overflow  : out std_logic
 );
 end entity pfb_filter_stage;
 
@@ -42,11 +43,6 @@ architecture rtl of pfb_filter_stage is
   signal r_input_sub_index  : unsigned(0 downto 0);
   signal r_input_curr_iq    : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
   signal r_input_prev_iq    : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
-
-  signal w_mult_valid       : std_logic;
-  signal w_mult_index       : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_mult_sub_index   : unsigned(0 downto 0);
-  signal w_mult_data        : signed(OUTPUT_DATA_WIDTH - 1 downto 0);
 
   signal w_mult_valid       : std_logic;
   signal w_mult_index       : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
@@ -68,9 +64,11 @@ begin
         r_input_curr_iq <= Input_curr_iq;
         r_input_prev_iq <= Input_prev_iq;
       else
-        r_input_valid   <= r_input_valid(0)   & '0';
-        r_input_curr_iq <= r_input_curr_iq(0) & (others => '-');
-        r_input_prev_iq <= r_input_prev_iq(0) & (others => '-');
+        r_input_valid      <= r_input_valid(0)   & '0';
+        r_input_curr_iq(1) <= r_input_curr_iq(0);
+        r_input_curr_iq(0) <= (others => '-');
+        r_input_prev_iq(1) <= r_input_prev_iq(0);
+        r_input_prev_iq(0) <= (others => '-');
       end if;
 
       if (Input_valid = '1') then
@@ -92,7 +90,7 @@ begin
     OUTPUT_DATA_WIDTH   => OUTPUT_DATA_WIDTH,
     LATENCY             => 3
   )
-  port (
+  port map (
     Clk             => Clk,
 
     Input_valid     => r_input_valid(1),
@@ -105,7 +103,7 @@ begin
     Output_valid      => w_mult_valid,
     Output_index      => w_mult_index,
     Output_sub_index  => w_mult_sub_index,
-    Output_iq         => w_mult_data
+    Output_data       => w_mult_data
   );
 
   process(Clk)
@@ -123,7 +121,7 @@ begin
   Output_iq(0)  <= w_mult_data;
   Output_iq(1)  <= r_mult_data;
 
-  assert (not(Output_valid) or ((r_mult_valid = '1') and (w_mult_index = r_mult_index) and (r_mult_sub_index = 0)))
+  assert ((Output_valid = '0') or ((r_mult_valid = '1') and (w_mult_index = r_mult_index) and (r_mult_sub_index = 0)))
     report "Unexpected data from multiplier."
     severity failure;
 
