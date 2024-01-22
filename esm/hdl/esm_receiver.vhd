@@ -1,0 +1,194 @@
+library ieee;
+  use ieee.std_logic_1164.all;
+  use ieee.numeric_std.all;
+
+library common_lib;
+  use common_lib.common_pkg.all;
+
+library axi_lib;
+
+library clock_lib;
+
+library dsp_lib;
+
+entity esm_receiver is
+generic (
+  AXI_DATA_WIDTH  : natural;
+  ADC_WIDTH       : natural;
+  IQ_WIDTH        : natural
+);
+port (
+  Adc_clk         : in  std_logic;
+  Adc_rst         : in  std_logic;
+
+  Adc_valid       : in  std_logic;
+  Adc_data_i      : in  signed(ADC_WIDTH - 1 downto 0);
+  Adc_data_q      : in  signed(ADC_WIDTH - 1 downto 0);
+
+  S_axis_clk      : in  std_logic;
+  S_axis_resetn   : in  std_logic;
+  S_axis_ready    : out std_logic;
+  S_axis_valid    : in  std_logic;
+  S_axis_data     : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  S_axis_last     : in  std_logic;
+
+  M_axis_clk      : in  std_logic;
+  M_axis_resetn   : in  std_logic;
+  M_axis_ready    : in  std_logic;
+  M_axis_valid    : out std_logic;
+  M_axis_data     : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  M_axis_last     : out std_logic
+);
+end entity esm_receiver;
+
+architecture rtl of esm_receiver is
+
+  constant CHANNELIZER_DATA_WIDTH : natural := IQ_WIDTH + 4 + 5; -- +4 for filter, +5 for ifft
+
+  signal data_clk                 : std_logic;
+
+  signal w_config_rst             : std_logic;
+  signal w_combined_rst           : std_logic;
+  signal w_extended_rst           : std_logic;
+
+  signal r_timestamp              : timestamp_t;
+
+  signal r_adc_valid              : std_logic;
+  signal r_adc_data_i             : signed(IQ_WIDTH - 1 downto 0);
+  signal r_adc_data_q             : signed(IQ_WIDTH - 1 downto 0);
+
+  signal w_adc_data_in            : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
+
+  signal w_channelizer_valid      : std_logic;
+  signal w_channelizer_index      : unsigned(4 downto 0);
+  signal w_channelizer_data       : signed_array_t(1 downto 0)(CHANNELIZER_DATA_WIDTH - 1 downto 0);
+  signal w_channelizer_overflow   : std_logic;
+
+  signal r_test                   : std_logic;
+
+  signal w_reporter_axis_ready    : std_logic;
+  signal w_reporter_axis_valid    : std_logic;
+  signal w_reporter_axis_data     : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_reporter_axis_last     : std_logic;
+
+  signal w_config_axis_ready      : std_logic;
+  signal w_config_axis_valid      : std_logic;
+  signal w_config_axis_data       : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_config_axis_last       : std_logic;
+
+begin
+
+  i_clocking : entity clock_lib.adc_clk_mult
+  port map (
+    Clk_x1  => Adc_clk,
+    reset   => Adc_rst,
+
+    locked  => open,
+    Clk_x2  => open,
+    Clk_x4  => data_clk
+  );
+
+  w_combined_rst <= Adc_rst or w_config_rst;
+
+  i_reset : entity common_lib.reset_extender
+  generic map (
+    RESET_LENGTH => 2*PREAMBLE_LENGTH
+  )
+  port map (
+    Clk     => Adc_clk,
+    Rst_in  => w_combined_rst,
+    Rst_out => w_extended_rst
+  );
+
+  process(Adc_clk)
+  begin
+    if rising_edge(Adc_clk) then
+      if (w_extended_rst = '1') then
+        r_timestamp <= (others => '0');
+      else
+        r_timestamp <= r_timestamp + 1;
+      end if;
+    end if;
+  end process;
+
+  process(Adc_clk)
+  begin
+    if rising_edge(Adc_clk) then
+      r_adc_valid   <= Adc_valid;
+      r_adc_data_i  <= Adc_data_i(ADC_WIDTH - 1 downto (ADC_WIDTH - IQ_WIDTH));
+      r_adc_data_q  <= Adc_data_q(ADC_WIDTH - 1 downto (ADC_WIDTH - IQ_WIDTH));
+    end if;
+  end process;
+
+  w_adc_data_in <= (r_adc_data_q, r_adc_data_i);
+
+  i_channelizer : entity dsp_lib.channelizer_32
+  generic map (
+    INPUT_DATA_WIDTH  => IQ_WIDTH,
+    OUTPUT_DATA_WIDTH => IQ_WIDTH + 4 + 5
+  )
+  port (
+    Clk             => data_clk,
+    Rst             => w_extended_rst,
+
+    Input_valid     => r_adc_valid, --TODO: gated
+    Input_data      => w_adc_data_in,
+
+    Output_valid    => w_channelizer_valid,
+    Output_index    => w_channelizer_index,
+    Output_data     => w_channelizer_data,
+
+    Error_overflow  => w_channelizer_overflow
+  );
+
+  process(data_clk)
+  begin
+    if rising_edge(data_clk) then
+      r_test <= w_channelizer_valid or or_reduce(std_logic_vector(w_channelizer_index) & std_logic_vector(w_channelizer_data(0)) & std_logic_vector(w_channelizer_data(0))) or w_channelizer_overflow;
+    end if;
+  end process;
+
+  i_master_axis_fifo : entity axi_lib.axis_async_fifo
+  generic map (
+    FIFO_DEPTH      => AXI_FIFO_DEPTH,
+    AXI_DATA_WIDTH  => AXI_DATA_WIDTH
+  )
+  port map (
+    S_axis_clk      => Adc_clk,
+    S_axis_resetn   => not(w_extended_rst),
+    S_axis_ready    => w_reporter_axis_ready,
+    S_axis_valid    => w_reporter_axis_valid,
+    S_axis_data     => w_reporter_axis_data,
+    S_axis_last     => w_reporter_axis_last,
+
+    M_axis_clk      => M_axis_clk,
+    M_axis_ready    => M_axis_ready,
+    M_axis_valid    => M_axis_valid,
+    M_axis_data     => M_axis_data,
+    M_axis_last     => M_axis_last
+  );
+
+  i_slave_axis_fifo : entity axi_lib.axis_async_fifo
+  generic map (
+    FIFO_DEPTH      => AXI_FIFO_DEPTH,
+    AXI_DATA_WIDTH  => AXI_DATA_WIDTH
+  )
+  port map (
+    S_axis_clk      => S_axis_clk,
+    S_axis_resetn   => S_axis_resetn,
+    S_axis_ready    => S_axis_ready,
+    S_axis_valid    => S_axis_valid,
+    S_axis_data     => S_axis_data,
+    S_axis_last     => S_axis_last,
+
+    M_axis_clk      => Adc_clk,
+    M_axis_ready    => w_config_axis_ready,
+    M_axis_valid    => w_config_axis_valid,
+    M_axis_data     => w_config_axis_data,
+    M_axis_last     => w_config_axis_last
+  );
+
+  w_reporter_axis_valid <= '0'; --TODO
+  w_config_axis_ready   <= r_test; --TODO --'1';
+
+end architecture rtl;
