@@ -11,6 +11,7 @@ custom_ip_files esm_receiver [list \
   {"../clock/hdl/adc_clk_mult_clk_wiz.v"  "clock_lib"}    \
   {"../clock/hdl/adc_clk_mult.v"          "clock_lib"}    \
   {"../mem/hdl/ram_sdp.vhd"               "mem_lib"}      \
+  {"../dsp/hdl/dsp_pkg.vhd"               "dsp_lib"}      \
   {"../dsp/hdl/correlator_simple.vhd"     "dsp_lib"}      \
   {"../dsp/hdl/filter_moving_avg.vhd"     "dsp_lib"}      \
   {"../dsp/hdl/mag_approximation.vhd"     "dsp_lib"}      \

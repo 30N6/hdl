@@ -162,7 +162,7 @@ begin
 
   w_fft_input_control.valid       <= w_filter_valid;
   w_fft_input_control.last        <= to_stdlogic(w_filter_index = 0);
-  w_fft_input_control.reverse     <= '1;
+  w_fft_input_control.reverse     <= '1';
   w_fft_input_control.data_index  <= w_filter_index;
   w_fft_input_control.tag         <= (others => '0');
 

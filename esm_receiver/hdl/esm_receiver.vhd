@@ -43,15 +43,15 @@ end entity esm_receiver;
 
 architecture rtl of esm_receiver is
 
+  constant AXI_FIFO_DEPTH         : natural := 64;
   constant CHANNELIZER_DATA_WIDTH : natural := IQ_WIDTH + 4 + 5; -- +4 for filter, +5 for ifft
 
   signal data_clk                 : std_logic;
 
   signal w_config_rst             : std_logic;
-  signal w_combined_rst           : std_logic;
-  signal w_extended_rst           : std_logic;
+  signal r_combined_rst           : std_logic;
 
-  signal r_timestamp              : timestamp_t;
+  signal r_timestamp              : unsigned(63 downto 0);
 
   signal r_adc_valid              : std_logic;
   signal r_adc_data_i             : signed(IQ_WIDTH - 1 downto 0);
@@ -88,22 +88,18 @@ begin
     Clk_x4  => data_clk
   );
 
-  w_combined_rst <= Adc_rst or w_config_rst;
-
-  i_reset : entity common_lib.reset_extender
-  generic map (
-    RESET_LENGTH => 2*PREAMBLE_LENGTH
-  )
-  port map (
-    Clk     => Adc_clk,
-    Rst_in  => w_combined_rst,
-    Rst_out => w_extended_rst
-  );
+  w_config_rst <= '0'; --TODO
+  process(Adc_clk)
+  begin
+    if rising_edge(Adc_clk) then
+      r_combined_rst <= Adc_rst or w_config_rst;
+    end if;
+  end process;
 
   process(Adc_clk)
   begin
     if rising_edge(Adc_clk) then
-      if (w_extended_rst = '1') then
+      if (Adc_rst = '1') then
         r_timestamp <= (others => '0');
       else
         r_timestamp <= r_timestamp + 1;
@@ -127,9 +123,9 @@ begin
     INPUT_DATA_WIDTH  => IQ_WIDTH,
     OUTPUT_DATA_WIDTH => IQ_WIDTH + 4 + 5
   )
-  port (
+  port map (
     Clk             => data_clk,
-    Rst             => w_extended_rst,
+    Rst             => r_combined_rst,
 
     Input_valid     => r_adc_valid, --TODO: gated
     Input_data      => w_adc_data_in,
@@ -155,7 +151,7 @@ begin
   )
   port map (
     S_axis_clk      => Adc_clk,
-    S_axis_resetn   => not(w_extended_rst),
+    S_axis_resetn   => not(r_combined_rst),
     S_axis_ready    => w_reporter_axis_ready,
     S_axis_valid    => w_reporter_axis_valid,
     S_axis_data     => w_reporter_axis_data,

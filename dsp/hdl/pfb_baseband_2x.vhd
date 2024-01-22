@@ -5,6 +5,9 @@ library ieee;
 library common_lib;
   use common_lib.common_pkg.all;
 
+library dsp_lib;
+  use dsp_lib.dsp_pkg.all;
+
 -- basebanding for 2x oversampled PFB data (odd channels multiplied by +1, -1, +1, -1, ...)
 
 entity pfb_baseband_2x is
@@ -30,6 +33,7 @@ architecture rtl of pfb_baseband_2x is
   type mod_array_t is array (natural range <>) of std_logic;
 
   signal m_mod_state : mod_array_t(2**CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_mod_state : std_logic;
 
 begin
 
