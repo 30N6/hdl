@@ -33,15 +33,15 @@ end entity fft_4;
 architecture rtl of fft_4 is
   constant ACTUAL_OUTPUT_DATA_WIDTH : natural := minimum(INPUT_DATA_WIDTH + 2, OUTPUT_DATA_WIDTH);
 
-  signal w_input_resized_i    : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
-  signal w_input_resized_q    : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
+  signal r_input_resized_i    : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
+  signal r_input_resized_q    : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
 
-  signal w_input_i_inv        : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
-  signal w_input_q_inv        : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
-  signal w_input_i_x_plus_j   : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
-  signal w_input_q_x_plus_j   : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
-  signal w_input_i_x_minus_j  : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
-  signal w_input_q_x_minus_j  : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
+  signal r_input_i_inv        : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
+  signal r_input_q_inv        : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
+  signal r_input_i_x_plus_j   : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
+  signal r_input_q_x_plus_j   : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
+  signal r_input_i_x_minus_j  : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
+  signal r_input_q_x_minus_j  : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
 
   signal w_output_i           : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
   signal w_output_q           : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH + 1 downto 0);
@@ -50,42 +50,44 @@ architecture rtl of fft_4 is
 
 begin
 
-  assert ((LATENCY = 0) or (LATENCY = 1))
-    report "LATENCY expected to be 0 or 1."
+  assert (LATENCY = 1)
+    report "LATENCY expected to be 1."
     severity failure;
 
   assert (OUTPUT_DATA_WIDTH >= INPUT_DATA_WIDTH)
     report "OUTPUT_DATA_WIDTH expected to be greater than or equal to INPUT_DATA_WIDTH."
     severity failure;
 
-  process(all)
+  process(Clk)
   begin
-    for i in 0 to 3 loop
-      w_input_resized_i(i)    <= resize_up(Input_i(i), INPUT_DATA_WIDTH + 2);
-      w_input_resized_q(i)    <= resize_up(Input_q(i), INPUT_DATA_WIDTH + 2);
+    if rising_edge(Clk) then
+      for i in 0 to 3 loop
+        r_input_resized_i(i)    <= resize_up(Input_i(i), INPUT_DATA_WIDTH + 2);
+        r_input_resized_q(i)    <= resize_up(Input_q(i), INPUT_DATA_WIDTH + 2);
 
-      w_input_i_inv(i)        <= resize_up(invert_sign(Input_i(i)), INPUT_DATA_WIDTH + 2);
-      w_input_q_inv(i)        <= resize_up(invert_sign(Input_q(i)), INPUT_DATA_WIDTH + 2);
+        r_input_i_inv(i)        <= resize_up(invert_sign(Input_i(i)), INPUT_DATA_WIDTH + 2);
+        r_input_q_inv(i)        <= resize_up(invert_sign(Input_q(i)), INPUT_DATA_WIDTH + 2);
 
-      w_input_i_x_plus_j(i)   <= resize_up(invert_sign(Input_q(i)), INPUT_DATA_WIDTH + 2);
-      w_input_q_x_plus_j(i)   <= resize_up(Input_i(i),              INPUT_DATA_WIDTH + 2);
+        r_input_i_x_plus_j(i)   <= resize_up(invert_sign(Input_q(i)), INPUT_DATA_WIDTH + 2);
+        r_input_q_x_plus_j(i)   <= resize_up(Input_i(i),              INPUT_DATA_WIDTH + 2);
 
-      w_input_i_x_minus_j(i)  <= resize_up(Input_q(i),              INPUT_DATA_WIDTH + 2);
-      w_input_q_x_minus_j(i)  <= resize_up(invert_sign(Input_i(i)), INPUT_DATA_WIDTH + 2);
-    end loop;
+        r_input_i_x_minus_j(i)  <= resize_up(Input_q(i),              INPUT_DATA_WIDTH + 2);
+        r_input_q_x_minus_j(i)  <= resize_up(invert_sign(Input_i(i)), INPUT_DATA_WIDTH + 2);
+      end loop;
+    end if;
   end process;
 
-  w_output_i(0) <= w_input_resized_i(0) + w_input_resized_i(1)  +  w_input_resized_i(2) +  w_input_resized_i(3);
-  w_output_q(0) <= w_input_resized_q(0) + w_input_resized_q(1)  +  w_input_resized_q(2) +  w_input_resized_q(3);
+  w_output_i(0) <= r_input_resized_i(0) + r_input_resized_i(1)  +  r_input_resized_i(2)   +  r_input_resized_i(3);
+  w_output_q(0) <= r_input_resized_q(0) + r_input_resized_q(1)  +  r_input_resized_q(2)   +  r_input_resized_q(3);
 
-  w_output_i(1) <= w_input_resized_i(0) + w_input_i_x_minus_j(1)  + w_input_i_inv(2)  + w_input_i_x_plus_j(3);
-  w_output_q(1) <= w_input_resized_q(0) + w_input_q_x_minus_j(1)  + w_input_q_inv(2)  + w_input_q_x_plus_j(3);
+  w_output_i(1) <= r_input_resized_i(0) + r_input_i_x_minus_j(1)  + r_input_i_inv(2)      + r_input_i_x_plus_j(3);
+  w_output_q(1) <= r_input_resized_q(0) + r_input_q_x_minus_j(1)  + r_input_q_inv(2)      + r_input_q_x_plus_j(3);
 
-  w_output_i(2) <= w_input_resized_i(0) + w_input_i_inv(1)        + w_input_resized_i(2)        + w_input_i_inv(3);
-  w_output_q(2) <= w_input_resized_q(0) + w_input_q_inv(1)        + w_input_resized_q(2)        + w_input_q_inv(3);
+  w_output_i(2) <= r_input_resized_i(0) + r_input_i_inv(1)        + r_input_resized_i(2)  + r_input_i_inv(3);
+  w_output_q(2) <= r_input_resized_q(0) + r_input_q_inv(1)        + r_input_resized_q(2)  + r_input_q_inv(3);
 
-  w_output_i(3) <= w_input_resized_i(0) + w_input_i_x_plus_j(1)   + w_input_i_inv(2)  + w_input_i_x_minus_j(3);
-  w_output_q(3) <= w_input_resized_q(0) + w_input_q_x_plus_j(1)   + w_input_q_inv(2)  + w_input_q_x_minus_j(3);
+  w_output_i(3) <= r_input_resized_i(0) + r_input_i_x_plus_j(1)   + r_input_i_inv(2)      + r_input_i_x_minus_j(3);
+  w_output_q(3) <= r_input_resized_q(0) + r_input_q_x_plus_j(1)   + r_input_q_inv(2)      + r_input_q_x_minus_j(3);
 
   process(all)
   begin
@@ -97,23 +99,14 @@ begin
     end loop;
   end process;
 
-  g_output : if (LATENCY = 0) generate
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Output_control  <= Input_control;
+    end if;
+  end process;
 
-    Output_control  <= Input_control;
-    Output_i        <= w_output_trimmed_i;
-    Output_q        <= w_output_trimmed_q;
-
-  elsif (LATENCY = 1) generate
-
-    process(Clk)
-    begin
-      if rising_edge(Clk) then
-        Output_control  <= Input_control;
-        Output_i        <= w_output_trimmed_i;
-        Output_q        <= w_output_trimmed_q;
-      end if;
-    end process;
-
-  end generate;
+  Output_i <= w_output_trimmed_i;
+  Output_q <= w_output_trimmed_q;
 
 end architecture rtl;
