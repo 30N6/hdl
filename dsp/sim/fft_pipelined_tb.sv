@@ -190,7 +190,7 @@ module fft_pipelined_tb;
     int fd_test_out = $fopen(fn_out, "r");
 
     repeat(10) @(posedge Clk);
-    $display("%0t: Standard test started: max_frame_delay=%0d max_sample_delay=%0d", $time, max_frame_delay, max_sample_delay);
+    $display("%0t: Standard test started: fn_in=%s fn_out=%s max_frame_delay=%0d max_sample_delay=%0d", $time, fn_in, fn_out, max_frame_delay, max_sample_delay);
 
     while ($fscanf(fd_test_in, "%d %d %d %d %d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q) == 5) begin
       //$display("input_transfer: frame=%0d index=%0d last=%0d d_i=%0d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q);
