@@ -11,10 +11,10 @@ typedef struct {
   bit reverse;
   int tag;
   int delay;
-} fft_32_transfer_t;
+} fft_transfer_t;
 
-interface fft_32_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
-  fft_control_t                   control;
+interface fft_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
+  fft_control_t                     control;
   logic signed [DATA_WIDTH - 1 : 0] data_i;
   logic signed [DATA_WIDTH - 1 : 0] data_q;
 
@@ -26,7 +26,7 @@ interface fft_32_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
     control.tag         <= 'x;
   endtask
 
-  task write(input fft_32_transfer_t tx);
+  task write(input fft_transfer_t tx);
     data_i              <= tx.data_i;
     data_q              <= tx.data_q;
     control.data_index  <= tx.index;
@@ -40,12 +40,12 @@ interface fft_32_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
   endtask
 endinterface
 
-interface fft_32_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
-  fft_control_t                   control;
+interface fft_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
+  fft_control_t                     control;
   logic signed [DATA_WIDTH - 1 : 0] data_i;
   logic signed [DATA_WIDTH - 1 : 0] data_q;
 
-  task read(output fft_32_transfer_t d);
+  task read(output fft_transfer_t d);
     logic v;
     do begin
       d.data_i  <= data_i;
@@ -60,24 +60,25 @@ interface fft_32_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
   endtask
 endinterface
 
-module fft_32_tb;
+module fft_pipelined_tb;
   parameter time CLK_HALF_PERIOD = 4ns;
+  parameter NUM_POINTS = 32;
   parameter INPUT_WIDTH = 16;
-  parameter OUTPUT_WIDTH = INPUT_WIDTH + 5;
+  parameter OUTPUT_WIDTH = INPUT_WIDTH + $clog2(NUM_POINTS);
 
   typedef struct
   {
-    fft_32_transfer_t data;
+    fft_transfer_t data;
     int frame_index;
   } expect_t;
 
   logic Clk;
   logic Rst;
 
-  fft_32_tx_intf #(.DATA_WIDTH(INPUT_WIDTH))  tx_intf (.*);
-  fft_32_rx_intf #(.DATA_WIDTH(OUTPUT_WIDTH)) rx_intf (.*);
-  expect_t                                    expected_data [$];
-  int                                         num_received = 0;
+  fft_tx_intf #(.DATA_WIDTH(INPUT_WIDTH))   tx_intf (.*);
+  fft_rx_intf #(.DATA_WIDTH(OUTPUT_WIDTH))  rx_intf (.*);
+  expect_t                                  expected_data [$];
+  int                                       num_received = 0;
 
   initial begin
     Clk = 0;
@@ -93,9 +94,9 @@ module fft_32_tb;
     Rst = 0;
   end
 
-  logic w_error;
-
-  fft_32 #(
+  fft_pipelined #(
+    .NUM_POINTS        (NUM_POINTS),
+    .INDEX_WIDTH       ($clog2(NUM_POINTS)),
     .INPUT_DATA_WIDTH  (INPUT_WIDTH),
     .OUTPUT_DATA_WIDTH (OUTPUT_WIDTH)
   )
@@ -119,7 +120,7 @@ module fft_32_tb;
     end while (Rst);
   endtask
 
-  function automatic bit compare_fft_data(fft_32_transfer_t a, fft_32_transfer_t b);
+  function automatic bit compare_fft_data(fft_transfer_t a, fft_transfer_t b);
     int d_i = a.data_i - b.data_i;
     int d_q = a.data_q - b.data_q;
     real diff = $sqrt($pow($itor(d_i), 2.0) + $pow($itor(d_q), 2.0));
@@ -147,7 +148,7 @@ module fft_32_tb;
   endfunction
 
   initial begin
-    automatic fft_32_transfer_t read_data;
+    automatic fft_transfer_t read_data;
 
     wait_for_reset();
 
@@ -177,9 +178,9 @@ module fft_32_tb;
     int max_frame_delay = 64;
     int max_sample_delay = $urandom_range(5);
     int wait_cycles;
-    fft_32_transfer_t tx_queue[$];
-    fft_32_transfer_t rx_queue[$];
-    fft_32_transfer_t transfer_data;
+    fft_transfer_t tx_queue[$];
+    fft_transfer_t rx_queue[$];
+    fft_transfer_t transfer_data;
     int d_i, d_q;
     int frame_index;
     int current_max_sample_delay = 0;
@@ -247,10 +248,29 @@ module fft_32_tb;
   initial
   begin
     wait_for_reset();
-    standard_tests("./test_data/fft_test_data_2024_01_16_forward_in.txt", "./test_data/fft_test_data_2024_01_16_forward_out.txt", 0);
-    repeat(100) @(posedge Clk);
-    standard_tests("./test_data/fft_test_data_2024_01_18_reverse_in.txt", "./test_data/fft_test_data_2024_01_18_reverse_out.txt", 1);
-    repeat(100) @(posedge Clk);
+
+    if (NUM_POINTS == 8) begin
+      standard_tests("./test_data/fft_test_data_2024_01_22_8_forward_in.txt", "./test_data/fft_test_data_2024_01_22_8_forward_out.txt", 0);
+      repeat(100) @(posedge Clk);
+      standard_tests("./test_data/fft_test_data_2024_01_22_8_reverse_in.txt", "./test_data/fft_test_data_2024_01_22_8_reverse_out.txt", 1);
+      repeat(100) @(posedge Clk);
+    end else if (NUM_POINTS == 16) begin
+      standard_tests("./test_data/fft_test_data_2024_01_22_16_forward_in.txt", "./test_data/fft_test_data_2024_01_22_16_forward_out.txt", 0);
+      repeat(100) @(posedge Clk);
+      standard_tests("./test_data/fft_test_data_2024_01_22_16_reverse_in.txt", "./test_data/fft_test_data_2024_01_22_16_reverse_out.txt", 1);
+      repeat(100) @(posedge Clk);
+    end else if (NUM_POINTS == 32) begin
+      standard_tests("./test_data/fft_test_data_2024_01_16_32_forward_in.txt", "./test_data/fft_test_data_2024_01_16_32_forward_out.txt", 0);
+      repeat(100) @(posedge Clk);
+      standard_tests("./test_data/fft_test_data_2024_01_18_32_reverse_in.txt", "./test_data/fft_test_data_2024_01_18_32_reverse_out.txt", 1);
+      repeat(100) @(posedge Clk);
+    end else if (NUM_POINTS == 64) begin
+      standard_tests("./test_data/fft_test_data_2024_01_22_64_forward_in.txt", "./test_data/fft_test_data_2024_01_22_64_forward_out.txt", 0);
+      repeat(100) @(posedge Clk);
+      standard_tests("./test_data/fft_test_data_2024_01_22_64_reverse_in.txt", "./test_data/fft_test_data_2024_01_22_64_reverse_out.txt", 1);
+      repeat(100) @(posedge Clk);
+    end
+
     $finish;
   end
 

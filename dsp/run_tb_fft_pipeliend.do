@@ -3,7 +3,7 @@
 # modify the rest of the script.
 
 set tb_lib      dsp_lib
-set tb_name     fft_32_tb
+set tb_name     fft_pipelined_tb
 set top_level   $tb_lib.$tb_name
 
 set xilinx_dir  C:/Xilinx/Vivado/2022.2/data/verilog/src
@@ -27,8 +27,8 @@ set library_file_list [list \
     ./hdl/fft_twiddle_mem.vhd \
     ./hdl/fft_radix2_output.vhd \
     ./hdl/fft_radix2_stage.vhd \
-    ./hdl/fft_32.vhd \
-    ./sim/fft_32_tb.sv \
+    ./hdl/fft_pipelined.vhd \
+    ./sim/fft_pipelined_tb.sv \
     ] \
 ]
 
@@ -101,7 +101,22 @@ set last_compile_time $time_now
 #TODO: non-gui mode
 
 # Load the simulation
-vsim -suppress 12110 $top_level glbl.glbl
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=8
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
+vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=16
+set NumericStdNoWarnings 1
+set BreakOnAssertion 2
+run -all
+
+vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=32
+set NumericStdNoWarnings 1
+set BreakOnAssertion 2
+run -all
+
+vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=64
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all
