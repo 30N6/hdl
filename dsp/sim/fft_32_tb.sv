@@ -14,7 +14,7 @@ typedef struct {
 } fft_32_transfer_t;
 
 interface fft_32_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
-  fft32_control_t                   control;
+  fft_control_t                   control;
   logic signed [DATA_WIDTH - 1 : 0] data_i;
   logic signed [DATA_WIDTH - 1 : 0] data_q;
 
@@ -41,7 +41,7 @@ interface fft_32_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
 endinterface
 
 interface fft_32_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
-  fft32_control_t                   control;
+  fft_control_t                   control;
   logic signed [DATA_WIDTH - 1 : 0] data_i;
   logic signed [DATA_WIDTH - 1 : 0] data_q;
 
@@ -101,27 +101,17 @@ module fft_32_tb;
   )
   dut
   (
-    .Clk                   (Clk),
-    .Rst                   (Rst),
+    .Clk            (Clk),
+    .Rst            (Rst),
 
-    .Input_control         (tx_intf.control),
-    .Input_i               (tx_intf.data_i),
-    .Input_q               (tx_intf.data_q),
+    .Input_control  (tx_intf.control),
+    .Input_i        (tx_intf.data_i),
+    .Input_q        (tx_intf.data_q),
 
-    .Output_control        (rx_intf.control),
-    .Output_i              (rx_intf.data_i),
-    .Output_q              (rx_intf.data_q),
-
-    .Error_input_overflow  (w_error)
+    .Output_control (rx_intf.control),
+    .Output_i       (rx_intf.data_i),
+    .Output_q       (rx_intf.data_q)
   );
-
-  always_ff @(posedge Clk) begin
-    if (!Rst) begin
-      if (w_error) begin
-        $error("%0t: overflow error", $time);
-      end
-    end
-  end
 
   task automatic wait_for_reset();
     do begin

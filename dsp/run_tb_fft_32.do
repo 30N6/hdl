@@ -26,7 +26,7 @@ set library_file_list [list \
     ./hdl/fft_4_serializer.vhd \
     ./hdl/fft_twiddle_mem.vhd \
     ./hdl/fft_radix2_output.vhd \
-    ./hdl/fft_32_radix2_stage.vhd \
+    ./hdl/fft_radix2_stage.vhd \
     ./hdl/fft_32.vhd \
     ./sim/fft_32_tb.sv \
     ] \

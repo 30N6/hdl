@@ -11,16 +11,16 @@ library dsp_lib;
 
 entity fft_twiddle_mem is
 generic (
-  NUM_CYCLES  : natural;
-  INDEX_WIDTH : natural;
-  STAGE_INDEX : natural;
-  DATA_WIDTH  : natural;
-  LATENCY     : natural
+  NUM_CYCLES        : natural;
+  CYCLE_INDEX_WIDTH : natural;
+  STAGE_INDEX       : natural;
+  DATA_WIDTH        : natural;
+  LATENCY           : natural
 );
 port (
   Clk                 : in  std_logic;
 
-  Read_index          : in  unsigned(INDEX_WIDTH - 1 downto 0);
+  Read_index          : in  unsigned(CYCLE_INDEX_WIDTH - 1 downto 0);
   Read_data_c         : out signed(DATA_WIDTH - 1 downto 0);
   Read_data_c_plus_d  : out signed(DATA_WIDTH downto 0);
   Read_data_d_minus_c : out signed(DATA_WIDTH downto 0)

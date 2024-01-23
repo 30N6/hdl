@@ -17,30 +17,28 @@ generic (
   OUTPUT_DATA_WIDTH : natural
 );
 port (
-  Clk                   : in  std_logic;
-  Rst                   : in  std_logic;
+  Clk             : in  std_logic;
+  Rst             : in  std_logic;
 
-  Input_control         : in  fft32_control_t;
-  Input_i               : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
-  Input_q               : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
+  Input_control   : in  fft_control_t;
+  Input_i         : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
+  Input_q         : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
 
-  Output_control        : out fft32_control_t;
-  Output_i              : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
-  Output_q              : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
-
-  Error_input_overflow  : out std_logic --TODO: use
+  Output_control  : out fft_control_t;
+  Output_i        : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
+  Output_q        : out signed(OUTPUT_DATA_WIDTH - 1 downto 0)
 );
 end entity fft_32;
 
 architecture rtl of fft_32 is
 
-  constant DATA_CYCLES              : natural := 32;
+  constant NUM_CYCLES              : natural := 32;
   constant NUM_PAGES                : natural := 2;
   constant PAGE_INDEX_WIDTH         : natural := clog2(NUM_PAGES);
 
   constant INPUT_BUFFER_ADDR_WIDTH  : natural := FFT32_DATA_INDEX_WIDTH + PAGE_INDEX_WIDTH;
   constant INPUT_MEM_DATA_WIDTH     : natural := 2*INPUT_DATA_WIDTH;
-  constant INPUT_MEM_INFO_WIDTH     : natural := FFT32_TAG_WIDTH + 1;
+  constant INPUT_MEM_INFO_WIDTH     : natural := FFT_TAG_WIDTH + 1;
 
   constant FFT4_OUTPUT_WIDTH        : natural := INPUT_DATA_WIDTH + 2;
   constant FFT8_OUTPUT_WIDTH        : natural := FFT4_OUTPUT_WIDTH + 1;
@@ -48,11 +46,11 @@ architecture rtl of fft_32 is
   constant FFT32_OUTPUT_WIDTH       : natural := FFT16_OUTPUT_WIDTH + 1;
 
   constant NUM_INPUT_PIPE_STAGES    : natural := 1;
-  constant INPUT_READ_INDEX         : natural_array_t(0 to DATA_CYCLES-1) := (0, 8, 16, 24,   4, 12, 20, 28,    2, 10, 18, 26,    6, 14, 22, 30,    1, 9, 17, 25,   5, 13, 21, 29,    3, 11, 19, 27,    7, 15, 23, 31);
+  constant INPUT_READ_INDEX         : natural_array_t(0 to NUM_CYCLES-1) := (0, 8, 16, 24,   4, 12, 20, 28,    2, 10, 18, 26,    6, 14, 22, 30,    1, 9, 17, 25,   5, 13, 21, 29,    3, 11, 19, 27,    7, 15, 23, 31);
 
   signal r_rst                  : std_logic;
 
-  signal r_input_wr_control     : fft32_control_t;
+  signal r_input_wr_control     : fft_control_t;
   signal r_input_wr_data        : std_logic_vector(INPUT_MEM_DATA_WIDTH - 1 downto 0);
   signal w_input_wr_info        : std_logic_vector(INPUT_MEM_INFO_WIDTH - 1 downto 0);
   signal w_input_wr_addr        : unsigned(INPUT_BUFFER_ADDR_WIDTH - 1 downto 0);
@@ -71,32 +69,29 @@ architecture rtl of fft_32 is
   signal r_input_active_pipe    : std_logic_vector(NUM_INPUT_PIPE_STAGES - 1 downto 0);
   signal r_input_last_pipe      : std_logic_vector(NUM_INPUT_PIPE_STAGES - 1 downto 0);
 
-  signal r_fft4_inpput_control  : fft32_control_t;
+  signal r_fft4_inpput_control  : fft_control_t;
   signal r_fft4_input_i         : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
   signal r_fft4_input_q         : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
-  signal w_fft4_output_control  : fft32_control_t;
+  signal w_fft4_output_control  : fft_control_t;
   signal w_fft4_output_i        : signed_array_t(3 downto 0)(FFT4_OUTPUT_WIDTH - 1 downto 0);
   signal w_fft4_output_q        : signed_array_t(3 downto 0)(FFT4_OUTPUT_WIDTH - 1 downto 0);
 
-  signal w_fft4_serial_control  : fft32_control_t;
+  signal w_fft4_serial_control  : fft_control_t;
   signal w_fft4_serial_i        : signed(FFT4_OUTPUT_WIDTH - 1 downto 0);
   signal w_fft4_serial_q        : signed(FFT4_OUTPUT_WIDTH - 1 downto 0);
 
-  signal w_fft8_output_control  : fft32_control_t;
+  signal w_fft8_output_control  : fft_control_t;
   signal w_fft8_output_i        : signed(FFT8_OUTPUT_WIDTH - 1 downto 0);
   signal w_fft8_output_q        : signed(FFT8_OUTPUT_WIDTH - 1 downto 0);
 
-  signal w_fft16_output_control : fft32_control_t;
+  signal w_fft16_output_control : fft_control_t;
   signal w_fft16_output_i       : signed(FFT16_OUTPUT_WIDTH - 1 downto 0);
   signal w_fft16_output_q       : signed(FFT16_OUTPUT_WIDTH - 1 downto 0);
 
-  signal w_fft32_output_control : fft32_control_t;
+  signal w_fft32_output_control : fft_control_t;
   signal w_fft32_output_i       : signed(FFT32_OUTPUT_WIDTH - 1 downto 0);
   signal w_fft32_output_q       : signed(FFT32_OUTPUT_WIDTH - 1 downto 0);
-
-  signal w_fft_error_overflow   : std_logic_vector(4 downto 0);
-  signal r_fft_error_overflow   : std_logic_vector(4 downto 0);
 
 begin
 
@@ -117,7 +112,7 @@ begin
 
   w_input_wr_info       <= r_input_wr_control.reverse & r_input_wr_control.tag;
   w_input_wr_valid_last <= r_input_wr_control.valid and r_input_wr_control.last;
-  w_input_wr_addr       <= r_write_page_index & r_input_wr_control.data_index;
+  w_input_wr_addr       <= r_write_page_index & r_input_wr_control.data_index(FFT32_DATA_INDEX_WIDTH - 1 downto 0);
   w_input_rd_addr       <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX(to_integer(r_input_index)), FFT32_DATA_INDEX_WIDTH);
 
   i_data_buffer_s0 : entity mem_lib.ram_sdp
@@ -173,7 +168,7 @@ begin
           r_write_page_index  <= r_write_page_index + 1;
           r_read_page_index   <= r_write_page_index;
         else
-          if (r_input_index = (DATA_CYCLES - 1)) then
+          if (r_input_index = (NUM_CYCLES - 1)) then
             r_input_active <= '0';
           end if;
           r_input_index <= r_input_index + 1;
@@ -182,19 +177,17 @@ begin
     end if;
   end process;
 
-  w_fft_error_overflow(0) <= '0'; --r_input_wr_control.valid and r_input_active and to_stdlogic(r_input_index /= (DATA_CYCLES - 1));
-
   process(Clk)
   begin
     if rising_edge(Clk) then
       if (NUM_INPUT_PIPE_STAGES > 1) then
         r_input_index_pipe      <= r_input_index_pipe(NUM_INPUT_PIPE_STAGES - 2 downto 0)   & r_input_index;
         r_input_active_pipe     <= r_input_active_pipe(NUM_INPUT_PIPE_STAGES - 2 downto 0)  & r_input_active;
-        r_input_last_pipe       <= r_input_last_pipe(NUM_INPUT_PIPE_STAGES - 2 downto 0)    & to_stdlogic(r_input_index = (DATA_CYCLES-1));
+        r_input_last_pipe       <= r_input_last_pipe(NUM_INPUT_PIPE_STAGES - 2 downto 0)    & to_stdlogic(r_input_index = (NUM_CYCLES-1));
       else
         r_input_index_pipe(0)   <=  r_input_index;
         r_input_active_pipe(0)  <=  r_input_active;
-        r_input_last_pipe(0)    <=  to_stdlogic(r_input_index = (DATA_CYCLES-1));
+        r_input_last_pipe(0)    <=  to_stdlogic(r_input_index = (NUM_CYCLES-1));
       end if;
     end if;
   end process;
@@ -214,9 +207,9 @@ begin
 
       r_fft4_inpput_control.valid       <= r_input_active_pipe(NUM_INPUT_PIPE_STAGES - 1) and to_stdlogic(r_input_index_pipe(NUM_INPUT_PIPE_STAGES - 1)(1 downto 0) = 3);
       r_fft4_inpput_control.last        <= r_input_last_pipe(NUM_INPUT_PIPE_STAGES - 1);
-      r_fft4_inpput_control.reverse     <= w_input_rd_info(FFT32_TAG_WIDTH);
-      r_fft4_inpput_control.data_index  <= r_input_index_pipe(NUM_INPUT_PIPE_STAGES - 1)(FFT32_DATA_INDEX_WIDTH - 1 downto 2) & "00";
-      r_fft4_inpput_control.tag         <= w_input_rd_info(FFT32_TAG_WIDTH - 1 downto 0);
+      r_fft4_inpput_control.reverse     <= w_input_rd_info(FFT_TAG_WIDTH);
+      r_fft4_inpput_control.data_index  <= resize_up(r_input_index_pipe(NUM_INPUT_PIPE_STAGES - 1)(FFT32_DATA_INDEX_WIDTH - 1 downto 2) & "00", r_fft4_inpput_control.data_index'length);
+      r_fft4_inpput_control.tag         <= w_input_rd_info(FFT_TAG_WIDTH - 1 downto 0);
     end if;
   end process;
 
@@ -253,16 +246,17 @@ begin
 
     Output_control        => w_fft4_serial_control,
     Output_i              => w_fft4_serial_i,
-    Output_q              => w_fft4_serial_q,
-
-    Error_input_overflow  => w_fft_error_overflow(1)
+    Output_q              => w_fft4_serial_q
   );
 
-  i_fft_8 : entity dsp_lib.fft_32_radix2_stage
+  i_fft_8 : entity dsp_lib.fft_radix2_stage
   generic map (
+    NUM_CYCLES        => NUM_CYCLES,
+    CYCLE_INDEX_WIDTH => FFT32_DATA_INDEX_WIDTH,
     INPUT_DATA_WIDTH  => FFT4_OUTPUT_WIDTH,
     OUTPUT_DATA_WIDTH => FFT8_OUTPUT_WIDTH,
-    STAGE_INDEX       => 8
+    STAGE_INDEX       => 8,
+    FINAL_STAGE       => false
   )
   port map (
     Clk                   => Clk,
@@ -274,16 +268,17 @@ begin
 
     Output_control        => w_fft8_output_control,
     Output_i              => w_fft8_output_i,
-    Output_q              => w_fft8_output_q,
-
-    Error_input_overflow  => w_fft_error_overflow(2)
+    Output_q              => w_fft8_output_q
   );
 
-  i_fft_16 : entity dsp_lib.fft_32_radix2_stage
+  i_fft_16 : entity dsp_lib.fft_radix2_stage
   generic map (
+    NUM_CYCLES        => NUM_CYCLES,
+    CYCLE_INDEX_WIDTH => FFT32_DATA_INDEX_WIDTH,
     INPUT_DATA_WIDTH  => FFT8_OUTPUT_WIDTH,
     OUTPUT_DATA_WIDTH => FFT16_OUTPUT_WIDTH,
-    STAGE_INDEX       => 16
+    STAGE_INDEX       => 16,
+    FINAL_STAGE       => false
   )
   port map (
     Clk                   => Clk,
@@ -295,16 +290,17 @@ begin
 
     Output_control        => w_fft16_output_control,
     Output_i              => w_fft16_output_i,
-    Output_q              => w_fft16_output_q,
-
-    Error_input_overflow  => w_fft_error_overflow(3)
+    Output_q              => w_fft16_output_q
   );
 
-  i_fft_32 : entity dsp_lib.fft_32_radix2_stage
+  i_fft_32 : entity dsp_lib.fft_radix2_stage
   generic map (
+    NUM_CYCLES        => NUM_CYCLES,
+    CYCLE_INDEX_WIDTH => FFT32_DATA_INDEX_WIDTH,
     INPUT_DATA_WIDTH  => FFT16_OUTPUT_WIDTH,
     OUTPUT_DATA_WIDTH => FFT32_OUTPUT_WIDTH,
-    STAGE_INDEX       => 32
+    STAGE_INDEX       => 32,
+    FINAL_STAGE       => true
   )
   port map (
     Clk                   => Clk,
@@ -316,21 +312,11 @@ begin
 
     Output_control        => w_fft32_output_control,
     Output_i              => w_fft32_output_i,
-    Output_q              => w_fft32_output_q,
-
-    Error_input_overflow  => w_fft_error_overflow(4)
+    Output_q              => w_fft32_output_q
   );
 
   Output_control  <= w_fft32_output_control;
   Output_i        <= w_fft32_output_i(FFT32_OUTPUT_WIDTH - 1 downto (FFT32_OUTPUT_WIDTH - OUTPUT_DATA_WIDTH));
   Output_q        <= w_fft32_output_q(FFT32_OUTPUT_WIDTH - 1 downto (FFT32_OUTPUT_WIDTH - OUTPUT_DATA_WIDTH));
-
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      r_fft_error_overflow <= w_fft_error_overflow;
-      Error_input_overflow <= or_reduce(r_fft_error_overflow);
-    end if;
-  end process;
 
 end architecture rtl;

@@ -20,11 +20,11 @@ generic (
 port (
   Clk             : in  std_logic;
 
-  Input_control   : in  fft32_control_t;
+  Input_control   : in  fft_control_t;
   Input_i         : in  signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
   Input_q         : in  signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
-  Output_control  : out fft32_control_t;
+  Output_control  : out fft_control_t;
   Output_i        : out signed_array_t(3 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
   Output_q        : out signed_array_t(3 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0)
 );
@@ -52,7 +52,7 @@ architecture rtl of fft_4 is
   signal w1_output_trimmed_i   : signed_array_t(3 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
   signal w1_output_trimmed_q   : signed_array_t(3 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
-  signal r_input_control      : fft32_control_t;
+  signal r_input_control      : fft_control_t;
 
 begin
 

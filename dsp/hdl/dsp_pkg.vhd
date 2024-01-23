@@ -7,18 +7,20 @@ library common_lib;
 
 package dsp_pkg is
 
+  constant FFT8_DATA_INDEX_WIDTH  : natural := clog2(8);
   constant FFT32_DATA_INDEX_WIDTH : natural := clog2(32);
-  constant FFT32_TAG_WIDTH        : natural := 8;
+  constant FFT64_DATA_INDEX_WIDTH : natural := clog2(64);
+  constant FFT_TAG_WIDTH          : natural := 8;
 
-  type fft32_control_t is record
+  type fft_control_t is record
     valid       : std_logic;
     last        : std_logic;
     reverse     : std_logic;
-    data_index  : unsigned(4 downto 0);
-    tag         : std_logic_vector(FFT32_TAG_WIDTH - 1 downto 0);
+    data_index  : unsigned(5 downto 0);
+    tag         : std_logic_vector(FFT_TAG_WIDTH - 1 downto 0);
   end record;
 
-  type fft32_control_array_t is array (natural range <>) of fft32_control_t;
+  type fft_control_array_t is array (natural range <>) of fft_control_t;
 
   function invert_sign(v : signed) return signed;
   function int_to_signed_array(int_array : integer_array_t; output_length : natural; input_width : natural; output_width : natural) return signed_array_t;

@@ -40,38 +40,38 @@ end entity fft_radix2_output;
 
 architecture rtl of fft_radix2_output is
 
-  constant K_WIDTH                : natural := INPUT_DATA_WIDTH + TWIDDLE_DATA_WIDTH + 1;
-  constant OUTPUT_SCALED_WIDTH    : natural := K_WIDTH + 2; -- k + k + d
+  constant K_WIDTH              : natural := INPUT_DATA_WIDTH + TWIDDLE_DATA_WIDTH + 1;
+  constant OUTPUT_SCALED_WIDTH  : natural := K_WIDTH + 2; -- k + k + d
 
-  signal r0_chan0_i         : signed(INPUT_DATA_WIDTH - 1 downto 0);
-  signal r0_chan0_q         : signed(INPUT_DATA_WIDTH - 1 downto 0);
-  signal r0_chan1_a         : signed(INPUT_DATA_WIDTH - 1 downto 0);
-  signal r0_chan1_b         : signed(INPUT_DATA_WIDTH - 1 downto 0);
-  signal r0_chan1_a_plus_b  : signed(INPUT_DATA_WIDTH downto 0);
-  signal r0_chan1_c         : signed(TWIDDLE_DATA_WIDTH - 1 downto 0);
-  signal r0_chan1_c_plus_d  : signed(TWIDDLE_DATA_WIDTH downto 0);
-  signal r0_chan1_d_minus_c : signed(TWIDDLE_DATA_WIDTH downto 0);
+  signal r0_chan0_i             : signed(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r0_chan0_q             : signed(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r0_chan1_a             : signed(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r0_chan1_b             : signed(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r0_chan1_a_plus_b      : signed(INPUT_DATA_WIDTH downto 0);
+  signal r0_chan1_c             : signed(TWIDDLE_DATA_WIDTH - 1 downto 0);
+  signal r0_chan1_c_plus_d      : signed(TWIDDLE_DATA_WIDTH downto 0);
+  signal r0_chan1_d_minus_c     : signed(TWIDDLE_DATA_WIDTH downto 0);
 
-  signal r1_chan0_scaled_i  : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
-  signal r1_chan0_scaled_q  : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
-  signal r1_k1              : signed(K_WIDTH - 1 downto 0); -- k1 = c * (a+b)
-  signal r1_k2              : signed(K_WIDTH - 1 downto 0); -- k2 = a * (d-c)
-  signal r1_k3              : signed(K_WIDTH - 1 downto 0); -- k3 = b * (c+d)
+  signal r1_chan0_scaled_i      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r1_chan0_scaled_q      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r1_k1                  : signed(K_WIDTH - 1 downto 0); -- k1 = c * (a+b)
+  signal r1_k2                  : signed(K_WIDTH - 1 downto 0); -- k2 = a * (d-c)
+  signal r1_k3                  : signed(K_WIDTH - 1 downto 0); -- k3 = b * (c+d)
 
-  signal r2_chan0_scaled_i  : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
-  signal r2_chan0_scaled_q  : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
-  signal r2_k1              : signed(K_WIDTH - 1 downto 0);
-  signal r2_k2              : signed(K_WIDTH - 1 downto 0);
-  signal r2_k3              : signed(K_WIDTH - 1 downto 0);
+  signal r2_chan0_scaled_i      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r2_chan0_scaled_q      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r2_k1                  : signed(K_WIDTH - 1 downto 0);
+  signal r2_k2                  : signed(K_WIDTH - 1 downto 0);
+  signal r2_k3                  : signed(K_WIDTH - 1 downto 0);
 
-  signal r3_chan0_scaled_i  : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
-  signal r3_chan0_scaled_q  : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
-  signal r3_k1              : signed(K_WIDTH - 1 downto 0);
-  signal r3_k2              : signed(K_WIDTH - 1 downto 0);
-  signal r3_k3              : signed(K_WIDTH - 1 downto 0);
+  signal r3_chan0_scaled_i      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r3_chan0_scaled_q      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r3_k1                  : signed(K_WIDTH - 1 downto 0);
+  signal r3_k2                  : signed(K_WIDTH - 1 downto 0);
+  signal r3_k3                  : signed(K_WIDTH - 1 downto 0);
 
-  signal r4_output_scaled_i : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
-  signal r4_output_scaled_q : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
+  signal r4_output_scaled_i     : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
+  signal r4_output_scaled_q     : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
 
 begin
 
