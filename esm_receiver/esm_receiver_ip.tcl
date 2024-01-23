@@ -18,17 +18,19 @@ custom_ip_files esm_receiver [list \
   {"../dsp/hdl/pipeline_delay.vhd"        "dsp_lib"}      \
   {"../dsp/hdl/fft_4.vhd"                 "dsp_lib"}      \
   {"../dsp/hdl/fft_4_serializer.vhd"      "dsp_lib"}      \
-  {"../dsp/hdl/fft_32.vhd"                "dsp_lib"}      \
-  {"../dsp/hdl/fft_32_radix2_stage.vhd"   "dsp_lib"}      \
-  {"../dsp/hdl/fft_32_twiddle_mem.vhd"    "dsp_lib"}      \
+  {"../dsp/hdl/fft_pipelined.vhd"         "dsp_lib"}      \
+  {"../dsp/hdl/fft_radix2_stage.vhd"      "dsp_lib"}      \
+  {"../dsp/hdl/fft_twiddle_mem.vhd"       "dsp_lib"}      \
   {"../dsp/hdl/fft_radix2_output.vhd"     "dsp_lib"}      \
-  {"../dsp/hdl/pfb_32_demux.vhd"          "dsp_lib"}      \
+  {"../dsp/hdl/pfb_demux_2x.vhd"          "dsp_lib"}      \
   {"../dsp/hdl/pfb_baseband_2x.vhd"       "dsp_lib"}      \
   {"../dsp/hdl/pfb_filter.vhd"            "dsp_lib"}      \
   {"../dsp/hdl/pfb_filter_buffer.vhd"     "dsp_lib"}      \
   {"../dsp/hdl/pfb_filter_mult.vhd"       "dsp_lib"}      \
   {"../dsp/hdl/pfb_filter_stage.vhd"      "dsp_lib"}      \
+  {"../dsp/hdl/channelizer_8.vhd"         "dsp_lib"}      \
   {"../dsp/hdl/channelizer_32.vhd"        "dsp_lib"}      \
+  {"../dsp/hdl/channelizer_64.vhd"        "dsp_lib"}      \
   {"./hdl/esm_receiver.vhd"               "dsp_lib"}      \
 ]
 

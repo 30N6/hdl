@@ -101,10 +101,9 @@ architecture rtl of channelizer_32 is
   signal w_filter_data        : signed_array_t(1 downto 0)(FILTER_DATA_WIDTH - 1 downto 0);
   signal w_filter_overflow    : std_logic;
 
-  signal w_fft_input_control  : fft32_control_t;
-  signal w_fft_output_control : fft32_control_t;
+  signal w_fft_input_control  : fft_control_t;
+  signal w_fft_output_control : fft_control_t;
   signal w_fft_data           : signed_array_t(1 downto 0)(FFT_DATA_WIDTH - 1 downto 0);
-  signal w_fft_overflow       : std_logic;
 
 begin
 
@@ -115,9 +114,11 @@ begin
     end if;
   end process;
 
-  i_demux : entity dsp_lib.pfb_32_demux
+  i_demux : entity dsp_lib.pfb_demux_2x
   generic map (
-    DATA_WIDTH => INPUT_DATA_WIDTH
+    CHANNEL_COUNT       => NUM_CHANNELS,  --TODO: consistent naming of generics
+    CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
+    DATA_WIDTH          => INPUT_DATA_WIDTH
   )
   port map (
     Clk             => Clk,
@@ -163,27 +164,27 @@ begin
   w_fft_input_control.valid       <= w_filter_valid;
   w_fft_input_control.last        <= to_stdlogic(w_filter_index = 0);
   w_fft_input_control.reverse     <= '1';
-  w_fft_input_control.data_index  <= w_filter_index;
+  w_fft_input_control.data_index  <= resize_up(w_filter_index, w_fft_input_control.data_index'length);
   w_fft_input_control.tag         <= (others => '0');
 
-  i_ifft : entity dsp_lib.fft_32
+  i_ifft : entity dsp_lib.fft_pipelined
   generic map (
+    NUM_POINTS        => NUM_CHANNELS,
+    INDEX_WIDTH       => CHANNEL_INDEX_WIDTH,
     INPUT_DATA_WIDTH  => FILTER_DATA_WIDTH,
     OUTPUT_DATA_WIDTH => FFT_DATA_WIDTH
   )
   port map (
-    Clk                   => Clk,
-    Rst                   => r_rst,
+    Clk             => Clk,
+    Rst             => r_rst,
 
-    Input_control         => w_fft_input_control,
-    Input_i               => w_filter_data(0),
-    Input_q               => w_filter_data(1),
+    Input_control   => w_fft_input_control,
+    Input_i         => w_filter_data(0),
+    Input_q         => w_filter_data(1),
 
-    Output_control        => w_fft_output_control,
-    Output_i              => w_fft_data(0),
-    Output_q              => w_fft_data(1),
-
-    Error_input_overflow  => w_fft_overflow
+    Output_control  => w_fft_output_control,
+    Output_i        => w_fft_data(0),
+    Output_q        => w_fft_data(1)
   );
 
   i_baseband : entity dsp_lib.pfb_baseband_2x
@@ -195,7 +196,7 @@ begin
     Clk           => Clk,
 
     Input_valid   => w_fft_output_control.valid,
-    Input_index   => w_fft_output_control.data_index,
+    Input_index   => w_fft_output_control.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0),
     Input_data    => w_fft_data,
 
     Output_valid  => Output_valid,
@@ -206,7 +207,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Error_overflow <= w_filter_overflow or w_fft_overflow;
+      Error_overflow <= w_filter_overflow;
     end if;
   end process;
 

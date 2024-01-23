@@ -43,8 +43,9 @@ end entity esm_receiver;
 
 architecture rtl of esm_receiver is
 
-  constant AXI_FIFO_DEPTH         : natural := 64;
-  constant CHANNELIZER_DATA_WIDTH : natural := IQ_WIDTH + 4 + 5; -- +4 for filter, +5 for ifft
+  constant AXI_FIFO_DEPTH           : natural := 64;
+  constant CHANNELIZER8_DATA_WIDTH  : natural := IQ_WIDTH + 4 + 3; -- +4 for filter, +3 for ifft
+  constant CHANNELIZER64_DATA_WIDTH : natural := IQ_WIDTH + 4 + 6; -- +4 for filter, +6 for ifft
 
   signal data_clk                 : std_logic;
 
@@ -59,11 +60,17 @@ architecture rtl of esm_receiver is
 
   signal w_adc_data_in            : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
 
-  signal w_channelizer_valid      : std_logic;
-  signal w_channelizer_index      : unsigned(4 downto 0);
-  signal w_channelizer_data       : signed_array_t(1 downto 0)(CHANNELIZER_DATA_WIDTH - 1 downto 0);
-  signal w_channelizer_overflow   : std_logic;
+  signal w_channelizer8_valid       : std_logic;
+  signal w_channelizer8_index       : unsigned(4 downto 0);
+  signal w_channelizer8_data        : signed_array_t(1 downto 0)(CHANNELIZER8_DATA_WIDTH - 1 downto 0);
+  signal w_channelizer8_overflow    : std_logic;
+  signal w_channelizer64_valid      : std_logic;
+  signal w_channelizer64_index      : unsigned(4 downto 0);
+  signal w_channelizer64_data       : signed_array_t(1 downto 0)(CHANNELIZER64_DATA_WIDTH - 1 downto 0);
+  signal w_channelizer64_overflow   : std_logic;
 
+  signal r_test_8                 : std_logic;
+  signal r_test_64                : std_logic;
   signal r_test                   : std_logic;
 
   signal w_reporter_axis_ready    : std_logic;
@@ -118,10 +125,29 @@ begin
 
   w_adc_data_in <= (r_adc_data_q, r_adc_data_i);
 
-  i_channelizer : entity dsp_lib.channelizer_32
+  --i_channelizer : entity dsp_lib.channelizer_32
+  --generic map (
+  --  INPUT_DATA_WIDTH  => IQ_WIDTH,
+  --  OUTPUT_DATA_WIDTH => IQ_WIDTH + 4 + 5
+  --)
+  --port map (
+  --  Clk             => data_clk,
+  --  Rst             => r_combined_rst,
+  --
+  --  Input_valid     => r_adc_valid, --TODO: gated
+  --  Input_data      => w_adc_data_in,
+  --
+  --  Output_valid    => w_channelizer_valid,
+  --  Output_index    => w_channelizer_index,
+  --  Output_data     => w_channelizer_data,
+  --
+  --  Error_overflow  => w_channelizer_overflow
+  --);
+
+  i_channelizer_8 : entity dsp_lib.channelizer_8
   generic map (
     INPUT_DATA_WIDTH  => IQ_WIDTH,
-    OUTPUT_DATA_WIDTH => IQ_WIDTH + 4 + 5
+    OUTPUT_DATA_WIDTH => CHANNELIZER8_DATA_WIDTH
   )
   port map (
     Clk             => data_clk,
@@ -130,17 +156,39 @@ begin
     Input_valid     => r_adc_valid, --TODO: gated
     Input_data      => w_adc_data_in,
 
-    Output_valid    => w_channelizer_valid,
-    Output_index    => w_channelizer_index,
-    Output_data     => w_channelizer_data,
+    Output_valid    => w_channelizer8_valid,
+    Output_index    => w_channelizer8_index,
+    Output_data     => w_channelizer8_data,
 
-    Error_overflow  => w_channelizer_overflow
+    Error_overflow  => w_channelizer8_overflow
+  );
+
+  i_channelizer_64 : entity dsp_lib.channelizer_64
+  generic map (
+    INPUT_DATA_WIDTH  => IQ_WIDTH,
+    OUTPUT_DATA_WIDTH => CHANNELIZER64_DATA_WIDTH
+  )
+  port map (
+    Clk             => data_clk,
+    Rst             => r_combined_rst,
+
+    Input_valid     => r_adc_valid, --TODO: gated
+    Input_data      => w_adc_data_in,
+
+    Output_valid    => w_channelizer64_valid,
+    Output_index    => w_channelizer64_index,
+    Output_data     => w_channelizer64_data,
+
+    Error_overflow  => w_channelizer64_overflow
   );
 
   process(data_clk)
   begin
     if rising_edge(data_clk) then
-      r_test <= w_channelizer_valid or or_reduce(std_logic_vector(w_channelizer_index) & std_logic_vector(w_channelizer_data(0)) & std_logic_vector(w_channelizer_data(1))) or w_channelizer_overflow;
+      r_test_8  <= w_channelizer8_valid  or or_reduce(std_logic_vector(w_channelizer8_index)  & std_logic_vector(w_channelizer8_data(0))  & std_logic_vector(w_channelizer8_data(1)))  or w_channelizer8_overflow;
+      r_test_64 <= w_channelizer64_valid or or_reduce(std_logic_vector(w_channelizer64_index) & std_logic_vector(w_channelizer64_data(0)) & std_logic_vector(w_channelizer64_data(1))) or w_channelizer64_overflow;
+      r_test    <= r_test_8 or r_test_64;
+      --r_test <= w_channelizer_valid or or_reduce(std_logic_vector(w_channelizer_index) & std_logic_vector(w_channelizer_data(0)) & std_logic_vector(w_channelizer_data(1))) or w_channelizer_overflow;
     end if;
   end process;
 
