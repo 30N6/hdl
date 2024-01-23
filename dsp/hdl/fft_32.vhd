@@ -224,7 +224,7 @@ begin
   generic map (
     INPUT_DATA_WIDTH  => INPUT_DATA_WIDTH,
     OUTPUT_DATA_WIDTH => FFT4_OUTPUT_WIDTH,
-    LATENCY           => 1
+    LATENCY           => 2
   )
   port map (
     Clk             => Clk,

@@ -140,7 +140,7 @@ begin
   process(data_clk)
   begin
     if rising_edge(data_clk) then
-      r_test <= w_channelizer_valid or or_reduce(std_logic_vector(w_channelizer_index) & std_logic_vector(w_channelizer_data(0)) & std_logic_vector(w_channelizer_data(0))) or w_channelizer_overflow;
+      r_test <= w_channelizer_valid or or_reduce(std_logic_vector(w_channelizer_index) & std_logic_vector(w_channelizer_data(0)) & std_logic_vector(w_channelizer_data(1))) or w_channelizer_overflow;
     end if;
   end process;
 

@@ -39,7 +39,7 @@ architecture rtl of fft_32_radix2_stage is
   constant TWIDDLE_DATA_WIDTH   : natural := 17;
   constant TWIDDLE_FRAC_WIDTH   : natural := 16;
   constant MEM_READ_LATENCY     : natural := 2;
-  constant OUTPUT_STAGE_LATENCY : natural := 4;
+  constant OUTPUT_STAGE_LATENCY : natural := 5;
   constant OUTPUT_PIPE_DEPTH    : natural := MEM_READ_LATENCY + OUTPUT_STAGE_LATENCY;
   constant NUM_PAGES            : natural := 2;
   constant PAGE_INDEX_WIDTH     : natural := clog2(NUM_PAGES);
@@ -166,8 +166,10 @@ begin
     w_buf_rd_data_q(i) <= signed(w_buf_rd_data(i)(INPUT_DATA_WIDTH - 1 downto 0));
   end generate g_buffer;
 
-  i_twiddle_mem : entity dsp_lib.fft_32_twiddle_mem
+  i_twiddle_mem : entity dsp_lib.fft_twiddle_mem
   generic map (
+    NUM_CYCLES  => 32,
+    INDEX_WIDTH => FFT32_DATA_INDEX_WIDTH,
     STAGE_INDEX => STAGE_INDEX,
     DATA_WIDTH  => TWIDDLE_DATA_WIDTH,
     LATENCY     => MEM_READ_LATENCY
