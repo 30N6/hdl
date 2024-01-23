@@ -61,11 +61,11 @@ architecture rtl of esm_receiver is
   signal w_adc_data_in            : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
 
   signal w_channelizer8_valid       : std_logic;
-  signal w_channelizer8_index       : unsigned(4 downto 0);
+  signal w_channelizer8_index       : unsigned(2 downto 0);
   signal w_channelizer8_data        : signed_array_t(1 downto 0)(CHANNELIZER8_DATA_WIDTH - 1 downto 0);
   signal w_channelizer8_overflow    : std_logic;
   signal w_channelizer64_valid      : std_logic;
-  signal w_channelizer64_index      : unsigned(4 downto 0);
+  signal w_channelizer64_index      : unsigned(5 downto 0);
   signal w_channelizer64_data       : signed_array_t(1 downto 0)(CHANNELIZER64_DATA_WIDTH - 1 downto 0);
   signal w_channelizer64_overflow   : std_logic;
 
