@@ -11,9 +11,11 @@ library mem_lib;
 library dsp_lib;
   use dsp_lib.dsp_pkg.all;
 
-entity pfb_32_demux is
+entity pfb_demux_2x is
 generic (
-  DATA_WIDTH  : natural
+  CHANNEL_COUNT       : natural;
+  CHANNEL_INDEX_WIDTH : natural;
+  DATA_WIDTH          : natural
 );
 port (
   Clk             : in  std_logic;
@@ -24,39 +26,90 @@ port (
   Input_q         : in  signed(DATA_WIDTH - 1 downto 0);
 
   Output_valid    : out std_logic;  -- 1/2 expected rate
-  Output_channel  : out unsigned(4 downto 0);
+  Output_channel  : out unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   Output_i        : out signed(DATA_WIDTH - 1 downto 0);
   Output_q        : out signed(DATA_WIDTH - 1 downto 0)
 );
-end entity pfb_32_demux;
+end entity pfb_demux_2x;
 
-architecture rtl of pfb_32_demux is
+architecture rtl of pfb_demux_2x is
 
-  constant CHANNEL_COUNT        : natural := 32;
-  constant CHANNEL_INDEX_WIDTH  : natural := clog2(CHANNEL_COUNT);
-  constant BUFFER_DEPTH         : natural := 64;
-  constant BUFFER_INDEX_WIDTH   : natural := clog2(BUFFER_DEPTH);
-  constant READ_CYCLE_COUNT     : natural := 128;
-  constant READ_CYCLE_WIDTH     : natural := clog2(READ_CYCLE_COUNT);
+  constant BUFFER_DEPTH       : natural := 2 * CHANNEL_COUNT;
+  constant BUFFER_INDEX_WIDTH : natural := clog2(BUFFER_DEPTH);
+  constant READ_CYCLE_COUNT   : natural := 2 * BUFFER_DEPTH;
+  constant READ_CYCLE_WIDTH   : natural := clog2(READ_CYCLE_COUNT);
 
   function get_read_index_map return unsigned_array_t is
     variable r : unsigned_array_t(READ_CYCLE_COUNT - 1 downto 0)(BUFFER_INDEX_WIDTH - 1 downto 0);
   begin
-    for i in 0 to 31 loop
-      r(i) := to_unsigned(i, BUFFER_INDEX_WIDTH);
-    end loop;
-    for i in 32 to 63 loop
-      r(i) := to_unsigned(i - 16, BUFFER_INDEX_WIDTH);
-    end loop;
-    for i in 64 to 95 loop
-      r(i) := to_unsigned(i - 32, BUFFER_INDEX_WIDTH);
-    end loop;
-    for i in 96 to 111 loop
-      r(i) := to_unsigned(i - 48, BUFFER_INDEX_WIDTH);
-    end loop;
-    for i in 112 to 127 loop
-      r(i) := to_unsigned(i - 112, BUFFER_INDEX_WIDTH);
-    end loop;
+    if (CHANNEL_COUNT = 8) then
+      for i in 0 to 7 loop
+        r(i) := to_unsigned(i, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 8 to 15 loop
+        r(i) := to_unsigned(i - 4, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 16 to 23 loop
+        r(i) := to_unsigned(i - 8, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 24 to 27 loop
+        r(i) := to_unsigned(i - 12, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 28 to 31 loop
+        r(i) := to_unsigned(i - 28, BUFFER_INDEX_WIDTH);
+      end loop;
+
+    elsif (CHANNEL_COUNT = 16) then
+      for i in 0 to 15 loop
+        r(i) := to_unsigned(i, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 16 to 31 loop
+        r(i) := to_unsigned(i - 8, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 32 to 47 loop
+        r(i) := to_unsigned(i - 16, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 48 to 55 loop
+        r(i) := to_unsigned(i - 24, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 56 to 63 loop
+        r(i) := to_unsigned(i - 56, BUFFER_INDEX_WIDTH);
+      end loop;
+
+    elsif (CHANNEL_COUNT = 32) then
+      for i in 0 to 31 loop
+        r(i) := to_unsigned(i, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 32 to 63 loop
+        r(i) := to_unsigned(i - 16, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 64 to 95 loop
+        r(i) := to_unsigned(i - 32, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 96 to 111 loop
+        r(i) := to_unsigned(i - 48, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 112 to 127 loop
+        r(i) := to_unsigned(i - 112, BUFFER_INDEX_WIDTH);
+      end loop;
+
+    elsif (CHANNEL_COUNT = 64) then
+      for i in 0 to 63 loop
+        r(i) := to_unsigned(i, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 64 to 127 loop
+        r(i) := to_unsigned(i - 32, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 128 to 191 loop
+        r(i) := to_unsigned(i - 64, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 192 to 223 loop
+        r(i) := to_unsigned(i - 96, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 224 to 255 loop
+        r(i) := to_unsigned(i - 224, BUFFER_INDEX_WIDTH);
+      end loop;
+    end if;
     return r;
   end function;
 
@@ -98,7 +151,7 @@ begin
         if (Input_valid = '1') then
           r_write_index <= r_write_index + 1;
 
-          if (r_write_index = 16) then
+          if (r_write_index = (CHANNEL_COUNT / 2)) then
             r_write_valid <= '1';
           end if;
         end if;
