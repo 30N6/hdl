@@ -27,6 +27,7 @@ port (
 
   Output_valid    : out std_logic;  -- 1/2 expected rate
   Output_channel  : out unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  Output_last     : out std_logic;
   Output_i        : out signed(DATA_WIDTH - 1 downto 0);
   Output_q        : out signed(DATA_WIDTH - 1 downto 0)
 );
@@ -187,6 +188,7 @@ begin
     if rising_edge(Clk) then
       Output_valid   <= r_output_valid;
       Output_channel <= r_read_channel;
+      Output_last    <= to_stdlogic(r_read_channel = 0);
       Output_i       <= m_buffer_i(to_integer(r_read_index));
       Output_q       <= m_buffer_q(to_integer(r_read_index));
     end if;

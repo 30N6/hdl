@@ -58,10 +58,12 @@ architecture rtl of channelizer_8 is
 
   signal w_demux_valid        : std_logic;
   signal w_demux_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_demux_last         : std_logic;
   signal w_demux_data         : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
   signal w_filter_valid       : std_logic;
   signal w_filter_index       : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_filter_last        : std_logic;
   signal w_filter_data        : signed_array_t(1 downto 0)(FILTER_DATA_WIDTH - 1 downto 0);
   signal w_filter_overflow    : std_logic;
 
@@ -94,6 +96,7 @@ begin
 
     Output_valid    => w_demux_valid,
     Output_channel  => w_demux_index,
+    Output_last     => w_demux_last,
     Output_i        => w_demux_data(0),
     Output_q        => w_demux_data(1)
   );
@@ -114,11 +117,13 @@ begin
 
     Input_valid           => w_demux_valid,
     Input_index           => w_demux_index,
+    Input_last            => w_demux_last,
     Input_i               => w_demux_data(0),
     Input_q               => w_demux_data(1),
 
     Output_valid          => w_filter_valid,
     Output_index          => w_filter_index,
+    Output_last           => w_filter_last,
     Output_i              => w_filter_data(0),
     Output_q              => w_filter_data(1),
 
@@ -126,7 +131,7 @@ begin
   );
 
   w_fft_input_control.valid       <= w_filter_valid;
-  w_fft_input_control.last        <= to_stdlogic(w_filter_index = 0);
+  w_fft_input_control.last        <= w_filter_last;
   w_fft_input_control.reverse     <= '1';
   w_fft_input_control.data_index  <= resize_up(w_filter_index, w_fft_input_control.data_index'length);
   w_fft_input_control.tag         <= (others => '0');

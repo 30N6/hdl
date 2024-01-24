@@ -7,11 +7,13 @@ typedef struct {
   int data_i;
   int data_q;
   int index;
+  bit last;
 } pfb_transaction_t;
 
 interface pfb_intf #(parameter DATA_WIDTH, parameter INDEX_WIDTH) (input logic Clk);
   logic                             valid = 0;
   logic [INDEX_WIDTH - 1 : 0]       index = 0;
+  logic                             last = 0;
   logic signed [DATA_WIDTH - 1 : 0] data_i = 0;
   logic signed [DATA_WIDTH - 1 : 0] data_q = 0;
 
@@ -19,6 +21,7 @@ interface pfb_intf #(parameter DATA_WIDTH, parameter INDEX_WIDTH) (input logic C
     data_i  <= tx.data_i;
     data_q  <= tx.data_q;
     index   <= tx.index;
+    last    <= tx.last;
     valid   <= 1;
     @(posedge Clk);
     data_i  <= 0;
@@ -33,6 +36,7 @@ interface pfb_intf #(parameter DATA_WIDTH, parameter INDEX_WIDTH) (input logic C
       rx.data_i <= data_i;
       rx.data_q <= data_q;
       rx.index  <= index;
+      rx.last   <= last;
       v         <= valid;
       @(posedge Clk);
     end while (v !== 1);
@@ -111,8 +115,8 @@ module pfb_filter_tb;
   pfb_intf #(.DATA_WIDTH(INPUT_DATA_WIDTH),   .INDEX_WIDTH(CHANNEL_INDEX_WIDTH))  tx_intf (.*);
   pfb_intf #(.DATA_WIDTH(OUTPUT_DATA_WIDTH),  .INDEX_WIDTH(CHANNEL_INDEX_WIDTH))  rx_intf (.*);
 
-  bit signed [INPUT_DATA_WIDTH - 1 : 0] filter_data_i [NUM_CHANNELS - 1 : 0][NUM_COEFS_PER_CHANNEL - 1 : 0];
-  bit signed [INPUT_DATA_WIDTH - 1 : 0] filter_data_q [NUM_CHANNELS - 1 : 0][NUM_COEFS_PER_CHANNEL - 1 : 0];
+  bit signed [INPUT_DATA_WIDTH - 1 : 0] filter_data_i [NUM_CHANNELS - 1 : 0][2*NUM_COEFS_PER_CHANNEL - 1 : 0];
+  bit signed [INPUT_DATA_WIDTH - 1 : 0] filter_data_q [NUM_CHANNELS - 1 : 0][2*NUM_COEFS_PER_CHANNEL - 1 : 0];
 
   expect_t          expected_data [$];
   int               num_received = 0;
@@ -149,11 +153,13 @@ module pfb_filter_tb;
 
     .Input_valid    (tx_intf.valid),
     .Input_index    (tx_intf.index),
+    .Input_last     (tx_intf.last),
     .Input_i        (tx_intf.data_i),
     .Input_q        (tx_intf.data_q),
 
     .Output_valid   (rx_intf.valid),
     .Output_index   (rx_intf.index),
+    .Output_last    (rx_intf.last),
     .Output_i       (rx_intf.data_i),
     .Output_q       (rx_intf.data_q),
 
@@ -175,8 +181,11 @@ module pfb_filter_tb;
       tx.data_i = 0;
       tx.data_q = 0;
       tx.index  = channel_index;
+      tx.last   = (channel_index == 0);
       channel_index--;
       tx_intf.write(tx);
+
+      void'(process_filter_sample(tx));
     end
   endtask
 
@@ -188,6 +197,9 @@ module pfb_filter_tb;
 
   function automatic bit compare_data(pfb_transaction_t r, pfb_transaction_t e);
     if (e.index !== r.index) begin
+      return 0;
+    end
+    if (e.last !== r.last) begin
       return 0;
     end
     if (e.data_i !== r.data_i) begin
@@ -234,33 +246,37 @@ module pfb_filter_tb;
     bit signed [OUTPUT_DATA_WIDTH - 1 : 0] accum_i;
     bit signed [OUTPUT_DATA_WIDTH - 1 : 0] accum_q;
 
-    for (int i = NUM_COEFS_PER_CHANNEL - 1; i > 0; i--) begin
+    for (int i = 2*NUM_COEFS_PER_CHANNEL - 1; i > 0; i--) begin
       filter_data_i[d.index][i] = filter_data_i[d.index][i - 1];
       filter_data_q[d.index][i] = filter_data_q[d.index][i - 1];
     end
     filter_data_i[d.index][0] = d.data_i;
     filter_data_q[d.index][0] = d.data_q;
 
-    //$display("%0t: process_filter_sample: d.i=%X d.q=%X", $time, d.data_i, d.data_q);
+    /*$display("%0t: process_filter_sample: d.i=%X d.q=%X", $time, d.data_i, d.data_q);
+    for (int i = 0; i < 2*NUM_COEFS_PER_CHANNEL; i++) begin
+      $display("    filter_data[%0d][%0d]:  I=%0X Q=%0X", d.index, i, filter_data_i[d.index][i], filter_data_q[d.index][i]);
+    end*/
 
     accum_i = 0;
     accum_q = 0;
     for (int i = 0; i < NUM_COEFS_PER_CHANNEL; i++) begin
-      bit signed [COEF_WIDTH - 1 : 0] coef = COEF_DATA[NUM_CHANNELS * i + d.index];
-      bit signed [INPUT_DATA_WIDTH + COEF_WIDTH - 1 : 0] mult_i = coef * filter_data_i[d.index][i];
-      bit signed [INPUT_DATA_WIDTH + COEF_WIDTH - 1 : 0] mult_q = coef * filter_data_q[d.index][i];
-      bit signed [INPUT_DATA_WIDTH : 0] mult_scaled_i = mult_i[INPUT_DATA_WIDTH + COEF_WIDTH - 1 : (COEF_WIDTH - 1)];
-      bit signed [INPUT_DATA_WIDTH : 0] mult_scaled_q = mult_q[INPUT_DATA_WIDTH + COEF_WIDTH - 1 : (COEF_WIDTH - 1)];
+      bit signed [COEF_WIDTH - 1 : 0]                     coef          = COEF_DATA[NUM_CHANNELS * i + d.index];
+      bit signed [INPUT_DATA_WIDTH + COEF_WIDTH - 1 : 0]  mult_i        = coef * filter_data_i[d.index][i*2];
+      bit signed [INPUT_DATA_WIDTH + COEF_WIDTH - 1 : 0]  mult_q        = coef * filter_data_q[d.index][i*2];
+      bit signed [INPUT_DATA_WIDTH : 0]                   mult_scaled_i = mult_i[INPUT_DATA_WIDTH + COEF_WIDTH - 1 : (COEF_WIDTH - 1)];
+      bit signed [INPUT_DATA_WIDTH : 0]                   mult_scaled_q = mult_q[INPUT_DATA_WIDTH + COEF_WIDTH - 1 : (COEF_WIDTH - 1)];
       accum_i += mult_scaled_i;
       accum_q += mult_scaled_q;
 
-      //$display("%0t: process_filter_sample: i=%0d  coef=%X  mult_i=%X mult_q=%X  mult_scaled_i=%X mult_scaled_q=%X  accum_i=%X accum_q=%X", $time, 
+      //$display("%0t: process_filter_sample: i=%0d  coef=%X  mult_i=%X mult_q=%X  mult_scaled_i=%X mult_scaled_q=%X  accum_i=%X accum_q=%X", $time,
       //  i, coef, mult_i, mult_q, mult_scaled_i, mult_scaled_q, accum_i, accum_q);
     end
 
-    r.index = d.index;
-    r.data_i = accum_i;
-    r.data_q = accum_q;
+    r.index   = d.index;
+    r.last    = d.last;
+    r.data_i  = accum_i;
+    r.data_q  = accum_q;
 
     //$display("%0t: process_filter_sample: d=%p r=%p", $time, d, r);
 
@@ -275,6 +291,8 @@ module pfb_filter_tb;
       int wait_cycles;
       bit [CHANNEL_INDEX_WIDTH - 1 : 0] channel_index = NUM_CHANNELS - 1;
 
+      clear_filter_state();
+
       repeat(10) @(posedge Clk);
       $display("%0t: Standard test started", $time);
 
@@ -286,9 +304,11 @@ module pfb_filter_tb;
         tx.data_i = $urandom_range(2**INPUT_DATA_WIDTH - 1, 0);
         tx.data_q = $urandom_range(2**INPUT_DATA_WIDTH - 1, 0);
         tx.index  = channel_index;
+        tx.last   = (channel_index == 0);
         channel_index--;
 
         rx = process_filter_sample(tx);
+        //$display("  expecting data: %p", rx);
         e.data = rx;
         expected_data.push_back(e);
 
@@ -313,7 +333,6 @@ module pfb_filter_tb;
 
   initial
   begin
-    clear_filter_state();
     wait_for_reset();
     standard_tests();
     $finish;
