@@ -98,8 +98,6 @@ foreach {library file_list} $library_file_list {
 }
 set last_compile_time $time_now
 
-#TODO: non-gui mode
-
 # Load the simulation
 #vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=8
 #set NumericStdNoWarnings 1
