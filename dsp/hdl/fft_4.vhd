@@ -71,14 +71,14 @@ begin
         r0_input_resized_i(i)   <= resize_up(Input_i(i), INPUT_DATA_WIDTH + 2);
         r0_input_resized_q(i)   <= resize_up(Input_q(i), INPUT_DATA_WIDTH + 2);
 
-        r0_input_i_inv(i)       <= resize_up(invert_sign(Input_i(i)), INPUT_DATA_WIDTH + 2);
-        r0_input_q_inv(i)       <= resize_up(invert_sign(Input_q(i)), INPUT_DATA_WIDTH + 2);
+        r0_input_i_inv(i)       <= invert_sign(resize_up(Input_i(i),  INPUT_DATA_WIDTH + 2), false);
+        r0_input_q_inv(i)       <= invert_sign(resize_up(Input_q(i),  INPUT_DATA_WIDTH + 2), false);
 
-        r0_input_i_x_plus_j(i)  <= resize_up(invert_sign(Input_q(i)), INPUT_DATA_WIDTH + 2);
+        r0_input_i_x_plus_j(i)  <= invert_sign(resize_up(Input_q(i),  INPUT_DATA_WIDTH + 2), false);
         r0_input_q_x_plus_j(i)  <= resize_up(Input_i(i),              INPUT_DATA_WIDTH + 2);
 
         r0_input_i_x_minus_j(i) <= resize_up(Input_q(i),              INPUT_DATA_WIDTH + 2);
-        r0_input_q_x_minus_j(i) <= resize_up(invert_sign(Input_i(i)), INPUT_DATA_WIDTH + 2);
+        r0_input_q_x_minus_j(i) <= invert_sign(resize_up(Input_i(i),  INPUT_DATA_WIDTH + 2), false);
       end loop;
     end if;
   end process;

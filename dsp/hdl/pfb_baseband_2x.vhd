@@ -77,8 +77,8 @@ begin
       r_input_valid       <= Input_valid;
       r_input_index       <= Input_index;
       r_input_data        <= Input_data;
-      r_input_data_inv(0) <= invert_sign(Input_data(0));
-      r_input_data_inv(1) <= invert_sign(Input_data(1));
+      r_input_data_inv(0) <= invert_sign(Input_data(0), true);
+      r_input_data_inv(1) <= invert_sign(Input_data(1), true);
     end if;
   end process;
 

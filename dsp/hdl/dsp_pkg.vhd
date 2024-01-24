@@ -22,19 +22,19 @@ package dsp_pkg is
 
   type fft_control_array_t is array (natural range <>) of fft_control_t;
 
-  function invert_sign(v : signed) return signed;
+  function invert_sign(v : signed; saturate : boolean) return signed;
   function int_to_signed_array(int_array : integer_array_t; output_length : natural; input_width : natural; output_width : natural) return signed_array_t;
 
 end package dsp_pkg;
 
 package body dsp_pkg is
 
-  function invert_sign(v : signed) return signed is
+  function invert_sign(v : signed; saturate : boolean) return signed is
     variable r      : signed(v'length - 1 downto 0);
     constant V_MAX  : signed(v'length - 1 downto 0) := ((v'length - 1) => '0', others => '1');
     constant V_MIN  : signed(v'length - 1 downto 0) := ((v'length - 1) => '1', others => '0');
   begin
-    if (v = V_MAX) then
+    if (saturate and (v = V_MAX)) then
       r := V_MIN;
     else
       r := -v;
