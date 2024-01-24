@@ -8,7 +8,8 @@ library common_lib;
 library dsp_lib;
   use dsp_lib.dsp_pkg.all;
 
--- basebanding for 2x oversampled PFB data (odd channels multiplied by +1, -1, +1, -1, ...)
+-- * basebanding for 2x oversampled PFB data (odd channels multiplied by +1, -1, +1, -1, ...)
+-- * channels remapped here as well (0 = lowest freq, N-1 = highest freq)
 
 entity pfb_baseband_2x is
 generic (
