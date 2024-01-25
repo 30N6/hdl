@@ -49,6 +49,7 @@ architecture rtl of pfb_filter_stage is
   signal r1_input_last      : std_logic;
   signal r1_input_curr_iq   : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
   signal r1_input_prev_iq   : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  signal r1_coef_data       : signed(COEF_WIDTH - 1 downto 0);
 
   signal r2_input_valid     : std_logic_vector(1 downto 0);
   signal r2_input_index     : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
@@ -90,6 +91,7 @@ begin
       r1_input_last     <= r0_input_last;
       r1_input_curr_iq  <= r0_input_curr_iq;
       r1_input_prev_iq  <= r0_input_prev_iq;
+      r1_coef_data      <= COEF_DATA(to_integer(r0_input_index));
       end if;
   end process;
 
@@ -113,7 +115,7 @@ begin
       if (r1_input_valid = '1') then
         r2_input_index  <= r1_input_index;
         r2_input_last   <= r1_input_last;
-        r2_coef_data    <= COEF_DATA(to_integer(r1_input_index));
+        r2_coef_data    <= r1_coef_data;
       end if;
     end if;
   end process;

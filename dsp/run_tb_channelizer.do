@@ -22,6 +22,8 @@ set library_file_list [list \
     ] \
   dsp_lib [list \
     ./hdl/dsp_pkg.vhd \
+    ./hdl/fft_sample_buffer.vhd \
+    ./hdl/fft_mux.vhd \
     ./hdl/fft_4.vhd \
     ./hdl/fft_4_serializer.vhd \
     ./hdl/fft_twiddle_mem.vhd \
@@ -108,20 +110,20 @@ foreach {library file_list} $library_file_list {
 set last_compile_time $time_now
 
 # Load the simulation
-vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=8
-set NumericStdNoWarnings 1
-set BreakOnAssertion 2
-run -all
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=8
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
 
 #vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=32
 #set NumericStdNoWarnings 1
 #set BreakOnAssertion 2
 #run -all
 
-#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=64
-#set NumericStdNoWarnings 1
-#set BreakOnAssertion 2
-#run -all
+vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=64
+set NumericStdNoWarnings 1
+set BreakOnAssertion 2
+run -all
 
 # If waves exists
 if [file exist wave.do] {

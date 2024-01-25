@@ -22,6 +22,12 @@ package dsp_pkg is
 
   type fft_control_array_t is array (natural range <>) of fft_control_t;
 
+  type channelizer_control_t is record
+    valid       : std_logic;
+    last        : std_logic;
+    data_index  : unsigned(5 downto 0);
+  end record;
+
   function invert_sign(v : signed; saturate : boolean) return signed;
   function int_to_signed_array(int_array : integer_array_t; output_length : natural; input_width : natural; output_width : natural) return signed_array_t;
 

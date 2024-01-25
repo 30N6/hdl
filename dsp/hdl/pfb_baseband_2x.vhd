@@ -21,10 +21,12 @@ port (
 
   Input_valid   : in  std_logic;
   Input_index   : in  unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  Input_last    : in  std_logic;
   Input_data    : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
 
   Output_valid  : out std_logic;
   Output_index  : out unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  Output_last   : out std_logic;
   Output_data   : out signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0)
 );
 end entity pfb_baseband_2x;
@@ -55,6 +57,7 @@ architecture rtl of pfb_baseband_2x is
   signal r_mod_state      : std_logic;
   signal r_input_valid    : std_logic;
   signal r_input_index    : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r_input_last     : std_logic;
   signal r_input_data     : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
   signal r_input_data_inv : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
 
@@ -77,6 +80,7 @@ begin
       r_mod_state         <= w_mod_state;
       r_input_valid       <= Input_valid;
       r_input_index       <= Input_index;
+      r_input_last        <= Input_last;
       r_input_data        <= Input_data;
       r_input_data_inv(0) <= invert_sign(Input_data(0), true);
       r_input_data_inv(1) <= invert_sign(Input_data(1), true);
@@ -88,6 +92,7 @@ begin
     if rising_edge(clk) then
       Output_valid  <= r_input_valid;
       Output_index  <= to_unsigned(CHANNEL_MAP(to_integer(r_input_index)), CHANNEL_INDEX_WIDTH);
+      Output_last   <= r_input_last;
 
       if ((r_input_index(0) = '1') and (r_mod_state = '1')) then
         Output_data <= r_input_data_inv;

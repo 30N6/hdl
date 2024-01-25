@@ -41,7 +41,7 @@ module channelizer_tb;
   parameter time CLK_HALF_PERIOD  = 4ns;
   parameter NUM_CHANNELS          = 32;
   parameter CHANNEL_INDEX_WIDTH   = $clog2(NUM_CHANNELS);
-  parameter NUM_COEFS_PER_CHANNEL = 12;
+  parameter NUM_COEFS_PER_CHANNEL = (NUM_CHANNELS > 8) ? 12 : 8;
   parameter INPUT_DATA_WIDTH      = 16;
   parameter OUTPUT_DATA_WIDTH     = 16 + $clog2(NUM_COEFS_PER_CHANNEL) + $clog2(NUM_CHANNELS);
 
@@ -61,12 +61,15 @@ module channelizer_tb;
   int                                     num_matched = 0;
   logic                                   w_error;
 
-  logic                                   w_output_valid;
-  logic signed [OUTPUT_DATA_WIDTH - 1:0]  w_output_iq [1:0];
-  logic [CHANNEL_INDEX_WIDTH - 1:0]       w_output_index;
+  channelizer_control_t                   w_chan_output_control;
+  logic signed [OUTPUT_DATA_WIDTH - 1:0]  w_chan_output_iq [1:0];
+  channelizer_control_t                   w_fft_output_control;
+  logic signed [OUTPUT_DATA_WIDTH - 1:0]  w_fft_output_iq [1:0];
 
-  logic [OUTPUT_DATA_WIDTH - 1:0]         r_output_i [NUM_CHANNELS - 1:0];
-  logic [OUTPUT_DATA_WIDTH - 1:0]         r_output_q [NUM_CHANNELS - 1:0];
+  logic [OUTPUT_DATA_WIDTH - 1:0]         r_chan_output_i [NUM_CHANNELS - 1:0];
+  logic [OUTPUT_DATA_WIDTH - 1:0]         r_chan_output_q [NUM_CHANNELS - 1:0];
+  logic [OUTPUT_DATA_WIDTH - 1:0]         r_fft_output_i [NUM_CHANNELS - 1:0];
+  logic [OUTPUT_DATA_WIDTH - 1:0]         r_fft_output_q [NUM_CHANNELS - 1:0];
 
   initial begin
     Clk = 0;
@@ -86,59 +89,70 @@ module channelizer_tb;
     if (NUM_CHANNELS == 64) begin
       channelizer_64 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH)) dut64
       (
-        .Clk            (Clk),
-        .Rst            (Rst),
+        .Clk                  (Clk),
+        .Rst                  (Rst),
 
-        .Input_valid    (tx_intf.valid),
-        .Input_data     (tx_intf.data),
+        .Input_valid          (tx_intf.valid),
+        .Input_data           (tx_intf.data),
 
-        .Output_valid   (w_output_valid),
-        .Output_index   (w_output_index),
-        .Output_data    (w_output_iq),
+        .Output_chan_control  (w_chan_output_control),
+        .Output_chan_data     (w_chan_output_iq),
 
-        .Error_overflow (w_error)
+        .Output_fft_control   (w_fft_output_control),
+        .Output_fft_data      (w_fft_output_iq),
+
+        .Error_overflow       (w_error)
       );
     end else if (NUM_CHANNELS == 32) begin
       channelizer_32 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH)) dut32
       (
-        .Clk            (Clk),
-        .Rst            (Rst),
+        .Clk                  (Clk),
+        .Rst                  (Rst),
 
-        .Input_valid    (tx_intf.valid),
-        .Input_data     (tx_intf.data),
+        .Input_valid          (tx_intf.valid),
+        .Input_data           (tx_intf.data),
 
-        .Output_valid   (w_output_valid),
-        .Output_index   (w_output_index),
-        .Output_data    (w_output_iq),
+        .Output_chan_control  (w_chan_output_control),
+        .Output_chan_data     (w_chan_output_iq),
 
-        .Error_overflow (w_error)
+        .Output_fft_control   (w_fft_output_control),
+        .Output_fft_data      (w_fft_output_iq),
+
+        .Error_overflow       (w_error)
       );
     end else if (NUM_CHANNELS == 8) begin
       channelizer_8 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH)) dut8
       (
-        .Clk            (Clk),
-        .Rst            (Rst),
+        .Clk                  (Clk),
+        .Rst                  (Rst),
 
-        .Input_valid    (tx_intf.valid),
-        .Input_data     (tx_intf.data),
+        .Input_valid          (tx_intf.valid),
+        .Input_data           (tx_intf.data),
 
-        .Output_valid   (w_output_valid),
-        .Output_index   (w_output_index),
-        .Output_data    (w_output_iq),
+        .Output_chan_control  (w_chan_output_control),
+        .Output_chan_data     (w_chan_output_iq),
 
-        .Error_overflow (w_error)
+        .Output_fft_control   (w_fft_output_control),
+        .Output_fft_data      (w_fft_output_iq),
+
+        .Error_overflow       (w_error)
       );
     end
   endgenerate
 
   //assign rx_intf.valid  = w_output_valid;
-  //assign rx_intf.data   = w_output_iq;
+  //assign rx_intf.data   = w_chan_output_iq;
   //assign rx_intf.index  = w_output_index;
 
   always_ff @(posedge Clk) begin
-    if (w_output_valid) begin
-      r_output_i[w_output_index] <= w_output_iq[0];
-      r_output_q[w_output_index] <= w_output_iq[1];
+    if (w_chan_output_control.valid) begin
+      r_chan_output_i[w_chan_output_control.data_index] <= w_chan_output_iq[0];
+      r_chan_output_q[w_chan_output_control.data_index] <= w_chan_output_iq[1];
+    end
+
+    if (w_fft_output_control.valid) begin
+      r_fft_output_i[w_fft_output_control.data_index] <= w_fft_output_iq[0];
+      r_fft_output_q[w_fft_output_control.data_index] <= w_fft_output_iq[1];
     end
   end
 
@@ -188,7 +202,7 @@ module channelizer_tb;
       //repeat () @(posedge Clk);
     end
 
-    $display("%p %p", r_output_i, r_output_q);
+    $display("%p %p", r_chan_output_i, r_chan_output_q);
     $display("%0t: Standard test finished: num_received = %0d num_matched=%0d", $time, num_received, num_matched);
 
     Rst = 1;

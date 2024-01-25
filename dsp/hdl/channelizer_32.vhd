@@ -15,17 +15,19 @@ generic (
   OUTPUT_DATA_WIDTH : natural
 );
 port (
-  Clk             : in  std_logic;
-  Rst             : in  std_logic;
+  Clk                 : in  std_logic;
+  Rst                 : in  std_logic;
 
-  Input_valid     : in  std_logic;
-  Input_data      : in  signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  Input_valid         : in  std_logic;
+  Input_data          : in  signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
-  Output_valid    : out std_logic;
-  Output_index    : out unsigned(4 downto 0);
-  Output_data     : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  Output_chan_control : out channelizer_control_t;
+  Output_chan_data    : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
-  Error_overflow  : out std_logic
+  Output_fft_control  : out channelizer_control_t;
+  Output_fft_data     : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+
+  Error_overflow      : out std_logic
 );
 end entity channelizer_32;
 
@@ -106,6 +108,11 @@ architecture rtl of channelizer_32 is
   signal w_fft_input_control  : fft_control_t;
   signal w_fft_output_control : fft_control_t;
   signal w_fft_data           : signed_array_t(1 downto 0)(FFT_DATA_WIDTH - 1 downto 0);
+
+  signal w_baseband_valid     : std_logic;
+  signal w_baseband_index     : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_baseband_last      : std_logic;
+  signal w_baseband_data      : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
 begin
 
@@ -202,12 +209,19 @@ begin
 
     Input_valid   => w_fft_output_control.valid,
     Input_index   => w_fft_output_control.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0),
+    Input_last    => w_fft_output_control.last,
     Input_data    => w_fft_data,
 
-    Output_valid  => Output_valid,
-    Output_index  => Output_index,
-    Output_data   => Output_data
+    Output_valid  => w_baseband_valid,
+    Output_index  => w_baseband_index,
+    Output_last   => w_baseband_last,
+    Output_data   => w_baseband_data
   );
+
+  Output_chan_control.valid      <= w_baseband_valid;
+  Output_chan_control.data_index <= resize_up(w_baseband_index, Output_chan_control.data_index'length);
+  Output_chan_control.last       <= w_baseband_last;
+  Output_chan_data               <= w_baseband_data;
 
   process(Clk)
   begin
