@@ -59,7 +59,10 @@ module channelizer_tb;
   expect_t                                expected_data [$];
   int                                     num_received = 0;
   int                                     num_matched = 0;
-  logic                                   w_error;
+  logic                                   w_error_filter_overflow;
+  logic                                   w_error_mux_overflow;
+  logic                                   w_error_mux_underflow;
+  logic                                   w_error_mux_collision;
 
   channelizer_control_t                   w_chan_output_control;
   logic signed [OUTPUT_DATA_WIDTH - 1:0]  w_chan_output_iq [1:0];
@@ -89,53 +92,62 @@ module channelizer_tb;
     if (NUM_CHANNELS == 64) begin
       channelizer_64 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH)) dut64
       (
-        .Clk                  (Clk),
-        .Rst                  (Rst),
+        .Clk                    (Clk),
+        .Rst                    (Rst),
 
-        .Input_valid          (tx_intf.valid),
-        .Input_data           (tx_intf.data),
+        .Input_valid            (tx_intf.valid),
+        .Input_data             (tx_intf.data),
 
-        .Output_chan_control  (w_chan_output_control),
-        .Output_chan_data     (w_chan_output_iq),
+        .Output_chan_ctrl       (w_chan_output_control),
+        .Output_chan_data       (w_chan_output_iq),
 
-        .Output_fft_control   (w_fft_output_control),
-        .Output_fft_data      (w_fft_output_iq),
+        .Output_fft_ctrl        (w_fft_output_control),
+        .Output_fft_data        (w_fft_output_iq),
 
-        .Error_overflow       (w_error)
+        .Error_filter_overflow  (w_error_filter_overflow),
+        .Error_mux_overflow     (w_error_mux_overflow),
+        .Error_mux_underflow    (w_error_mux_underflow),
+        .Error_mux_collision    (w_error_mux_collision)
       );
     end else if (NUM_CHANNELS == 32) begin
       channelizer_32 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH)) dut32
       (
-        .Clk                  (Clk),
-        .Rst                  (Rst),
+        .Clk                    (Clk),
+        .Rst                    (Rst),
 
-        .Input_valid          (tx_intf.valid),
-        .Input_data           (tx_intf.data),
+        .Input_valid            (tx_intf.valid),
+        .Input_data             (tx_intf.data),
 
-        .Output_chan_control  (w_chan_output_control),
-        .Output_chan_data     (w_chan_output_iq),
+        .Output_chan_ctrl       (w_chan_output_control),
+        .Output_chan_data       (w_chan_output_iq),
 
-        .Output_fft_control   (w_fft_output_control),
-        .Output_fft_data      (w_fft_output_iq),
+        .Output_fft_ctrl        (w_fft_output_control),
+        .Output_fft_data        (w_fft_output_iq),
 
-        .Error_overflow       (w_error)
+        .Error_filter_overflow  (w_error_filter_overflow),
+        .Error_mux_overflow     (w_error_mux_overflow),
+        .Error_mux_underflow    (w_error_mux_underflow),
+        .Error_mux_collision    (w_error_mux_collision)
       );
     end else if (NUM_CHANNELS == 8) begin
       channelizer_8 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH)) dut8
       (
-        .Clk                  (Clk),
-        .Rst                  (Rst),
+        .Clk                    (Clk),
+        .Rst                    (Rst),
 
-        .Input_valid          (tx_intf.valid),
-        .Input_data           (tx_intf.data),
+        .Input_valid            (tx_intf.valid),
+        .Input_data             (tx_intf.data),
 
-        .Output_chan_control  (w_chan_output_control),
-        .Output_chan_data     (w_chan_output_iq),
+        .Output_chan_ctrl       (w_chan_output_control),
+        .Output_chan_data       (w_chan_output_iq),
 
-        .Output_fft_control   (w_fft_output_control),
-        .Output_fft_data      (w_fft_output_iq),
+        .Output_fft_ctrl        (w_fft_output_control),
+        .Output_fft_data        (w_fft_output_iq),
 
-        .Error_overflow       (w_error)
+        .Error_filter_overflow  (w_error_filter_overflow),
+        .Error_mux_overflow     (w_error_mux_overflow),
+        .Error_mux_underflow    (w_error_mux_underflow),
+        .Error_mux_collision    (w_error_mux_collision)
       );
     end
   endgenerate
@@ -158,8 +170,17 @@ module channelizer_tb;
 
   always_ff @(posedge Clk) begin
     if (!Rst) begin
-      if (w_error) begin
-        $error("%0t: overflow error", $time);
+      if (w_error_filter_overflow) begin
+        $error("%0t: filter overflow error", $time);
+      end
+      if (w_error_mux_overflow) begin
+        $error("%0t: mux overflow error", $time);
+      end
+      if (w_error_mux_underflow) begin
+        $error("%0t: mux underflow error", $time);
+      end
+      if (w_error_mux_collision) begin
+        $error("%0t: mux collision error", $time);
       end
     end
   end

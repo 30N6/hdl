@@ -30,6 +30,7 @@ custom_ip_files esm_receiver [list \
   {"../dsp/hdl/pfb_filter_buffer.vhd"     "dsp_lib"}      \
   {"../dsp/hdl/pfb_filter_mult.vhd"       "dsp_lib"}      \
   {"../dsp/hdl/pfb_filter_stage.vhd"      "dsp_lib"}      \
+  {"../dsp/hdl/channelizer_common.vhd"    "dsp_lib"}      \
   {"../dsp/hdl/channelizer_8.vhd"         "dsp_lib"}      \
   {"../dsp/hdl/channelizer_32.vhd"        "dsp_lib"}      \
   {"../dsp/hdl/channelizer_64.vhd"        "dsp_lib"}      \
