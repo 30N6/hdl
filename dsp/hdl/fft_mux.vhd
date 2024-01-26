@@ -17,115 +17,122 @@ generic (
   CHANNEL_INDEX_WIDTH : natural
 );
 port (
-  Clk                 : in  std_logic;
-  Rst                 : in  std_logic;
+  Clk             : in  std_logic;
+  Rst             : in  std_logic;
 
-  Input_chan_control  : in  fft_control_t;  -- 1/2 rate
-  Input_chan_data     : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+  Input_chan_ctrl : in  fft_control_t;  -- 1/2 rate
+  Input_chan_data : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
 
-  Input_raw_control   : in  fft_control_t;      -- 1/4 rate
-  Input_raw_data      : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+  Input_raw_ctrl  : in  fft_control_t;      -- 1/4 rate
+  Input_raw_data  : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
 
-  Output_control      : out fft_control_t;
-  Output_data         : out signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0)
+  Output_ctrl     : out fft_control_t;
+  Output_data     : out signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+
+  Error_overflow  : out std_logic;
+  Error_underflow : out std_logic;
+  Error_collision : out std_logic
 );
 end entity fft_mux;
 
 architecture rtl of fft_mux is
 
-  constant NUM_PAGES        : natural := 2;
-  constant PAGE_INDEX_WIDTH : natural := clog2(NUM_PAGES);
-  constant BUF_PIPE_STAGES  : natural := 2;
+  constant FIFO_READ_LATENCY    : natural := 2;
 
-  signal w_chan_wr_data     : std_logic_vector(2*DATA_WIDTH - 1 downto 0);
-  signal w_chan_valid       : std_logic;
-  signal w_chan_last        : std_logic;
-  signal w_chan_index       : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_chan_data        : std_logic_vector(2*DATA_WIDTH - 1 downto 0);
+  signal w_chan_fifo_ctrl       : fft_control_t;
+  signal w_chan_fifo_data       : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
 
-  signal w_raw_wr_data      : std_logic_vector(2*DATA_WIDTH - 1 downto 0);
-  signal w_raw_valid        : std_logic;
-  signal w_raw_last         : std_logic;
-  signal w_raw_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_raw_data         : std_logic_vector(2*DATA_WIDTH - 1 downto 0);
-  signal w_raw_start        : std_logic;
+  signal w_raw_fifo_read        : std_logic;
+  signal w_raw_fifo_avail       : std_logic;
+  signal w_raw_fifo_ctrl        : fft_control_t;
+  signal w_raw_fifo_data        : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
 
+  signal w_chan_fifo_overflow   : std_logic;
+  signal w_chan_fifo_underflow  : std_logic;
+  signal w_raw_fifo_overflow    : std_logic;
+  signal w_raw_fifo_underflow   : std_logic;
+  signal r_chan_fifo_overflow   : std_logic;
+  signal r_chan_fifo_underflow  : std_logic;
+  signal r_raw_fifo_overflow    : std_logic;
+  signal r_raw_fifo_underflow   : std_logic;
+  signal r_collision            : std_logic;
 begin
 
-  w_chan_wr_data <= std_logic_vector(Input_chan_data(1)) & std_logic_vector(Input_chan_data(0));
-
-  i_chan_buffer : entity dsp_lib.fft_sample_buffer
+  i_chan_fifo : entity dsp_lib.fft_sample_fifo
   generic map (
-    DATA_WIDTH        => 2*DATA_WIDTH,
+    DATA_WIDTH        => DATA_WIDTH,
     DATA_INDEX_WIDTH  => CHANNEL_INDEX_WIDTH,
-    READ_PIPE_STAGES  => 2,
-    IMMEDIATE_READ    => true
+    READ_LATENCY      => FIFO_READ_LATENCY,
+    IMMEDIATE_READ    => '1'
   )
   port map (
-    Clk           => Clk,
-    Rst           => Rst,
+    Clk               => Clk,
+    Rst               => Rst,
 
-    Input_valid   => Input_chan_control.valid,
-    Input_last    => Input_chan_control.last,
-    Input_index   => Input_chan_control.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0),
-    Input_data    => w_chan_wr_data,
+    Input_ctrl        => Input_chan_ctrl,
+    Input_data        => Input_chan_data,
 
-    Output_start  => '0',
-    Output_valid  => w_chan_valid,
-    Output_last   => w_chan_last,
-    Output_index  => w_chan_index,
-    Output_data   => w_chan_data
+    Output_read       => '0',
+    Output_available  => open,
+    Output_ctrl       => w_chan_fifo_ctrl,
+    Output_data       => w_chan_fifo_data,
+
+    Error_overflow    => w_chan_fifo_overflow,
+    Error_underflow   => w_chan_fifo_underflow
   );
 
-  w_raw_wr_data <= std_logic_vector(Input_raw_data(1)) & std_logic_vector(Input_raw_data(0));
+  w_raw_fifo_read <= w_chan_fifo_ctrl.valid and to_stdlogic(w_chan_fifo_ctrl.data_index = (2**CHANNEL_INDEX_WIDTH - 1 - FIFO_READ_LATENCY)) and w_raw_fifo_avail;
 
-  i_raw_buffer : entity dsp_lib.fft_sample_buffer
+  i_raw_fifo : entity dsp_lib.fft_sample_fifo
   generic map (
-    DATA_WIDTH        => 2*DATA_WIDTH,
+    DATA_WIDTH        => DATA_WIDTH,
     DATA_INDEX_WIDTH  => CHANNEL_INDEX_WIDTH,
-    READ_PIPE_STAGES  => 2,
-    IMMEDIATE_READ    => false
+    READ_LATENCY      => FIFO_READ_LATENCY,
+    IMMEDIATE_READ    => '0'
   )
   port map (
-    Clk           => Clk,
-    Rst           => Rst,
+    Clk               => Clk,
+    Rst               => Rst,
 
-    Input_valid   => Input_raw_control.valid,
-    Input_last    => Input_raw_control.last,
-    Input_index   => Input_raw_control.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0),
-    Input_data    => w_raw_wr_data,
+    Input_ctrl        => Input_raw_ctrl,
+    Input_data        => Input_raw_data,
 
-    Output_start  => w_raw_start,
-    Output_valid  => w_raw_valid,
-    Output_last   => w_raw_last,
-    Output_index  => w_raw_index,
-    Output_data   => w_raw_data
+    Output_read       => w_raw_fifo_read,
+    Output_available  => w_raw_fifo_avail,
+    Output_ctrl       => w_raw_fifo_ctrl,
+    Output_data       => w_raw_fifo_data,
+
+    Error_overflow    => w_raw_fifo_overflow,
+    Error_underflow   => w_raw_fifo_underflow
   );
-
-  --TODO: can't use this -- need a proper fifo since the raw buffer is filled at half the rate
-  w_raw_start <= w_chan_valid and to_stdlogic(w_chan_index = (2**CHANNEL_INDEX_WIDTH - 1 - BUF_PIPE_STAGES));
-
-  --TODO: collision error check
-  --TODO: fifo underflow/overflow
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (w_chan_valid = '1') then
-        Output_control.valid      <= '1';
-        Output_control.last       <= w_chan_last;
-        Output_control.data_index <= resize_up(w_chan_index, Output_control.data_index'length);
-        Output_control.reverse    <= '1';
-        Output_data(0)            <= signed(w_chan_data(DATA_WIDTH - 1 downto 0));
-        Output_data(1)            <= signed(w_chan_data(2*DATA_WIDTH - 1 downto DATA_WIDTH));
+      if (w_chan_fifo_ctrl.valid = '1') then
+        Output_ctrl         <= w_chan_fifo_ctrl;
+        Output_ctrl.reverse <= '1';
+        Output_data         <= w_chan_fifo_data;
       else
-        Output_control.valid      <= w_raw_valid;
-        Output_control.last       <= w_raw_last;
-        Output_control.data_index <= resize_up(w_raw_index, Output_control.data_index'length);
-        Output_control.reverse    <= '0';
-        Output_data(0)            <= signed(w_raw_data(DATA_WIDTH - 1 downto 0));
-        Output_data(1)            <= signed(w_raw_data(2*DATA_WIDTH - 1 downto DATA_WIDTH));
+        Output_ctrl         <= w_raw_fifo_ctrl;
+        Output_ctrl.reverse <= '0';
+        Output_data         <= w_raw_fifo_data;
       end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_chan_fifo_overflow  <= w_chan_fifo_overflow;
+      r_chan_fifo_underflow <= w_chan_fifo_underflow;
+      r_raw_fifo_overflow   <= w_raw_fifo_overflow;
+      r_raw_fifo_underflow  <= w_raw_fifo_underflow;
+      r_collision           <= w_chan_fifo_ctrl.valid and w_raw_fifo_ctrl.valid;
+
+      Error_overflow        <= r_chan_fifo_overflow or r_raw_fifo_overflow;
+      Error_underflow       <= r_chan_fifo_underflow or r_raw_fifo_underflow;
+      Error_collision       <= r_collision;
     end if;
   end process;
 

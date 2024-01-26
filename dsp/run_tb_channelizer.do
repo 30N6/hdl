@@ -22,7 +22,7 @@ set library_file_list [list \
     ] \
   dsp_lib [list \
     ./hdl/dsp_pkg.vhd \
-    ./hdl/fft_sample_buffer.vhd \
+    ./hdl/fft_sample_fifo.vhd \
     ./hdl/fft_mux.vhd \
     ./hdl/fft_4.vhd \
     ./hdl/fft_4_serializer.vhd \

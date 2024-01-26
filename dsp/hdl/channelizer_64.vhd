@@ -140,39 +140,43 @@ architecture rtl of channelizer_64 is
     760 => "111111111111111011", 761 => "111111111111111011", 762 => "111111111111111011", 763 => "111111111111111100", 764 => "111111111111111100", 765 => "111111111111111100", 766 => "111111111111111101", 767 => "111111111111111101"
   );
 
-  signal r_rst                : std_logic;
+  signal r_rst                  : std_logic;
 
-  signal w_demux_valid        : std_logic;
-  signal w_demux_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_demux_last         : std_logic;
-  signal w_demux_data         : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  signal w_demux_valid          : std_logic;
+  signal w_demux_index          : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_demux_last           : std_logic;
+  signal w_demux_data           : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
-  signal w_filter_valid       : std_logic;
-  signal w_filter_index       : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_filter_last        : std_logic;
-  signal w_filter_data        : signed_array_t(1 downto 0)(FILTER_DATA_WIDTH - 1 downto 0);
-  signal w_filter_overflow    : std_logic;
+  signal w_filter_valid         : std_logic;
+  signal w_filter_index         : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_filter_last          : std_logic;
+  signal w_filter_data          : signed_array_t(1 downto 0)(FILTER_DATA_WIDTH - 1 downto 0);
+  signal w_filter_overflow      : std_logic;
 
-  signal r_fft_filt_control   : fft_control_t;
-  signal r_fft_filt_data      : signed_array_t(1 downto 0)(FILTER_DATA_WIDTH - 1 downto 0);
+  signal r_fft_filt_control     : fft_control_t;
+  signal r_fft_filt_data        : signed_array_t(1 downto 0)(FILTER_DATA_WIDTH - 1 downto 0);
 
-  signal r_fft_raw_index      : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal r_fft_raw_control    : fft_control_t;
-  signal r_fft_raw_data       : signed_array_t(1 downto 0)(FILTER_DATA_WIDTH - 1 downto 0);
+  signal r_fft_raw_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r_fft_raw_control      : fft_control_t;
+  signal r_fft_raw_data         : signed_array_t(1 downto 0)(FILTER_DATA_WIDTH - 1 downto 0);
 
-  signal w_fft_mux_control    : fft_control_t;
-  signal w_fft_mux_data       : signed_array_t(1 downto 0)(FILTER_DATA_WIDTH - 1 downto 0);
+  signal w_fft_mux_control      : fft_control_t;
+  signal w_fft_mux_data         : signed_array_t(1 downto 0)(FILTER_DATA_WIDTH - 1 downto 0);
 
-  signal w_fft_output_control : fft_control_t;
-  signal w_fft_data           : signed_array_t(1 downto 0)(FFT_DATA_WIDTH - 1 downto 0);
+  signal w_fft_output_control   : fft_control_t;
+  signal w_fft_data             : signed_array_t(1 downto 0)(FFT_DATA_WIDTH - 1 downto 0);
 
-  signal w_chan_output_valid  : std_logic;
-  signal w_raw_output_valid   : std_logic;
+  signal w_chan_output_valid    : std_logic;
+  signal w_raw_output_valid     : std_logic;
 
-  signal w_baseband_valid     : std_logic;
-  signal w_baseband_index     : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_baseband_last      : std_logic;
-  signal w_baseband_data      : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  signal w_baseband_valid       : std_logic;
+  signal w_baseband_index       : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_baseband_last        : std_logic;
+  signal w_baseband_data        : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+
+  signal w_mux_error_overflow   : std_logic;
+  signal w_mux_error_underflow  : std_logic;
+  signal w_mux_error_collision  : std_logic;
 
 begin
 
@@ -251,16 +255,12 @@ begin
     if rising_edge(Clk) then
       r_fft_filt_control.valid      <= w_filter_valid;
       r_fft_filt_control.last       <= w_filter_last;
-      r_fft_filt_control.reverse    <= '1';
       r_fft_filt_control.data_index <= resize_up(w_filter_index, r_fft_filt_control.data_index'length);
-      r_fft_filt_control.tag        <= (others => '0');
       r_fft_filt_data               <= w_filter_data;
 
       r_fft_raw_control.valid       <= Input_valid;
       r_fft_raw_control.last        <= to_stdlogic(r_fft_raw_index = (2**CHANNEL_INDEX_WIDTH - 1));
-      r_fft_raw_control.reverse     <= '0';
       r_fft_raw_control.data_index  <= resize_up(r_fft_raw_index, r_fft_raw_control.data_index'length);
-      r_fft_raw_control.tag         <= (others => '0');
       r_fft_raw_data(0)             <= resize_up(Input_data(0), FILTER_DATA_WIDTH);
       r_fft_raw_data(1)             <= resize_up(Input_data(1), FILTER_DATA_WIDTH);
     end if;
@@ -272,17 +272,21 @@ begin
     CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH
   )
   port map (
-    Clk                 => Clk,
-    Rst                 => r_rst,
+    Clk             => Clk,
+    Rst             => r_rst,
 
-    Input_chan_control  => r_fft_filt_control,
-    Input_chan_data     => r_fft_filt_data,
+    Input_chan_ctrl => r_fft_filt_control,
+    Input_chan_data => r_fft_filt_data,
 
-    Input_raw_control   => r_fft_raw_control,
-    Input_raw_data      => r_fft_raw_data,
+    Input_raw_ctrl  => r_fft_raw_control,
+    Input_raw_data  => r_fft_raw_data,
 
-    Output_control      => w_fft_mux_control,
-    Output_data         => w_fft_mux_data
+    Output_ctrl     => w_fft_mux_control,
+    Output_data     => w_fft_mux_data,
+
+    Error_overflow  => w_mux_error_overflow,
+    Error_underflow => w_mux_error_underflow,
+    Error_collision => w_mux_error_collision
   );
 
   i_fft : entity dsp_lib.fft_pipelined

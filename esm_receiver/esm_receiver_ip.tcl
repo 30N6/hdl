@@ -16,6 +16,8 @@ custom_ip_files esm_receiver [list \
   {"../dsp/hdl/filter_moving_avg.vhd"     "dsp_lib"}      \
   {"../dsp/hdl/mag_approximation.vhd"     "dsp_lib"}      \
   {"../dsp/hdl/pipeline_delay.vhd"        "dsp_lib"}      \
+  {"../dsp/hdl/fft_mux.vhd"               "dsp_lib"}      \
+  {"../dsp/hdl/fft_sample_fifo.vhd"       "dsp_lib"}      \
   {"../dsp/hdl/fft_4.vhd"                 "dsp_lib"}      \
   {"../dsp/hdl/fft_4_serializer.vhd"      "dsp_lib"}      \
   {"../dsp/hdl/fft_pipelined.vhd"         "dsp_lib"}      \
