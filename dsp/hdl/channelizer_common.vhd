@@ -16,7 +16,8 @@ generic (
   NUM_CHANNELS      : natural;
   NUM_COEFS         : natural;
   COEF_WIDTH        : natural;
-  COEF_DATA         : signed_array_t(NUM_COEFS - 1 downto 0)(COEF_WIDTH - 1 downto 0)
+  COEF_DATA         : signed_array_t(NUM_COEFS - 1 downto 0)(COEF_WIDTH - 1 downto 0);
+  FFT_PATH_ENABLE   : boolean
 );
 port (
   Clk                   : in  std_logic;
@@ -160,38 +161,48 @@ begin
       r_fft_filt_control.valid      <= w_filter_valid;
       r_fft_filt_control.last       <= w_filter_last;
       r_fft_filt_control.data_index <= resize_up(w_filter_index, r_fft_filt_control.data_index'length);
+      r_fft_filt_control.reverse    <= '1';
       r_fft_filt_data               <= w_filter_data;
 
       r_fft_raw_control.valid       <= Input_valid;
       r_fft_raw_control.last        <= to_stdlogic(r_fft_raw_index = (2**CHANNEL_INDEX_WIDTH - 1));
       r_fft_raw_control.data_index  <= resize_up(r_fft_raw_index, r_fft_raw_control.data_index'length);
+      r_fft_raw_control.reverse     <= '0';
       r_fft_raw_data(0)             <= resize_up(Input_data(0), FILTER_DATA_WIDTH);
       r_fft_raw_data(1)             <= resize_up(Input_data(1), FILTER_DATA_WIDTH);
     end if;
   end process;
 
-  i_mux : entity dsp_lib.fft_mux
-  generic map (
-    DATA_WIDTH          => FILTER_DATA_WIDTH,
-    CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH
-  )
-  port map (
-    Clk             => Clk,
-    Rst             => r_rst,
+  g_mux : if (FFT_PATH_ENABLE) generate
+    i_mux : entity dsp_lib.fft_mux
+    generic map (
+      DATA_WIDTH          => FILTER_DATA_WIDTH,
+      CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH
+    )
+    port map (
+      Clk             => Clk,
+      Rst             => r_rst,
 
-    Input_chan_ctrl => r_fft_filt_control,
-    Input_chan_data => r_fft_filt_data,
+      Input_chan_ctrl => r_fft_filt_control,
+      Input_chan_data => r_fft_filt_data,
 
-    Input_raw_ctrl  => r_fft_raw_control,
-    Input_raw_data  => r_fft_raw_data,
+      Input_raw_ctrl  => r_fft_raw_control,
+      Input_raw_data  => r_fft_raw_data,
 
-    Output_ctrl     => w_fft_mux_control,
-    Output_data     => w_fft_mux_data,
+      Output_ctrl     => w_fft_mux_control,
+      Output_data     => w_fft_mux_data,
 
-    Error_overflow  => w_mux_error_overflow,
-    Error_underflow => w_mux_error_underflow,
-    Error_collision => w_mux_error_collision
-  );
+      Error_overflow  => w_mux_error_overflow,
+      Error_underflow => w_mux_error_underflow,
+      Error_collision => w_mux_error_collision
+    );
+  else generate
+    w_fft_mux_control     <= r_fft_filt_control;
+    w_fft_mux_data        <= r_fft_filt_data;
+    w_mux_error_overflow  <= '0';
+    w_mux_error_underflow <= '0';
+    w_mux_error_collision <= '0';
+  end generate g_mux;
 
   i_fft : entity dsp_lib.fft_pipelined
   generic map (
@@ -240,10 +251,17 @@ begin
   Output_chan_ctrl.last       <= w_baseband_last;
   Output_chan_data            <= w_baseband_data;
 
-  Output_fft_ctrl.valid       <= w_raw_output_valid;
-  Output_fft_ctrl.data_index  <= w_fft_output_control.data_index;
-  Output_fft_ctrl.last        <= w_fft_output_control.last;
-  Output_fft_data             <= w_fft_data;
+  g_raw_output : if (FFT_PATH_ENABLE) generate
+    Output_fft_ctrl.valid       <= w_raw_output_valid;
+    Output_fft_ctrl.data_index  <= w_fft_output_control.data_index;
+    Output_fft_ctrl.last        <= w_fft_output_control.last;
+    Output_fft_data             <= w_fft_data;
+  else generate
+    Output_fft_ctrl.valid       <= '0';
+    Output_fft_ctrl.data_index  <= (others => '0');
+    Output_fft_ctrl.last        <= '0';
+    Output_fft_data             <= (others => (others => '0'));
+  end generate;
 
   process(Clk)
   begin

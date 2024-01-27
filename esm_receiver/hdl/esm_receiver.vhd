@@ -156,19 +156,22 @@ begin
     OUTPUT_DATA_WIDTH => CHANNELIZER8_DATA_WIDTH
   )
   port map (
-    Clk                 => data_clk,
-    Rst                 => r_combined_rst,
+    Clk                   => data_clk,
+    Rst                   => r_combined_rst,
 
-    Input_valid         => r_adc_valid, --TODO: gated
-    Input_data          => w_adc_data_in,
+    Input_valid           => r_adc_valid, --TODO: gated
+    Input_data            => w_adc_data_in,
 
-    Output_chan_control => w_channelizer8_chan_control,
-    Output_chan_data    => w_channelizer8_chan_data,
+    Output_chan_ctrl      => w_channelizer8_chan_control,
+    Output_chan_data      => w_channelizer8_chan_data,
 
-    Output_fft_control  => w_channelizer8_fft_control,
-    Output_fft_data     => w_channelizer8_fft_data,
+    Output_fft_ctrl       => w_channelizer8_fft_control,
+    Output_fft_data       => w_channelizer8_fft_data,
 
-    Error_overflow      => w_channelizer8_overflow
+    Error_filter_overflow => w_channelizer8_overflow,
+    Error_mux_overflow    => open,
+    Error_mux_underflow   => open,
+    Error_mux_collision   => open
   );
 
   i_channelizer_64 : entity dsp_lib.channelizer_64
@@ -177,19 +180,22 @@ begin
     OUTPUT_DATA_WIDTH => CHANNELIZER64_DATA_WIDTH
   )
   port map (
-    Clk                 => data_clk,
-    Rst                 => r_combined_rst,
+    Clk                   => data_clk,
+    Rst                   => r_combined_rst,
 
-    Input_valid         => r_adc_valid, --TODO: gated
-    Input_data          => w_adc_data_in,
+    Input_valid           => r_adc_valid, --TODO: gated
+    Input_data            => w_adc_data_in,
 
-    Output_chan_control => w_channelizer64_chan_control,
-    Output_chan_data    => w_channelizer64_chan_data,
+    Output_chan_ctrl      => w_channelizer64_chan_control,
+    Output_chan_data      => w_channelizer64_chan_data,
 
-    Output_fft_control  => w_channelizer64_fft_control,
-    Output_fft_data     => w_channelizer64_fft_data,
+    Output_fft_ctrl       => w_channelizer64_fft_control,
+    Output_fft_data       => w_channelizer64_fft_data,
 
-    Error_overflow      => w_channelizer64_overflow
+    Error_filter_overflow => w_channelizer64_overflow,
+    Error_mux_overflow    => open,
+    Error_mux_underflow   => open,
+    Error_mux_collision   => open
   );
 
   process(data_clk)

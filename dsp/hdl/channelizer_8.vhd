@@ -59,7 +59,8 @@ begin
     NUM_CHANNELS      => NUM_CHANNELS,
     NUM_COEFS         => NUM_COEFS,
     COEF_WIDTH        => COEF_WIDTH,
-    COEF_DATA         => COEF_DATA
+    COEF_DATA         => COEF_DATA,
+    FFT_PATH_ENABLE   => false
   )
   port map (
     Clk                   => Clk,

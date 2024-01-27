@@ -70,8 +70,14 @@ architecture rtl of fft_radix2_output is
   signal r3_k2                  : signed(K_WIDTH - 1 downto 0);
   signal r3_k3                  : signed(K_WIDTH - 1 downto 0);
 
-  signal r4_output_scaled_i     : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
-  signal r4_output_scaled_q     : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
+  signal r4_chan0_scaled_i      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r4_chan0_scaled_q      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r4_k1                  : signed(K_WIDTH - 1 downto 0);
+  signal r4_k2                  : signed(K_WIDTH - 1 downto 0);
+  signal r4_k3                  : signed(K_WIDTH - 1 downto 0);
+
+  signal r5_output_scaled_i     : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
+  signal r5_output_scaled_q     : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
 
 begin
 
@@ -136,12 +142,23 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r4_output_scaled_i  <= resize_up(r3_chan0_scaled_i, OUTPUT_SCALED_WIDTH) + r3_k1 - r3_k3;
-      r4_output_scaled_q  <= resize_up(r3_chan0_scaled_q, OUTPUT_SCALED_WIDTH) + r3_k1 + r3_k2;
+      r4_chan0_scaled_i <= r3_chan0_scaled_i;
+      r4_chan0_scaled_q <= r3_chan0_scaled_q;
+      r4_k1             <= r3_k1;
+      r4_k2             <= r3_k2;
+      r4_k3             <= r3_k3;
     end if;
   end process;
 
-  Output_i <= r4_output_scaled_i(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
-  Output_q <= r4_output_scaled_q(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r5_output_scaled_i  <= resize_up(r4_chan0_scaled_i, OUTPUT_SCALED_WIDTH) + r4_k1 - r4_k3;
+      r5_output_scaled_q  <= resize_up(r4_chan0_scaled_q, OUTPUT_SCALED_WIDTH) + r4_k1 + r4_k2;
+    end if;
+  end process;
+
+  Output_i <= r5_output_scaled_i(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
+  Output_q <= r5_output_scaled_q(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
 
 end architecture rtl;
