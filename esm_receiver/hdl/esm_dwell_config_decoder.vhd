@@ -9,9 +9,6 @@ library esm_lib;
   use esm_lib.esm_pkg.all;
 
 entity esm_dwell_config_decoder is
-generic (
-  MODULE_ID : natural
-);
 port (
   Clk                     : in  std_logic;
   Rst                     : in  std_logic;
@@ -87,7 +84,7 @@ begin
     end if;
   end process;
 
-  w_module_id_match     <= to_stdlogic(r_module_config.module_id = MODULE_ID);
+  w_module_id_match     <= to_stdlogic(r_module_config.module_id = ESM_MODULE_ID_CONTROL);
   w_message_type_match  <= to_stdlogic(r_module_config.message_type = ESM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY) or
                            to_stdlogic(r_module_config.message_type = ESM_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM);
 

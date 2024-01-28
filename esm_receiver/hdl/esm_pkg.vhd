@@ -63,6 +63,8 @@ package esm_pkg is
     channel_mask_wide         : std_logic_vector(ESM_NUM_CHANNELS_WIDE - 1 downto 0);
   end record;
 
+  type esm_dwell_metadata_array_t is array (natural range <>) of esm_dwell_metadata_t;
+
   constant ESM_DWELL_METADATA_PACKED_WIDTH : natural := 184;
   --type esm_dwell_metadata_packed_t is record
   --  tag                       : unsigned(15 downto 0);

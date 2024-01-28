@@ -21,12 +21,205 @@ port (
   Ad9361_control  : out std_logic_vector(3 downto 0);
   Ad9361_status   : in  std_logic_vector(7 downto 0);
 
+  Dwell_active    : out std_logic;
+  Dwell_data      : out esm_dwell_metadata_t
 );
 end entity esm_dwell_controller;
 
 architecture rtl of esm_dwell_controller is
 
+  type s_state is
+  (
+    S_IDLE,
+    S_START_WAIT,
+    S_INSTRUCTION_LOOKUP,
+    S_DWELL_ACTIVE,
+    S_DWELL_DONE,
+    S_NEXT_INSTRUCTION
+  );
+
+  signal r_rst                      : std_logic;
+  signal r_timestamp                : unsigned(63 downto 0);
+
+  signal w_dwell_entry_valid        : std_logic;
+  signal w_dwell_entry_index        : unsigned(ESM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
+  signal w_dwell_entry_data         : esm_dwell_metadata_t;
+
+  signal w_dwell_instruction_valid  : std_logic;
+  signal w_dwell_instruction_index  : unsigned(ESM_DWELL_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
+  signal w_dwell_instruction_data   : esm_dwell_instruction_t;
+
+  signal w_dwell_program_valid      : std_logic;
+  signal w_dwell_program_data       : esm_message_dwell_program_header_t;
+
+  signal m_dwell_entry              : esm_dwell_metadata_array_t(ESM_NUM_DWELL_ENTRIES - 1 downto 0);
+  signal m_dwell_instruction        : esm_dwell_instruction_array_t(ESM_NUM_DWELL_INSTRUCTIONS - 1 downto 0);
+  signal r_dwell_program_data       : esm_message_dwell_program_header_t;
+  signal r_dwell_program_valid      : std_logic;
+
+  signal w_delay_start              : std_logic;
+
+  signal r_global_counter           : unsigned(31 downto 0);
+  signal r_instruction_index        : unsigned(ESM_DWELL_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
+  signal r_instruction_data         : esm_dwell_instruction_t;
+
 begin
 
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_rst <= Rst;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (r_rst = '1') then
+        r_timestamp <= (others => '0');
+      else
+        r_timestamp <= r_timestamp + 1;
+      end if;
+    end if;
+  end process;
+
+  i_config : entity esm_lib.sm_dwell_config_decoder
+  port map (
+    Clk                     => Clk,
+    Rst                     => r_rst,
+
+    Module_config           => Module_config,
+
+    Dwell_entry_valid       => w_dwell_entry_valid,
+    Dwell_entry_index       => w_dwell_entry_index,
+    Dwell_entry_data        => w_dwell_entry_data,
+
+    Dwell_instruction_valid => w_dwell_instruction_valid,
+    Dwell_instruction_index => w_dwell_instruction_index,
+    Dwell_instruction_data  => w_dwell_instruction_data,
+
+    Dwell_program_valid     => w_dwell_program_valid,
+    Dwell_program_data      => w_dwell_program_data
+  );
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (w_dwell_entry_valid = '1') then
+        m_dwell_entry(to_integer(w_dwell_entry_index)) <= w_dwell_entry_data;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (w_dwell_instruction_valid = '1') then
+        m_dwell_instruction(to_integer(w_dwell_instruction_index)) <= w_dwell_instruction_data;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (r_rst = '1') then
+        r_dwell_program_data.enable_program        <= '0';
+        r_dwell_program_data.enable_delayed_start  <= '-';
+        r_dwell_program_data.global_counter_init   <= (others => '-');
+        r_dwell_program_data.delayed_start_time    <= (others => '-');
+      else
+        if (w_dwell_program_valid = '1') then
+          r_dwell_program_data <= w_dwell_program_data;
+        end if;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_dwell_program_valid <= w_dwell_program_valid;
+    end if;
+  end process;
+
+  w_delay_start <= r_dwell_program_data.enable_delayed_start and to_stdlogic(r_dwell_program_data.delayed_start_time < r_timestamp);
+  w_dwell_done  <=
+  w_all_done    <= not(r_instruction_data.valid) or (r_instruction_data.global_counter_check and to_stdlogic(r_global_counter = 0));
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (r_rst = '1') then
+        s_state <= S_IDLE;
+      else
+        case s_state is
+        when S_IDLE =>
+          s_state <= S_IDLE;  --transition handled below
+
+        when S_START_WAIT =>
+          if (w_delay_start = '1') then
+            s_state <= S_START_WAIT;
+          else
+            s_start <= S_INSTRUCTION_LOOKUP;
+          end if;
+
+        when S_INSTRUCTION_LOOKUP =>
+          s_state <= S_DWELL_ACTIVE;
+
+        when S_DWELL_ACTIVE =>
+          if ((w_all_done = '1') or (w_dwell_done = '1')) then
+            s_state <= S_DWELL_DONE;
+          else
+            s_state <= S_DWELL_ACTIVE;
+          end if;
+
+        when S_DWELL_DONE =>
+          if (w_all_done = '1') then
+            s_state <= S_IDLE;
+          else
+            s_state <= S_INSTRUCTION_LOOKUP;
+          end if;
+
+
+        end case;
+
+        if (r_dwell_program_valid = '1') then
+          s_state <= S_START_WAIT;
+        elsif ((w_dwell_entry_valid = '1') or (w_dwell_instruction_valid = '1') or (w_dwell_program_valid = '1')) then
+          s_state <= S_IDLE;
+        end if;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (s_state = S_START_WAIT) then
+        r_global_counter    <= r_dwell_program_data.global_counter_init;
+        r_instruction_index <= (others => '0');
+      elsif (s_state = S_DWELL_DONE) then
+        --TODO: check repeat count
+        r_instruction_index <= r_instruction_data.next_instruction_index;
+      end if;
+    end if;
+  end process;
+
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_instruction_data <= m_dwell_instruction(to_integer(r_instruction_index));
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Dwell_active  <= to_stdlogic(s_state = S_DWELL_ACTIVE) and r_instruction_data.valid;
+      Dwell_data    <= m_dwell_entry(to_integer(r_instruction_data.entry_index));
+    end if;
+  end process;
 
 end architecture rtl;
