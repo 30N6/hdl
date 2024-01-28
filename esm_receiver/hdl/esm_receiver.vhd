@@ -22,6 +22,9 @@ port (
   Adc_clk         : in  std_logic;
   Adc_rst         : in  std_logic;
 
+  Ad9361_control  : out std_logic_vector(3 downto 0);
+  Ad9361_status   : in  std_logic_vector(7 downto 0);
+
   Adc_valid       : in  std_logic;
   Adc_data_i      : in  signed(ADC_WIDTH - 1 downto 0);
   Adc_data_q      : in  signed(ADC_WIDTH - 1 downto 0);
@@ -48,12 +51,23 @@ architecture rtl of esm_receiver is
   constant CHANNELIZER8_DATA_WIDTH  : natural := IQ_WIDTH + 3 + 3; -- +4 for filter, +3 for ifft
   constant CHANNELIZER64_DATA_WIDTH : natural := IQ_WIDTH + 4 + 6; -- +4 for filter, +6 for ifft
 
+  constant AD9361_BIT_PIPE_DEPTH    : natural := 3;
+
   signal data_clk                     : std_logic;
 
   signal w_config_rst                 : std_logic;
   signal r_combined_rst               : std_logic;
 
-  signal r_timestamp                  : unsigned(63 downto 0);
+  signal w_enable_chan                : std_logic_vector(1 downto 0);
+  signal w_enable_pdw                 : std_logic_vector(1 downto 0);
+  signal w_module_config              : esm_config_data_t;
+
+  signal w_ad9361_control             : std_logic_vector(3 downto 0);
+  signal r_ad9361_control             : std_logic_vector_array_t(AD9361_BIT_PIPE_DEPTH - 1 downto 0)(3 downto 0);
+  signal r_ad9361_status              : std_logic_vector_array_t(AD9361_BIT_PIPE_DEPTH - 1 downto 0)(7 downto 0); --TODO: async reg
+
+  signal w_dwell_active               : std_logic;
+  signal w_dwell_data                 : esm_dwell_metadata_t;
 
   signal r_adc_valid                  : std_logic;
   signal r_adc_data_i                 : signed(IQ_WIDTH - 1 downto 0);
@@ -101,22 +115,53 @@ begin
     Clk_x4  => data_clk
   );
 
-  w_config_rst <= '0'; --TODO
-  process(Adc_clk)
+  process(data_clk)
   begin
-    if rising_edge(Adc_clk) then
+    if rising_edge(data_clk) then
       r_combined_rst <= Adc_rst or w_config_rst;
     end if;
   end process;
 
+  i_config : esm_lib.esm_config
+  generic map (
+    AXI_DATA_WIDTH => AXI_DATA_WIDTH
+  )
+  port map (
+    Clk           => data_clk,
+    Rst           => Adc_rst,
+
+    Axis_ready    => w_config_axis_ready,
+    Axis_valid    => w_config_axis_valid,
+    Axis_last     => w_config_axis_last,
+    Axis_data     => w_config_axis_data,
+
+    Rst_out       => w_config_rst,
+    Enable_chan   => w_enable_chan,
+    Enable_pdw    => w_enable_pdw,
+
+    Module_config => w_module_config
+  );
+
+  i_dwell_controller : entity esm_lib.esm_dwell_controller
+  port map (
+    Clk             => data_clk,
+    Rst             => r_combined_rst,
+
+    Module_config   => w_module_config,
+
+    Ad9361_control  => w_ad9361_control,
+    Ad9361_status   => r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 1),
+
+    Dwell_active    => w_dwell_active,
+    Dwell_data      => w_dwell_data
+  );
+
   process(Adc_clk)
   begin
     if rising_edge(Adc_clk) then
-      if (Adc_rst = '1') then
-        r_timestamp <= (others => '0');
-      else
-        r_timestamp <= r_timestamp + 1;
-      end if;
+      r_ad9361_control <= r_ad9361_control(AD9361_BIT_PIPE_DEPTH - 2 downto 0)  & w_ad9361_control;
+      r_ad9361_status  <= r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 2 downto 0)   & Ad9361_status;
+      Ad9361_control   <= r_ad9361_control(AD9361_BIT_PIPE_DEPTH - 1);
     end if;
   end process;
 
@@ -131,25 +176,6 @@ begin
 
   w_adc_data_in <= (r_adc_data_q, r_adc_data_i);
 
-  --i_channelizer : entity dsp_lib.channelizer_32
-  --generic map (
-  --  INPUT_DATA_WIDTH  => IQ_WIDTH,
-  --  OUTPUT_DATA_WIDTH => IQ_WIDTH + 4 + 5
-  --)
-  --port map (
-  --  Clk             => data_clk,
-  --  Rst             => r_combined_rst,
-  --
-  --  Input_valid     => r_adc_valid, --TODO: gated
-  --  Input_data      => w_adc_data_in,
-  --
-  --  Output_valid    => w_channelizer_valid,
-  --  Output_index    => w_channelizer_index,
-  --  Output_data     => w_channelizer_data,
-  --
-  --  Error_overflow  => w_channelizer_overflow
-  --);
-
   i_channelizer_8 : entity dsp_lib.channelizer_8
   generic map (
     INPUT_DATA_WIDTH  => IQ_WIDTH,
@@ -159,7 +185,7 @@ begin
     Clk                   => data_clk,
     Rst                   => r_combined_rst,
 
-    Input_valid           => r_adc_valid, --TODO: gated
+    Input_valid           => r_adc_valid, --TODO: gated x4
     Input_data            => w_adc_data_in,
 
     Output_chan_ctrl      => w_channelizer8_chan_control,
@@ -216,7 +242,7 @@ begin
     AXI_DATA_WIDTH  => AXI_DATA_WIDTH
   )
   port map (
-    S_axis_clk      => Adc_clk,
+    S_axis_clk      => data_clk,
     S_axis_resetn   => not(r_combined_rst),
     S_axis_ready    => w_reporter_axis_ready,
     S_axis_valid    => w_reporter_axis_valid,
@@ -243,7 +269,7 @@ begin
     S_axis_data     => S_axis_data,
     S_axis_last     => S_axis_last,
 
-    M_axis_clk      => Adc_clk,
+    M_axis_clk      => data_clk,
     M_axis_ready    => w_config_axis_ready,
     M_axis_valid    => w_config_axis_valid,
     M_axis_data     => w_config_axis_data,
