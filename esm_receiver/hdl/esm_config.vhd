@@ -72,7 +72,6 @@ begin
     end if;
   end process;
 
-
   w_module_id     <= unsigned(r_axis_data(24 + ESM_MODULE_ID_WIDTH - 1 downto 24));
   w_message_type  <= unsigned(r_axis_data(16 + ESM_MESSAGE_TYPE_WIDTH - 1 downto 16));
 
