@@ -7,8 +7,8 @@ library common_lib;
 
 package esm_pkg is
 
-  constant ESM_CONTROL_MAGIC_NUM                        : std_logic_vector(31 downto 0) := "45534D43";
-  constant ESM_REPORT_MAGIC_NUM                         : std_logic_vector(31 downto 0) := "45534D52";
+  constant ESM_CONTROL_MAGIC_NUM                        : std_logic_vector(31 downto 0) := x"45534D43";
+  constant ESM_REPORT_MAGIC_NUM                         : std_logic_vector(31 downto 0) := x"45534D52";
 
   constant ESM_MODULE_ID_WIDTH                          : natural := 2;
   constant ESM_MESSAGE_TYPE_WIDTH                       : natural := 8;
@@ -135,39 +135,39 @@ package esm_pkg is
   --  --instructions              : esm_dwell_instruction_array_packed_t(ESM_NUM_DWELL_INSTRUCTIONS - 1 downto 0);
   --end record;
 
-  type esm_message_dwell_complete_info_t is record
-    header                    : esm_common_header_t;
-    dwell_sequence_num        : unsigned(31 downto 0);
-    metadata                  : esm_dwell_metadata_t;
-
-    num_samples               : unsigned(31 downto 0);
-    ts_dwell_start            : unsigned(63 downto 0);
-    ts_pll_locked             : unsigned(63 downto 0);
-    ts_dwell_end              : unsigned(63 downto 0);
-  end record;
-
-  type esm_message_dwell_complete_stats_t is record
-    header                    : esm_common_header_t;
-    dwell_sequence_num        : unsigned(31 downto 0);
-    metadata                  : esm_dwell_metadata_t;
-
-    channel_start_index       : unsigned(ESM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-    channel_amplitude         : unsigned_array_t(ESM_NUM_CHANNELS_WIDE/2 - 1 downto 0)(31 downto 0);
-  end record;
-
-  type esm_message_pdw_t is record
-    header                    : esm_common_header_t;
-    pdw_sequence_num          : unsigned(31 downto 0);
-    dwell_sequence_num        : unsigned(31 downto 0);
-    dwell_metadata            : esm_dwell_metadata_t;
-    pulse_channel             : unsigned(ESM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-    pulse_threshold           : unsigned(31 downto 0);
-    pulse_amplitude           : unsigned(31 downto 0);
-    pulse_duration            : unsigned(31 downto 0);  --TODO: early termination flag?
-    pulse_frequency           : unsigned(31 downto 0);  --TODO: IFM module
-    pulse_start_time          : unsigned(63 downto 0);
-    raw_samples               : std_logic_vector_array_t(40 downto 0)(31 downto 0); --TODO: increase to max
-  end record;
+  --type esm_message_dwell_complete_info_t is record
+  --  header                    : esm_common_header_t;
+  --  dwell_sequence_num        : unsigned(31 downto 0);
+  --  metadata                  : esm_dwell_metadata_t;
+  --
+  --  num_samples               : unsigned(31 downto 0);
+  --  ts_dwell_start            : unsigned(63 downto 0);
+  --  ts_pll_locked             : unsigned(63 downto 0);
+  --  ts_dwell_end              : unsigned(63 downto 0);
+  --end record;
+  --
+  --type esm_message_dwell_complete_stats_t is record
+  --  header                    : esm_common_header_t;
+  --  dwell_sequence_num        : unsigned(31 downto 0);
+  --  metadata                  : esm_dwell_metadata_t;
+  --
+  --  channel_start_index       : unsigned(ESM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  --  channel_amplitude         : unsigned_array_t(ESM_NUM_CHANNELS_WIDE/2 - 1 downto 0)(31 downto 0);
+  --end record;
+  --
+  --type esm_message_pdw_t is record
+  --  header                    : esm_common_header_t;
+  --  pdw_sequence_num          : unsigned(31 downto 0);
+  --  dwell_sequence_num        : unsigned(31 downto 0);
+  --  dwell_metadata            : esm_dwell_metadata_t;
+  --  pulse_channel             : unsigned(ESM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  --  pulse_threshold           : unsigned(31 downto 0);
+  --  pulse_amplitude           : unsigned(31 downto 0);
+  --  pulse_duration            : unsigned(31 downto 0);  --TODO: early termination flag?
+  --  pulse_frequency           : unsigned(31 downto 0);  --TODO: IFM module
+  --  pulse_start_time          : unsigned(63 downto 0);
+  --  raw_samples               : std_logic_vector_array_t(40 downto 0)(31 downto 0); --TODO: increase to max
+  --end record;
 
   type esm_config_data_t is record
     valid                     : std_logic;
@@ -188,21 +188,24 @@ end package esm_pkg;
 package body esm_pkg is
 
   function unpack(v : std_logic_vector) return esm_dwell_metadata_t is
+    variable vm : std_logic_vector(v'length - 1 downto 0);
     variable r : esm_dwell_metadata_t;
   begin
     assert (v'length = ESM_DWELL_METADATA_PACKED_WIDTH)
       report "Unexpected length"
       severity failure;
 
-    r.tag                 := v(15 downto 0);
-    r.frequency           := v(31 downto 16);
-    r.duration            := v(63 downto 32);
-    r.gain                := v(70 downto 64);
-    r.fast_lock_profile   := v(74 downto 72);
-    r.threshold_narrow    := v(95 downto 80);
-    r.threshold_wide      := v(111 downto 96);
-    r.channel_mask_narrow := v(175 downto 112);
-    r.channel_mask_wide   := v(183 downto 176);
+    vm := v;
+
+    r.tag                 := unsigned(vm(15 downto 0));
+    r.frequency           := unsigned(vm(31 downto 16));
+    r.duration            := unsigned(vm(63 downto 32));
+    r.gain                := unsigned(vm(70 downto 64));
+    r.fast_lock_profile   := unsigned(vm(74 downto 72));
+    r.threshold_narrow    := unsigned(vm(95 downto 80));
+    r.threshold_wide      := unsigned(vm(111 downto 96));
+    r.channel_mask_narrow := vm(175 downto 112);
+    r.channel_mask_wide   := vm(183 downto 176);
     return r;
   end function;
 
@@ -213,7 +216,7 @@ package body esm_pkg is
       report "Unexpected length"
       severity failure;
 
-    r.entry_index   := v(ESM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
+    r.entry_index   := unsigned(v(ESM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0));
     r.entry_data    := unpack(v(8 + ESM_DWELL_METADATA_PACKED_WIDTH - 1 downto 8));
     return r;
   end function;
@@ -227,8 +230,8 @@ package body esm_pkg is
 
     r.enable_program        := v(0);
     r.enable_delayed_start  := v(8);
-    r.global_counter_init   := v(63 downto 32);
-    r.delayed_start_time    := v(127 downto 64);
+    r.global_counter_init   := unsigned(v(63 downto 32));
+    r.delayed_start_time    := unsigned(v(127 downto 64));
     return r;
   end function;
 
@@ -242,9 +245,9 @@ package body esm_pkg is
     r.valid                   := v(0);
     r.global_counter_check    := v(1);
     r.global_counter_dec      := v(2);
-    r.repeat_count            := v(11 downto 8);
-    r.entry_index             := v(20 downto 16);
-    r.next_instruction_index  := v(28 downto 24);
+    r.repeat_count            := unsigned(v(11 downto 8));
+    r.entry_index             := unsigned(v(20 downto 16));
+    r.next_instruction_index  := unsigned(v(28 downto 24));
     return r;
   end function;
 

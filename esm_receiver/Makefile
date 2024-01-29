@@ -33,6 +33,10 @@ GENERIC_DEPS += ../dsp/hdl/pfb_filter_mult.vhd
 GENERIC_DEPS += ../dsp/hdl/pfb_filter_stage.vhd
 GENERIC_DEPS += ../dsp/hdl/channelizer_32.vhd
 
+GENERIC_DEPS += ./hdl/esm_pkg.vhd
+GENERIC_DEPS += ./hdl/esm_config.vhd
+GENERIC_DEPS += ./hdl/esm_dwell_config_decoder.vhd
+GENERIC_DEPS += ./hdl/esm_dwell_controller.vhd
 GENERIC_DEPS += ./hdl/esm_receiver.vhd
 
 XILINX_DEPS += esm_receiver_ip.tcl

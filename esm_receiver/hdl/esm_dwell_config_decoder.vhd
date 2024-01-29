@@ -67,8 +67,8 @@ architecture rtl of esm_dwell_config_decoder is
   signal r_instruction_index    : unsigned(ESM_DWELL_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
   signal r_instruction_active   : std_logic;
 
-  signal w_dwell_entry          : esm_dwell_metadata_packed_t;
-  signal w_dwell_instruction    : esm_message_dwell_instruction_packed_t;
+  signal w_dwell_entry          : esm_message_dwell_entry_t;
+  signal w_dwell_instruction    : esm_dwell_instruction_t;
   signal w_dwell_program_header : esm_message_dwell_program_header_t;
 
 begin
@@ -191,7 +191,7 @@ begin
       if (s_state = S_IDLE) then
         r_instruction_index   <= (others => '0');
         r_instruction_active  <= '1';
-      elsif ((r_instruction_active = '1') and (r_module_config.valid = '1') and (s_state = S_WAIT_DONE) and (r_message_type = DWELL_PROGRAM))
+      elsif ((r_instruction_active = '1') and (r_module_config.valid = '1') and (s_state = S_WAIT_DONE) and (r_message_type = DWELL_PROGRAM)) then
         if (r_instruction_index = (ESM_NUM_DWELL_INSTRUCTIONS - 1)) then
           r_instruction_active  <= '0';
           r_instruction_index   <= (others => '0');

@@ -25,7 +25,7 @@ end entity esm_dwell_controller;
 
 architecture rtl of esm_dwell_controller is
 
-  type s_state is
+  type state_t is
   (
     S_IDLE,
     S_INSTRUCTION_LOOKUP,
@@ -39,6 +39,8 @@ architecture rtl of esm_dwell_controller is
 
   constant PLL_PRE_LOCK_DELAY_CYCLES  : natural := 2048;
   constant PLL_POST_LOCK_DELAY_CYCLES : natural := 4096;
+
+  signal s_state                    : state_t;
 
   signal r_rst                      : std_logic;
   signal r_timestamp                : unsigned(63 downto 0);
@@ -98,7 +100,7 @@ begin
     end if;
   end process;
 
-  i_config : entity esm_lib.sm_dwell_config_decoder
+  i_config : entity esm_lib.esm_dwell_config_decoder
   port map (
     Clk                     => Clk,
     Rst                     => r_rst,
@@ -189,7 +191,7 @@ begin
         --TODO: skip PLL delays if not changing the fast lock profile
 
         when S_PLL_WAIT_PRE_LOCK =>
-          if ((w_pll_pre_lock_done = '`1') and (w_pll_locked = '1')) then
+          if ((w_pll_pre_lock_done = '1') and (w_pll_locked = '1')) then
             s_state <= S_PLL_WAIT_POST_LOCK;
           else
             s_state <= S_PLL_WAIT_PRE_LOCK;
@@ -206,7 +208,7 @@ begin
           if (w_delay_start = '1') then
             s_state <= S_START_WAIT;
           else
-            s_start <= S_DWELL_ACTIVE;
+            s_state <= S_DWELL_ACTIVE;
           end if;
 
         when S_DWELL_ACTIVE =>
@@ -247,7 +249,7 @@ begin
           r_global_counter <= r_global_counter - 1;
         end if;
 
-        if (r_dwell_repeat == 0) then
+        if (r_dwell_repeat = 0) then
           r_instruction_index <= r_instruction_data.next_instruction_index;
         end if;
       end if;
@@ -313,7 +315,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Ad9361_control <= std_logic_vector(r_dwell_entry.fast_lock_profile);
+      Ad9361_control <= std_logic_vector('0' & r_dwell_entry.fast_lock_profile);
     end if;
   end process;
 

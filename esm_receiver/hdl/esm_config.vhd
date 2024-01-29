@@ -79,7 +79,7 @@ begin
   begin
     if rising_edge(Clk) then
       if (Rst = '1') then
-        s_state <= WORD_0;
+        s_state <= S_WORD_0;
       else
         if (r_axis_valid = '1') then
           case s_state is
@@ -112,7 +112,7 @@ begin
           end case;
 
           if (r_axis_last = '1') then
-            s_state <= WORD_0;
+            s_state <= S_WORD_0;
           end if;
         end if;
       end if;
