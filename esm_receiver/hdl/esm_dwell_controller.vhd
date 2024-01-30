@@ -211,7 +211,7 @@ begin
           end if;
 
         when S_START_WAIT =>
-          if (w_delay_start = '0') then
+          if (w_delay_start = '1') then
             s_state <= S_START_WAIT;
           else
             s_state <= S_DWELL_ACTIVE;
