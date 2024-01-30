@@ -78,6 +78,8 @@ architecture rtl of esm_dwell_controller is
   signal r_instruction_index        : unsigned(ESM_DWELL_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
   signal r_instruction_data         : esm_dwell_instruction_t;
   signal r_dwell_entry              : esm_dwell_metadata_t;
+  signal r_dwell_entry_d            : esm_dwell_metadata_t;
+  signal r_dwell_active             : std_logic;
 
 begin
 
@@ -165,7 +167,7 @@ begin
   w_pll_locked          <= r_ad9361_status(6);
   w_pll_post_lock_done  <= to_stdlogic(r_pll_post_lock_cycles = (PLL_POST_LOCK_DELAY_CYCLES - 1));
   w_delay_start         <= r_dwell_program_data.enable_delayed_start and to_stdlogic(r_dwell_program_data.delayed_start_time < r_timestamp);
-  w_dwell_done          <= to_stdlogic(r_dwell_entry.duration = r_dwell_cycles);
+  w_dwell_done          <= to_stdlogic(r_dwell_entry_d.duration = r_dwell_cycles);
 
   process(Clk)
   begin
@@ -309,13 +311,21 @@ begin
     end if;
   end process;
 
-  Dwell_active  <= to_stdlogic(s_state = S_DWELL_ACTIVE);
-  Dwell_data    <= r_dwell_entry;
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_dwell_active  <= to_stdlogic(s_state = S_DWELL_ACTIVE);
+      r_dwell_entry_d <= r_dwell_entry;
+    end if;
+  end process;
+
+  Dwell_active  <= r_dwell_active;
+  Dwell_data    <= r_dwell_entry_d;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Ad9361_control <= std_logic_vector('0' & r_dwell_entry.fast_lock_profile);
+      Ad9361_control <= std_logic_vector('0' & r_dwell_entry_d.fast_lock_profile);
     end if;
   end process;
 

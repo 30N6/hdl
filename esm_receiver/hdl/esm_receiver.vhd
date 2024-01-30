@@ -12,6 +12,9 @@ library clock_lib;
 library dsp_lib;
   use dsp_lib.dsp_pkg.all;
 
+library esm_lib;
+  use esm_lib.esm_pkg.all;
+
 entity esm_receiver is
 generic (
   AXI_DATA_WIDTH  : natural;
@@ -92,6 +95,7 @@ architecture rtl of esm_receiver is
   signal r_test_64_chn                : std_logic;
   signal r_test_64_fft                : std_logic;
   signal r_test                       : std_logic;
+  signal r_test_dwell                 : std_logic;
 
   signal w_reporter_axis_ready        : std_logic;
   signal w_reporter_axis_valid        : std_logic;
@@ -122,7 +126,7 @@ begin
     end if;
   end process;
 
-  i_config : esm_lib.esm_config
+  i_config : entity esm_lib.esm_config
   generic map (
     AXI_DATA_WIDTH => AXI_DATA_WIDTH
   )
@@ -231,7 +235,8 @@ begin
       r_test_8_fft  <= w_channelizer8_fft_control.valid  or or_reduce(std_logic_vector(w_channelizer8_fft_control.data_index)  & std_logic_vector(w_channelizer8_fft_data(0))  & std_logic_vector(w_channelizer8_fft_data(1)));
       r_test_64_chn <= w_channelizer64_chan_control.valid or or_reduce(std_logic_vector(w_channelizer64_chan_control.data_index) & std_logic_vector(w_channelizer64_chan_data(0)) & std_logic_vector(w_channelizer64_chan_data(1))) or w_channelizer64_overflow;
       r_test_64_fft <= w_channelizer64_fft_control.valid or or_reduce(std_logic_vector(w_channelizer64_fft_control.data_index) & std_logic_vector(w_channelizer64_fft_data(0)) & std_logic_vector(w_channelizer64_fft_data(1)));
-      r_test        <= r_test_8_chn or r_test_8_fft or r_test_64_chn or r_test_64_fft;
+      r_test_dwell  <= w_dwell_active or or_reduce(w_dwell_data.tag) or or_reduce(w_dwell_data.frequency) or or_reduce(w_dwell_data.duration) or or_reduce(w_dwell_data.gain) or or_reduce(w_dwell_data.fast_lock_profile) or or_reduce(w_dwell_data.threshold_narrow) or or_reduce(w_dwell_data.threshold_wide) or or_reduce(w_dwell_data.channel_mask_narrow) or or_reduce(w_dwell_data.channel_mask_wide);
+      r_test        <= r_test_8_chn or r_test_8_fft or r_test_64_chn or r_test_64_fft or r_test_dwell;
       --r_test <= w_channelizer_valid or or_reduce(std_logic_vector(w_channelizer_index) & std_logic_vector(w_channelizer_data(0)) & std_logic_vector(w_channelizer_data(1))) or w_channelizer_overflow;
     end if;
   end process;
@@ -276,7 +281,9 @@ begin
     M_axis_last     => w_config_axis_last
   );
 
-  w_reporter_axis_valid <= '0'; --TODO
-  w_config_axis_ready   <= r_test; --TODO --'1';
+  w_reporter_axis_valid <= r_test; --TODO
+  w_reporter_axis_data  <= (others => '0');
+  w_reporter_axis_last  <= '1';
+  --w_config_axis_ready   <= ; --TODO --'1';
 
 end architecture rtl;

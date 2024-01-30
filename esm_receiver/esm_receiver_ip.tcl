@@ -34,6 +34,10 @@ custom_ip_files esm_receiver [list \
   {"../dsp/hdl/channelizer_8.vhd"         "dsp_lib"}      \
   {"../dsp/hdl/channelizer_32.vhd"        "dsp_lib"}      \
   {"../dsp/hdl/channelizer_64.vhd"        "dsp_lib"}      \
+  {"./hdl/esm_pkg.vhd"                    "esm_lib"}      \
+  {"./hdl/esm_config.vhd"                 "esm_lib"}      \
+  {"./hdl/esm_dwell_config_decoder.vhd"   "esm_lib"}      \
+  {"./hdl/esm_dwell_controller.vhd"       "esm_lib"}      \
   {"./hdl/esm_receiver.vhd"               "esm_lib"}      \
 ]
 

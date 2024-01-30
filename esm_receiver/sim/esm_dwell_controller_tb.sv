@@ -65,6 +65,9 @@ module esm_dwell_controller_tb;
   logic [3:0]                                     r_ad9361_control;
   logic [7:0]                                     w_ad9361_status;
 
+  bit [31:0]                                      config_seq_num = 0;
+  esm_dwell_metadata_t                            dwell_entry_mem [esm_num_dwell_entries - 1 : 0];
+
   expect_t                                        expected_data [$];
   int                                             num_received = 0;
 
@@ -138,12 +141,61 @@ module esm_dwell_controller_tb;
     end while (Rst);
   endtask
 
-  task automatic write_config(bit [31:0] config_data [][]);
+  task automatic write_config(bit [31:0] config_data []);
     @(posedge Clk)
+    cfg_tx_intf.write(config_data);
+    repeat(10) @(posedge Clk);
+  endtask
+
+  task automatic send_initial_config();
+    bit [31:0] config_data [][] = '{{esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h00030300}, {esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h00030300}};
     foreach (config_data[i]) begin
-      cfg_tx_intf.write(config_data[i]);
-      repeat(10) @(posedge Clk);
+      write_config(config_data[i]);
     end
+  endtask
+
+  //type esm_dwell_metadata_packed_t is record
+  //  tag                       : unsigned(15 downto 0);
+  //  frequency                 : unsigned(15 downto 0);
+  //  duration                  : unsigned(31 downto 0);
+  //  gain                      : unsigned(7 downto 0);
+  //  fast_lock_profile         : unsigned(7 downto 0);
+  //  threshold_narrow          : unsigned(15 downto 0);
+  //  threshold_wide            : unsigned(15 downto 0);
+  //  channel_mask_narrow       : std_logic_vector(63 downto 0);
+  //  channel_mask_wide         : std_logic_vector(7 downto 0);
+  //end record;
+  //type esm_message_dwell_entry_packed_t is record
+  //  entry_index               : unsigned(7 downto 0);
+  //  entry_data                : esm_dwell_metadata_packed_t;
+  //end record;
+
+  task automatic send_dwell_entry(esm_message_dwell_entry_t entry);
+    bit [esm_message_dwell_entry_packed_width - 1 : 0] packed_entry = '0;
+    bit [31:0] config_data [] = new[3 + esm_message_dwell_entry_packed_width/32];
+
+    $display("%0t: send_dwell_entry[%0d] = %p", $time, entry.entry_index, entry.entry_data);
+
+    packed_entry[7  :   0] = entry.entry_index;
+    packed_entry[23 :   8] = entry.entry_data.tag;
+    packed_entry[39 :  24] = entry.entry_data.frequency;
+    packed_entry[71 :  40] = entry.entry_data.duration;
+    packed_entry[79 :  72] = entry.entry_data.gain;
+    packed_entry[87 :  80] = entry.entry_data.fast_lock_profile;
+    packed_entry[103:  88] = entry.entry_data.threshold_narrow;
+    packed_entry[119: 104] = entry.entry_data.threshold_wide;
+    packed_entry[183: 120] = entry.entry_data.channel_mask_narrow;
+    packed_entry[191: 184] = entry.entry_data.channel_mask_wide;
+
+    config_data[0] = esm_control_magic_num;
+    config_data[1] = config_seq_num++;
+    config_data[2] = {esm_module_id_dwell, esm_control_message_type_dwell_entry, 16'h0000};
+
+    for (int i = 0; i < (esm_message_dwell_entry_packed_width/32); i++) begin
+      config_data[3 + i] = packed_entry[i*32 +: 32];
+    end
+
+    write_config(config_data);
   endtask
 
   function automatic bit compare_data(esm_dwell_metadata_t a, esm_dwell_metadata_t b);
@@ -188,85 +240,103 @@ module esm_dwell_controller_tb;
   end
 
   task automatic standard_tests();
-    int wait_cycles;
-    /*int max_frame_delay = 64;
-    int max_sample_delay = $urandom_range(5);
-    fft_transfer_t tx_queue[$];
-    fft_transfer_t rx_queue[$];
-    fft_transfer_t transfer_data;
-    int d_i, d_q;
-    int frame_index;
-    int current_max_sample_delay = 0;
-    int tx_tag [*];
+    parameter NUM_TESTS = 20;
 
-    int fd_test_in  = $fopen(fn_in, "r");
-    int fd_test_out = $fopen(fn_out, "r");
+    for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
+      int wait_cycles;
 
-    repeat(10) @(posedge Clk);
-    $display("%0t: Standard test started: fn_in=%s fn_out=%s max_frame_delay=%0d max_sample_delay=%0d", $time, fn_in, fn_out, max_frame_delay, max_sample_delay);
+      send_initial_config();
 
-    while ($fscanf(fd_test_in, "%d %d %d %d %d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q) == 5) begin
-      //$display("input_transfer: frame=%0d index=%0d last=%0d d_i=%0d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q);
-      if (!tx_tag.exists(frame_index)) begin
-        tx_tag[frame_index] = $urandom_range(255, 0);
+      for (int i_dwell = 0; i_dwell < esm_num_dwell_entries; i_dwell++) begin
+        esm_message_dwell_entry_t entry;
+        entry.entry_index                     = i_dwell;
+        entry.entry_data.tag                  = $urandom;
+        entry.entry_data.frequency            = $urandom;
+        entry.entry_data.duration             = $urandom_range(1000);
+        entry.entry_data.gain                 = $urandom;
+        entry.entry_data.fast_lock_profile    = $urandom;
+        entry.entry_data.threshold_narrow     = $urandom;
+        entry.entry_data.threshold_wide       = $urandom;
+        entry.entry_data.channel_mask_narrow  = $urandom;
+        entry.entry_data.channel_mask_wide    = $urandom;
+
+        send_dwell_entry(entry);
+        dwell_entry_mem[i_dwell] = entry.entry_data;
       end
-      transfer_data.tag     = tx_tag[frame_index];
-      transfer_data.reverse = reverse;
-      transfer_data.data_i  = d_i;
-      transfer_data.data_q  = d_q;
-      tx_queue.push_back(transfer_data);
-    end
-    $fclose(fd_test_in);
 
-    while ($fscanf(fd_test_out, "%d %d %d %d %d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q) == 5) begin
-      expect_t e;
-      transfer_data.tag     = tx_tag[frame_index];
-      transfer_data.reverse = reverse;
-      transfer_data.data_i  = d_i;
-      transfer_data.data_q  = d_q;
-      e.data = transfer_data;
-      e.frame_index = frame_index;
-      expected_data.push_back(e);
-    end
-    $fclose(fd_test_out);
+      /*int max_frame_delay = 64;
+      int max_sample_delay = $urandom_range(5);
+      fft_transfer_t tx_queue[$];
+      fft_transfer_t rx_queue[$];
+      fft_transfer_t transfer_data;
+      int d_i, d_q;
+      int frame_index;
+      int current_max_sample_delay = 0;
+      int tx_tag [*];
 
-    $display("%0t: TX queue size = %0d", $time, tx_queue.size());
+      int fd_test_in  = $fopen(fn_in, "r");
+      int fd_test_out = $fopen(fn_out, "r");
 
-    while (tx_queue.size() > 0) begin
-      transfer_data = tx_queue.pop_front();
-      tx_intf.write(transfer_data);
-      if (transfer_data.last) begin
-        int frame_delay = ($urandom_range(99) < 50) ? 0 : $urandom_range(max_frame_delay, 0);
-        repeat (frame_delay) @(posedge Clk);
-        current_max_sample_delay = ($urandom_range(99) < 50) ? 0 : $urandom_range(max_sample_delay);
-      end else begin
-        repeat (current_max_sample_delay) @(posedge Clk);
+      repeat(10) @(posedge Clk);
+      $display("%0t: Standard test started: fn_in=%s fn_out=%s max_frame_delay=%0d max_sample_delay=%0d", $time, fn_in, fn_out, max_frame_delay, max_sample_delay);
+
+      while ($fscanf(fd_test_in, "%d %d %d %d %d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q) == 5) begin
+        //$display("input_transfer: frame=%0d index=%0d last=%0d d_i=%0d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q);
+        if (!tx_tag.exists(frame_index)) begin
+          tx_tag[frame_index] = $urandom_range(255, 0);
+        end
+        transfer_data.tag     = tx_tag[frame_index];
+        transfer_data.reverse = reverse;
+        transfer_data.data_i  = d_i;
+        transfer_data.data_q  = d_q;
+        tx_queue.push_back(transfer_data);
       end
-    end*/
+      $fclose(fd_test_in);
 
-    wait_cycles = 0;
-    while ((expected_data.size() != 0) && (wait_cycles < 1e5)) begin
-      @(posedge Clk);
-      wait_cycles++;
+      while ($fscanf(fd_test_out, "%d %d %d %d %d", frame_index, transfer_data.index, transfer_data.last, d_i, d_q) == 5) begin
+        expect_t e;
+        transfer_data.tag     = tx_tag[frame_index];
+        transfer_data.reverse = reverse;
+        transfer_data.data_i  = d_i;
+        transfer_data.data_q  = d_q;
+        e.data = transfer_data;
+        e.frame_index = frame_index;
+        expected_data.push_back(e);
+      end
+      $fclose(fd_test_out);
+
+      $display("%0t: TX queue size = %0d", $time, tx_queue.size());
+
+      while (tx_queue.size() > 0) begin
+        transfer_data = tx_queue.pop_front();
+        tx_intf.write(transfer_data);
+        if (transfer_data.last) begin
+          int frame_delay = ($urandom_range(99) < 50) ? 0 : $urandom_range(max_frame_delay, 0);
+          repeat (frame_delay) @(posedge Clk);
+          current_max_sample_delay = ($urandom_range(99) < 50) ? 0 : $urandom_range(max_sample_delay);
+        end else begin
+          repeat (current_max_sample_delay) @(posedge Clk);
+        end
+      end*/
+
+      wait_cycles = 0;
+      while ((expected_data.size() != 0) && (wait_cycles < 1e5)) begin
+        @(posedge Clk);
+        wait_cycles++;
+      end
+      assert (wait_cycles < 1e5) else $error("Timeout while waiting for expected queue to empty during standard test");
+
+      $display("%0t: Standard test finished: num_received = %0d", $time, num_received);
+
+      Rst = 1;
+      repeat(100) @(posedge Clk);
+      Rst = 0;
     end
-    assert (wait_cycles < 1e5) else $error("Timeout while waiting for expected queue to empty during standard test");
-
-    $display("%0t: Standard test finished: num_received = %0d", $time, num_received);
-
-    Rst = 1;
-    repeat(100) @(posedge Clk);
-    Rst = 0;
   endtask
 
   initial
   begin
     wait_for_reset();
-
-    begin
-      automatic bit [31:0] config_data [][] = '{{esm_control_magic_num, 32'h00000001, 32'h00000000, 32'h00030300}, {esm_control_magic_num, 32'h00000001, 32'h00000000, 32'h00030300}};
-      write_config(config_data);
-    end
-
     standard_tests();
 
     $finish;
