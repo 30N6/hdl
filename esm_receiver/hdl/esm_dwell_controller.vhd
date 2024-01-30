@@ -9,6 +9,10 @@ library esm_lib;
   use esm_lib.esm_pkg.all;
 
 entity esm_dwell_controller is
+generic (
+  PLL_PRE_LOCK_DELAY_CYCLES   : natural;
+  PLL_POST_LOCK_DELAY_CYCLES  : natural
+);
 port (
   Clk             : in  std_logic;
   Rst             : in  std_logic;
@@ -37,8 +41,8 @@ architecture rtl of esm_dwell_controller is
     S_DWELL_DONE
   );
 
-  constant PLL_PRE_LOCK_DELAY_CYCLES  : natural := 2048;
-  constant PLL_POST_LOCK_DELAY_CYCLES : natural := 4096;
+  --constant PLL_PRE_LOCK_DELAY_CYCLES  : natural := 2048;
+  --constant PLL_POST_LOCK_DELAY_CYCLES : natural := 4096;
 
   signal s_state                    : state_t;
 
@@ -207,7 +211,7 @@ begin
           end if;
 
         when S_START_WAIT =>
-          if (w_delay_start = '1') then
+          if (w_delay_start = '0') then
             s_state <= S_START_WAIT;
           else
             s_state <= S_DWELL_ACTIVE;

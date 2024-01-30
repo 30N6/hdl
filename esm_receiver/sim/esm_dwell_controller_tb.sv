@@ -102,7 +102,7 @@ module esm_dwell_controller_tb;
     .Module_config (w_module_config)
   );
 
-  esm_dwell_controller dut
+  esm_dwell_controller #(.PLL_PRE_LOCK_DELAY_CYCLES(8), .PLL_POST_LOCK_DELAY_CYCLES(10)) dut
   (
     .Clk             (Clk),
     .Rst             (Rst),
@@ -126,7 +126,7 @@ module esm_dwell_controller_tb;
     while (1) begin
       if (w_ad9361_control != r_ad9361_control) begin
         w_ad9361_status <= '0;
-        repeat ($urandom_range(500, 50)) @(posedge Clk);
+        repeat ($urandom_range(10, 5)) @(posedge Clk);
         w_ad9361_status <= '1;
       end
       @(posedge Clk);
@@ -198,6 +198,45 @@ module esm_dwell_controller_tb;
     write_config(config_data);
   endtask
 
+  function automatic bit [31:0] pack_dwell_instruction(esm_dwell_instruction_t instruction);
+    bit [31:0] r = '0;
+
+    r[0]      = instruction.valid;
+    r[1]      = instruction.global_counter_check;
+    r[2]      = instruction.global_counter_dec;
+    r[15:8]   = instruction.repeat_count;
+    r[23:16]  = instruction.entry_index;
+    r[31:24]  = instruction.next_instruction_index;
+
+    return r;
+  endfunction
+
+  task automatic send_dwell_program(esm_message_dwell_program_t dwell_program);
+    bit [esm_message_dwell_program_header_packed_width - 1 : 0] packed_header = '0;
+    bit [31:0] config_data [] = new[3 + esm_message_dwell_program_header_packed_width/32 + esm_num_dwell_instructions];
+
+    $display("%0t: send_dwell_program = %p", $time, dwell_program);
+
+    packed_header[7:0]    = dwell_program.enable_program;
+    packed_header[15:8]   = dwell_program.enable_delayed_start;
+    packed_header[63:32]  = dwell_program.global_counter_init;
+    packed_header[127:64] = dwell_program.delayed_start_time;
+
+    config_data[0] = esm_control_magic_num;
+    config_data[1] = config_seq_num++;
+    config_data[2] = {esm_module_id_dwell, esm_control_message_type_dwell_program, 16'h0000};
+
+    for (int i = 0; i < (esm_message_dwell_program_header_packed_width/32); i++) begin
+      config_data[3 + i] = packed_header[i*32 +: 32];
+    end
+
+    for (int i = 0; i < esm_num_dwell_instructions; i++) begin
+      config_data[3 + (esm_message_dwell_program_header_packed_width/32) + i] = pack_dwell_instruction(dwell_program.instructions[i]);
+    end
+
+    write_config(config_data);
+  endtask
+
   function automatic bit compare_data(esm_dwell_metadata_t a, esm_dwell_metadata_t b);
     if(a.tag                  !== b.tag)                    return 0;
     if(a.frequency            !== b.frequency)              return 0;
@@ -239,6 +278,47 @@ module esm_dwell_controller_tb;
     end
   end
 
+  function automatic void randomize_instructions(inout esm_message_dwell_program_t dwell_program, bit global_counter_enable);
+    int random_order = $urandom_range(99) < 50;
+    int loop = $urandom_range(99) < 50;
+    int num_instructions = $urandom_range(10, esm_num_dwell_instructions - 1);
+    int indices [$];
+
+    for (int i = 1; i < num_instructions; i++) begin
+      indices.push_back(i);
+    end
+    indices.shuffle();
+    indices.push_front(0);
+
+    for (int i = 0; i < esm_num_dwell_instructions; i++) begin
+      dwell_program.instructions[i].valid = 0;
+    end
+
+    for (int i = 0; i < num_instructions; i++) begin
+      int idx = random_order ? indices[i] : i;
+
+      dwell_program.instructions[idx].valid = 1;
+      dwell_program.instructions[idx].global_counter_check    = global_counter_enable;
+      dwell_program.instructions[idx].global_counter_dec      = global_counter_enable;
+      dwell_program.instructions[idx].repeat_count            = $urandom_range(4);
+      dwell_program.instructions[idx].entry_index             = $urandom_range(esm_num_dwell_entries - 1);
+
+      if (i == (num_instructions - 1)) begin
+        if (loop) begin
+          dwell_program.instructions[idx].next_instruction_index = 0;
+        end else begin
+          dwell_program.instructions[idx].next_instruction_index = esm_num_dwell_instructions - 1;
+        end
+      end else begin
+        if (random_order) begin
+          dwell_program.instructions[idx].next_instruction_index = indices[i + 1];
+        end else begin
+          dwell_program.instructions[idx].next_instruction_index = idx + 1;
+        end
+      end
+    end
+  endfunction
+
   task automatic standard_tests();
     parameter NUM_TESTS = 20;
 
@@ -262,6 +342,25 @@ module esm_dwell_controller_tb;
 
         send_dwell_entry(entry);
         dwell_entry_mem[i_dwell] = entry.entry_data;
+      end
+
+      for (int i_rep = 0; i_rep < 10; i_rep++) begin
+        int global_counter_init   = $urandom_range(500);
+        bit global_counter_enable = $urandom;
+        int delayed_start_time    = $urandom_range(5000);
+        int delayed_start_enable  = $urandom;
+
+        esm_message_dwell_program_t dwell_program;
+        dwell_program.enable_program        = 1;
+        dwell_program.enable_delayed_start  = delayed_start_enable;
+        dwell_program.global_counter_init   = global_counter_init;
+        dwell_program.delayed_start_time    = delayed_start_time;
+
+        randomize_instructions(dwell_program, global_counter_enable);
+
+        send_dwell_program(dwell_program);
+
+        repeat(40000) @(posedge Clk);
       end
 
       /*int max_frame_delay = 64;

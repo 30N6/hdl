@@ -147,6 +147,10 @@ begin
   );
 
   i_dwell_controller : entity esm_lib.esm_dwell_controller
+  generic map (
+    PLL_PRE_LOCK_DELAY_CYCLES   => 2048,
+    PLL_POST_LOCK_DELAY_CYCLES  => 2048
+  )
   port map (
     Clk             => data_clk,
     Rst             => r_combined_rst,

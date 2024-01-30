@@ -108,14 +108,14 @@ package esm_pkg is
 
   type esm_dwell_instruction_array_t is array (natural range <>) of esm_dwell_instruction_t;
 
-  --type esm_message_dwell_program_t is record
-  --  --header                    : esm_common_header_t;
-  --  enable_program            : std_logic;
-  --  enable_delayed_start      : std_logic;
-  --  global_counter_init       : unsigned(31 downto 0);
-  --  delayed_start_time        : unsigned(63 downto 0);
-  --  instructions              : esm_dwell_instruction_array_t(ESM_NUM_DWELL_INSTRUCTIONS - 1 downto 0);
-  --end record;
+  type esm_message_dwell_program_t is record
+    --header                    : esm_common_header_t;
+    enable_program            : std_logic;
+    enable_delayed_start      : std_logic;
+    global_counter_init       : unsigned(31 downto 0);
+    delayed_start_time        : unsigned(63 downto 0);
+    instructions              : esm_dwell_instruction_array_t(ESM_NUM_DWELL_INSTRUCTIONS - 1 downto 0);
+  end record;
 
   type esm_message_dwell_program_header_t is record
     enable_program            : std_logic;
