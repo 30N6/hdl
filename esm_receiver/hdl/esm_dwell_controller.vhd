@@ -170,7 +170,7 @@ begin
   w_pll_pre_lock_done   <= to_stdlogic(r_pll_pre_lock_cycles = (PLL_PRE_LOCK_DELAY_CYCLES - 1));
   w_pll_locked          <= r_ad9361_status(6);
   w_pll_post_lock_done  <= to_stdlogic(r_pll_post_lock_cycles = (PLL_POST_LOCK_DELAY_CYCLES - 1));
-  w_delay_start         <= r_dwell_program_data.enable_delayed_start and to_stdlogic(r_dwell_program_data.delayed_start_time < r_timestamp);
+  w_delay_start         <= r_dwell_program_data.enable_delayed_start and to_stdlogic(r_dwell_program_data.delayed_start_time > r_timestamp);
   w_dwell_done          <= to_stdlogic(r_dwell_entry_d.duration = r_dwell_cycles);
 
   process(Clk)

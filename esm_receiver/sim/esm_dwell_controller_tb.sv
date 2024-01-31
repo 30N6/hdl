@@ -10,8 +10,8 @@ interface dwell_rx_intf (input logic Clk);
   task read(output esm_dwell_metadata_t d);
     logic v;
     do begin
-      d = data;
-      v = valid;
+      d <= data;
+      v <= valid;
       @(posedge Clk);
     end while (v !== 1);
   endtask
@@ -247,7 +247,7 @@ module esm_dwell_controller_tb;
     forever begin
       rx_intf.read(read_data);
       if (compare_data(read_data, expected_data[0].data)) begin
-        $display("%0t: data match - %p", $time, read_data);
+        $display("%0t: data match (remaining=%0d) - %p", $time, expected_data.size(), read_data);
       end else begin
         $error("%0t: error -- data mismatch: expected = %p  actual = %p", $time, expected_data[0].data, read_data);
       end
@@ -268,7 +268,7 @@ module esm_dwell_controller_tb;
 
   function automatic void randomize_instructions(inout esm_message_dwell_program_t dwell_program, bit global_counter_enable);
     int random_order = $urandom_range(99) < 50;
-    int loop = $urandom_range(99) < 50;
+    int loop = ($urandom_range(99) < 50) && global_counter_enable;
     int num_instructions = $urandom_range(10, esm_num_dwell_instructions - 1);
     int indices [$];
 
@@ -281,6 +281,8 @@ module esm_dwell_controller_tb;
     for (int i = 0; i < esm_num_dwell_instructions; i++) begin
       dwell_program.instructions[i].valid = 0;
     end
+
+    //$display("%0t: randomize_instructions: global_counter_enable=%0d", $time, global_counter_enable);
 
     for (int i = 0; i < num_instructions; i++) begin
       int idx = random_order ? indices[i] : i;
@@ -304,6 +306,7 @@ module esm_dwell_controller_tb;
           dwell_program.instructions[idx].next_instruction_index = idx + 1;
         end
       end
+      //$display("%0t: randomize_instructions[%0d]: idx=%0d inst=%p", $time, i, idx, dwell_program.instructions[idx]);
     end
   endfunction
 
@@ -316,13 +319,22 @@ module esm_dwell_controller_tb;
       esm_dwell_instruction_t inst = dwell_program.instructions[inst_index];
       expect_t e;
 
+      //$display("%0t: expect_dwell_program - initial: inst[%0d]=%p", $time, inst_index, inst);
+
+      if (!inst.valid) begin
+        break;
+      end
+
       for (int i = 0; i < inst.repeat_count + 1; i++) begin
-        if (!inst.valid || (inst.global_counter_check && (global_counter <= 0))) begin
+        if (inst.global_counter_check && (global_counter <= 0)) begin
           done = 1;
           break;
         end
 
+        //$display("%0t: expecting dwell: inst_index=%0d  entry_index=%0d  next_instruction_index=%0d  global_counter=%0d", $time, inst_index, inst.entry_index, inst.next_instruction_index, global_counter);
         e.data = dwell_entry_mem[inst.entry_index];
+        $display("%0t: expecting dwell: inst_index=%0d  dwell_entry=%p", $time, inst_index, e.data);
+
         expected_data.push_back(e);
         if (inst.global_counter_dec) begin
           global_counter--;
@@ -334,6 +346,7 @@ module esm_dwell_controller_tb;
       end
 
       inst_index = inst.next_instruction_index;
+      //$display("%0t: expect_dwell_program - final: inst_index=%0d", $time, inst_index);
     end
   endfunction
 
@@ -375,20 +388,28 @@ module esm_dwell_controller_tb;
         dwell_program.delayed_start_time    = delayed_start_time;
 
         randomize_instructions(dwell_program, global_counter_enable);
+        /*$display("dwell_program: %p", dwell_program);
+        for (int i = 0; i < esm_num_dwell_instructions; i++) begin
+          $display("  inst[%0d] = %p", i, dwell_program.instructions[i]);
+        end*/
 
         expect_dwell_program(dwell_program);
 
         send_dwell_program(dwell_program);
 
-        repeat(80000) @(posedge Clk);
-      end
+        //repeat(300000) @(posedge Clk);
 
-      wait_cycles = 0;
-      while ((expected_data.size() != 0) && (wait_cycles < 1e5)) begin
-        @(posedge Clk);
-        wait_cycles++;
+        wait_cycles = 0;
+        while ((expected_data.size() != 0) && (wait_cycles < 3e5)) begin
+          @(posedge Clk);
+          wait_cycles++;
+        end
+        assert (wait_cycles < 3e5) else $error("Timeout while waiting for expected queue to empty during standard test");
+
+        foreach (expected_data[i]) begin
+          $display("%0t: end of rep: expected_data[%0d]=%p", $time, i, expected_data[i]);
+        end
       end
-      assert (wait_cycles < 1e5) else $error("Timeout while waiting for expected queue to empty during standard test");
 
       $display("%0t: Standard test finished: num_received = %0d", $time, num_received);
 
