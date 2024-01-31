@@ -84,7 +84,7 @@ begin
     end if;
   end process;
 
-  w_module_id_match     <= to_stdlogic(r_module_config.module_id = ESM_MODULE_ID_DWELL);
+  w_module_id_match     <= to_stdlogic(r_module_config.module_id = ESM_MODULE_ID_DWELL_CONTROLLER);
   w_message_type_match  <= to_stdlogic(r_module_config.message_type = ESM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY) or
                            to_stdlogic(r_module_config.message_type = ESM_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM);
 

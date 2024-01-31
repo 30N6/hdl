@@ -62,6 +62,7 @@ module esm_dwell_controller_tb;
   logic                                           w_dwell_active;
   logic                                           r_dwell_active;
   esm_dwell_metadata_t                            w_dwell_data;
+  logic [31:0]                                    w_dwell_seq_num;
 
   logic [3:0]                                     w_ad9361_control;
   logic [3:0]                                     r_ad9361_control;
@@ -106,16 +107,17 @@ module esm_dwell_controller_tb;
 
   esm_dwell_controller #(.PLL_PRE_LOCK_DELAY_CYCLES(8), .PLL_POST_LOCK_DELAY_CYCLES(10)) dut
   (
-    .Clk             (Clk),
-    .Rst             (Rst),
+    .Clk                (Clk),
+    .Rst                (Rst),
 
-    .Module_config   (w_module_config),
+    .Module_config      (w_module_config),
 
-    .Ad9361_control  (w_ad9361_control),
-    .Ad9361_status   (w_ad9361_status),
+    .Ad9361_control     (w_ad9361_control),
+    .Ad9361_status      (w_ad9361_status),
 
-    .Dwell_active    (w_dwell_active),
-    .Dwell_data      (w_dwell_data)
+    .Dwell_active       (w_dwell_active),
+    .Dwell_data         (w_dwell_data),
+    .Dwell_sequence_num (w_dwell_seq_num)
   );
 
   always_ff @(posedge Clk) begin
@@ -164,20 +166,20 @@ module esm_dwell_controller_tb;
 
     $display("%0t: send_dwell_entry[%0d] = %p", $time, entry.entry_index, entry.entry_data);
 
-    packed_entry[7  :   0] = entry.entry_index;
-    packed_entry[23 :   8] = entry.entry_data.tag;
-    packed_entry[39 :  24] = entry.entry_data.frequency;
-    packed_entry[71 :  40] = entry.entry_data.duration;
-    packed_entry[79 :  72] = entry.entry_data.gain;
-    packed_entry[87 :  80] = entry.entry_data.fast_lock_profile;
-    packed_entry[103:  88] = entry.entry_data.threshold_narrow;
-    packed_entry[119: 104] = entry.entry_data.threshold_wide;
-    packed_entry[183: 120] = entry.entry_data.channel_mask_narrow;
-    packed_entry[191: 184] = entry.entry_data.channel_mask_wide;
+    packed_entry[7   :   0] = entry.entry_index;
+    packed_entry[47  :  32] = entry.entry_data.tag;
+    packed_entry[63  :  48] = entry.entry_data.frequency;
+    packed_entry[95  :  64] = entry.entry_data.duration;
+    packed_entry[103 :  96] = entry.entry_data.gain;
+    packed_entry[111 : 104] = entry.entry_data.fast_lock_profile;
+    packed_entry[143 : 128] = entry.entry_data.threshold_narrow;
+    packed_entry[159 : 144] = entry.entry_data.threshold_wide;
+    packed_entry[223 : 160] = entry.entry_data.channel_mask_narrow;
+    packed_entry[231 : 224] = entry.entry_data.channel_mask_wide;
 
     config_data[0] = esm_control_magic_num;
     config_data[1] = config_seq_num++;
-    config_data[2] = {esm_module_id_dwell, esm_control_message_type_dwell_entry, 16'h0000};
+    config_data[2] = {esm_module_id_dwell_controller, esm_control_message_type_dwell_entry, 16'h0000};
 
     for (int i = 0; i < (esm_message_dwell_entry_packed_width/32); i++) begin
       config_data[3 + i] = packed_entry[i*32 +: 32];
@@ -212,7 +214,7 @@ module esm_dwell_controller_tb;
 
     config_data[0] = esm_control_magic_num;
     config_data[1] = config_seq_num++;
-    config_data[2] = {esm_module_id_dwell, esm_control_message_type_dwell_program, 16'h0000};
+    config_data[2] = {esm_module_id_dwell_controller, esm_control_message_type_dwell_program, 16'h0000};
 
     for (int i = 0; i < (esm_message_dwell_program_header_packed_width/32); i++) begin
       config_data[3 + i] = packed_header[i*32 +: 32];

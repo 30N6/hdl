@@ -30,6 +30,8 @@ package dsp_pkg is
     data_index  : unsigned(5 downto 0);
   end record;
 
+  type channelizer_control_array_t is array (natural range <>) of channelizer_control_t;
+
   function invert_sign(v : signed; saturate : boolean) return signed;
   function int_to_signed_array(int_array : integer_array_t; output_length : natural; input_width : natural; output_width : natural) return signed_array_t;
 

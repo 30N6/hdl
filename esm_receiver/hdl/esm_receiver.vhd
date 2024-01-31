@@ -71,6 +71,7 @@ architecture rtl of esm_receiver is
 
   signal w_dwell_active               : std_logic;
   signal w_dwell_data                 : esm_dwell_metadata_t;
+  signal w_dwell_sequence_num         : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   signal r_adc_valid                  : std_logic;
   signal r_adc_data_i                 : signed(IQ_WIDTH - 1 downto 0);
@@ -155,16 +156,17 @@ begin
     PLL_POST_LOCK_DELAY_CYCLES  => 2048
   )
   port map (
-    Clk             => data_clk,
-    Rst             => r_combined_rst,
+    Clk                 => data_clk,
+    Rst                 => r_combined_rst,
 
-    Module_config   => w_module_config,
+    Module_config       => w_module_config,
 
-    Ad9361_control  => w_ad9361_control,
-    Ad9361_status   => r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 1),
+    Ad9361_control      => w_ad9361_control,
+    Ad9361_status       => r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 1),
 
-    Dwell_active    => w_dwell_active,
-    Dwell_data      => w_dwell_data
+    Dwell_active        => w_dwell_active,
+    Dwell_data          => w_dwell_data,
+    Dwell_sequence_num  => w_dwell_sequence_num
   );
 
   process(Adc_clk)

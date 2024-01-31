@@ -14,16 +14,17 @@ generic (
   PLL_POST_LOCK_DELAY_CYCLES  : natural
 );
 port (
-  Clk             : in  std_logic;
-  Rst             : in  std_logic;
+  Clk                 : in  std_logic;
+  Rst                 : in  std_logic;
 
-  Module_config   : in  esm_config_data_t;
+  Module_config       : in  esm_config_data_t;
 
-  Ad9361_control  : out std_logic_vector(3 downto 0);
-  Ad9361_status   : in  std_logic_vector(7 downto 0);
+  Ad9361_control      : out std_logic_vector(3 downto 0);
+  Ad9361_status       : in  std_logic_vector(7 downto 0);
 
-  Dwell_active    : out std_logic;
-  Dwell_data      : out esm_dwell_metadata_t
+  Dwell_active        : out std_logic;
+  Dwell_data          : out esm_dwell_metadata_t;
+  Dwell_sequence_num  : out unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0)
 );
 end entity esm_dwell_controller;
 
@@ -86,6 +87,7 @@ architecture rtl of esm_dwell_controller is
   signal r_dwell_entry              : esm_dwell_metadata_t;
   signal r_dwell_entry_d            : esm_dwell_metadata_t;
   signal r_dwell_active             : std_logic;
+  signal r_dwell_sequence_num       : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
 begin
 
@@ -320,6 +322,20 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      if (r_rst = '1') then
+        r_dwell_sequence_num <= (others => '0');
+      else
+        if (s_state = S_DWELL_DONE) then
+          r_dwell_sequence_num <= r_dwell_sequence_num + 1;
+        end if;
+      end if;
+    end if;
+  end process;
+
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
       r_instruction_data  <= m_dwell_instruction(to_integer(r_instruction_index));
       r_dwell_entry       <= m_dwell_entry(to_integer(r_instruction_data.entry_index));
     end if;
@@ -333,8 +349,9 @@ begin
     end if;
   end process;
 
-  Dwell_active  <= r_dwell_active;
-  Dwell_data    <= r_dwell_entry_d;
+  Dwell_active        <= r_dwell_active;
+  Dwell_data          <= r_dwell_entry_d;
+  Dwell_sequence_num  <= r_dwell_sequence_num;
 
   process(Clk)
   begin

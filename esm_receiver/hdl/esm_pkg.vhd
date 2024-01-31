@@ -10,20 +10,22 @@ package esm_pkg is
   constant ESM_CONTROL_MAGIC_NUM                        : std_logic_vector(31 downto 0) := x"45534D43";
   constant ESM_REPORT_MAGIC_NUM                         : std_logic_vector(31 downto 0) := x"45534D52";
 
-  constant ESM_MODULE_ID_WIDTH                          : natural := 2;
+  constant ESM_MODULE_ID_WIDTH                          : natural := 8;
   constant ESM_MESSAGE_TYPE_WIDTH                       : natural := 8;
 
-  constant ESM_MODULE_ID_CONTROL                        : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := "00";
-  constant ESM_MODULE_ID_DWELL                          : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := "01";
-  constant ESM_MODULE_ID_PDW                            : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := "10";
+  constant ESM_MODULE_ID_CONTROL                        : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"00";
+  constant ESM_MODULE_ID_DWELL_CONTROLLER               : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"01";
+  constant ESM_MODULE_ID_DWELL_STATS_NARROW             : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"02";
+  constant ESM_MODULE_ID_DWELL_STATS_WIDE               : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"03";
+  constant ESM_MODULE_ID_PDW                            : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"04";
 
   constant ESM_CONTROL_MESSAGE_TYPE_ENABLE              : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"00";
   constant ESM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY         : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"01";
   constant ESM_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM       : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"02";
   constant ESM_CONTROL_MESSAGE_TYPE_PDW_SETUP           : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"03";  --TODO: unused?
 
-  constant ESM_REPORT_MESSAGE_TYPE_DWELL_COMPLETE_INFO  : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"10";
-  constant ESM_REPORT_MESSAGE_TYPE_DWELL_COMPLETE_STATS : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"10";
+  constant ESM_REPORT_MESSAGE_TYPE_DWELL_COMPLETE_INFO  : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"10"; --TODO: unused?
+  constant ESM_REPORT_MESSAGE_TYPE_DWELL_STATS          : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"11";
   constant ESM_REPORT_MESSAGE_TYPE_PDW                  : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"20";
 
   constant ESM_NUM_CHANNELS_NARROW                      : natural := 64;
@@ -36,6 +38,10 @@ package esm_pkg is
   constant ESM_DWELL_ENTRY_INDEX_WIDTH                  : natural := clog2(ESM_NUM_DWELL_ENTRIES);
   constant ESM_NUM_DWELL_INSTRUCTIONS                   : natural := 32;
   constant ESM_DWELL_INSTRUCTION_INDEX_WIDTH            : natural := clog2(ESM_NUM_DWELL_INSTRUCTIONS);
+
+  constant ESM_DWELL_DURATION_WIDTH                     : natural := 32;
+  constant ESM_DWELL_SEQUENCE_NUM_WIDTH                 : natural := 32;
+  constant ESM_TIMESTAMP_WIDTH                          : natural := 48;
 
   --type esm_common_header_t is record
   --  magic_num                 : std_logic_vector(31 downto 0);
@@ -54,7 +60,7 @@ package esm_pkg is
   type esm_dwell_metadata_t is record
     tag                       : unsigned(15 downto 0);
     frequency                 : unsigned(15 downto 0);
-    duration                  : unsigned(31 downto 0);
+    duration                  : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
     gain                      : unsigned(6 downto 0);
     fast_lock_profile         : unsigned(ESM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 0);
     threshold_narrow          : unsigned(15 downto 0);
@@ -65,17 +71,19 @@ package esm_pkg is
 
   type esm_dwell_metadata_array_t is array (natural range <>) of esm_dwell_metadata_t;
 
-  constant ESM_DWELL_METADATA_PACKED_WIDTH : natural := 184;
+  constant ESM_DWELL_METADATA_PACKED_WIDTH : natural := 224;
   --type esm_dwell_metadata_packed_t is record
   --  tag                       : unsigned(15 downto 0);
   --  frequency                 : unsigned(15 downto 0);
   --  duration                  : unsigned(31 downto 0);
   --  gain                      : unsigned(7 downto 0);
   --  fast_lock_profile         : unsigned(7 downto 0);
+  --  padding0                  : std_logic_vector(15 downto 0);
   --  threshold_narrow          : unsigned(15 downto 0);
   --  threshold_wide            : unsigned(15 downto 0);
   --  channel_mask_narrow       : std_logic_vector(63 downto 0);
   --  channel_mask_wide         : std_logic_vector(7 downto 0);
+  --  padding1                  : std_logic_vector(23 downto 0);
   --end record;
 
   type esm_message_dwell_entry_t is record
@@ -83,9 +91,10 @@ package esm_pkg is
     entry_data                : esm_dwell_metadata_t;
   end record;
 
-  constant ESM_MESSAGE_DWELL_ENTRY_PACKED_WIDTH : natural := 8 + ESM_DWELL_METADATA_PACKED_WIDTH;
+  constant ESM_MESSAGE_DWELL_ENTRY_PACKED_WIDTH : natural := 32 + ESM_DWELL_METADATA_PACKED_WIDTH;
   --type esm_message_dwell_entry_packed_t is record
   --  entry_index               : unsigned(7 downto 0);
+  --  padding                   : std_logic_vector(23 downto 0);
   --  entry_data                : esm_dwell_metadata_packed_t;
   --end record;
 
@@ -135,22 +144,25 @@ package esm_pkg is
   --  --instructions              : esm_dwell_instruction_array_packed_t(ESM_NUM_DWELL_INSTRUCTIONS - 1 downto 0);
   --end record;
 
+  --TODO: add reporting?
   --type esm_message_dwell_complete_info_t is record
   --  header                    : esm_common_header_t;
-  --  dwell_sequence_num        : unsigned(31 downto 0);
+  --  dwell_sequence_num        : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   --  metadata                  : esm_dwell_metadata_t;
   --
   --  num_samples               : unsigned(31 downto 0);
   --  ts_dwell_start            : unsigned(63 downto 0);
-  --  ts_pll_locked             : unsigned(63 downto 0);
   --  ts_dwell_end              : unsigned(63 downto 0);
   --end record;
   --
   --type esm_message_dwell_complete_stats_t is record
   --  header                    : esm_common_header_t;
-  --  dwell_sequence_num        : unsigned(31 downto 0);
+  --  dwell_sequence_num        : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   --  metadata                  : esm_dwell_metadata_t;
-  --
+  --  num_samples               : unsigned(31 downto 0);
+  --  ts_dwell_start            : unsigned(63 downto 0);
+  --  ts_dwell_end              : unsigned(63 downto 0);
+
   --  channel_start_index       : unsigned(ESM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   --  channel_amplitude         : unsigned_array_t(ESM_NUM_CHANNELS_WIDE/2 - 1 downto 0)(31 downto 0);
   --end record;
@@ -158,7 +170,7 @@ package esm_pkg is
   --type esm_message_pdw_t is record
   --  header                    : esm_common_header_t;
   --  pdw_sequence_num          : unsigned(31 downto 0);
-  --  dwell_sequence_num        : unsigned(31 downto 0);
+  --  dwell_sequence_num        : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   --  dwell_metadata            : esm_dwell_metadata_t;
   --  pulse_channel             : unsigned(ESM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   --  pulse_threshold           : unsigned(31 downto 0);
@@ -187,6 +199,20 @@ end package esm_pkg;
 
 package body esm_pkg is
 
+  --type esm_dwell_metadata_packed_t is record
+  --  tag                       : unsigned(15 downto 0);
+  --  frequency                 : unsigned(15 downto 0);
+  --  duration                  : unsigned(31 downto 0);
+  --  gain                      : unsigned(7 downto 0);
+  --  fast_lock_profile         : unsigned(7 downto 0);
+  --  padding0                  : std_logic_vector(15 downto 0);
+  --  threshold_narrow          : unsigned(15 downto 0);
+  --  threshold_wide            : unsigned(15 downto 0);
+  --  channel_mask_narrow       : std_logic_vector(63 downto 0);
+  --  channel_mask_wide         : std_logic_vector(7 downto 0);
+  --  padding1                  : std_logic_vector(23 downto 0);
+  --end record;
+
   function unpack(v : std_logic_vector) return esm_dwell_metadata_t is
     variable vm : std_logic_vector(v'length - 1 downto 0);
     variable r : esm_dwell_metadata_t;
@@ -202,10 +228,10 @@ package body esm_pkg is
     r.duration            := unsigned(vm(63 downto 32));
     r.gain                := unsigned(vm(70 downto 64));
     r.fast_lock_profile   := unsigned(vm(74 downto 72));
-    r.threshold_narrow    := unsigned(vm(95 downto 80));
-    r.threshold_wide      := unsigned(vm(111 downto 96));
-    r.channel_mask_narrow := vm(175 downto 112);
-    r.channel_mask_wide   := vm(183 downto 176);
+    r.threshold_narrow    := unsigned(vm(111 downto 96));
+    r.threshold_wide      := unsigned(vm(127 downto 112));
+    r.channel_mask_narrow := vm(191 downto 128);
+    r.channel_mask_wide   := vm(199 downto 192);
     return r;
   end function;
 
@@ -213,11 +239,11 @@ package body esm_pkg is
     variable r : esm_message_dwell_entry_t;
   begin
     assert (v'length = ESM_MESSAGE_DWELL_ENTRY_PACKED_WIDTH)
-      report "Unexpected length"
+      report "Unexpected length: " & integer'image(v'length)
       severity failure;
 
     r.entry_index   := unsigned(v(ESM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0));
-    r.entry_data    := unpack(v(8 + ESM_DWELL_METADATA_PACKED_WIDTH - 1 downto 8));
+    r.entry_data    := unpack(v(32 + ESM_DWELL_METADATA_PACKED_WIDTH - 1 downto 32));
     return r;
   end function;
 
