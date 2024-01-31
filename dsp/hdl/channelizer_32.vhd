@@ -23,6 +23,7 @@ port (
 
   Output_chan_ctrl      : out channelizer_control_t;
   Output_chan_data      : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  Output_chan_pwr       : out unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   Output_fft_ctrl       : out channelizer_control_t;
   Output_fft_data       : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
@@ -111,6 +112,7 @@ begin
 
     Output_chan_ctrl      => Output_chan_ctrl,
     Output_chan_data      => Output_chan_data,
+    Output_chan_pwr       => Output_chan_pwr,
 
     Output_fft_ctrl       => Output_fft_ctrl,
     Output_fft_data       => Output_fft_data,

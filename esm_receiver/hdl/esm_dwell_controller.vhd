@@ -73,8 +73,10 @@ architecture rtl of esm_dwell_controller is
   signal w_pll_pre_lock_done        : std_logic;
   signal w_pll_locked               : std_logic;
   signal w_pll_post_lock_done       : std_logic;
-  signal w_delay_start              : std_logic;
   signal w_dwell_done               : std_logic;
+
+  signal r_dwell_start_time_check   : std_logic;
+  signal w_delay_start              : std_logic;
 
   signal r_global_counter           : unsigned(31 downto 0);
   signal r_dwell_cycles             : unsigned(31 downto 0);
@@ -170,8 +172,16 @@ begin
   w_pll_pre_lock_done   <= to_stdlogic(r_pll_pre_lock_cycles = (PLL_PRE_LOCK_DELAY_CYCLES - 1));
   w_pll_locked          <= r_ad9361_status(6);
   w_pll_post_lock_done  <= to_stdlogic(r_pll_post_lock_cycles = (PLL_POST_LOCK_DELAY_CYCLES - 1));
-  w_delay_start         <= r_dwell_program_data.enable_delayed_start and to_stdlogic(r_dwell_program_data.delayed_start_time > r_timestamp);
   w_dwell_done          <= to_stdlogic(r_dwell_entry_d.duration = r_dwell_cycles);
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_dwell_start_time_check <= to_stdlogic(r_dwell_program_data.delayed_start_time > r_timestamp);
+    end if;
+  end process;
+
+  w_delay_start <= r_dwell_program_data.enable_delayed_start and r_dwell_start_time_check;
 
   process(Clk)
   begin

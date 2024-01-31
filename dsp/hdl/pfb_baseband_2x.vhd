@@ -40,11 +40,8 @@ architecture rtl of pfb_baseband_2x is
   function get_channel_map return natural_array_t is
     variable r : natural_array_t(NUM_CHANNELS - 1 downto 0);
   begin
-    for i in 0 to (NUM_CHANNELS/2 - 1) loop
-      r(i) := i + NUM_CHANNELS/2;
-    end loop;
-    for i in (NUM_CHANNELS/2) to (NUM_CHANNELS - 1) loop
-      r(i) := i - NUM_CHANNELS/2;
+    for i in 0 to (NUM_CHANNELS - 1) loop
+      r(i) := (i + (NUM_CHANNELS/2 - 1)) mod NUM_CHANNELS;
     end loop;
     return r;
   end function;

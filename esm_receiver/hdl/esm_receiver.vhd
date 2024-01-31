@@ -109,6 +109,9 @@ architecture rtl of esm_receiver is
 
 begin
 
+  --TODO: use axi clock to generate 250 MHz
+  --TODO: cdc fifo for adc data_clk -- limit max rate to 1/4
+  --TODO: handle gaps in pfb -- need fifo-based design?
   i_clocking : entity clock_lib.adc_clk_mult
   port map (
     Clk_x1  => Adc_clk,

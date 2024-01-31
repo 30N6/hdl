@@ -12,6 +12,8 @@ package dsp_pkg is
   constant FFT64_DATA_INDEX_WIDTH : natural := clog2(64);
   constant FFT_TAG_WIDTH          : natural := 8;
 
+  constant CHAN_POWER_WIDTH       : natural := 32;
+
   type fft_control_t is record
     valid       : std_logic;
     last        : std_logic;

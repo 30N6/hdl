@@ -28,6 +28,7 @@ port (
 
   Output_chan_ctrl      : out channelizer_control_t;
   Output_chan_data      : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  Output_chan_pwr       : out unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   Output_fft_ctrl       : out channelizer_control_t;
   Output_fft_data       : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
@@ -44,6 +45,7 @@ architecture rtl of channelizer_common is
   constant CHANNEL_INDEX_WIDTH  : natural := clog2(NUM_CHANNELS);
   constant FILTER_DATA_WIDTH    : natural := INPUT_DATA_WIDTH + clog2(NUM_COEFS / NUM_CHANNELS);
   constant FFT_DATA_WIDTH       : natural := FILTER_DATA_WIDTH + clog2(NUM_CHANNELS);
+  constant POWER_LATENCY        : natural := 4;
 
   signal r_rst                  : std_logic;
 
@@ -78,6 +80,14 @@ architecture rtl of channelizer_common is
   signal w_baseband_index       : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal w_baseband_last        : std_logic;
   signal w_baseband_data        : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+
+  signal r_baseband_valid       : std_logic_vector(POWER_LATENCY - 1 downto 0);
+  signal r_baseband_index       : unsigned_array_t(POWER_LATENCY - 1 downto 0)(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r_baseband_last        : std_logic_vector(POWER_LATENCY - 1 downto 0);
+  signal r_baseband_data_i      : signed_array_t(POWER_LATENCY - 1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  signal r_baseband_data_q      : signed_array_t(POWER_LATENCY - 1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+
+  signal w_channelizer_power    : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   signal w_mux_error_overflow   : std_logic;
   signal w_mux_error_underflow  : std_logic;
@@ -246,10 +256,35 @@ begin
     Output_data   => w_baseband_data
   );
 
-  Output_chan_ctrl.valid      <= w_baseband_valid;
-  Output_chan_ctrl.data_index <= resize_up(w_baseband_index, Output_chan_ctrl.data_index'length);
-  Output_chan_ctrl.last       <= w_baseband_last;
-  Output_chan_data            <= w_baseband_data;
+  i_power : entity dsp_lib.channelizer_power
+  generic map (
+    DATA_WIDTH  => FFT_DATA_WIDTH,
+    LATENCY     => POWER_LATENCY
+  )
+  port map (
+    Clk         => Clk,
+
+    Input_data  => w_baseband_data,
+    Output_data => w_channelizer_power
+  );
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_baseband_valid  <= r_baseband_valid(POWER_LATENCY - 2 downto 0)  & w_baseband_valid;
+      r_baseband_index  <= r_baseband_index(POWER_LATENCY - 2 downto 0)  & w_baseband_index;
+      r_baseband_last   <= r_baseband_last(POWER_LATENCY - 2 downto 0)   & w_baseband_last;
+      r_baseband_data_i <= r_baseband_data_i(POWER_LATENCY - 2 downto 0) & w_baseband_data(0);
+      r_baseband_data_q <= r_baseband_data_q(POWER_LATENCY - 2 downto 0) & w_baseband_data(1);
+    end if;
+  end process;
+
+  Output_chan_ctrl.valid      <= r_baseband_valid(POWER_LATENCY - 1);
+  Output_chan_ctrl.data_index <= resize_up(r_baseband_index(POWER_LATENCY - 1), Output_chan_ctrl.data_index'length);
+  Output_chan_ctrl.last       <= r_baseband_last(POWER_LATENCY - 1);
+  Output_chan_data(0)         <= r_baseband_data_i(POWER_LATENCY - 1);
+  Output_chan_data(1)         <= r_baseband_data_q(POWER_LATENCY - 1);
+  Output_chan_pwr             <= w_channelizer_power;
 
   g_raw_output : if (FFT_PATH_ENABLE) generate
     Output_fft_ctrl.valid       <= w_raw_output_valid;
