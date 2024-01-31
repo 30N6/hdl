@@ -85,7 +85,7 @@ begin
     report "Invalid output width - expecting 1 bit of growth per stage."
     severity failure;
 
-  assert (LATENCY = 5)
+  assert (LATENCY = 6)
     report "Invalid latency."
     severity failure;
 

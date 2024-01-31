@@ -42,8 +42,8 @@ module channelizer_tb;
   parameter NUM_CHANNELS          = 32;
   parameter CHANNEL_INDEX_WIDTH   = $clog2(NUM_CHANNELS);
   parameter NUM_COEFS_PER_CHANNEL = (NUM_CHANNELS > 8) ? 12 : 8;
-  parameter INPUT_DATA_WIDTH      = 16;
-  parameter OUTPUT_DATA_WIDTH     = 16 + $clog2(NUM_COEFS_PER_CHANNEL) + $clog2(NUM_CHANNELS);
+  parameter INPUT_DATA_WIDTH      = 12;
+  parameter OUTPUT_DATA_WIDTH     = 12 + $clog2(NUM_COEFS_PER_CHANNEL) + $clog2(NUM_CHANNELS);
 
   typedef struct
   {
@@ -66,13 +66,15 @@ module channelizer_tb;
 
   channelizer_control_t                   w_chan_output_control;
   logic signed [OUTPUT_DATA_WIDTH - 1:0]  w_chan_output_iq [1:0];
+  logic [chan_power_width - 1 : 0]        w_chan_power;
   channelizer_control_t                   w_fft_output_control;
   logic signed [OUTPUT_DATA_WIDTH - 1:0]  w_fft_output_iq [1:0];
 
   logic [OUTPUT_DATA_WIDTH - 1:0]         r_chan_output_i [NUM_CHANNELS - 1:0];
   logic [OUTPUT_DATA_WIDTH - 1:0]         r_chan_output_q [NUM_CHANNELS - 1:0];
-  logic [OUTPUT_DATA_WIDTH - 1:0]         r_fft_output_i [NUM_CHANNELS - 1:0];
-  logic [OUTPUT_DATA_WIDTH - 1:0]         r_fft_output_q [NUM_CHANNELS - 1:0];
+  logic [chan_power_width - 1:0]          r_chan_power    [NUM_CHANNELS - 1:0];
+  logic [OUTPUT_DATA_WIDTH - 1:0]         r_fft_output_i  [NUM_CHANNELS - 1:0];
+  logic [OUTPUT_DATA_WIDTH - 1:0]         r_fft_output_q  [NUM_CHANNELS - 1:0];
 
   initial begin
     Clk = 0;
@@ -100,6 +102,7 @@ module channelizer_tb;
 
         .Output_chan_ctrl       (w_chan_output_control),
         .Output_chan_data       (w_chan_output_iq),
+        .Output_chan_pwr        (w_chan_power),
 
         .Output_fft_ctrl        (w_fft_output_control),
         .Output_fft_data        (w_fft_output_iq),
@@ -120,6 +123,7 @@ module channelizer_tb;
 
         .Output_chan_ctrl       (w_chan_output_control),
         .Output_chan_data       (w_chan_output_iq),
+        .Output_chan_pwr        (w_chan_power),
 
         .Output_fft_ctrl        (w_fft_output_control),
         .Output_fft_data        (w_fft_output_iq),
@@ -140,6 +144,7 @@ module channelizer_tb;
 
         .Output_chan_ctrl       (w_chan_output_control),
         .Output_chan_data       (w_chan_output_iq),
+        .Output_chan_pwr        (w_chan_power),
 
         .Output_fft_ctrl        (w_fft_output_control),
         .Output_fft_data        (w_fft_output_iq),
@@ -160,6 +165,7 @@ module channelizer_tb;
     if (w_chan_output_control.valid) begin
       r_chan_output_i[w_chan_output_control.data_index] <= w_chan_output_iq[0];
       r_chan_output_q[w_chan_output_control.data_index] <= w_chan_output_iq[1];
+      r_chan_power[w_chan_output_control.data_index]    <= w_chan_power;
     end
 
     if (w_fft_output_control.valid) begin
@@ -236,11 +242,11 @@ module channelizer_tb;
     wait_for_reset();
 
     if (NUM_CHANNELS == 64) begin
-      standard_tests("./test_data/channelizer_test_data_2024_01_23_64.txt");
+      standard_tests("./test_data/channelizer_test_data_2024_01_25_64.txt");
     end else if (NUM_CHANNELS == 32) begin
-      standard_tests("./test_data/channelizer_test_data_2024_01_23_32.txt");
+      standard_tests("./test_data/channelizer_test_data_2024_01_25_32.txt");
     end else if (NUM_CHANNELS == 8) begin
-      standard_tests("./test_data/channelizer_test_data_2024_01_23_8.txt");
+      standard_tests("./test_data/channelizer_test_data_2024_01_25_8.txt");
     end
     $finish;
   end

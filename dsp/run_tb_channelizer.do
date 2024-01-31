@@ -36,6 +36,7 @@ set library_file_list [list \
     ./hdl/pfb_filter_mult.vhd \
     ./hdl/pfb_filter_stage.vhd \
     ./hdl/pfb_filter.vhd \
+    ./hdl/channelizer_power.vhd \
     ./hdl/channelizer_common.vhd \
     ./hdl/channelizer_8.vhd \
     ./hdl/channelizer_32.vhd \
@@ -111,20 +112,20 @@ foreach {library file_list} $library_file_list {
 set last_compile_time $time_now
 
 # Load the simulation
-vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=8
-set NumericStdNoWarnings 1
-set BreakOnAssertion 2
-run -all
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=8
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
 
 #vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=32
 #set NumericStdNoWarnings 1
 #set BreakOnAssertion 2
 #run -all
 
-#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=64
-#set NumericStdNoWarnings 1
-#set BreakOnAssertion 2
-#run -all
+vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=64
+set NumericStdNoWarnings 1
+set BreakOnAssertion 2
+run -all
 
 # If waves exists
 if [file exist wave.do] {
