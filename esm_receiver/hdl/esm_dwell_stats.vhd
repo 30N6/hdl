@@ -78,9 +78,10 @@ architecture rtl of esm_dwell_stats is
   signal w_channel_wr_max     : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal w_channel_rd_index   : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
 
-  signal r_read_pipe_active   : std_logic_vector(READ_PIPE_DEPTH - 1 downto 0);
   signal r_read_pipe_ctrl     : channelizer_control_array_t(READ_PIPE_DEPTH - 1 downto 0);
-  signal r_read_pipe_pwr      : unsigned_array_t(READ_PIPE_DEPTH - 2 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r_read_pipe_active   : std_logic_vector(READ_PIPE_DEPTH - 1 downto 0);
+  signal r_read_pipe_req      : std_logic_vector(READ_LATENCY - 1 downto 0);
+  signal r_read_pipe_pwr      : unsigned_array_t(READ_LATENCY - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
   signal r_channel_rd_accum   : unsigned_array_t(READ_LATENCY - 1 downto 0)(POWER_ACCUM_WIDTH - 1 downto 0);
   signal r_channel_rd_max     : unsigned_array_t(READ_LATENCY - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
   signal r_channel_new_accum  : unsigned(POWER_ACCUM_WIDTH - 1 downto 0);
@@ -93,6 +94,11 @@ architecture rtl of esm_dwell_stats is
   signal r_timestamp          : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
   signal r_ts_dwell_start     : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
   signal r_ts_dwell_end       : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+
+  signal w_dwell_done         : std_logic;
+  signal w_report_read_req    : std_logic;
+  signal w_report_read_index  : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_report_ack         : std_logic;
 
 begin
 
@@ -143,6 +149,13 @@ begin
         when S_DONE =>
           s_state <= S_CLEAR;
 
+        when S_REPORT_WAIT =>
+          if (w_report_ack = '1') then
+            s_state <= S_CLEAR;
+          else
+            s_state <= S_REPORT_WAIT;
+          end if;
+
         when S_CLEAR =>
           if (r_clear_index = (NUM_CHANNELS - 1)) then
             s_state <= S_IDLE;
@@ -160,7 +173,7 @@ begin
     if (s_state = S_ACTIVE) then
       w_channel_rd_index <= r_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
     else
-      --TODO
+      w_channel_rd_index <= w_report_read_index;
     end if;
   end process;
 
@@ -173,8 +186,6 @@ begin
       end if;
     end if;
   end process;
-
-  --TODO: read mux
 
   process(Clk)
   begin
@@ -190,9 +201,10 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_read_pipe_active  <= r_read_pipe_active(READ_PIPE_DEPTH - 2 downto 0) & to_stdlogic(s_state = S_ACTIVE);
       r_read_pipe_ctrl    <= r_read_pipe_ctrl(READ_PIPE_DEPTH - 2 downto 0)   & r_input_ctrl;
-      r_read_pipe_pwr     <= r_read_pipe_pwr(READ_PIPE_DEPTH - 3 downto 0)    & r_input_pwr;
+      r_read_pipe_active  <= r_read_pipe_active(READ_PIPE_DEPTH - 2 downto 0) & to_stdlogic(s_state = S_ACTIVE);
+      r_read_pipe_req     <= r_read_pipe_active(READ_LATENCY - 2 downto 0)    & (w_report_read_req and to_stdlogic(s_state /= S_ACTIVE));
+      r_read_pipe_pwr     <= r_read_pipe_pwr(READ_LATENCY - 2 downto 0)       & r_input_pwr;
     end if;
   end process;
 
@@ -207,7 +219,11 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_clear_index <= r_clear_index + 1;
+      if (s_state /= S_CLEAR) then
+        r_clear_index <= (others => '0');
+      else
+        r_clear_index <= r_clear_index + 1;
+      end if;
     end if;
   end process;
 
@@ -241,59 +257,49 @@ begin
   begin
     if rising_edge(Clk) then
       if (s_state = S_IDLE) then
-        r_ts_dwell_start  <= r_timestamp;
-        r_duration        <= (others => '0');
+        r_ts_dwell_start <= r_timestamp;
+        r_duration <= (others => '0');
       elsif (s_state = S_ACTIVE) then
-        r_ts_dwell_end    <= r_timestamp;
-        r_duration        <= r_duration + 1;
+        r_ts_dwell_end <= r_timestamp;
+        if (and_reduce(r_duration) = '0') then
+          r_duration <= r_duration + 1;
+        end if;
       end if;
     end if;
   end process;
 
+  w_dwell_done <= to_stdlogic(s_state = S_DONE);
 
-  i_master_axis_fifo : entity axi_lib.axis_async_fifo
+  i_reporter : entity esm_lib.esm_dwell_reporter
   generic map (
-    FIFO_DEPTH      => AXI_FIFO_DEPTH,
-    AXI_DATA_WIDTH  => AXI_DATA_WIDTH
+    AXI_DATA_WIDTH        => AXI_DATA_WIDTH,
+    NUM_CHANNELS          => NUM_CHANNELS,
+    CHANNEL_INDEX_WIDTH   => CHANNEL_INDEX_WIDTH,
+    MODULE_ID             => MODULE_ID
   )
   port map (
-    S_axis_clk      => data_clk,
-    S_axis_resetn   => not(r_combined_rst),
-    S_axis_ready    => w_reporter_axis_ready,
-    S_axis_valid    => w_reporter_axis_valid,
-    S_axis_data     => w_reporter_axis_data,
-    S_axis_last     => w_reporter_axis_last,
+    Clk                 => Clk,
+    Rst                 => r_rst,
 
-    M_axis_clk      => M_axis_clk,
-    M_axis_ready    => M_axis_ready,
-    M_axis_valid    => M_axis_valid,
-    M_axis_data     => M_axis_data,
-    M_axis_last     => M_axis_last
+    Dwell_done          => w_dwell_done,
+    Dwell_data          => r_dwell_data,
+    Dwell_sequence_num  => r_dwell_sequence_num,
+    Dwell_duration      => r_duration,
+    Timestamp_start     => r_ts_dwell_start,
+    Timestamp_end       => r_ts_dwell_end,
+
+    Read_req            => w_report_read_req,
+    Read_index          => w_report_read_index,
+    Read_accum          => r_channel_rd_accum(READ_LATENCY - 1),
+    Read_max            => r_channel_rd_max(READ_LATENCY - 1),
+    Read_valid          => r_read_pipe_req(READ_LATENCY - 1),
+
+    Report_ack          => w_report_ack,
+
+    Axis_ready          => Axis_ready,
+    Axis_valid          => Axis_valid,
+    Axis_data           => Axis_data,
+    Axis_last           => Axis_last
   );
-
-  i_slave_axis_fifo : entity axi_lib.axis_async_fifo
-  generic map (
-    FIFO_DEPTH      => AXI_FIFO_DEPTH,
-    AXI_DATA_WIDTH  => AXI_DATA_WIDTH
-  )
-  port map (
-    S_axis_clk      => S_axis_clk,
-    S_axis_resetn   => S_axis_resetn,
-    S_axis_ready    => S_axis_ready,
-    S_axis_valid    => S_axis_valid,
-    S_axis_data     => S_axis_data,
-    S_axis_last     => S_axis_last,
-
-    M_axis_clk      => data_clk,
-    M_axis_ready    => w_config_axis_ready,
-    M_axis_valid    => w_config_axis_valid,
-    M_axis_data     => w_config_axis_data,
-    M_axis_last     => w_config_axis_last
-  );
-
-  w_reporter_axis_valid <= r_test; --TODO
-  w_reporter_axis_data  <= (others => '0');
-  w_reporter_axis_last  <= '1';
-  --w_config_axis_ready   <= ; --TODO --'1';
 
 end architecture rtl;

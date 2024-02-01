@@ -32,10 +32,10 @@ port (
   Timestamp_start     : in  unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
   Timestamp_end       : in  unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
 
-  Read_req_accum      : out std_logic;
-  Read_req_max        : out std_logic;
-  Read_req_index      : out unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  Read_data           : in  unsigned(63 downto 0);
+  Read_req            : out std_logic;
+  Read_index          : out unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  Read_accum          : in  unsigned(63 downto 0);
+  Read_max            : in  unsigned(31 downto 0);
   Read_valid          : in  std_logic;
 
   Report_ack          : out std_logic;
@@ -72,15 +72,22 @@ architecture rtl of esm_dwell_reporter is
     S_META_3,
     S_META_4,
     S_META_5,
+    S_META_6,
 
+    S_DURATION,
+    S_TIMESTAMP_START_0,
+    S_TIMESTAMP_START_1,
+    S_TIMESTAMP_END_0,
+    S_TIMESTAMP_END_1,
+
+    S_READ_CHANNEL_REQ,
+    S_READ_CHANNEL_ACK,
     S_CHANNEL_INDEX,
-    S_READ_CHANNEL,
     S_CHANNEL_ACCUM_0,
     S_CHANNEL_ACCUM_1,
     S_CHANNEL_MAX,
 
     S_PAD,
-
     S_DONE
   );
 
@@ -88,7 +95,11 @@ architecture rtl of esm_dwell_reporter is
 
   signal r_packet_seq_num : unsigned(31 downto 0);
 
+  signal r_channel_index  : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r_words_in_msg   : unsigned(clog2(MAX_WORDS_PER_PACKET) - 1 downto 0);
+
+  signal r_read_accum     : unsigned(63 downto 0);
+  signal r_read_max       : unsigned(31 downto 0);
 
   signal w_fifo_ready     : std_logic;
   signal w_fifo_valid     : std_logic;
@@ -107,85 +118,100 @@ begin
       if (Rst = '1') then
         s_state <= S_IDLE;
       else
-        if (w_fifo_ready = '1') then
-          case s_state is
-          when S_IDLE =>
-            if (Dwell_done = '1') then
-              s_state <= S_START_NEW;
-            else
-              s_state <= S_IDLE;
-            end if;
+        case s_state is
+        when S_IDLE =>
+          if (Dwell_done = '1') then
+            s_state <= S_START_NEW;
+          else
+            s_state <= S_IDLE;
+          end if;
 
-          when S_START_NEW =>
-            if (w_fifo_almost_full = '0') then
-              s_state <= S_HEADER_0;
-            else
-              s_state <= S_START_NEW;
-            end if;
+        when S_START_NEW =>
+          if (w_fifo_almost_full = '0') then
+            s_state <= S_HEADER_0;
+          else
+            s_state <= S_START_NEW;
+          end if;
 
-          when S_START_CONTINUED =>
-            if (w_fifo_almost_full = '0') then
-              s_state <= S_HEADER_0;
-            else
-              s_state <= S_START_CONTINUED;
-            end if;
+        when S_START_CONTINUED =>
+          if (w_fifo_almost_full = '0') then
+            s_state <= S_HEADER_0;
+          else
+            s_state <= S_START_CONTINUED;
+          end if;
 
-          when S_HEADER_0 =>
-            s_state <= S_HEADER_1;
-          when S_HEADER_1 =>
-            s_state <= S_HEADER_2;
-          when S_HEADER_2 =>
-            s_state <= S_SEQ_NUM;
+        when S_HEADER_0 =>
+          s_state <= S_HEADER_1;
+        when S_HEADER_1 =>
+          s_state <= S_HEADER_2;
+        when S_HEADER_2 =>
+          s_state <= S_SEQ_NUM;
 
-          when S_SEQ_NUM =>
-            s_state <= S_META_0;
+        when S_SEQ_NUM =>
+          s_state <= S_META_0;
 
-          when S_META_0 =>
-            s_state <= S_META_1;
-          when S_META_1 =>
-            s_state <= S_META_2;
-          when S_META_2 =>
-            s_state <= S_META_3;
-          when S_META_3 =>
-            s_state <= S_META_4;
-          when S_META_4 =>
-            s_state <= S_META_5;
-          when S_META_5 =>
-            s_state <= S_CHANNEL_INDEX; --TODO;
+        when S_META_0 =>
+          s_state <= S_META_1;
+        when S_META_1 =>
+          s_state <= S_META_2;
+        when S_META_2 =>
+          s_state <= S_META_3;
+        when S_META_3 =>
+          s_state <= S_META_4;
+        when S_META_4 =>
+          s_state <= S_META_5;
+        when S_META_5 =>
+          s_state <= S_META_6;
+        when S_META_6 =>
+          s_state <= S_DURATION;
 
-          when S_CHANNEL_INDEX =>
-            s_state <= S_CHANNEL_ACCUM_0;
+        when S_DURATION =>
+          s_state <= S_TIMESTAMP_START_0;
+        when S_TIMESTAMP_START_0 =>
+          s_state <= S_TIMESTAMP_START_1;
+        when S_TIMESTAMP_START_1 =>
+          s_state <= S_TIMESTAMP_END_0;
+        when S_TIMESTAMP_END_0 =>
+          s_state <= S_TIMESTAMP_END_1
+        when S_TIMESTAMP_END_1 =>
+          s_state <= S_READ_CHANNEL_REQ;
 
-          when S_READ_CHANNEL =>
-            if ( ) then
-              s_state <= S_READ_CHANNEL;
-          when S_CHANNEL_ACCUM_0 =>
-            s_state <= S_CHANNEL_ACCUM_1;
-          when S_CHANNEL_ACCUM_1 =>
-            s_state <= S_CHANNEL_MAX;
-          when S_CHANNEL_MAX =>
-            if ( TODO ) then
-              s_state <= S_READ_CHANNEL;
-            else
-              s_state <= S_PAD;
-            end if;
+        when S_READ_CHANNEL_REQ =>
+          s_state <= S_READ_CHANNEL_ACK;
+        when S_READ_CHANNEL_ACK =>
+          if (Read_valid = '1') then
+            s_state <= S_CHANNEL_INDEX;
+          else
+            s_state <= S_READ_CHANNEL_ACK;
+          end if;
+        when S_CHANNEL_INDEX =>
+          s_state <= S_CHANNEL_ACCUM_0;
+        when S_CHANNEL_ACCUM_0 =>
+          s_state <= S_CHANNEL_ACCUM_1;
+        when S_CHANNEL_ACCUM_1 =>
+          s_state <= S_CHANNEL_MAX;
+        when S_CHANNEL_MAX =>
+          if ((r_channel_index = (NUM_CHANNELS - 1)) or (r_words_in_msg > (MAX_WORDS_PER_PACKET - 4 - 2))) then
+            s_state <= S_PAD;
+          else
+            s_state <= S_READ_CHANNEL_REQ;
+          end if;
 
-          when S_PAD =>
-            if ( TODO ) then
-              s_state <= S_PAD;
-            else
-              s_state <= S_DONE;
-            end if;
+        when S_PAD =>
+          if (r_words_in_msg = (MAX_WORDS_PER_PACKET - 1)) then
+            s_state <= S_DONE;
+          else
+            s_state <= S_PAD;
+          end if;
 
-          when S_DONE =>
-            if ( TODO ) then
-              s_state <= S_START_CONTINUED;
-            else
-              s_state <= S_IDLE;
-            end if;
+        when S_DONE =>
+          if (r_channel_index < (NUM_CHANNELS - 1)) then
+            s_state <= S_START_CONTINUED;
+          else
+            s_state <= S_IDLE;
+          end if;
 
-          end case;
-        end if;
+        end case;
       end if;
     end if;
   end process;
@@ -199,6 +225,43 @@ begin
         if (s_state = S_DONE) then
           r_packet_seq_num <= r_packet_seq_num + 1;
         end if;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (s_state = S_IDLE) then
+        r_words_in_msg <= (others => '0');
+      elsif (w_fifo_valid = '1') then
+        r_words_in_msg <= r_words_in_msg + 1;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (s_state = S_START_NEW) then
+        r_channel_index <= (others => '0');
+      elsif (s_state = S_CHANNEL_MAX) then
+        if (r_channel_index /= (NUM_CHANNELS = 1)) then
+          r_channel_index <= r_channel_index + 1;
+        end if;
+      end if;
+    end if;
+  end process;
+
+  Read_req   <= to_stdlogic(s_state = S_READ_CHANNEL_REQ);
+  Read_index <= r_channel_index;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (Read_valid = '1') then
+        r_read_accum  <= Read_accum;
+        r_read_max    <= Read_max;
       end if;
     end if;
   end process;
@@ -254,20 +317,55 @@ begin
       w_fifo_valid  <= '1';
       w_fifo_data   <= std_logic_vector(Dwell_data.channel_mask_wide) & x"000000";
 
+    when S_DURATION =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= std_logic_vector(Dwell_duration);
+
+    when S_TIMESTAMP_START_0 =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= std_logic_vector(resize_up(Timestamp_start(ESM_TIMESTAMP_WIDTH - 1 downto 32), 32));
+
+    when S_TIMESTAMP_START_1 =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= std_logic_vector(Timestamp_start(31 downto 0));
+
+    when S_TIMESTAMP_END_0 =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= std_logic_vector(resize_up(Timestamp_end(ESM_TIMESTAMP_WIDTH - 1 downto 32), 32));
+
+    when S_TIMESTAMP_END_1 =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= std_logic_vector(Timestamp_end(31 downto 0));
+
     when S_CHANNEL_INDEX =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= std_logic_vector(resize_up(r_channel_index, 32));
 
     when S_CHANNEL_ACCUM_0 =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= std_logic_vector(r_read_accum(63 downto 32));
 
     when S_CHANNEL_ACCUM_1 =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= std_logic_vector(r_read_accum(31 downto 0));
 
     when S_CHANNEL_MAX =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= std_logic_vector(r_read_max);
 
     when S_PAD =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= (others => '0');
+      w_fifo_last   <= to_stdlogic(r_words_in_msg = (MAX_WORDS_PER_PACKET - 1));
 
     when others => null;
     end case;
   end process;
 
+  --TODO: error bit
+  assert ((s_state = S_IDLE) or (w_fifo_ready = '1'))
+    report "Ready expected to be high."
+    severity failure;
 
   i_fifo : entity axi_lib.axis_sync_fifo
   generic map (

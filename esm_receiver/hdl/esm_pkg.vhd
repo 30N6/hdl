@@ -162,9 +162,8 @@ package esm_pkg is
   --  num_samples               : unsigned(31 downto 0);
   --  ts_dwell_start            : unsigned(63 downto 0);
   --  ts_dwell_end              : unsigned(63 downto 0);
-
-  --  channel_start_index       : unsigned(ESM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  --  channel_amplitude         : unsigned_array_t(ESM_NUM_CHANNELS_WIDE/2 - 1 downto 0)(31 downto 0);
+  --
+  --  -- array of 128 bit entries: index, accum, max
   --end record;
   --
   --type esm_message_pdw_t is record
@@ -198,20 +197,6 @@ package esm_pkg is
 end package esm_pkg;
 
 package body esm_pkg is
-
-  --type esm_dwell_metadata_packed_t is record
-  --  tag                       : unsigned(15 downto 0);
-  --  frequency                 : unsigned(15 downto 0);
-  --  duration                  : unsigned(31 downto 0);
-  --  gain                      : unsigned(7 downto 0);
-  --  fast_lock_profile         : unsigned(7 downto 0);
-  --  padding0                  : std_logic_vector(15 downto 0);
-  --  threshold_narrow          : unsigned(15 downto 0);
-  --  threshold_wide            : unsigned(15 downto 0);
-  --  channel_mask_narrow       : std_logic_vector(63 downto 0);
-  --  channel_mask_wide         : std_logic_vector(7 downto 0);
-  --  padding1                  : std_logic_vector(23 downto 0);
-  --end record;
 
   function unpack(v : std_logic_vector) return esm_dwell_metadata_t is
     variable vm : std_logic_vector(v'length - 1 downto 0);
