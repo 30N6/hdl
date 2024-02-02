@@ -170,7 +170,7 @@ package esm_pkg is
   --  header                    : esm_common_header_t;
   --  pdw_sequence_num          : unsigned(31 downto 0);
   --  dwell_sequence_num        : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
-  --  dwell_metadata            : esm_dwell_metadata_t;
+  --  dwell_metadata            : esm_dwell_metadata_t; --TODO: remove
   --  pulse_channel             : unsigned(ESM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   --  pulse_threshold           : unsigned(31 downto 0);
   --  pulse_amplitude           : unsigned(31 downto 0);

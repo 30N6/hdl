@@ -210,7 +210,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_channel_new_accum <= r_channel_rd_accum(1) + r_read_pipe_pwr(1);
+      r_channel_new_accum <= r_channel_rd_accum(1) + r_read_pipe_pwr(1);  --TODO: add an extra pipeline stage, split across cycles
       r_channel_new_max   <= r_read_pipe_pwr(1) when (r_read_pipe_pwr(1) > r_channel_rd_max(1)) else r_channel_rd_max(1);
     end if;
   end process;
