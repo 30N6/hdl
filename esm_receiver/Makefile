@@ -10,6 +10,7 @@ GENERIC_DEPS += ../common/hdl/common_pkg.vhd
 GENERIC_DEPS += ../common/hdl/math_pkg.vhd
 GENERIC_DEPS += ../common/hdl/reset_extender.vhd
 GENERIC_DEPS += ../axi/hdl/axis_async_fifo.vhd
+GENERIC_DEPS += ../axi/hdl/axis_sync_fifo.vhd
 GENERIC_DEPS += ../mem/hdl/ram_sdp.vhd
 
 GENERIC_DEPS += ../dsp/hdl/dsp_pkg.vhd
@@ -31,12 +32,17 @@ GENERIC_DEPS += ../dsp/hdl/pfb_filter.vhd
 GENERIC_DEPS += ../dsp/hdl/pfb_filter_buffer.vhd
 GENERIC_DEPS += ../dsp/hdl/pfb_filter_mult.vhd
 GENERIC_DEPS += ../dsp/hdl/pfb_filter_stage.vhd
+GENERIC_DEPS += ../dsp/hdl/channelizer_power.vhd
+GENERIC_DEPS += ../dsp/hdl/channelizer_8.vhd
 GENERIC_DEPS += ../dsp/hdl/channelizer_32.vhd
+GENERIC_DEPS += ../dsp/hdl/channelizer_64.vhd
 
 GENERIC_DEPS += ./hdl/esm_pkg.vhd
 GENERIC_DEPS += ./hdl/esm_config.vhd
 GENERIC_DEPS += ./hdl/esm_dwell_config_decoder.vhd
 GENERIC_DEPS += ./hdl/esm_dwell_controller.vhd
+GENERIC_DEPS += ./hdl/esm_dwell_reporter.vhd
+GENERIC_DEPS += ./hdl/esm_dwell_stats.vhd
 GENERIC_DEPS += ./hdl/esm_receiver.vhd
 
 XILINX_DEPS += esm_receiver_ip.tcl

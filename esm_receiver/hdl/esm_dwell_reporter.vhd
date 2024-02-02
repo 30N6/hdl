@@ -15,11 +15,10 @@ library esm_lib;
 
 entity esm_dwell_reporter is
 generic (
-  AXI_DATA_WIDTH        : natural;
-  DATA_WIDTH            : natural;
-  NUM_CHANNELS          : natural;
-  CHANNEL_INDEX_WIDTH   : natural;
-  MODULE_ID             : unsigned
+  AXI_DATA_WIDTH      : natural;
+  NUM_CHANNELS        : natural;
+  CHANNEL_INDEX_WIDTH : natural;
+  MODULE_ID           : unsigned
 );
 port (
   Clk                 : in  std_logic;
@@ -91,20 +90,25 @@ architecture rtl of esm_dwell_reporter is
     S_DONE
   );
 
-  signal s_state          : state_t;
+  signal s_state            : state_t;
 
-  signal r_packet_seq_num : unsigned(31 downto 0);
+  signal r_packet_seq_num   : unsigned(31 downto 0);
 
-  signal r_channel_index  : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal r_words_in_msg   : unsigned(clog2(MAX_WORDS_PER_PACKET) - 1 downto 0);
+  signal r_channel_index    : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r_words_in_msg     : unsigned(clog2(MAX_WORDS_PER_PACKET) - 1 downto 0);
 
-  signal r_read_accum     : unsigned(63 downto 0);
-  signal r_read_max       : unsigned(31 downto 0);
+  signal r_read_accum       : unsigned(63 downto 0);
+  signal r_read_max         : unsigned(31 downto 0);
 
-  signal w_fifo_ready     : std_logic;
-  signal w_fifo_valid     : std_logic;
-  signal w_fifo_data      : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal w_fifo_last      : std_logic;
+  signal w_fifo_almost_full : std_logic;
+  signal w_fifo_ready       : std_logic;
+  signal w_fifo_valid       : std_logic;
+  signal w_fifo_data        : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_fifo_last        : std_logic;
+
+  signal r_fifo_valid       : std_logic;
+  signal r_fifo_data        : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal r_fifo_last        : std_logic;
 
 begin
 
@@ -172,7 +176,7 @@ begin
         when S_TIMESTAMP_START_1 =>
           s_state <= S_TIMESTAMP_END_0;
         when S_TIMESTAMP_END_0 =>
-          s_state <= S_TIMESTAMP_END_1
+          s_state <= S_TIMESTAMP_END_1;
         when S_TIMESTAMP_END_1 =>
           s_state <= S_READ_CHANNEL_REQ;
 
@@ -246,7 +250,7 @@ begin
       if (s_state = S_START_NEW) then
         r_channel_index <= (others => '0');
       elsif (s_state = S_CHANNEL_MAX) then
-        if (r_channel_index /= (NUM_CHANNELS = 1)) then
+        if (r_channel_index /= (NUM_CHANNELS - 1)) then
           r_channel_index <= r_channel_index + 1;
         end if;
       end if;
@@ -269,7 +273,7 @@ begin
   process(all)
   begin
     w_fifo_data   <= (others => '-');
-    w_fifo_last   <= (others => '-');
+    w_fifo_last   <= '-';
     w_fifo_valid  <= '0';
 
     case s_state is
@@ -362,6 +366,15 @@ begin
     end case;
   end process;
 
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_fifo_valid  <= w_fifo_valid;
+      r_fifo_data   <= w_fifo_data;
+      r_fifo_last   <= w_fifo_last;
+    end if;
+ end process;
+
   --TODO: error bit
   assert ((s_state = S_IDLE) or (w_fifo_ready = '1'))
     report "Ready expected to be high."
@@ -380,9 +393,9 @@ begin
     Almost_full   => w_fifo_almost_full,
 
     S_axis_ready  => w_fifo_ready,
-    S_axis_valid  => w_fifo_valid,
-    S_axis_data   => w_fifo_data,
-    S_axis_last   => w_fifo_last,
+    S_axis_valid  => r_fifo_valid,
+    S_axis_data   => r_fifo_data,
+    S_axis_last   => r_fifo_last,
 
     M_axis_ready  => Axis_ready,
     M_axis_valid  => Axis_valid,

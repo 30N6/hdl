@@ -159,7 +159,7 @@ package esm_pkg is
   --  header                    : esm_common_header_t;
   --  dwell_sequence_num        : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   --  metadata                  : esm_dwell_metadata_t;
-  --  num_samples               : unsigned(31 downto 0);
+  --  duration_actual           : unsigned(31 downto 0);
   --  ts_dwell_start            : unsigned(63 downto 0);
   --  ts_dwell_end              : unsigned(63 downto 0);
   --

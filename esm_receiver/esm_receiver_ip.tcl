@@ -8,6 +8,7 @@ custom_ip_files esm_receiver [list \
   {"../common/hdl/math_pkg.vhd"           "common_lib"}   \
   {"../common/hdl/reset_extender.vhd"     "common_lib"}   \
   {"../axi/hdl/axis_async_fifo.vhd"       "axi_lib"}      \
+  {"../axi/hdl/axis_sync_fifo.vhd"        "axi_lib"}      \
   {"../clock/hdl/adc_clk_mult_clk_wiz.v"  "clock_lib"}    \
   {"../clock/hdl/adc_clk_mult.v"          "clock_lib"}    \
   {"../mem/hdl/ram_sdp.vhd"               "mem_lib"}      \
@@ -30,6 +31,7 @@ custom_ip_files esm_receiver [list \
   {"../dsp/hdl/pfb_filter_buffer.vhd"     "dsp_lib"}      \
   {"../dsp/hdl/pfb_filter_mult.vhd"       "dsp_lib"}      \
   {"../dsp/hdl/pfb_filter_stage.vhd"      "dsp_lib"}      \
+  {"../dsp/hdl/channelizer_power.vhd"     "dsp_lib"}      \
   {"../dsp/hdl/channelizer_common.vhd"    "dsp_lib"}      \
   {"../dsp/hdl/channelizer_8.vhd"         "dsp_lib"}      \
   {"../dsp/hdl/channelizer_32.vhd"        "dsp_lib"}      \
@@ -38,6 +40,8 @@ custom_ip_files esm_receiver [list \
   {"./hdl/esm_config.vhd"                 "esm_lib"}      \
   {"./hdl/esm_dwell_config_decoder.vhd"   "esm_lib"}      \
   {"./hdl/esm_dwell_controller.vhd"       "esm_lib"}      \
+  {"./hdl/esm_dwell_reporter.vhd"         "esm_lib"}      \
+  {"./hdl/esm_dwell_stats.vhd"            "esm_lib"}      \
   {"./hdl/esm_receiver.vhd"               "esm_lib"}      \
 ]
 

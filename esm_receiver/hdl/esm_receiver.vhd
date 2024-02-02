@@ -81,15 +81,28 @@ architecture rtl of esm_receiver is
 
   signal w_channelizer8_chan_control  : channelizer_control_t;
   signal w_channelizer8_chan_data     : signed_array_t(1 downto 0)(CHANNELIZER8_DATA_WIDTH - 1 downto 0);
+  signal w_channelizer8_chan_pwr      : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+
   signal w_channelizer8_fft_control   : channelizer_control_t;
   signal w_channelizer8_fft_data      : signed_array_t(1 downto 0)(CHANNELIZER8_DATA_WIDTH - 1 downto 0);
   signal w_channelizer8_overflow      : std_logic;
 
   signal w_channelizer64_chan_control : channelizer_control_t;
   signal w_channelizer64_chan_data    : signed_array_t(1 downto 0)(CHANNELIZER64_DATA_WIDTH - 1 downto 0);
+  signal w_channelizer64_chan_pwr     : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal w_channelizer64_fft_control  : channelizer_control_t;
   signal w_channelizer64_fft_data     : signed_array_t(1 downto 0)(CHANNELIZER64_DATA_WIDTH - 1 downto 0);
   signal w_channelizer64_overflow     : std_logic;
+
+  signal w_dwell_stats_8_axis_ready   : std_logic;
+  signal w_dwell_stats_8_axis_valid   : std_logic;
+  signal w_dwell_stats_8_axis_data    : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_dwell_stats_8_axis_last    : std_logic;
+  signal w_dwell_stats_64_axis_ready  : std_logic;
+  signal w_dwell_stats_64_axis_valid  : std_logic;
+  signal w_dwell_stats_64_axis_data   : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_dwell_stats_64_axis_last   : std_logic;
+
 
   signal r_test_8_chn                 : std_logic;
   signal r_test_8_fft                 : std_logic;
@@ -203,6 +216,7 @@ begin
 
     Output_chan_ctrl      => w_channelizer8_chan_control,
     Output_chan_data      => w_channelizer8_chan_data,
+    Output_chan_pwr       => w_channelizer8_chan_pwr,
 
     Output_fft_ctrl       => w_channelizer8_fft_control,
     Output_fft_data       => w_channelizer8_fft_data,
@@ -236,6 +250,67 @@ begin
     Error_mux_underflow   => open,
     Error_mux_collision   => open
   );
+
+  i_dwell_stats_8 : entity esm_lib.esm_dwell_stats
+  generic map (
+    AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
+    DATA_WIDTH      => CHANNELIZER8_DATA_WIDTH,
+    NUM_CHANNELS    => 8,
+    MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_WIDE
+  )
+  port map (
+    Clk                 => data_clk,
+    Rst                 => r_combined_rst,
+
+    Enable              => w_enable_chan(0),
+
+    Dwell_active        => w_dwell_active,
+    Dwell_data          => w_dwell_data,
+    Dwell_sequence_num  => w_dwell_sequence_num,
+
+    Input_ctrl          => w_channelizer8_chan_control,
+    Input_data          => w_channelizer8_chan_data,
+    Input_pwr           => w_channelizer8_chan_pwr,
+
+    Axis_ready          => w_dwell_stats_8_axis_ready,
+    Axis_valid          => w_dwell_stats_8_axis_valid,
+    Axis_data           => w_dwell_stats_8_axis_data,
+    Axis_last           => w_dwell_stats_8_axis_last
+  );
+
+  i_dwell_stats_64 : entity esm_lib.esm_dwell_stats
+  generic map (
+    AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
+    DATA_WIDTH      => CHANNELIZER64_DATA_WIDTH,
+    NUM_CHANNELS    => 64,
+    MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_WIDE
+  )
+  port map (
+    Clk                 => data_clk,
+    Rst                 => r_combined_rst,
+
+    Enable              => w_enable_chan(1),
+
+    Dwell_active        => w_dwell_active,
+    Dwell_data          => w_dwell_data,
+    Dwell_sequence_num  => w_dwell_sequence_num,
+
+    Input_ctrl          => w_channelizer64_chan_control,
+    Input_data          => w_channelizer64_chan_data,
+    Input_pwr           => w_channelizer64_chan_pwr,
+
+    Axis_ready          => w_dwell_stats_64_axis_ready,
+    Axis_valid          => w_dwell_stats_64_axis_valid,
+    Axis_data           => w_dwell_stats_64_axis_data,
+    Axis_last           => w_dwell_stats_64_axis_last
+  );
+
+  --TODO: testing
+  w_dwell_stats_8_axis_ready  <= w_reporter_axis_ready;
+  w_dwell_stats_64_axis_ready <= w_reporter_axis_ready;
+  w_reporter_axis_valid       <= w_dwell_stats_8_axis_valid or w_dwell_stats_64_axis_valid or r_test;
+  w_reporter_axis_data        <= w_dwell_stats_8_axis_data or w_dwell_stats_64_axis_data;
+  w_reporter_axis_last        <= w_dwell_stats_8_axis_last or w_dwell_stats_64_axis_last;
 
   process(data_clk)
   begin
@@ -289,10 +364,5 @@ begin
     M_axis_data     => w_config_axis_data,
     M_axis_last     => w_config_axis_last
   );
-
-  w_reporter_axis_valid <= r_test; --TODO
-  w_reporter_axis_data  <= (others => '0');
-  w_reporter_axis_last  <= '1';
-  --w_config_axis_ready   <= ; --TODO --'1';
 
 end architecture rtl;

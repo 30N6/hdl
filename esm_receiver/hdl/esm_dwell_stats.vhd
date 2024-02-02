@@ -18,7 +18,7 @@ generic (
   AXI_DATA_WIDTH  : natural;
   DATA_WIDTH      : natural;
   NUM_CHANNELS    : natural;
-  MODULE_ID       : unsigned;
+  MODULE_ID       : unsigned
 );
 port (
   Clk                 : in  std_logic;
@@ -31,7 +31,7 @@ port (
   Dwell_sequence_num  : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   Input_ctrl          : out channelizer_control_t;
-  Input_data          : out signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+  Input_data          : out signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);  --unused
   Input_pwr           : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   Axis_ready          : in  std_logic;
@@ -53,6 +53,7 @@ architecture rtl of esm_dwell_stats is
     S_IDLE,
     S_ACTIVE,
     S_DONE,
+    S_REPORT_WAIT,
     S_CLEAR
   );
 
@@ -64,13 +65,12 @@ architecture rtl of esm_dwell_stats is
   signal r_dwell_sequence_num : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   signal r_input_ctrl         : channelizer_control_t;
-  signal r_input_data         : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
   signal r_input_pwr          : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   signal s_state              : state_t;
 
-  signal m_channel_accum      : unsigned(NUM_CHANNELS - 1 downto 0)(POWER_ACCUM_WIDTH - 1 downto 0);
-  signal m_channel_max        : unsigned(NUM_CHANNELS - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
+  signal m_channel_accum      : unsigned_array_t(NUM_CHANNELS - 1 downto 0)(POWER_ACCUM_WIDTH - 1 downto 0);
+  signal m_channel_max        : unsigned_array_t(NUM_CHANNELS - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
 
   signal w_channel_wr_en      : std_logic;
   signal w_channel_wr_index   : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
@@ -114,7 +114,6 @@ begin
   begin
     if rising_edge(Clk) then
       r_input_ctrl   <= Input_ctrl;
-      r_input_data   <= Input_data;
       r_input_pwr    <= Input_pwr;
       r_dwell_active <= Dwell_active;
 
@@ -147,7 +146,7 @@ begin
           end if;
 
         when S_DONE =>
-          s_state <= S_CLEAR;
+          s_state <= S_REPORT_WAIT;
 
         when S_REPORT_WAIT =>
           if (w_report_ack = '1') then
@@ -246,7 +245,7 @@ begin
   begin
     if rising_edge(Clk) then
       if (r_rst = '1') then
-        r_timestamp <= (others => '0;);
+        r_timestamp <= (others => '0');
       else
         r_timestamp <= r_timestamp + 1;
       end if;
@@ -257,13 +256,11 @@ begin
   begin
     if rising_edge(Clk) then
       if (s_state = S_IDLE) then
-        r_ts_dwell_start <= r_timestamp;
-        r_duration <= (others => '0');
+        r_ts_dwell_start  <= r_timestamp;
+        r_duration        <= (others => '0');
       elsif (s_state = S_ACTIVE) then
-        r_ts_dwell_end <= r_timestamp;
-        if (and_reduce(r_duration) = '0') then
-          r_duration <= r_duration + 1;
-        end if;
+        r_ts_dwell_end    <= r_timestamp;
+        r_duration        <= r_duration + 1;
       end if;
     end if;
   end process;
