@@ -46,7 +46,7 @@ architecture rtl of esm_dwell_stats is
   constant POWER_ACCUM_WIDTH    : natural := CHAN_POWER_WIDTH + ESM_DWELL_DURATION_WIDTH;
   constant CHANNEL_INDEX_WIDTH  : natural := clog2(NUM_CHANNELS);
   constant READ_LATENCY         : natural := 2;
-  constant READ_PIPE_DEPTH      : natural := READ_LATENCY + 1;
+  constant READ_PIPE_DEPTH      : natural := READ_LATENCY + 2;
 
   type state_t is
   (
@@ -57,49 +57,54 @@ architecture rtl of esm_dwell_stats is
     S_CLEAR
   );
 
-  signal r_rst                : std_logic;
-  signal r_enable             : std_logic;
+  signal r_rst                        : std_logic;
+  signal r_enable                     : std_logic;
 
-  signal r_dwell_active       : std_logic;
-  signal r_dwell_data         : esm_dwell_metadata_t;
-  signal r_dwell_sequence_num : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal r_dwell_active               : std_logic;
+  signal r_dwell_data                 : esm_dwell_metadata_t;
+  signal r_dwell_sequence_num         : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
-  signal r_input_ctrl         : channelizer_control_t;
-  signal r_input_pwr          : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r_input_ctrl                 : channelizer_control_t;
+  signal r_input_pwr                  : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  signal s_state              : state_t;
+  signal s_state                      : state_t;
 
-  signal m_channel_accum      : unsigned_array_t(NUM_CHANNELS - 1 downto 0)(POWER_ACCUM_WIDTH - 1 downto 0);
-  signal m_channel_max        : unsigned_array_t(NUM_CHANNELS - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
+  signal m_channel_accum              : unsigned_array_t(NUM_CHANNELS - 1 downto 0)(POWER_ACCUM_WIDTH - 1 downto 0);
+  signal m_channel_max                : unsigned_array_t(NUM_CHANNELS - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
 
-  signal w_channel_wr_en      : std_logic;
-  signal w_channel_wr_index   : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_channel_wr_accum   : unsigned(POWER_ACCUM_WIDTH - 1 downto 0);
-  signal w_channel_wr_max     : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-  signal w_channel_rd_index   : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_channel_wr_en              : std_logic;
+  signal w_channel_wr_index           : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_channel_wr_accum           : unsigned(POWER_ACCUM_WIDTH - 1 downto 0);
+  signal w_channel_wr_max             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal w_channel_rd_index           : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
 
-  signal r_read_pipe_ctrl     : channelizer_control_array_t(READ_PIPE_DEPTH - 1 downto 0);
-  signal r_read_pipe_active   : std_logic_vector(READ_PIPE_DEPTH - 1 downto 0);
-  signal r_read_pipe_req      : std_logic_vector(READ_LATENCY - 1 downto 0);
-  signal r_read_pipe_pwr      : unsigned_array_t(READ_LATENCY - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
-  signal r_channel_rd_accum   : unsigned_array_t(READ_LATENCY - 1 downto 0)(POWER_ACCUM_WIDTH - 1 downto 0);
-  signal r_channel_rd_max     : unsigned_array_t(READ_LATENCY - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
-  signal r_channel_new_accum  : unsigned(POWER_ACCUM_WIDTH - 1 downto 0);
-  signal r_channel_new_max    : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r_read_pipe_ctrl             : channelizer_control_array_t(READ_PIPE_DEPTH - 1 downto 0);
+  signal r_read_pipe_active           : std_logic_vector(READ_PIPE_DEPTH - 1 downto 0);
+  signal r_read_pipe_req              : std_logic_vector(READ_LATENCY - 1 downto 0);
+  signal r_read_pipe_pwr              : unsigned_array_t(READ_LATENCY - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r_channel_rd_accum           : unsigned_array_t(READ_LATENCY - 1 downto 0)(POWER_ACCUM_WIDTH - 1 downto 0);
+  signal r_channel_rd_max             : unsigned_array_t(READ_LATENCY - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
 
-  signal r_clear_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
-  signal r_read_index         : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r_channel_new_accum_d0_a     : unsigned(31 downto 0);
+  signal r_channel_new_accum_d0_b     : unsigned(31 downto 0);
+  signal r_channel_new_accum_d0_c     : unsigned(0 downto 0);
+  signal r_channel_new_accum_d1       : unsigned(POWER_ACCUM_WIDTH - 1 downto 0);
+  signal r_channel_new_max_d0         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r_channel_new_max_d1         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  signal r_num_samples        : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
-  signal r_duration           : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
-  signal r_timestamp          : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
-  signal r_ts_dwell_start     : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
-  signal r_ts_dwell_end       : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+  signal r_clear_index                : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
+  signal r_read_index                 : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
 
-  signal w_dwell_done         : std_logic;
-  signal w_report_read_req    : std_logic;
-  signal w_report_read_index  : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_report_ack         : std_logic;
+  signal r_num_samples                : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
+  signal r_duration                   : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
+  signal r_timestamp                  : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+  signal r_ts_dwell_start             : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+  signal r_ts_dwell_end               : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+
+  signal w_dwell_done                 : std_logic;
+  signal w_report_read_req            : std_logic;
+  signal w_report_read_index          : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_report_ack                 : std_logic;
 
 begin
 
@@ -211,8 +216,18 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_channel_new_accum <= r_channel_rd_accum(1) + r_read_pipe_pwr(1);  --TODO: add an extra pipeline stage, split across cycles
-      r_channel_new_max   <= r_read_pipe_pwr(1) when (r_read_pipe_pwr(1) > r_channel_rd_max(1)) else r_channel_rd_max(1);
+      (r_channel_new_accum_d0_c, r_channel_new_accum_d0_a)  <= ('0' & r_channel_rd_accum(1)(31 downto 0)) + ('0' & r_read_pipe_pwr(1)(31 downto 0));
+      r_channel_new_accum_d0_b                              <= r_channel_rd_accum(1)(63 downto 32);
+      r_channel_new_max_d0                                  <= r_read_pipe_pwr(1) when (r_read_pipe_pwr(1) > r_channel_rd_max(1)) else r_channel_rd_max(1);
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_channel_new_accum_d1(63 downto 32)  <= r_channel_new_accum_d0_b + r_channel_new_accum_d0_c;
+      r_channel_new_accum_d1(31 downto 0)   <= r_channel_new_accum_d0_a;
+      r_channel_new_max_d1                  <= r_channel_new_max_d0;
     end if;
   end process;
 
@@ -237,8 +252,8 @@ begin
     else
       w_channel_wr_en     <= r_read_pipe_ctrl(READ_PIPE_DEPTH - 1).valid and r_read_pipe_active(READ_PIPE_DEPTH - 1);
       w_channel_wr_index  <= r_read_pipe_ctrl(READ_PIPE_DEPTH - 1).data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
-      w_channel_wr_accum  <= r_channel_new_accum;
-      w_channel_wr_max    <= r_channel_new_max;
+      w_channel_wr_accum  <= r_channel_new_accum_d1;
+      w_channel_wr_max    <= r_channel_new_max_d1;
     end if;
   end process;
 
