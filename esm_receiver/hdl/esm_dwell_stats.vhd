@@ -277,7 +277,6 @@ begin
     end if;
   end process;
 
-
   w_dwell_done <= to_stdlogic(s_state = S_DONE);
 
   i_reporter : entity esm_lib.esm_dwell_reporter

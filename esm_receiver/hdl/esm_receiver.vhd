@@ -51,6 +51,7 @@ end entity esm_receiver;
 architecture rtl of esm_receiver is
 
   constant AXI_FIFO_DEPTH           : natural := 64;
+  constant NUM_D2H_MUX_INPUTS       : natural := 2;
   constant CHANNELIZER8_DATA_WIDTH  : natural := IQ_WIDTH + 3 + 3; -- +4 for filter, +3 for ifft
   constant CHANNELIZER64_DATA_WIDTH : natural := IQ_WIDTH + 4 + 6; -- +4 for filter, +6 for ifft
 
@@ -94,16 +95,6 @@ architecture rtl of esm_receiver is
   signal w_channelizer64_fft_data     : signed_array_t(1 downto 0)(CHANNELIZER64_DATA_WIDTH - 1 downto 0);
   signal w_channelizer64_overflow     : std_logic;
 
-  signal w_dwell_stats_8_axis_ready   : std_logic;
-  signal w_dwell_stats_8_axis_valid   : std_logic;
-  signal w_dwell_stats_8_axis_data    : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal w_dwell_stats_8_axis_last    : std_logic;
-  signal w_dwell_stats_64_axis_ready  : std_logic;
-  signal w_dwell_stats_64_axis_valid  : std_logic;
-  signal w_dwell_stats_64_axis_data   : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal w_dwell_stats_64_axis_last   : std_logic;
-
-
   signal r_test_8_chn                 : std_logic;
   signal r_test_8_fft                 : std_logic;
   signal r_test_64_chn                : std_logic;
@@ -111,10 +102,15 @@ architecture rtl of esm_receiver is
   signal r_test                       : std_logic;
   signal r_test_dwell                 : std_logic;
 
-  signal w_reporter_axis_ready        : std_logic;
-  signal w_reporter_axis_valid        : std_logic;
-  signal w_reporter_axis_data         : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal w_reporter_axis_last         : std_logic;
+  signal w_d2h_mux_in_ready           : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
+  signal w_d2h_mux_in_valid           : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
+  signal w_d2h_mux_in_data            : std_logic_vector_array_t(NUM_D2H_MUX_INPUTS -1 downto 0)(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_d2h_mux_in_last            : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
+
+  signal w_d2h_mux_out_ready          : std_logic;
+  signal w_d2h_mux_out_valid          : std_logic;
+  signal w_d2h_mux_out_data           : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_d2h_mux_out_last           : std_logic;
 
   signal w_config_axis_ready          : std_logic;
   signal w_config_axis_valid          : std_logic;
@@ -272,10 +268,10 @@ begin
     Input_data          => w_channelizer8_chan_data,
     Input_pwr           => w_channelizer8_chan_pwr,
 
-    Axis_ready          => w_dwell_stats_8_axis_ready,
-    Axis_valid          => w_dwell_stats_8_axis_valid,
-    Axis_data           => w_dwell_stats_8_axis_data,
-    Axis_last           => w_dwell_stats_8_axis_last
+    Axis_ready          => w_d2h_mux_in_ready(0),
+    Axis_valid          => w_d2h_mux_in_valid(0),
+    Axis_data           => w_d2h_mux_in_data(0),
+    Axis_last           => w_d2h_mux_in_last(0)
   );
 
   i_dwell_stats_64 : entity esm_lib.esm_dwell_stats
@@ -299,18 +295,11 @@ begin
     Input_data          => w_channelizer64_chan_data,
     Input_pwr           => w_channelizer64_chan_pwr,
 
-    Axis_ready          => w_dwell_stats_64_axis_ready,
-    Axis_valid          => w_dwell_stats_64_axis_valid,
-    Axis_data           => w_dwell_stats_64_axis_data,
-    Axis_last           => w_dwell_stats_64_axis_last
+    Axis_ready          => w_d2h_mux_in_ready(1),
+    Axis_valid          => w_d2h_mux_in_valid(1),
+    Axis_data           => w_d2h_mux_in_data(1),
+    Axis_last           => w_d2h_mux_in_last(1)
   );
-
-  --TODO: testing
-  w_dwell_stats_8_axis_ready  <= w_reporter_axis_ready;
-  w_dwell_stats_64_axis_ready <= w_reporter_axis_ready;
-  w_reporter_axis_valid       <= w_dwell_stats_8_axis_valid or w_dwell_stats_64_axis_valid or r_test;
-  w_reporter_axis_data        <= w_dwell_stats_8_axis_data or w_dwell_stats_64_axis_data;
-  w_reporter_axis_last        <= w_dwell_stats_8_axis_last or w_dwell_stats_64_axis_last;
 
   process(data_clk)
   begin
@@ -325,6 +314,26 @@ begin
     end if;
   end process;
 
+  i_d2h_mux : entity axi_lib.axis_mux
+  generic map (
+    NUM_INPUTS      => NUM_D2H_MUX_INPUTS,
+    AXI_DATA_WIDTH  => AXI_DATA_WIDTH
+  )
+  port map (
+    Clk             => data_clk,
+    Rst             => r_combined_rst,
+
+    S_axis_ready    => w_d2h_mux_in_ready,
+    S_axis_valid    => w_d2h_mux_in_valid,
+    S_axis_data     => w_d2h_mux_in_data,
+    S_axis_last     => w_d2h_mux_in_last,
+
+    M_axis_ready    => w_d2h_mux_out_ready,
+    M_axis_valid    => w_d2h_mux_out_valid,
+    M_axis_data     => w_d2h_mux_out_data,
+    M_axis_last     => w_d2h_mux_out_last
+  );
+
   i_master_axis_fifo : entity axi_lib.axis_async_fifo
   generic map (
     FIFO_DEPTH      => AXI_FIFO_DEPTH,
@@ -333,10 +342,10 @@ begin
   port map (
     S_axis_clk      => data_clk,
     S_axis_resetn   => not(r_combined_rst),
-    S_axis_ready    => w_reporter_axis_ready,
-    S_axis_valid    => w_reporter_axis_valid,
-    S_axis_data     => w_reporter_axis_data,
-    S_axis_last     => w_reporter_axis_last,
+    S_axis_ready    => w_d2h_mux_out_ready,
+    S_axis_valid    => w_d2h_mux_out_valid,
+    S_axis_data     => w_d2h_mux_out_data,
+    S_axis_last     => w_d2h_mux_out_last,
 
     M_axis_clk      => M_axis_clk,
     M_axis_ready    => M_axis_ready,

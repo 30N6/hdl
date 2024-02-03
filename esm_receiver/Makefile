@@ -11,6 +11,7 @@ GENERIC_DEPS += ../common/hdl/math_pkg.vhd
 GENERIC_DEPS += ../common/hdl/reset_extender.vhd
 GENERIC_DEPS += ../axi/hdl/axis_async_fifo.vhd
 GENERIC_DEPS += ../axi/hdl/axis_sync_fifo.vhd
+GENERIC_DEPS += ../axi/hdl/axis_mux.vhd
 GENERIC_DEPS += ../mem/hdl/ram_sdp.vhd
 
 GENERIC_DEPS += ../dsp/hdl/dsp_pkg.vhd
