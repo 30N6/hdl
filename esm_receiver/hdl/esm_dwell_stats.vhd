@@ -30,8 +30,8 @@ port (
   Dwell_data          : in  esm_dwell_metadata_t;
   Dwell_sequence_num  : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
-  Input_ctrl          : out channelizer_control_t;
-  Input_data          : out signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);  --unused
+  Input_ctrl          : in  channelizer_control_t;
+  Input_data          : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);  --unused
   Input_pwr           : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   Axis_ready          : in  std_logic;
@@ -90,6 +90,7 @@ architecture rtl of esm_dwell_stats is
   signal r_clear_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
   signal r_read_index         : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
 
+  signal r_num_samples        : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
   signal r_duration           : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
   signal r_timestamp          : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
   signal r_ts_dwell_start     : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
@@ -132,7 +133,7 @@ begin
       else
         case s_state is
         when S_IDLE =>
-          if ((r_enable = '1') and (r_dwell_active = '1') and (r_input_ctrl.valid = '1') and (r_input_ctrl.last = '1')) then
+          if ((r_enable = '1') and (r_dwell_active = '1')) then
             s_state <= S_ACTIVE;
           else
             s_state <= S_IDLE;
@@ -202,7 +203,7 @@ begin
     if rising_edge(Clk) then
       r_read_pipe_ctrl    <= r_read_pipe_ctrl(READ_PIPE_DEPTH - 2 downto 0)   & r_input_ctrl;
       r_read_pipe_active  <= r_read_pipe_active(READ_PIPE_DEPTH - 2 downto 0) & to_stdlogic(s_state = S_ACTIVE);
-      r_read_pipe_req     <= r_read_pipe_active(READ_LATENCY - 2 downto 0)    & (w_report_read_req and to_stdlogic(s_state /= S_ACTIVE));
+      r_read_pipe_req     <= r_read_pipe_req(READ_LATENCY - 2 downto 0)       & (w_report_read_req and to_stdlogic(s_state /= S_ACTIVE));
       r_read_pipe_pwr     <= r_read_pipe_pwr(READ_LATENCY - 2 downto 0)       & r_input_pwr;
     end if;
   end process;
@@ -265,6 +266,18 @@ begin
     end if;
   end process;
 
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (s_state = S_IDLE) then
+        r_num_samples <= (others => '0');
+      elsif ((s_state = S_ACTIVE) and (r_input_ctrl.valid = '1')) then
+        r_num_samples <= r_num_samples + 1;
+      end if;
+    end if;
+  end process;
+
+
   w_dwell_done <= to_stdlogic(s_state = S_DONE);
 
   i_reporter : entity esm_lib.esm_dwell_reporter
@@ -282,6 +295,7 @@ begin
     Dwell_data          => r_dwell_data,
     Dwell_sequence_num  => r_dwell_sequence_num,
     Dwell_duration      => r_duration,
+    Dwell_num_samples   => r_num_samples,
     Timestamp_start     => r_ts_dwell_start,
     Timestamp_end       => r_ts_dwell_end,
 

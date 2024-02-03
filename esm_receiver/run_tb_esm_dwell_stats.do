@@ -102,10 +102,16 @@ foreach {library file_list} $library_file_list {
 }
 set last_compile_time $time_now
 
-vsim -suppress 12110 $top_level glbl.glbl
+vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=8
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all
+
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=64
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
 
 # If waves exists
 if [file exist wave.do] {

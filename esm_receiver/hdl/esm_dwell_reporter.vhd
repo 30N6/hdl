@@ -28,6 +28,7 @@ port (
   Dwell_data          : in  esm_dwell_metadata_t;
   Dwell_sequence_num  : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   Dwell_duration      : in  unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
+  Dwell_num_samples   : in  unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
   Timestamp_start     : in  unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
   Timestamp_end       : in  unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
 
@@ -74,6 +75,7 @@ architecture rtl of esm_dwell_reporter is
     S_META_6,
 
     S_DURATION,
+    S_NUM_SAMPLES,
     S_TIMESTAMP_START_0,
     S_TIMESTAMP_START_1,
     S_TIMESTAMP_END_0,
@@ -87,28 +89,32 @@ architecture rtl of esm_dwell_reporter is
     S_CHANNEL_MAX,
 
     S_PAD,
-    S_DONE
+    S_DONE,
+    S_REPORT_ACK
   );
 
-  signal s_state            : state_t;
+  signal s_state                : state_t;
 
-  signal r_packet_seq_num   : unsigned(31 downto 0);
+  signal r_packet_seq_num       : unsigned(31 downto 0);
 
-  signal r_channel_index    : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal r_words_in_msg     : unsigned(clog2(MAX_WORDS_PER_PACKET) - 1 downto 0);
+  signal r_channel_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r_words_in_msg         : unsigned(clog2(MAX_WORDS_PER_PACKET) - 1 downto 0);
 
-  signal r_read_accum       : unsigned(63 downto 0);
-  signal r_read_max         : unsigned(31 downto 0);
+  signal r_read_accum           : unsigned(63 downto 0);
+  signal r_read_max             : unsigned(31 downto 0);
 
-  signal w_fifo_almost_full : std_logic;
-  signal w_fifo_ready       : std_logic;
-  signal w_fifo_valid       : std_logic;
-  signal w_fifo_data        : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal w_fifo_last        : std_logic;
+  signal w_fifo_almost_full     : std_logic;
+  signal w_fifo_ready           : std_logic;
 
-  signal r_fifo_valid       : std_logic;
-  signal r_fifo_data        : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal r_fifo_last        : std_logic;
+  signal w_fifo_valid           : std_logic;
+  signal w_fifo_last            : std_logic;
+  signal w_fifo_partial_0_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_fifo_partial_1_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+
+  signal r_fifo_valid           : std_logic;
+  signal r_fifo_last            : std_logic;
+  signal r_fifo_partial_0_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal r_fifo_partial_1_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
 
 begin
 
@@ -170,6 +176,9 @@ begin
           s_state <= S_DURATION;
 
         when S_DURATION =>
+          s_state <= S_NUM_SAMPLES;
+
+        when S_NUM_SAMPLES =>
           s_state <= S_TIMESTAMP_START_0;
         when S_TIMESTAMP_START_0 =>
           s_state <= S_TIMESTAMP_START_1;
@@ -212,13 +221,18 @@ begin
           if (r_channel_index < (NUM_CHANNELS - 1)) then
             s_state <= S_START_CONTINUED;
           else
-            s_state <= S_IDLE;
+            s_state <= S_REPORT_ACK;
           end if;
+
+        when S_REPORT_ACK =>
+          s_state <= S_IDLE;
 
         end case;
       end if;
     end if;
   end process;
+
+  Report_ack <= to_stdlogic(s_state = S_REPORT_ACK);
 
   process(Clk)
   begin
@@ -270,97 +284,102 @@ begin
     end if;
   end process;
 
-  process(all)
+  process(Clk)
   begin
-    w_fifo_data   <= (others => '-');
-    w_fifo_last   <= '-';
     w_fifo_valid  <= '0';
+    w_fifo_last   <= '0';
+    w_fifo_partial_0_data   <= (others => '0');
+    w_fifo_partial_1_data   <= (others => '0');
 
     case s_state is
     when S_HEADER_0 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= ESM_REPORT_MAGIC_NUM;
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= ESM_REPORT_MAGIC_NUM;
 
     when S_HEADER_1 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(r_packet_seq_num);
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(r_packet_seq_num);
 
     when S_HEADER_2 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(MODULE_ID) & std_logic_vector(ESM_REPORT_MESSAGE_TYPE_DWELL_STATS) & x"0000";
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(MODULE_ID) & std_logic_vector(ESM_REPORT_MESSAGE_TYPE_DWELL_STATS) & x"0000";
 
     when S_SEQ_NUM =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(Dwell_sequence_num);
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_sequence_num);
 
     when S_META_0 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(Dwell_data.tag) & std_logic_vector(Dwell_data.frequency);
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_data.tag) & std_logic_vector(Dwell_data.frequency);
 
     when S_META_1 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(Dwell_data.duration);
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_data.duration);
 
     when S_META_2 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(resize_up(Dwell_data.gain, 8)) & std_logic_vector(resize_up(Dwell_data.fast_lock_profile, 8)) & x"0000";
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(resize_up(Dwell_data.gain, 8)) & std_logic_vector(resize_up(Dwell_data.fast_lock_profile, 8)) & x"0000";
 
     when S_META_3 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(Dwell_data.threshold_narrow) & std_logic_vector(Dwell_data.threshold_wide);
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_data.threshold_narrow) & std_logic_vector(Dwell_data.threshold_wide);
 
     when S_META_4 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(Dwell_data.channel_mask_narrow(63 downto 32));
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_data.channel_mask_narrow(63 downto 32));
 
     when S_META_5 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(Dwell_data.channel_mask_narrow(31 downto 0));
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_data.channel_mask_narrow(31 downto 0));
 
     when S_META_6 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(Dwell_data.channel_mask_wide) & x"000000";
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_data.channel_mask_wide) & x"000000";
 
     when S_DURATION =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(Dwell_duration);
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(Dwell_duration);
+
+    when S_NUM_SAMPLES =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(Dwell_num_samples);
 
     when S_TIMESTAMP_START_0 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(resize_up(Timestamp_start(ESM_TIMESTAMP_WIDTH - 1 downto 32), 32));
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(resize_up(Timestamp_start(ESM_TIMESTAMP_WIDTH - 1 downto 32), 32));
 
     when S_TIMESTAMP_START_1 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(Timestamp_start(31 downto 0));
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(Timestamp_start(31 downto 0));
 
     when S_TIMESTAMP_END_0 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(resize_up(Timestamp_end(ESM_TIMESTAMP_WIDTH - 1 downto 32), 32));
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(resize_up(Timestamp_end(ESM_TIMESTAMP_WIDTH - 1 downto 32), 32));
 
     when S_TIMESTAMP_END_1 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(Timestamp_end(31 downto 0));
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(Timestamp_end(31 downto 0));
 
     when S_CHANNEL_INDEX =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(resize_up(r_channel_index, 32));
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(resize_up(r_channel_index, 32));
 
     when S_CHANNEL_ACCUM_0 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(r_read_accum(63 downto 32));
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(r_read_accum(63 downto 32));
 
     when S_CHANNEL_ACCUM_1 =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(r_read_accum(31 downto 0));
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(r_read_accum(31 downto 0));
 
     when S_CHANNEL_MAX =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(r_read_max);
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(r_read_max);
 
     when S_PAD =>
-      w_fifo_valid  <= '1';
-      w_fifo_data   <= (others => '0');
-      w_fifo_last   <= to_stdlogic(r_words_in_msg = (MAX_WORDS_PER_PACKET - 1));
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= (others => '0');
+      w_fifo_last             <= to_stdlogic(r_words_in_msg = (MAX_WORDS_PER_PACKET - 1));
 
     when others => null;
     end case;
@@ -369,9 +388,10 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_fifo_valid  <= w_fifo_valid;
-      r_fifo_data   <= w_fifo_data;
-      r_fifo_last   <= w_fifo_last;
+      r_fifo_valid          <= w_fifo_valid;
+      r_fifo_partial_0_data <= w_fifo_partial_0_data;
+      r_fifo_partial_1_data <= w_fifo_partial_1_data;
+      r_fifo_last           <= w_fifo_last;
     end if;
  end process;
 
@@ -394,7 +414,7 @@ begin
 
     S_axis_ready  => w_fifo_ready,
     S_axis_valid  => r_fifo_valid,
-    S_axis_data   => r_fifo_data,
+    S_axis_data   => r_fifo_partial_0_data or r_fifo_partial_1_data,
     S_axis_last   => r_fifo_last,
 
     M_axis_ready  => Axis_ready,
@@ -402,5 +422,7 @@ begin
     M_axis_data   => Axis_data,
     M_axis_last   => Axis_last
   );
+
+  --TODO: timeout error
 
 end architecture rtl;

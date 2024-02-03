@@ -10,15 +10,17 @@ typedef struct {
   int unsigned power;
 } dwell_channel_data_t;
 
+typedef dwell_channel_data_t dwell_channel_array_t [];
+
 interface dwell_stats_tx_intf (input logic Clk);
-  logic                                         dwell_active;
+  logic                                         dwell_active = 0;
   esm_dwell_metadata_t                          dwell_data;
   logic [esm_dwell_sequence_num_width - 1 : 0]  dwell_sequence_num;
 
-  channelizer_control_t                         input_ctrl;
+  channelizer_control_t                         input_ctrl = {valid:0, default:0};
   logic [chan_power_width - 1 : 0]              input_pwr;
 
-  task write(esm_dwell_metadata_t data, int unsigned seq_num, dwell_channel_data_t input_data [$]);
+  task write(esm_dwell_metadata_t data, int unsigned seq_num, dwell_channel_data_t input_data []);
     automatic dwell_channel_data_t d;
 
     dwell_active        = 1;
@@ -27,8 +29,11 @@ interface dwell_stats_tx_intf (input logic Clk);
 
     repeat (5) @(posedge Clk);
 
-    while(input_data.size() > 0) begin
-      d = input_data.pop_front();
+    //$display("%0t: input_data = %p", $time, input_data);
+
+    for (int i = 0; i < input_data.size(); i++) begin
+      d = input_data[i];
+
       input_ctrl.valid      = 1;
       input_ctrl.last       = d.last;
       input_ctrl.data_index = d.channel;
@@ -69,8 +74,8 @@ endinterface
 module esm_dwell_stats_tb;
   parameter time CLK_HALF_PERIOD  = 8ns;
   parameter AXI_DATA_WIDTH        = 32;
-  parameter MODULE_ID             = 99;
-  parameter NUM_CHANNELS          = 8;
+  parameter logic [7:0] MODULE_ID = 99;
+  parameter NUM_CHANNELS          = 64;
 
   typedef struct
   {
@@ -100,6 +105,7 @@ module esm_dwell_stats_tb;
     bit [23:0]  padding_2;
 
     bit [31:0]  duration_actual;
+    bit [31:0]  num_samples;
     bit [63:0]  ts_dwell_start;
     bit [63:0]  ts_dwell_end;
   } esm_dwell_report_header_t;
@@ -114,16 +120,20 @@ module esm_dwell_stats_tb;
   typedef bit [$bits(esm_dwell_report_header_t) - 1 : 0]        dwell_report_header_bits_t;
   typedef bit [$bits(esm_dwell_report_channel_entry_t) - 1 : 0] dwell_report_channel_entry_bits_t;
 
+  parameter MAX_WORDS_PER_PACKET = 64;
+  parameter NUM_HEADER_WORDS = ($bits(esm_dwell_report_header_t) / AXI_DATA_WIDTH);
+
   logic Clk;
   logic Rst;
 
   dwell_stats_tx_intf                             dwell_tx_intf (.*);
   axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf   (.*);
 
-  expect_t    expected_data [$];
-  int         num_received = 0;
-  logic       r_axi_rx_ready;
-  logic       w_axi_rx_valid;
+  int unsigned  report_seq_num = 0;
+  expect_t      expected_data [$];
+  int           num_received = 0;
+  logic         r_axi_rx_ready;
+  logic         w_axi_rx_valid;
 
   initial begin
     Clk = 0;
@@ -177,25 +187,27 @@ module esm_dwell_stats_tb;
     do begin
       @(posedge Clk);
     end while (Rst);
+    repeat(100) @(posedge Clk);
   endtask
 
-  function automatic esm_dwell_report_header_t unpack_report(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
+  function automatic esm_dwell_report_header_t unpack_report_header(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
     esm_dwell_report_header_t   report_header;
     dwell_report_header_bits_t  packed_report_header;
 
-    $display("unpack_report: data=%p", data);
+    //$display("unpack_report: data=%p", data);
 
     for (int i = 0; i < $size(packed_report_header)/AXI_DATA_WIDTH; i++) begin
-      packed_report_header[i*AXI_DATA_WIDTH +: AXI_DATA_WIDTH] = data.pop_back();
+      //$display("unpack_report_header [%0d] = %X", i, data[0]);
+      packed_report_header[(NUM_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH] = data.pop_front();
     end
 
-    $display("unpack_report: packed=%X", packed_report_header);
+    //$display("unpack_report: packed=%X", packed_report_header);
 
     report_header = esm_dwell_report_header_t'(packed_report_header);
     return report_header;
   endfunction
 
-/*
+
   function automatic bit data_match(logic [AXI_DATA_WIDTH - 1 : 0] a [$], logic [AXI_DATA_WIDTH - 1 : 0] b []);
     esm_dwell_report_header_t report_a = unpack_report_header(a);
     esm_dwell_report_header_t report_b = unpack_report_header(b);
@@ -205,7 +217,7 @@ module esm_dwell_stats_tb;
       return 0;
     end
 
-    $display("a[0]=%X b[0]=%X", a[0], b[0]);
+    //$display("a[0]=%X b[0]=%X  size: %0d %0d", a[0], b[0], a.size(), b.size());
 
     if (report_a.magic_num !== report_b.magic_num) begin
       $display("magic_num mismatch: %X %X", report_a.magic_num, report_b.magic_num);
@@ -217,19 +229,80 @@ module esm_dwell_stats_tb;
       return 0;
     end
 
-    if (report_a.message_crc !== report_b.message_crc) begin
-      $display("message_crc mismatch: %X %X", report_a.message_crc, report_b.message_crc);
+    if (report_a.module_id !== report_b.module_id) begin
+      $display("module_id mismatch: %X %X", report_a.module_id, report_b.module_id);
       return 0;
     end
 
-    if (report_a.message_data !== report_b.message_data) begin
-      $display("message_data mismatch: %X %X", report_a.message_data, report_b.message_data);
+    if (report_a.message_type !== report_b.message_type) begin
+      $display("message_type mismatch: %X %X", report_a.message_type, report_b.message_type);
       return 0;
     end
+
+    if (report_a.dwell_sequence_num !== report_b.dwell_sequence_num) begin
+      $display("dwell_sequence_num mismatch: %X %X", report_a.dwell_sequence_num, report_b.dwell_sequence_num);
+      return 0;
+    end
+
+    if (report_a.tag !== report_b.tag) begin
+      $display("tag mismatch: %X %X", report_a.tag, report_b.tag);
+      return 0;
+    end
+    if (report_a.frequency !== report_b.frequency) begin
+      $display("frequency mismatch: %X %X", report_a.frequency, report_b.frequency);
+      return 0;
+    end
+    if (report_a.duration_requested !== report_b.duration_requested) begin
+      $display("duration_requested mismatch: %X %X", report_a.duration_requested, report_b.duration_requested);
+      return 0;
+    end
+    if (report_a.gain !== report_b.gain) begin
+      $display("gain mismatch: %X %X", report_a.gain, report_b.gain);
+      return 0;
+    end
+    if (report_a.fast_lock_profile !== report_b.fast_lock_profile) begin
+      $display("fast_lock_profile mismatch: %X %X", report_a.fast_lock_profile, report_b.fast_lock_profile);
+      return 0;
+    end
+    if (report_a.threshold_narrow !== report_b.threshold_narrow) begin
+      $display("threshold_narrow mismatch: %X %X", report_a.threshold_narrow, report_b.threshold_narrow);
+      return 0;
+    end
+    if (report_a.threshold_wide !== report_b.threshold_wide) begin
+      $display("threshold_wide mismatch: %X %X", report_a.threshold_wide, report_b.threshold_wide);
+      return 0;
+    end
+    if (report_a.channel_mask_narrow !== report_b.channel_mask_narrow) begin
+      $display("channel_mask_narrow mismatch: %X %X", report_a.channel_mask_narrow, report_b.channel_mask_narrow);
+      return 0;
+    end
+    if (report_a.channel_mask_wide !== report_b.channel_mask_wide) begin
+      $display("channel_mask_wide mismatch: %X %X", report_a.channel_mask_wide, report_b.channel_mask_wide);
+      return 0;
+    end
+
+    /*
+    if (report_a.duration_actual !== report_b.duration_actual) begin
+      $display("duration_actual mismatch: %X %X", report_a.duration_actual, report_b.duration_actual);
+      return 0;
+    end
+    */
+    if (report_a.num_samples !== report_b.num_samples) begin
+      $display("num_samples mismatch: %X %X", report_a.num_samples, report_b.num_samples);
+      return 0;
+    end
+
+    for (int i = NUM_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
+      if (a[i] !== b[i]) begin
+        $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
+        return 0;
+      end
+    end
+
+    //TODO: check channel data
 
     return 1;
   endfunction
-*/
 
   initial begin
     automatic logic [AXI_DATA_WIDTH - 1 : 0] read_data [$];
@@ -239,11 +312,11 @@ module esm_dwell_stats_tb;
     forever begin
       rpt_rx_intf.read(read_data);
 
-      /*if (data_match(read_data, expected_data[0].data)) begin
-        //$display("%0t: data match - %X", $time, read_data);
+      if (data_match(read_data, expected_data[0].data)) begin
+        $display("%0t: data match - %p", $time, read_data);
       end else begin
         $error("%0t: error -- data mismatch: expected = %p  actual = %p", $time, expected_data[0].data, read_data);
-      end*/
+      end
       num_received++;
       void'(expected_data.pop_front());
     end
@@ -258,91 +331,152 @@ module esm_dwell_stats_tb;
       end
     end
   end
-/*
-  function automatic expect_t populate_report(bit [adsb_message_width - 1 : 0] output_msg);
-    expect_t r;
-    static int seq_num = 0;
 
-    adsb_report_packed_t report;
-    adsb_report_bits_t packed_report;
+  function automatic void expect_reports(esm_dwell_metadata_t dwell_data, int unsigned dwell_seq_num, dwell_channel_data_t  dwell_input []);
+    int channels_per_packet = (MAX_WORDS_PER_PACKET - NUM_HEADER_WORDS) / 4;
+    int num_packets = (NUM_CHANNELS + channels_per_packet - 1) / channels_per_packet;
+    int num_padding_words = 0;
+    int channel_index = 0;
 
-    report.magic_num     = 32'hAD5B0001;
-    report.sequence_num  = seq_num;
-    report.timestamp     = 0;
-    report.preamble_s    = 0;
-    report.preamble_sn   = 0;
-    report.message_crc   = 1;
-    report.message_data  = output_msg;
+    longint unsigned channel_accum [NUM_CHANNELS] = {default:0};
+    int unsigned channel_max [NUM_CHANNELS] = {default:0};
 
-    packed_report = adsb_report_bits_t'(report);
-    for (int i = 0; i < $size(packed_report)/AXI_DATA_WIDTH; i++) begin
-      r.data.push_front(packed_report[i*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
+    //$display("%0t: num_header_words=%0d channels_per_packet=%0d num_packets=%0d", $time, NUM_HEADER_WORDS, channels_per_packet, num_packets);
+
+    for (int i = 0; i < dwell_input.size(); i++) begin
+      channel_accum[dwell_input[i].channel] += dwell_input[i].power;
+      channel_max[dwell_input[i].channel] = (dwell_input[i].power > channel_max[dwell_input[i].channel]) ? dwell_input[i].power : channel_max[dwell_input[i].channel];
     end
 
-    $display("report: %p", report);
-    $display("packed_report: %p", packed_report);
-    $display("axi report: %p [0]", r.data, r.data[0]);
+    for (int i_packet = 0; i_packet < num_packets; i_packet++) begin
+      expect_t r;
+      esm_dwell_report_header_t   report_header;
+      dwell_report_header_bits_t  report_header_packed;
 
-    seq_num++;
+      report_header.magic_num           = esm_report_magic_num;
+      report_header.sequence_num        = report_seq_num;
+      report_header.module_id           = MODULE_ID;
+      report_header.message_type        = esm_report_message_type_dwell_stats;
+      report_header.dwell_sequence_num  = dwell_seq_num;
+      report_header.tag                 = dwell_data.tag;
+      report_header.frequency           = dwell_data.frequency;
+      report_header.duration_requested  = dwell_data.duration;
+      report_header.gain                = dwell_data.gain;
+      report_header.fast_lock_profile   = dwell_data.fast_lock_profile;
+      report_header.threshold_narrow    = dwell_data.threshold_narrow;
+      report_header.threshold_wide      = dwell_data.threshold_wide;
+      report_header.channel_mask_narrow = dwell_data.channel_mask_narrow;
+      report_header.channel_mask_wide   = dwell_data.channel_mask_wide;
+      report_header.duration_actual     = 0;
+      report_header.num_samples         = dwell_input.size();
+      report_header.ts_dwell_start      = 0;
+      report_header.ts_dwell_end        = 0;
+
+      report_header_packed = dwell_report_header_bits_t'(report_header);
+      //$display("report_packed: %X", report_header_packed);
+
+      for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
+        r.data.push_back(report_header_packed[(NUM_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
+      end
+
+      for (int i_channel = 0; i_channel < channels_per_packet; i_channel++) begin
+        bit [31:0] words [4];
+        if (channel_index >= NUM_CHANNELS) begin
+          break;
+        end
+
+        words[0] = channel_index;
+        words[1] = channel_accum[channel_index][63:32];
+        words[2] = channel_accum[channel_index][31:0];
+        words[3] = channel_max[channel_index];
+        for (int i = 0; i < $size(words); i++) begin
+          r.data.push_back(words[i]);
+        end
+        channel_index++;
+      end
+
+      num_padding_words = MAX_WORDS_PER_PACKET - r.data.size();
+      for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
+        r.data.push_back(0);
+      end
+
+      /*for (int i = 0; i < r.data.size(); i++) begin
+        $display("r.data[%02d]=%X", i, r.data[i]);
+      end*/
+
+      expected_data.push_back(r);
+
+      /*$display("report_header: %p", report_header);
+      $display("report_header_packed: %p", report_header_packed);
+      $display("axi report: %p [0]", r.data, r.data[0]);*/
+
+      report_seq_num++;
+    end
+  endfunction
+
+  function automatic esm_dwell_metadata_t randomize_dwell_metadata();
+    esm_dwell_metadata_t r;
+    r.tag                   = $urandom;
+    r.frequency             = $urandom;
+    r.duration              = $urandom;
+    r.gain                  = $urandom;
+    r.fast_lock_profile     = $urandom;
+    r.threshold_narrow      = $urandom;
+    r.threshold_wide        = $urandom;
+    r.channel_mask_narrow   = {$urandom, $urandom};
+    r.channel_mask_wide     = $urandom;
+    return r;
+  endfunction
+
+  function automatic dwell_channel_array_t randomize_dwell_input();
+    dwell_channel_array_t r = new [$urandom_range(2000, 500)];
+    int channel_index = 0;
+
+    for (int i = 0; i < r.size(); i++) begin
+      r[i].channel  = channel_index;
+      r[i].last     = (channel_index == (NUM_CHANNELS - 1));
+      r[i].power    = $urandom;
+      channel_index = (channel_index + 1) % NUM_CHANNELS;
+    end
 
     return r;
   endfunction
 
-  function automatic adsb_report_packed_t unpack_report(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
-    adsb_report_packed_t report;
-    adsb_report_bits_t packed_report;
-
-    $display("unpack_report: data=%p", data);
-
-    for (int i = 0; i < $size(packed_report)/AXI_DATA_WIDTH; i++) begin
-      packed_report[i*AXI_DATA_WIDTH +: AXI_DATA_WIDTH] = data.pop_back();
-    end
-
-    $display("unpack_report: packed=%X", packed_report);
-
-    report = adsb_report_packed_t'(packed_report);
-    return report;
-  endfunction
-*/
   task automatic standard_test();
-    /*string str_iq [$];
-    string str_msg [$];
-    string line;
-    adc_data_t adc_data;
-    bit [MSG_WIDTH - 1 : 0] output_msg;
-    int fd_test_iq  = $fopen("./test_data/adsb_test_data_2023_12_29_iq.txt", "r");
-    int fd_test_msg = $fopen("./test_data/adsb_test_data_2023_12_29_msg.txt", "r");
+    parameter NUM_TESTS = 20;
     int max_write_delay = 5;
 
+    for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
+      $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
+      report_seq_num = 0;
 
-    while ($fscanf(fd_test_iq, "%f %f", adc_data.d_i, adc_data.d_q) == 2) begin
-      input_data.push_back(adc_data);
-    end
-    $fclose(fd_test_iq);
+      for (int i_dwell = 0; i_dwell < 100; i_dwell++) begin
+        int unsigned          dwell_seq_num   = $urandom;
+        esm_dwell_metadata_t  dwell_data      = randomize_dwell_metadata();
+        dwell_channel_data_t  dwell_input []  = randomize_dwell_input();
 
-    while ($fscanf(fd_test_msg, "%X", output_msg) == 1) begin
-      expected_data.push_back(populate_report(output_msg));
-    end
-    $fclose(fd_test_msg);
+        expect_reports(dwell_data, dwell_seq_num, dwell_input);
+        dwell_tx_intf.write(dwell_data, dwell_seq_num, dwell_input);
 
-    $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
-    foreach (input_data[i]) begin
-      bit signed [ADC_WIDTH - 1 : 0] input_i = input_data[i].d_i * (2**(ADC_WIDTH-1));
-      bit signed [ADC_WIDTH - 1 : 0] input_q = input_data[i].d_q * (2**(ADC_WIDTH-1));
-      adc_tx_intf.write(input_i, input_q);
-      //repeat($urandom_range(max_write_delay)) @(posedge(Clk));
-    end*/
+        repeat(1000) @(posedge Clk);
 
-    begin
-      int wait_cycles = 0;
-      while ((expected_data.size() != 0) && (wait_cycles < 1e5)) begin
-        @(posedge Clk);
-        wait_cycles++;
+        begin
+          int wait_cycles = 0;
+          while ((expected_data.size() != 0) && (wait_cycles < 1e5)) begin
+            @(posedge Clk);
+            wait_cycles++;
+          end
+          assert (wait_cycles < 1e5) else $error("Timeout while waiting for expected queue to empty during test.");
+        end
+
       end
-      assert (wait_cycles < 1e5) else $error("Timeout while waiting for expected queue to empty during test.");
-    end
 
-    $display("%0t: Test finished: num_received = %0d", $time, num_received);
+      $display("%0t: Test finished: num_received = %0d", $time, num_received);
+      Rst = 1;
+      repeat(100) @(posedge Clk);
+      Rst = 0;
+      repeat(100) @(posedge Clk);
+    end
   endtask
 
   initial
