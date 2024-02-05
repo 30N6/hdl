@@ -51,7 +51,7 @@ end entity esm_receiver;
 architecture rtl of esm_receiver is
 
   constant AXI_FIFO_DEPTH           : natural := 64;
-  constant NUM_D2H_MUX_INPUTS       : natural := 2;
+  constant NUM_D2H_MUX_INPUTS       : natural := 3;
   constant CHANNELIZER8_DATA_WIDTH  : natural := IQ_WIDTH + 3 + 3; -- +4 for filter, +3 for ifft
   constant CHANNELIZER64_DATA_WIDTH : natural := IQ_WIDTH + 4 + 6; -- +4 for filter, +6 for ifft
 
@@ -240,6 +240,7 @@ begin
 
     Output_fft_ctrl       => w_channelizer64_fft_control,
     Output_fft_data       => w_channelizer64_fft_data,
+    Output_chan_pwr       => w_channelizer64_chan_pwr,
 
     Error_filter_overflow => w_channelizer64_overflow,
     Error_mux_overflow    => open,
@@ -313,6 +314,10 @@ begin
       --r_test <= w_channelizer_valid or or_reduce(std_logic_vector(w_channelizer_index) & std_logic_vector(w_channelizer_data(0)) & std_logic_vector(w_channelizer_data(1))) or w_channelizer_overflow;
     end if;
   end process;
+
+  w_d2h_mux_in_valid(2) <= r_test;
+  w_d2h_mux_in_data(2)  <= (others => '0');
+  w_d2h_mux_in_last(2)  <= r_test;
 
   i_d2h_mux : entity axi_lib.axis_mux
   generic map (

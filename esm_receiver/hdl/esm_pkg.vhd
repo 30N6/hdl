@@ -42,6 +42,11 @@ package esm_pkg is
   constant ESM_DWELL_DURATION_WIDTH                     : natural := 32;
   constant ESM_DWELL_SEQUENCE_NUM_WIDTH                 : natural := 32;
   constant ESM_TIMESTAMP_WIDTH                          : natural := 48;
+  constant ESM_THRESHOLD_FACTOR_WIDTH                   : natural := 16;
+  constant ESM_THRESHOLD_FRAC_WIDTH                     : natural := 8;
+
+  constant ESM_THRESHOLD_FILTER_FACTOR                  : natural := 7;
+  constant ESM_THRESHOLD_FILTER_DELAY                   : natural := 256;
 
   --type esm_common_header_t is record
   --  magic_num                 : std_logic_vector(31 downto 0);
@@ -63,8 +68,8 @@ package esm_pkg is
     duration                  : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
     gain                      : unsigned(6 downto 0);
     fast_lock_profile         : unsigned(ESM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 0);
-    threshold_narrow          : unsigned(15 downto 0);
-    threshold_wide            : unsigned(15 downto 0);
+    threshold_factor_narrow   : unsigned(ESM_THRESHOLD_FACTOR_WIDTH -1 downto 0);
+    threshold_factor_wide     : unsigned(ESM_THRESHOLD_FACTOR_WIDTH -1 downto 0);
     channel_mask_narrow       : std_logic_vector(ESM_NUM_CHANNELS_NARROW - 1 downto 0);
     channel_mask_wide         : std_logic_vector(ESM_NUM_CHANNELS_WIDE - 1 downto 0);
   end record;
@@ -79,8 +84,8 @@ package esm_pkg is
   --  gain                      : unsigned(7 downto 0);
   --  fast_lock_profile         : unsigned(7 downto 0);
   --  padding0                  : std_logic_vector(15 downto 0);
-  --  threshold_narrow          : unsigned(15 downto 0);
-  --  threshold_wide            : unsigned(15 downto 0);
+  --  threshold_factor_narrow   : unsigned(ESM_THRESHOLD_FACTOR_WIDTH - 1 downto 0);
+  --  threshold_factor_wide     : unsigned(ESM_THRESHOLD_FACTOR_WIDTH - 1 downto 0);
   --  channel_mask_narrow       : std_logic_vector(63 downto 0);
   --  channel_mask_wide         : std_logic_vector(7 downto 0);
   --  padding1                  : std_logic_vector(23 downto 0);
@@ -209,15 +214,15 @@ package body esm_pkg is
 
     vm := v;
 
-    r.tag                 := unsigned(vm(15 downto 0));
-    r.frequency           := unsigned(vm(31 downto 16));
-    r.duration            := unsigned(vm(63 downto 32));
-    r.gain                := unsigned(vm(70 downto 64));
-    r.fast_lock_profile   := unsigned(vm(74 downto 72));
-    r.threshold_narrow    := unsigned(vm(111 downto 96));
-    r.threshold_wide      := unsigned(vm(127 downto 112));
-    r.channel_mask_narrow := vm(191 downto 128);
-    r.channel_mask_wide   := vm(199 downto 192);
+    r.tag                     := unsigned(vm(15 downto 0));
+    r.frequency               := unsigned(vm(31 downto 16));
+    r.duration                := unsigned(vm(63 downto 32));
+    r.gain                    := unsigned(vm(70 downto 64));
+    r.fast_lock_profile       := unsigned(vm(74 downto 72));
+    r.threshold_factor_narrow := unsigned(vm(111 downto 96));
+    r.threshold_factor_wide   := unsigned(vm(127 downto 112));
+    r.channel_mask_narrow     := vm(191 downto 128);
+    r.channel_mask_wide       := vm(199 downto 192);
     return r;
   end function;
 

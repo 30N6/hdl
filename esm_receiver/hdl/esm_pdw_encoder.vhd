@@ -13,12 +13,13 @@ library dsp_lib;
 library esm_lib;
   use esm_lib.esm_pkg.all;
 
-entity esm_dwell_stats is
+entity esm_pdw_decoder is
 generic (
   AXI_DATA_WIDTH  : natural;
   DATA_WIDTH      : natural;
   NUM_CHANNELS    : natural;
-  MODULE_ID       : unsigned
+  MODULE_ID       : unsigned;
+  WIDE_BANDWIDTH  : boolean
 );
 port (
   Clk                 : in  std_logic;
@@ -31,7 +32,7 @@ port (
   Dwell_sequence_num  : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   Input_ctrl          : in  channelizer_control_t;
-  Input_data          : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);  --unused
+  Input_data          : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
   Input_pwr           : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   Axis_ready          : in  std_logic;
@@ -39,72 +40,26 @@ port (
   Axis_data           : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   Axis_last           : out std_logic
 );
-end entity esm_dwell_stats;
+end entity esm_pdw_decoder;
 
-architecture rtl of esm_dwell_stats is
+architecture rtl of esm_pdw_decoder is
 
-  constant POWER_ACCUM_WIDTH    : natural := CHAN_POWER_WIDTH + ESM_DWELL_DURATION_WIDTH;
   constant CHANNEL_INDEX_WIDTH  : natural := clog2(NUM_CHANNELS);
-  constant READ_LATENCY         : natural := 2;
-  constant READ_PIPE_DEPTH      : natural := READ_LATENCY + 2;
 
   type state_t is
   (
     S_IDLE,
-    S_ACTIVE,
-    S_DONE,
-    S_REPORT_WAIT,
-    S_CLEAR
+    S_THRESHOLD_WAIT,
+
   );
 
-  signal r_rst                        : std_logic;
-  signal r_enable                     : std_logic;
 
-  signal r_dwell_active               : std_logic;
-  signal r_dwell_data                 : esm_dwell_metadata_t;
-  signal r_dwell_sequence_num         : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal w_threshold_factor     : unsigned(ESM_THRESHOLD_FACTOR_WIDTH - 1 downto 0);
 
-  signal r_input_ctrl                 : channelizer_control_t;
-  signal r_input_pwr                  : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-
-  signal s_state                      : state_t;
-
-  signal m_channel_accum              : unsigned_array_t(NUM_CHANNELS - 1 downto 0)(POWER_ACCUM_WIDTH - 1 downto 0);
-  signal m_channel_max                : unsigned_array_t(NUM_CHANNELS - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
-
-  signal w_channel_wr_en              : std_logic;
-  signal w_channel_wr_index           : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_channel_wr_accum           : unsigned(POWER_ACCUM_WIDTH - 1 downto 0);
-  signal w_channel_wr_max             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-  signal w_channel_rd_index           : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-
-  signal r_read_pipe_ctrl             : channelizer_control_array_t(READ_PIPE_DEPTH - 1 downto 0);
-  signal r_read_pipe_active           : std_logic_vector(READ_PIPE_DEPTH - 1 downto 0);
-  signal r_read_pipe_req              : std_logic_vector(READ_LATENCY - 1 downto 0);
-  signal r_read_pipe_pwr              : unsigned_array_t(READ_LATENCY     downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
-  signal r_channel_rd_accum           : unsigned_array_t(READ_LATENCY - 1 downto 0)(POWER_ACCUM_WIDTH - 1 downto 0);
-  signal r_channel_rd_max             : unsigned_array_t(READ_LATENCY     downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
-
-  signal r_channel_new_accum_d0_a     : unsigned(31 downto 0);
-  signal r_channel_new_accum_d0_b     : unsigned(31 downto 0);
-  signal r_channel_new_accum_d0_c     : unsigned(0 downto 0);
-  signal r_channel_new_accum_d1       : unsigned(POWER_ACCUM_WIDTH - 1 downto 0);
-  signal r_channel_new_max_valid_d0   : std_logic;
-  signal r_channel_new_max_d1         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-
-  signal r_clear_index                : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
-  signal r_read_index                 : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-
-  signal r_num_samples                : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
-  signal r_duration                   : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
-  signal r_timestamp                  : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
-  signal r_ts_dwell_start             : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
-  signal r_ts_dwell_end               : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
-
-  signal w_dwell_done                 : std_logic;
-  signal w_report_read_req            : std_logic;
-  signal w_report_read_index          : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_report_ack                 : std_logic;
+  signal w_piped_ctrl           : channelizer_control_t;
+  signal w_piped_data           : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+  signal w_piped_pwr            : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal w_piped_threshold      : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
 begin
 
@@ -115,6 +70,31 @@ begin
       r_enable  <= Enable;
     end if;
   end process;
+
+  w_threshold_factor <= Dwell_data.threshold_factor_wide when WIDE_BANDWIDTH else Dwell_data.threshold_factor_narrow;
+
+  i_threshold : entity esm_lib.esm_pdw_threshold
+  generic map (
+    DATA_WIDTH          => DATA_WIDTH,
+    CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH
+  )
+  port map (
+    Clk                     => Clk,
+
+    Dwell_active            => Dwell_active,
+    Dwell_threshold_factor  => w_threshold_factor,
+
+    Input_ctrl              => Input_ctrl,
+    Input_data              => Input_data,
+    Input_pwr               => Input_pwr,
+
+    Output_ctrl             => w_piped_ctrl,
+    Output_data             => w_piped_data,
+    Output_pwr              => w_piped_pwr,
+    Output_threshold        => w_piped_threshold
+  );
+
+
 
   process(Clk)
   begin
