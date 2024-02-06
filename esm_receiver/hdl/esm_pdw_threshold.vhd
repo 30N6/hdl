@@ -16,7 +16,8 @@ library esm_lib;
 entity esm_pdw_threshold is
 generic (
   DATA_WIDTH          : natural;
-  CHANNEL_INDEX_WIDTH : natural
+  CHANNEL_INDEX_WIDTH : natural;
+  LATENCY             : natural
 );
 port (
   Clk                     : in  std_logic;
@@ -80,6 +81,10 @@ architecture rtl of esm_pdw_threshold is
   signal r4_threshold           : unsigned(THRESHOLD_RAW_WIDTH - 1 downto 0);
 
 begin
+
+  assert (LATENCY = 5)
+    report "LATENCY expected to be 5."
+    severity failure;
 
   process(Clk)
   begin

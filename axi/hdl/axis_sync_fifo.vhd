@@ -53,7 +53,7 @@ begin
      TDEST_WIDTH          => 1,
      TID_WIDTH            => 1,
      TUSER_WIDTH          => 1,
-     USE_ADV_FEATURES     => "0",
+     USE_ADV_FEATURES     => "2",
      WR_DATA_COUNT_WIDTH  => 1
   )
   port map (

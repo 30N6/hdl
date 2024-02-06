@@ -44,9 +44,14 @@ package esm_pkg is
   constant ESM_TIMESTAMP_WIDTH                          : natural := 48;
   constant ESM_THRESHOLD_FACTOR_WIDTH                   : natural := 16;
   constant ESM_THRESHOLD_FRAC_WIDTH                     : natural := 8;
-
   constant ESM_THRESHOLD_FILTER_FACTOR                  : natural := 7;
   constant ESM_THRESHOLD_FILTER_DELAY                   : natural := 256;
+  constant ESM_PDW_SEQUENCE_NUM_WIDTH                   : natural := 32;
+  constant ESM_PDW_AMPLITUDE_ACCUM_WIDTH                : natural := 48;
+  constant ESM_PDW_CYCLE_COUNT_WIDTH                    : natural := 32;
+  constant ESM_PDW_IFM_WIDTH                            : natural := 16;
+  constant ESM_PDW_SAMPLE_BUFFER_DEPTH                  : natural := 2048;
+  constant ESM_PDW_SAMPLE_BUFFER_INDEX                  : natural := clog2(ESM_PDW_SAMPLE_BUFFER_DEPTH);
 
   --type esm_common_header_t is record
   --  magic_num                 : std_logic_vector(31 downto 0);
@@ -182,9 +187,21 @@ package esm_pkg is
   --  pulse_amplitude           : unsigned(31 downto 0);
   --  pulse_duration            : unsigned(31 downto 0);  --TODO: early termination flag?
   --  pulse_frequency           : unsigned(31 downto 0);  --TODO: IFM module
-  --  pulse_start_time          : unsigned(63 downto 0);
+  --  pulse_start_time          : unsigned(63 downto 0);  --TODO: end time instead?
   --  raw_samples               : std_logic_vector_array_t(40 downto 0)(31 downto 0); --TODO: increase to max
   --end record;
+
+  type esm_pdw_queue_data_t is record
+    sequence_num                : unsigned(ESM_PDW_SEQUENCE_NUM_WIDTH - 1 downto 0);
+    channel                     : unsigned(ESM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+    amplitude_accum             : unsigned(ESM_PDW_AMPLITUDE_ACCUM_WIDTH - 1 downto 0);
+    num_samples                 : unsigned(ESM_PDW_CYCLE_COUNT_WIDTH - 1 downto 0);
+    frequency                   : unsigned(ESM_PDW_IFM_WIDTH - 1 downto 0);
+    pulse_end_time              : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+    sample_buffer_index         : unsigned(ESM_PDW_SAMPLE_BUFFER_INDEX - 1 downto 0);
+  end record;
+  constant ESM_PDW_QUEUE_DATA_WIDTH : natural :=  ESM_PDW_SEQUENCE_NUM_WIDTH + ESM_CHANNEL_INDEX_WIDTH + ESM_PDW_AMPLITUDE_ACCUM_WIDTH + ESM_PDW_CYCLE_COUNT_WIDTH +
+                                                  ESM_PDW_IFM_WIDTH + ESM_TIMESTAMP_WIDTH + ESM_PDW_SAMPLE_BUFFER_INDEX;
 
   type esm_config_data_t is record
     valid                     : std_logic;
@@ -199,6 +216,8 @@ package esm_pkg is
   function unpack(v : std_logic_vector) return esm_message_dwell_entry_t;
   function unpack(v : std_logic_vector) return esm_message_dwell_program_header_t;
   function unpack(v : std_logic_vector) return esm_dwell_instruction_t;
+  --function unpack(v : std_logic_vector) return esm_pdw_queue_data_t;
+  --function pack(v :
 
 end package esm_pkg;
 
