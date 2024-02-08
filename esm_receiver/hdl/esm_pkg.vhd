@@ -184,12 +184,11 @@ package esm_pkg is
   --
   --type esm_message_pdw_t is record
   --  header                    : esm_common_header_t;
-  --  pdw_sequence_num          : unsigned(31 downto 0);
   --  dwell_sequence_num        : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
-  --  dwell_metadata            : esm_dwell_metadata_t; --TODO: remove
+  --  pdw_sequence_num          : unsigned(31 downto 0);
   --  pulse_channel             : unsigned(ESM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   --  pulse_threshold           : unsigned(31 downto 0);
-  --  pulse_amplitude           : unsigned(31 downto 0);
+  --  pulse_power_accum         : unsigned(63 downto 0);
   --  pulse_duration            : unsigned(31 downto 0);  --TODO: early termination flag?
   --  pulse_frequency           : unsigned(31 downto 0);  --TODO: IFM module
   --  pulse_start_time          : unsigned(63 downto 0);  --TODO: end time instead?
@@ -318,10 +317,10 @@ package body esm_pkg is
     r.power_threshold       := v(69 downto 38);
     r.power_accum           := v(117 downto 70);
     r.duration              := v(149 downto 118);
-    r.frequency             := v(181 downto 150);
-    r.pulse_start_time      := v(229 downto 182);
-    r.buffered_frame_index  := v(234 downto 230);
-    r.buffered_frame_valid  := v(235);
+    r.frequency             := v(165 downto 150);
+    r.pulse_start_time      := v(213 downto 166);
+    r.buffered_frame_index  := v(218 downto 214);
+    r.buffered_frame_valid  := v(219);
     return r;
   end function;
 
@@ -334,10 +333,10 @@ package body esm_pkg is
     r(69 downto 38)   := std_logic_vector(r.power_threshold);
     r(117 downto 70)  := std_logic_vector(r.power_accum);
     r(149 downto 118) := std_logic_vector(r.duration);
-    r(181 downto 150) := std_logic_vector(r.frequency);
-    r(229 downto 182) := std_logic_vector(r.pulse_start_time);
-    r(234 downto 230) := std_logic_vector(r.buffered_frame_index);
-    r(235)            := r.buffered_frame_valid;
+    r(165 downto 150) := std_logic_vector(r.frequency);
+    r(213 downto 166) := std_logic_vector(r.pulse_start_time);
+    r(218 downto 214) := std_logic_vector(r.buffered_frame_index);
+    r(219)            := r.buffered_frame_valid;
 
     return r;
   end function;

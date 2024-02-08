@@ -46,7 +46,8 @@ architecture rtl of esm_pdw_decoder is
 
   constant CHANNEL_INDEX_WIDTH        : natural := clog2(NUM_CHANNELS);
   constant THRESHOLD_LATENCY          : natural := 5;
-  constant THRESHOLD_WAIT_CYCLES      : natural := 128;
+  constant THRESHOLD_WAIT_CYCLES      : natural := NUM_CHANNELS * 256;
+  constant DWELL_STOP_WAIT_CYCLES     : natural := NUM_CHANNELS * 4;
   constant IQ_WIDTH                   : natural := 16;
   constant IQ_DELAY                   : natural := 8;
   constant BUFFERED_SAMPLES_PER_FRAME : natural := 40;
@@ -67,6 +68,7 @@ architecture rtl of esm_pdw_decoder is
 
   signal s_state                    : state_t;
   signal r_threshold_wait_count     : unsigned(clog2(THRESHOLD_WAIT_CYCLES) - 1 downto 0);
+  signal r_stop_wait_count          : unsigned(clog2(DWELL_STOP_WAIT_CYCLES) - 1 downto 0);
 
   signal r_dwell_active             : std_logic;
   signal r_dwell_data               : esm_dwell_metadata_t;
@@ -228,6 +230,13 @@ begin
             s_state <= S_ACTIVE;
           end if;
 
+        when S_DWELL_STOP =>
+          if (r_stop_wait_count = (DWELL_STOP_CYCLES - 1)) then
+            s_state <= S_DWELL_DONE;
+          else
+            s_state <= S_DWELL_STOP;
+          end if;
+
         when S_DWELL_DONE =>
           s_state <= S_REPORT_WAIT;
 
@@ -257,6 +266,12 @@ begin
         r_threshold_wait_count <= (others => '0');
       else
         r_threshold_wait_count <= r_threshold_wait_count + 1;
+      end if;
+
+      if (s_state /= S_DWELL_STOP) then
+        r_stop_wait_count <= (others => '0');
+      else
+        r_stop_wait_count <= r_stop_wait_count + 1;
       end if;
     end if;
   end process;
