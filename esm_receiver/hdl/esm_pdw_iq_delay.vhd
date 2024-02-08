@@ -33,30 +33,30 @@ end entity esm_pdw_iq_delay;
 
 architecture rtl of esm_pdw_iq_delay is
 
-  constant DELAY_INDEX_WIDTH    : natural := clog2(DELAY);
-  constant MEM_ADDR_WIDTH       : natural := CHANNEL_INDEX_WIDTH + DELAY_INDEX_WIDTH;
-  constant MEM_DATA_WIDTH       : natural := 2*DATA_WIDTH;
+  constant DELAY_INDEX_WIDTH  : natural := clog2(DELAY);
+  constant MEM_ADDR_WIDTH     : natural := CHANNEL_INDEX_WIDTH + DELAY_INDEX_WIDTH;
+  constant MEM_DATA_WIDTH     : natural := 2*DATA_WIDTH;
 
-  signal m_delay_mem            : std_logic_vector_array_t(2**MEM_ADDR_WIDTH - 1 downto 0)(MEM_DATA_WIDTH - 1 downto 0);
-  signal m_index_mem            : unsigned_array_t(2**CHANNEL_INDEX_WIDTH - 1 downto 0)(DELAY_INDEX_WIDTH - 1 downto 0) := (others => (others => '0'));
+  signal m_delay_mem          : std_logic_vector_array_t(2**MEM_ADDR_WIDTH - 1 downto 0)(MEM_DATA_WIDTH - 1 downto 0);
+  signal m_index_mem          : unsigned_array_t(2**CHANNEL_INDEX_WIDTH - 1 downto 0)(DELAY_INDEX_WIDTH - 1 downto 0) := (others => (others => '0'));
 
-  signal r0_input_ctrl          : channelizer_control_t;
-  signal r0_input_data          : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
-  signal r0_wr_delay_index      : unsigned(DELAY_INDEX_WIDTH - 1 downto 0);
+  signal r0_input_ctrl        : channelizer_control_t;
+  signal r0_input_data        : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+  signal r0_wr_delay_index    : unsigned(DELAY_INDEX_WIDTH - 1 downto 0);
 
-  signal w0_rd_delay_index      : unsigned(DELAY_INDEX_WIDTH - 1 downto 0);
-  signal w0_rd_addr             : unsigned(MEM_ADDR_WIDTH - 1 downto 0);
-  signal w0_wr_addr             : unsigned(MEM_ADDR_WIDTH - 1 downto 0);
-  signal w0_wr_data             : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
+  signal w0_rd_delay_index    : unsigned(DELAY_INDEX_WIDTH - 1 downto 0);
+  signal w0_rd_addr           : unsigned(MEM_ADDR_WIDTH - 1 downto 0);
+  signal w0_wr_addr           : unsigned(MEM_ADDR_WIDTH - 1 downto 0);
+  signal w0_wr_data           : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
 
-  signal r1_input_ctrl          : channelizer_control_t;
-  signal r1_rd_data             : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
+  signal r1_input_ctrl        : channelizer_control_t;
+  signal r1_rd_data           : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
 
-  signal r2_input_ctrl          : channelizer_control_t;
-  signal r2_rd_data             : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
-  signal r3_input_ctrl          : channelizer_control_t;
-  signal r3_rd_data             : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
-  signal r4_input_ctrl          : channelizer_control_t;
+  signal r2_input_ctrl        : channelizer_control_t;
+  signal r2_rd_data           : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
+  signal r3_input_ctrl        : channelizer_control_t;
+  signal r3_rd_data           : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
+  signal r4_input_ctrl        : channelizer_control_t;
   signal r4_rd_data             : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
 
 begin
