@@ -192,6 +192,7 @@ package esm_pkg is
   --end record;
 
   type esm_pdw_queue_data_t is record
+    --TODO: threshold
     sequence_num                : unsigned(ESM_PDW_SEQUENCE_NUM_WIDTH - 1 downto 0);
     channel                     : unsigned(ESM_CHANNEL_INDEX_WIDTH - 1 downto 0);
     amplitude_accum             : unsigned(ESM_PDW_AMPLITUDE_ACCUM_WIDTH - 1 downto 0);

@@ -44,16 +44,21 @@ end entity esm_pdw_decoder;
 
 architecture rtl of esm_pdw_decoder is
 
-  constant CHANNEL_INDEX_WIDTH  : natural := clog2(NUM_CHANNELS);
-  constant THRESHOLD_LATENCY    : natural := 5;
-  constant IQ_WIDTH             : natural := 16;
-  constant IQ_DELAY             : natural := 8;
+  constant CHANNEL_INDEX_WIDTH          : natural := clog2(NUM_CHANNELS);
+  constant THRESHOLD_LATENCY            : natural := 5;
+  constant IQ_WIDTH                     : natural := 16;
+  constant IQ_DELAY                     : natural := 8;
+  constant BUFFERED_FRAMES                : natural := 32;
+  constant BUFFERED_SAMPLES_PER_FRAME     : natural := 40;
+  constant BUFFERED_FRAME_INDEX_WIDTH     : natural := clog2(BUFFERED_FRAMES);
+  constant BUFFERED_SAMPLE_INDEX_WIDTH    : natural := clog2(BUFFERED_SAMPLES_PER_FRAME);
 
-  type state_t is
+  type global_state_t is
   (
     S_IDLE,
     S_THRESHOLD_WAIT,
-
+    S_ACTIVE,
+    S_FLUSH_REPORTS
   );
 
   signal r_rst                  : std_logic;
@@ -64,12 +69,15 @@ architecture rtl of esm_pdw_decoder is
   signal w_threshold_factor     : unsigned(ESM_THRESHOLD_FACTOR_WIDTH - 1 downto 0);
 
   signal w_piped_ctrl           : channelizer_control_t;
-  --signal w_piped_data           : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);  --TODO
+  --signal w_piped_data           : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);  --TODO: IFM?
   signal w_piped_pwr            : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal w_piped_threshold      : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   signal w_delayed_iq_ctrl      : channelizer_control_t;
   signal w_delayed_iq_data      : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
+
+  signal w_sample_buffer_underflow  : std_logic;  --TODO: use
+  signal w_sample_buffer_overflow   : std_logic;  --TODO: use
 
 begin
 
@@ -107,7 +115,7 @@ begin
     Input_pwr               => Input_pwr,
 
     Output_ctrl             => w_piped_ctrl,
-    Output_data             => open, --w_piped_data, TODO
+    Output_data             => open, --w_piped_data, TODO: IFM?
     Output_pwr              => w_piped_pwr,
     Output_threshold        => w_piped_threshold
   );
