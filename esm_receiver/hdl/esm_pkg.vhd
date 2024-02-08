@@ -5,6 +5,9 @@ library ieee;
 library common_lib;
   use common_lib.common_pkg.all;
 
+library dsp_lib;
+  use dsp_lib.dsp_pkg.all;
+
 package esm_pkg is
 
   constant ESM_CONTROL_MAGIC_NUM                        : std_logic_vector(31 downto 0) := x"45534D43";
@@ -30,7 +33,7 @@ package esm_pkg is
 
   constant ESM_NUM_CHANNELS_NARROW                      : natural := 64;
   constant ESM_NUM_CHANNELS_WIDE                        : natural := 8;
-  constant ESM_CHANNEL_INDEX_WIDTH                      : natural := clog2(ESM_NUM_CHANNELS_WIDE);
+  constant ESM_CHANNEL_INDEX_WIDTH                      : natural := clog2(ESM_NUM_CHANNELS_NARROW);
 
   constant ESM_NUM_FAST_LOCK_PROFILES                   : natural := 8;
   constant ESM_FAST_LOCK_PROFILE_INDEX_WIDTH            : natural := clog2(ESM_NUM_FAST_LOCK_PROFILES);
@@ -47,11 +50,13 @@ package esm_pkg is
   constant ESM_THRESHOLD_FILTER_FACTOR                  : natural := 7;
   constant ESM_THRESHOLD_FILTER_DELAY                   : natural := 256;
   constant ESM_PDW_SEQUENCE_NUM_WIDTH                   : natural := 32;
-  constant ESM_PDW_AMPLITUDE_ACCUM_WIDTH                : natural := 48;
+  constant ESM_PDW_POWER_ACCUM_WIDTH                    : natural := 48;
   constant ESM_PDW_CYCLE_COUNT_WIDTH                    : natural := 32;
   constant ESM_PDW_IFM_WIDTH                            : natural := 16;
-  constant ESM_PDW_SAMPLE_BUFFER_DEPTH                  : natural := 2048;
-  constant ESM_PDW_SAMPLE_BUFFER_INDEX                  : natural := clog2(ESM_PDW_SAMPLE_BUFFER_DEPTH);
+  constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH            : natural := 32;
+  constant ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH      : natural := clog2(ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH);
+  constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_DEPTH           : natural := 64;
+  constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH     : natural := clog2(ESM_PDW_SAMPLE_BUFFER_SAMPLE_DEPTH);
 
   --type esm_common_header_t is record
   --  magic_num                 : std_logic_vector(31 downto 0);
@@ -191,18 +196,31 @@ package esm_pkg is
   --  raw_samples               : std_logic_vector_array_t(40 downto 0)(31 downto 0); --TODO: increase to max
   --end record;
 
-  type esm_pdw_queue_data_t is record
-    --TODO: threshold
+  type esm_pdw_sample_buffer_req_t is record
+    frame_index   : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
+    frame_read    : std_logic;
+  end record;
+
+  type esm_pdw_sample_buffer_ack_t is record
+    sample_index  : unsigned(ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH - 1 downto 0);
+    sample_last   : std_logic;
+    sample_valid  : std_logic;
+  end record;
+
+  type esm_pdw_fifo_data_t is record
     sequence_num                : unsigned(ESM_PDW_SEQUENCE_NUM_WIDTH - 1 downto 0);
     channel                     : unsigned(ESM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-    amplitude_accum             : unsigned(ESM_PDW_AMPLITUDE_ACCUM_WIDTH - 1 downto 0);
-    num_samples                 : unsigned(ESM_PDW_CYCLE_COUNT_WIDTH - 1 downto 0);
+    power_threshold             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+    power_accum                 : unsigned(ESM_PDW_POWER_ACCUM_WIDTH - 1 downto 0);
+    duration                    : unsigned(ESM_PDW_CYCLE_COUNT_WIDTH - 1 downto 0);
     frequency                   : unsigned(ESM_PDW_IFM_WIDTH - 1 downto 0);
-    pulse_end_time              : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
-    sample_buffer_index         : unsigned(ESM_PDW_SAMPLE_BUFFER_INDEX - 1 downto 0);
+    pulse_start_time            : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+    buffered_frame_index        : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
+    buffered_frame_valid        : std_logic;
   end record;
-  constant ESM_PDW_QUEUE_DATA_WIDTH : natural :=  ESM_PDW_SEQUENCE_NUM_WIDTH + ESM_CHANNEL_INDEX_WIDTH + ESM_PDW_AMPLITUDE_ACCUM_WIDTH + ESM_PDW_CYCLE_COUNT_WIDTH +
-                                                  ESM_PDW_IFM_WIDTH + ESM_TIMESTAMP_WIDTH + ESM_PDW_SAMPLE_BUFFER_INDEX;
+  constant ESM_PDW_FIFO_DATA_WIDTH : natural :=  ESM_PDW_SEQUENCE_NUM_WIDTH + ESM_CHANNEL_INDEX_WIDTH + CHAN_POWER_WIDTH + ESM_PDW_POWER_ACCUM_WIDTH +
+                                                 ESM_PDW_CYCLE_COUNT_WIDTH + ESM_PDW_IFM_WIDTH + ESM_TIMESTAMP_WIDTH + ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH +
+                                                 1;
 
   type esm_config_data_t is record
     valid                     : std_logic;
@@ -217,8 +235,8 @@ package esm_pkg is
   function unpack(v : std_logic_vector) return esm_message_dwell_entry_t;
   function unpack(v : std_logic_vector) return esm_message_dwell_program_header_t;
   function unpack(v : std_logic_vector) return esm_dwell_instruction_t;
-  --function unpack(v : std_logic_vector) return esm_pdw_queue_data_t;
-  --function pack(v :
+  function unpack(v : std_logic_vector) return esm_pdw_fifo_data_t;
+  function pack(v : esm_pdw_fifo_data_t) return std_logic_vector;
 
 end package esm_pkg;
 
@@ -287,5 +305,42 @@ package body esm_pkg is
     r.next_instruction_index  := unsigned(v(28 downto 24));
     return r;
   end function;
+
+  function unpack(v : std_logic_vector) return esm_pdw_fifo_data_t is
+    variable r : esm_pdw_fifo_data_t;
+  begin
+    assert (v'length = ESM_PDW_FIFO_DATA_WIDTH)
+      report "Invalid length."
+      severity failure;
+
+    r.sequence_num          := v(31 downto 0);
+    r.channel               := v(37 downto 32);
+    r.power_threshold       := v(69 downto 38);
+    r.power_accum           := v(117 downto 70);
+    r.duration              := v(149 downto 118);
+    r.frequency             := v(181 downto 150);
+    r.pulse_start_time      := v(229 downto 182);
+    r.buffered_frame_index  := v(234 downto 230);
+    r.buffered_frame_valid  := v(235);
+    return r;
+  end function;
+
+  function pack(v : esm_pdw_fifo_data_t) return std_logic_vector is
+    variable r : std_logic_vector(ESM_PDW_FIFO_DATA_WIDTH - 1 downto 0);
+  begin
+
+    r(31 downto 0)    := std_logic_vector(r.sequence_num);
+    r(37 downto 32)   := std_logic_vector(r.channel);
+    r(69 downto 38)   := std_logic_vector(r.power_threshold);
+    r(117 downto 70)  := std_logic_vector(r.power_accum);
+    r(149 downto 118) := std_logic_vector(r.duration);
+    r(181 downto 150) := std_logic_vector(r.frequency);
+    r(229 downto 182) := std_logic_vector(r.pulse_start_time);
+    r(234 downto 230) := std_logic_vector(r.buffered_frame_index);
+    r(235)            := r.buffered_frame_valid;
+
+    return r;
+  end function;
+
 
 end package body esm_pkg;

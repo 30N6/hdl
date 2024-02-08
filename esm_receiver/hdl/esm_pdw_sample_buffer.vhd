@@ -15,30 +15,25 @@ library esm_lib;
 
 entity esm_pdw_sample_buffer is
 generic (
-  DATA_WIDTH          : natural;
-  FRAME_INDEX_WIDTH   : natural;
-  SAMPLE_INDEX_WIDTH  : natural;
-  SAMPLES_PER_FRAME   : natural
+  DATA_WIDTH        : natural;
+  SAMPLES_PER_FRAME : natural
 );
 port (
   Clk                 : in  std_logic;
   Rst                 : in  std_logic;
 
   Buffer_full         : out std_logic;
-  Buffer_next_index   : out unsigned(FRAME_INDEX_WIDTH - 1 downto 0);
+  Buffer_next_index   : out unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
   Buffer_next_ack     : in  std_logic;
 
   Input_valid         : in  std_logic;
-  Input_frame_index   : in  unsigned(FRAME_INDEX_WIDTH - 1 downto 0);
-  Input_sample_index  : in  unsigned(SAMPLE_INDEX_WIDTH - 1 downto 0);
+  Input_frame_index   : in  unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
+  Input_sample_index  : in  unsigned(ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH - 1 downto 0);
   Input_data          : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
 
-  Output_frame_index  : in  unsigned(FRAME_INDEX_WIDTH - 1 downto 0);
-  Output_frame_read   : in  std_logic;
-  Output_sample_index : out unsigned(SAMPLE_INDEX_WIDTH - 1 downto 0);
+  Output_frame_req    : in  esm_pdw_sample_buffer_req_t;
+  Output_frame_ack    : out esm_pdw_sample_buffer_ack_t;
   Output_sample_data  : out signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
-  Output_sample_last  : out std_logic;
-  Output_sample_valid : out std_logic;
 
   Error_underflow     : out std_logic;
   Error_overflow      : out std_logic
@@ -47,7 +42,7 @@ end entity esm_pdw_sample_buffer;
 
 architecture rtl of esm_pdw_sample_buffer is
 
-  constant MEM_ADDR_WIDTH         : natural := FRAME_INDEX_WIDTH + SAMPLE_INDEX_WIDTH;
+  constant MEM_ADDR_WIDTH         : natural := ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH + ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH;
   constant MEM_DATA_WIDTH         : natural := 2*DATA_WIDTH;
 
   signal m_buffer                 : std_logic_vector_array_t(2**MEM_ADDR_WIDTH - 1 downto 0)(MEM_DATA_WIDTH - 1 downto 0);
@@ -57,17 +52,17 @@ architecture rtl of esm_pdw_sample_buffer is
   signal w_rd_addr                : unsigned(MEM_ADDR_WIDTH - 1 downto 0);
   signal r_rd_data                : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
 
-  signal r_buffer_pending         : std_logic_vector(2**FRAME_INDEX_WIDTH - 1 downto 0);
+  signal r_buffer_pending         : std_logic_vector(2**ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
   signal w_buffer_full            : std_logic;
-  signal w_buffer_next_index      : unsigned(FRAME_INDEX_WIDTH - 1 downto 0);
+  signal w_buffer_next_index      : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
 
   signal r_output_valid           : std_logic;
-  signal r_output_frame_index     : unsigned(FRAME_INDEX_WIDTH - 1 downto 0);
-  signal r_output_sample_index    : unsigned(SAMPLE_INDEX_WIDTH - 1 downto 0);
+  signal r_output_frame_index     : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
+  signal r_output_sample_index    : unsigned(ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH - 1 downto 0);
   signal r_output_sample_last     : std_logic;
 
   signal r_output_valid_d         : std_logic;
-  signal r_output_sample_index_d  : unsigned(SAMPLE_INDEX_WIDTH - 1 downto 0);
+  signal r_output_sample_index_d  : unsigned(ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH - 1 downto 0);
   signal r_output_sample_last_d   : std_logic;
 
 begin
@@ -85,12 +80,12 @@ begin
   end process;
 
   process(all)
-    variable v_next_index : unsigned(FRAME_INDEX_WIDTH - 1 downto 0);
+    variable v_next_index : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
   begin
     v_next_index := (others => '0');
-    for i in 0 to (2**FRAME_INDEX_WIDTH - 1) loop
+    for i in 0 to (2**ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1) loop
       if (r_buffer_pending(i) = '0') then
-        v_next_index := to_unsigned(i, FRAME_INDEX_WIDTH);
+        v_next_index := to_unsigned(i, ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH);
         exit;
       end if;
     end loop;
@@ -127,9 +122,9 @@ begin
         r_output_frame_index  <= (others => '-');
         r_output_sample_index <= (others => '-');
       else
-        if (Output_frame_read = '1') then
+        if (Output_frame_req.frame_read = '1') then
           r_output_valid        <= '1';
-          r_output_frame_index  <= Output_frame_index;
+          r_output_frame_index  <= Output_frame_req.frame_index;
           r_output_sample_index <= (others => '0');
           r_output_sample_last  <= '0';
         elsif (r_output_valid = '1') then
@@ -162,18 +157,18 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Output_sample_data(1) <= signed(r_rd_data(MEM_DATA_WIDTH - 1 downto DATA_WIDTH));
-      Output_sample_data(0) <= signed(r_rd_data(DATA_WIDTH - 1 downto 0));
-      Output_sample_index   <= r_output_sample_index_d;
-      Output_sample_last    <= r_output_sample_last_d;
-      Output_sample_valid   <= r_output_valid_d;
+      Output_sample_data(1)           <= signed(r_rd_data(MEM_DATA_WIDTH - 1 downto DATA_WIDTH));
+      Output_sample_data(0)           <= signed(r_rd_data(DATA_WIDTH - 1 downto 0));
+      Output_frame_ack.sample_index   <= r_output_sample_index_d;
+      Output_frame_ack.sample_last    <= r_output_sample_last_d;
+      Output_frame_ack.sample_valid   <= r_output_valid_d;
     end if;
   end process;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Error_underflow <= Output_frame_read and not(r_buffer_pending(to_integer(Output_frame_index)));
+      Error_underflow <= Output_frame_req.frame_read and not(r_buffer_pending(to_integer(Output_frame_req.frame_index)));
       Error_overflow  <= Buffer_next_ack and w_buffer_full;
     end if;
   end process;
