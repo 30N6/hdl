@@ -312,14 +312,14 @@ package body esm_pkg is
       report "Invalid length."
       severity failure;
 
-    r.sequence_num          := v(31 downto 0);
-    r.channel               := v(37 downto 32);
-    r.power_threshold       := v(69 downto 38);
-    r.power_accum           := v(117 downto 70);
-    r.duration              := v(149 downto 118);
-    r.frequency             := v(165 downto 150);
-    r.pulse_start_time      := v(213 downto 166);
-    r.buffered_frame_index  := v(218 downto 214);
+    r.sequence_num          := unsigned(v(31 downto 0));
+    r.channel               := unsigned(v(37 downto 32));
+    r.power_threshold       := unsigned(v(69 downto 38));
+    r.power_accum           := unsigned(v(117 downto 70));
+    r.duration              := unsigned(v(149 downto 118));
+    r.frequency             := unsigned(v(165 downto 150));
+    r.pulse_start_time      := unsigned(v(213 downto 166));
+    r.buffered_frame_index  := unsigned(v(218 downto 214));
     r.buffered_frame_valid  := v(219);
     return r;
   end function;
@@ -328,15 +328,15 @@ package body esm_pkg is
     variable r : std_logic_vector(ESM_PDW_FIFO_DATA_WIDTH - 1 downto 0);
   begin
 
-    r(31 downto 0)    := std_logic_vector(r.sequence_num);
-    r(37 downto 32)   := std_logic_vector(r.channel);
-    r(69 downto 38)   := std_logic_vector(r.power_threshold);
-    r(117 downto 70)  := std_logic_vector(r.power_accum);
-    r(149 downto 118) := std_logic_vector(r.duration);
-    r(165 downto 150) := std_logic_vector(r.frequency);
-    r(213 downto 166) := std_logic_vector(r.pulse_start_time);
-    r(218 downto 214) := std_logic_vector(r.buffered_frame_index);
-    r(219)            := r.buffered_frame_valid;
+    r(31 downto 0)    := std_logic_vector(v.sequence_num);
+    r(37 downto 32)   := std_logic_vector(v.channel);
+    r(69 downto 38)   := std_logic_vector(v.power_threshold);
+    r(117 downto 70)  := std_logic_vector(v.power_accum);
+    r(149 downto 118) := std_logic_vector(v.duration);
+    r(165 downto 150) := std_logic_vector(v.frequency);
+    r(213 downto 166) := std_logic_vector(v.pulse_start_time);
+    r(218 downto 214) := std_logic_vector(v.buffered_frame_index);
+    r(219)            := v.buffered_frame_valid;
 
     return r;
   end function;
