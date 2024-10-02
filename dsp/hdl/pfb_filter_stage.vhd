@@ -59,6 +59,14 @@ architecture rtl of pfb_filter_stage is
   signal r2_input_prev_iq   : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
   signal r2_coef_data       : signed(COEF_WIDTH - 1 downto 0);
 
+  signal r3_input_valid     : std_logic_vector(1 downto 0);
+  signal r3_input_index     : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r3_input_last      : std_logic;
+  signal r3_input_sub_index : unsigned(0 downto 0);
+  signal r3_input_curr_iq   : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r3_input_prev_iq   : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  signal r3_coef_data       : signed(COEF_WIDTH - 1 downto 0);
+
   signal w_mult_valid       : std_logic;
   signal w_mult_index       : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal w_mult_sub_index   : unsigned(0 downto 0);
@@ -120,6 +128,19 @@ begin
     end if;
   end process;
 
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r3_input_valid      <= r2_input_valid;
+      r3_input_index      <= r2_input_index;
+      r3_input_sub_index  <= r2_input_sub_index;
+      r3_input_last       <= r2_input_last;
+      r3_input_curr_iq    <= r2_input_curr_iq;
+      r3_coef_data        <= r2_coef_data;
+      r3_input_prev_iq    <= r2_input_prev_iq;
+    end if;
+  end process;
+
   i_mult : entity dsp_lib.pfb_filter_mult
   generic map (
     INDEX_WIDTH         => CHANNEL_INDEX_WIDTH,
@@ -134,13 +155,13 @@ begin
   port map (
     Clk             => Clk,
 
-    Input_valid     => r2_input_valid(1),
-    Input_index     => r2_input_index,
-    Input_sub_index => r2_input_sub_index,
-    Input_last      => r2_input_last,
-    Input_a         => r2_input_curr_iq(1),
-    Input_b         => r2_coef_data,
-    Input_c         => r2_input_prev_iq(1),
+    Input_valid     => r3_input_valid(1),
+    Input_index     => r3_input_index,
+    Input_sub_index => r3_input_sub_index,
+    Input_last      => r3_input_last,
+    Input_a         => r3_input_curr_iq(1),
+    Input_b         => r3_coef_data,
+    Input_c         => r3_input_prev_iq(1),
 
     Output_valid      => w_mult_valid,
     Output_index      => w_mult_index,
