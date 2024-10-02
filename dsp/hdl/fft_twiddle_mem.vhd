@@ -100,12 +100,15 @@ architecture rtl of fft_twiddle_mem is
   constant W_C_PLUS_D           : signed_array_t(0 to NUM_CYCLES-1)(DATA_WIDTH     downto 0) := initialize_w_c_plus_d;
   constant W_D_MINUS_C          : signed_array_t(0 to NUM_CYCLES-1)(DATA_WIDTH     downto 0) := initialize_w_d_minus_c;
 
-  signal w_read_data_c          : signed(DATA_WIDTH - 1 downto 0);
-  signal w_read_data_c_plus_d   : signed(DATA_WIDTH downto 0);
-  signal w_read_data_d_minus_c  : signed(DATA_WIDTH downto 0);
-  signal r_read_data_c          : signed(DATA_WIDTH - 1 downto 0);
-  signal r_read_data_c_plus_d   : signed(DATA_WIDTH downto 0);
-  signal r_read_data_d_minus_c  : signed(DATA_WIDTH downto 0);
+  signal w0_read_data_c         : signed(DATA_WIDTH - 1 downto 0);
+  signal w0_read_data_c_plus_d  : signed(DATA_WIDTH downto 0);
+  signal w0_read_data_d_minus_c : signed(DATA_WIDTH downto 0);
+  signal r1_read_data_c         : signed(DATA_WIDTH - 1 downto 0);
+  signal r1_read_data_c_plus_d  : signed(DATA_WIDTH downto 0);
+  signal r1_read_data_d_minus_c : signed(DATA_WIDTH downto 0);
+  signal r2_read_data_c         : signed(DATA_WIDTH - 1 downto 0);
+  signal r2_read_data_c_plus_d  : signed(DATA_WIDTH downto 0);
+  signal r2_read_data_d_minus_c : signed(DATA_WIDTH downto 0);
 
 begin
 
@@ -113,32 +116,32 @@ begin
     report "Invalid stage index"
     severity failure;
 
-  assert ((LATENCY = 0) or (LATENCY = 1) or (LATENCY = 2))
-    report "Invalid latency"
+  assert (LATENCY <= 3)
+    report "LATENCY must be 3 or less."
     severity failure;
 
   assert (DATA_WIDTH <= INIT_WIDTH_C)
     report "Unsupported data width"
     severity failure;
 
-  w_read_data_c         <= W_C(to_integer(Read_index));
-  w_read_data_c_plus_d  <= W_C_PLUS_D(to_integer(Read_index));
-  w_read_data_d_minus_c <= W_D_MINUS_C(to_integer(Read_index));
+  w0_read_data_c         <= W_C(to_integer(Read_index));
+  w0_read_data_c_plus_d  <= W_C_PLUS_D(to_integer(Read_index));
+  w0_read_data_d_minus_c <= W_D_MINUS_C(to_integer(Read_index));
 
   g_output : if (LATENCY = 0) generate
 
-    Read_data_c         <= w_read_data_c;
-    Read_data_c_plus_d  <= w_read_data_c_plus_d;
-    Read_data_d_minus_c <= w_read_data_d_minus_c;
+    Read_data_c         <= w0_read_data_c;
+    Read_data_c_plus_d  <= w0_read_data_c_plus_d;
+    Read_data_d_minus_c <= w0_read_data_d_minus_c;
 
   elsif (LATENCY = 1) generate
 
     process(Clk)
     begin
       if rising_edge(Clk) then
-        Read_data_c         <= w_read_data_c;
-        Read_data_c_plus_d  <= w_read_data_c_plus_d;
-        Read_data_d_minus_c <= w_read_data_d_minus_c;
+        Read_data_c         <= w0_read_data_c;
+        Read_data_c_plus_d  <= w0_read_data_c_plus_d;
+        Read_data_d_minus_c <= w0_read_data_d_minus_c;
       end if;
     end process;
 
@@ -147,18 +150,42 @@ begin
     process(Clk)
     begin
       if rising_edge(Clk) then
-        r_read_data_c         <= w_read_data_c;
-        r_read_data_c_plus_d  <= w_read_data_c_plus_d;
-        r_read_data_d_minus_c <= w_read_data_d_minus_c;
+        r1_read_data_c         <= w0_read_data_c;
+        r1_read_data_c_plus_d  <= w0_read_data_c_plus_d;
+        r1_read_data_d_minus_c <= w0_read_data_d_minus_c;
       end if;
     end process;
 
     process(Clk)
     begin
       if rising_edge(Clk) then
-        Read_data_c         <= r_read_data_c;
-        Read_data_c_plus_d  <= r_read_data_c_plus_d;
-        Read_data_d_minus_c <= r_read_data_d_minus_c;
+        Read_data_c         <= r1_read_data_c;
+        Read_data_c_plus_d  <= r1_read_data_c_plus_d;
+        Read_data_d_minus_c <= r1_read_data_d_minus_c;
+      end if;
+    end process;
+
+  elsif (LATENCY = 3) generate
+
+    process(Clk)
+    begin
+      if rising_edge(Clk) then
+        r1_read_data_c         <= w0_read_data_c;
+        r1_read_data_c_plus_d  <= w0_read_data_c_plus_d;
+        r1_read_data_d_minus_c <= w0_read_data_d_minus_c;
+
+        r2_read_data_c         <= r1_read_data_c;
+        r2_read_data_c_plus_d  <= r1_read_data_c_plus_d;
+        r2_read_data_d_minus_c <= r1_read_data_d_minus_c;
+      end if;
+    end process;
+
+    process(Clk)
+    begin
+      if rising_edge(Clk) then
+        Read_data_c         <= r2_read_data_c;
+        Read_data_c_plus_d  <= r2_read_data_c_plus_d;
+        Read_data_d_minus_c <= r2_read_data_d_minus_c;
       end if;
     end process;
 

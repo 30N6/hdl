@@ -39,7 +39,7 @@ architecture rtl of fft_radix2_stage is
   constant BUFFER_DATA_WIDTH      : natural := 2*INPUT_DATA_WIDTH;
   constant TWIDDLE_DATA_WIDTH     : natural := 17;
   constant TWIDDLE_FRAC_WIDTH     : natural := 16;
-  constant MEM_READ_LATENCY       : natural := 2;
+  constant MEM_READ_LATENCY       : natural := 3; -- third stage to help timing into DSP block
   constant OUTPUT_STAGE_LATENCY   : natural := 6;
   constant OUTPUT_PIPE_DEPTH      : natural := MEM_READ_LATENCY + OUTPUT_STAGE_LATENCY;
   constant NUM_PAGES              : natural := 2;
