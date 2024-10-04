@@ -29,7 +29,8 @@ package esm_pkg is
 
   constant ESM_REPORT_MESSAGE_TYPE_DWELL_COMPLETE_INFO  : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"10"; --TODO: unused?
   constant ESM_REPORT_MESSAGE_TYPE_DWELL_STATS          : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"11";
-  constant ESM_REPORT_MESSAGE_TYPE_PDW                  : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"20";
+  constant ESM_REPORT_MESSAGE_TYPE_PDW_PULSE            : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"20";
+  constant ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY          : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"21";
 
   constant ESM_NUM_CHANNELS_NARROW                      : natural := 64;
   constant ESM_NUM_CHANNELS_WIDE                        : natural := 8;
@@ -46,12 +47,6 @@ package esm_pkg is
   constant ESM_DWELL_SEQUENCE_NUM_WIDTH                 : natural := 32;
   constant ESM_TIMESTAMP_WIDTH                          : natural := 48;
   constant ESM_THRESHOLD_WIDTH                          : natural := 32;
-
-  --constant ESM_THRESHOLD_FACTOR_WIDTH                   : natural := 16;
-  --constant ESM_THRESHOLD_FRAC_WIDTH                     : natural := 8;
-  --constant ESM_THRESHOLD_FILTER_FACTOR                  : natural := 7;
-  --constant ESM_THRESHOLD_FILTER_DELAY                   : natural := 256;
-
   constant ESM_PDW_SEQUENCE_NUM_WIDTH                   : natural := 32;
   constant ESM_PDW_POWER_ACCUM_WIDTH                    : natural := 48;
   constant ESM_PDW_CYCLE_COUNT_WIDTH                    : natural := 32;

@@ -45,7 +45,6 @@ end entity esm_pdw_encoder;
 architecture rtl of esm_pdw_encoder is
 
   constant CHANNEL_INDEX_WIDTH        : natural := clog2(NUM_CHANNELS);
-  constant THRESHOLD_WAIT_CYCLES      : natural := NUM_CHANNELS * 256;
   constant DWELL_STOP_WAIT_CYCLES     : natural := NUM_CHANNELS * 4;
   constant IQ_WIDTH                   : natural := 16;
   constant IQ_DELAY_SAMPLES           : natural := 8;
@@ -57,7 +56,6 @@ architecture rtl of esm_pdw_encoder is
   type state_t is
   (
     S_IDLE,
-    S_THRESHOLD_WAIT,
     S_ACTIVE,
     S_DWELL_DONE,
     S_FLUSH_REPORTS
@@ -67,7 +65,6 @@ architecture rtl of esm_pdw_encoder is
   signal r_enable                   : std_logic;
 
   signal s_state                    : state_t;
-  signal r_threshold_wait_count     : unsigned(clog2(THRESHOLD_WAIT_CYCLES) - 1 downto 0);
   signal r_stop_wait_count          : unsigned(clog2(DWELL_STOP_WAIT_CYCLES) - 1 downto 0);
   signal r_clear_index              : unsigned(clog2(NUM_CHANNELS) - 1 downto 0);
 
@@ -184,16 +181,9 @@ begin
         case s_state is
         when S_IDLE =>
           if ((r_enable = '1') and (r_dwell_active = '1')) then
-            s_state <= S_THRESHOLD_WAIT;
-          else
-            s_state <= S_IDLE;
-          end if;
-
-        when S_THRESHOLD_WAIT =>
-          if (r_threshold_wait_count = (THRESHOLD_WAIT_CYCLES - 1)) then
             s_state <= S_ACTIVE;
           else
-            s_state <= S_THRESHOLD_WAIT;
+            s_state <= S_IDLE;
           end if;
 
         when S_ACTIVE =>
@@ -235,12 +225,6 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (s_state /= S_THRESHOLD_WAIT) then
-        r_threshold_wait_count <= (others => '0');
-      else
-        r_threshold_wait_count <= r_threshold_wait_count + 1;
-      end if;
-
       if (s_state /= S_DWELL_STOP) then
         r_stop_wait_count <= (others => '0');
       else
@@ -257,7 +241,7 @@ begin
 
   w_dwell_done <= to_stdlogic(s_state = S_DWELL_DONE);
 
-  i_reporter : entity esm_lib.esm_dwell_reporter
+  i_reporter : entity esm_lib.esm_pdw_reporter
   generic map (
     AXI_DATA_WIDTH      => AXI_DATA_WIDTH,
     CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,

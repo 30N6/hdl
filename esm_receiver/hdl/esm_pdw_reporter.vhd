@@ -55,14 +55,19 @@ architecture rtl of esm_pdw_reporter is
   (
     S_IDLE,
 
-    S_START_NEW,
-    S_START_CONTINUED,
+    S_CHECK_START,
 
-    S_HEADER_0,
-    S_HEADER_1,
-    S_HEADER_2,
+    S_SUMMARY_HEADER_0,
+    S_SUMMARY_HEADER_1,
+    S_SUMMARY_HEADER_2,
+    S_SUMMARY_PULSE_COUNT,
+    S_SUMMARY_PAD,
+    S_SUMMARY_DONE,
 
-    S_DWELL_SEQ_NUM,
+    S_PULSE_HEADER_0,
+    S_PULSE_HEADER_1,
+    S_PULSE_HEADER_2,
+    S_PULSE_DWELL_SEQ_NUM,
     S_PULSE_SEQ_NUM,
     S_PULSE_CHANNEL,
     S_PULSE_POWER_ACCUM_0,
@@ -71,13 +76,13 @@ architecture rtl of esm_pdw_reporter is
     S_PULSE_FREQUENCY,
     S_PULSE_START_TIME_0,
     S_PULSE_START_TIME_1,
+    S_PULSE_PAD,
+    S_PULSE_DONE,
 
     S_BUFFER_READ,
     S_BUFFERED_SAMPLE,
-
-    S_PAD,
     S_PDW_READ,
-    S_DONE,
+
     S_REPORT_ACK
   );
 
@@ -99,6 +104,8 @@ architecture rtl of esm_pdw_reporter is
   signal r_fifo_partial_0_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   signal r_fifo_partial_1_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
 
+  signal r_pulse_count          : unsigned(15 downto 0);
+
 begin
 
   assert (AXI_DATA_WIDTH = 32)
@@ -114,28 +121,27 @@ begin
         case s_state is
         when S_IDLE =>
           if (Dwell_done = '1') then
-            s_state <= S_START;
+            s_state <= S_CHECK_START;
           else
             s_state <= S_IDLE;
           end if;
 
-        when S_START =>
+        when S_CHECK_START =>
           if (Pdw_valid = '0') then
-            s_state <= S_IDLE;
+            s_state <= S_SUMMARY_HEADER_0;
           elsif (w_fifo_almost_full = '0') then
-            s_state <= S_HEADER_0;
+            s_state <= S_PULSE_HEADER_0;
           else
-            s_state <= S_START;
+            s_state <= S_CHECK_START;
           end if;
 
-        when S_HEADER_0 =>
-          s_state <= S_HEADER_1;
-        when S_HEADER_1 =>
-          s_state <= S_HEADER_2;
-        when S_HEADER_2 =>
-          s_state <= S_DWELL_SEQ_NUM;
-
-        when S_DWELL_SEQ_NUM =>
+        when S_PULSE_HEADER_0 =>
+          s_state <= S_PULSE_HEADER_1;
+        when S_PULSE_HEADER_1 =>
+          s_state <= S_PULSE_HEADER_2;
+        when S_PULSE_HEADER_2 =>
+          s_state <= S_PULSE_DWELL_SEQ_NUM;
+        when S_PULSE_DWELL_SEQ_NUM =>
           s_state <= S_PULSE_SEQ_NUM;
         when S_PULSE_SEQ_NUM =>
           s_state <= S_PULSE_CHANNEL;
@@ -157,7 +163,7 @@ begin
           if (Pdw_data.buffered_frame_valid = '1') then
             s_state <= S_BUFFER_READ;
           else
-            s_state <= S_PAD;
+            s_state <= S_PULSE_PAD;
           end if;
 
         when S_BUFFER_READ =>
@@ -166,7 +172,7 @@ begin
         when S_BUFFERED_SAMPLE =>
           if ((Buffered_frame_ack.sample_valid = '1') and (Buffered_frame_ack.sample_last = '1')) then
             if (r_words_in_msg < (MAX_WORDS_PER_PACKET - 1)) then
-              s_state <= S_PAD;
+              s_state <= S_PULSE_PAD;
             else
               s_state <= S_PDW_READ;
             end if;
@@ -174,22 +180,36 @@ begin
             s_state <= S_BUFFERED_SAMPLE;
           end if;
 
-        when S_PAD =>
+        when S_PULSE_PAD =>
           if (r_words_in_msg = (MAX_WORDS_PER_PACKET - 1)) then
             s_state <= S_PDW_READ;
           else
-            s_state <= S_PAD;
+            s_state <= S_PULSE_PAD;
           end if;
 
         when S_PDW_READ =>
-          s_state <= S_DONE;
+          s_state <= S_PULSE_DONE;
 
-        when S_DONE =>
-          if (Pdw_valid = '1') then
-            s_state <= S_START;
+        when S_PULSE_DONE =>
+          s_state <= S_CHECK_START;
+
+        when S_SUMMARY_HEADER_0 =>
+          s_state <= S_SUMMARY_HEADER_1;
+        when S_SUMMARY_HEADER_1 =>
+          s_state <= S_SUMMARY_HEADER_2;
+        when S_SUMMARY_HEADER_2 =>
+          s_state <= S_SUMMARY_PULSE_COUNT;
+        when S_SUMMARY_PULSE_COUNT =>
+          s_state <= S_SUMMARY_PAD;
+        when S_SUMMARY_PAD =>
+          if (r_words_in_msg = (MAX_WORDS_PER_PACKET - 1)) then
+            s_state <= S_SUMMARY_DONE;
           else
-            s_state <= S_REPORT_ACK;
+            s_state <= S_SUMMARY_PAD;
           end if;
+
+        when S_SUMMARY_DONE =>
+          s_state <= S_REPORT_ACK;
 
         when S_REPORT_ACK =>
           s_state <= S_IDLE;
@@ -210,7 +230,7 @@ begin
       if (Rst = '1') then
         r_packet_seq_num <= (others => '0');
       else
-        if (s_state = S_DONE) then
+        if ((s_state = S_PULSE_DONE) or (s_state = S_SUMMARY_DONE)) then
           r_packet_seq_num <= r_packet_seq_num + 1;
         end if;
       end if;
@@ -221,6 +241,19 @@ begin
   begin
     if rising_edge(Clk) then
       if (s_state = S_IDLE) then
+        r_pulse_count <= (others => '0');
+      elsif (s_state = S_PULSE_DONE) then
+        if (and_reduce(r_pulse_count) = '0') then
+          r_pulse_count <= r_pulse_count + 1;
+        end if;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (s_state = S_CHECK_START) then
         r_words_in_msg <= (others => '0');
       elsif (w_fifo_valid = '1') then
         r_words_in_msg <= r_words_in_msg + 1;
@@ -236,19 +269,19 @@ begin
     w_fifo_partial_1_data   <= (others => '0');
 
     case s_state is
-    when S_HEADER_0 =>
+    when S_PULSE_HEADER_0 =>
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= ESM_REPORT_MAGIC_NUM;
 
-    when S_HEADER_1 =>
+    when S_PULSE_HEADER_1 =>
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= std_logic_vector(r_packet_seq_num);
 
-    when S_HEADER_2 =>
+    when S_PULSE_HEADER_2 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(MODULE_ID) & std_logic_vector(ESM_REPORT_MESSAGE_TYPE_DWELL_STATS) & x"0000";
+      w_fifo_partial_0_data   <= std_logic_vector(MODULE_ID) & std_logic_vector(ESM_REPORT_MESSAGE_TYPE_PDW_PULSE) & x"0000";
 
-    when S_DWELL_SEQ_NUM =>
+    when S_PULSE_DWELL_SEQ_NUM =>
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= std_logic_vector(Dwell_sequence_num);
 
@@ -292,7 +325,23 @@ begin
       w_fifo_valid            <= Buffered_frame_ack.sample_valid;
       w_fifo_partial_1_data   <= std_logic_vector(Buffered_frame_data(1)) & std_logic_vector(Buffered_frame_data(1));
 
-    when S_PAD =>
+    when S_SUMMARY_HEADER_0 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= ESM_REPORT_MAGIC_NUM;
+
+    when S_SUMMARY_HEADER_1 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(r_packet_seq_num);
+
+    when S_SUMMARY_HEADER_2 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(MODULE_ID) & std_logic_vector(ESM_REPORT_MESSAGE_TYPE_PDW_PULSE) & x"0000";
+
+    when S_SUMMARY_PULSE_COUNT =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(r_pulse_count) & x"0000";
+
+    when S_PULSE_PAD | S_SUMMARY_PAD =>
       w_fifo_valid            <= '1';
       w_fifo_partial_1_data   <= (others => '0');
       w_fifo_last             <= to_stdlogic(r_words_in_msg = (MAX_WORDS_PER_PACKET - 1));
