@@ -93,7 +93,6 @@ architecture rtl of esm_dwell_stats is
   signal r_channel_new_max_d1         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   signal r_clear_index                : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
-  signal r_read_index                 : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
 
   signal r_num_samples                : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
   signal r_duration                   : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);

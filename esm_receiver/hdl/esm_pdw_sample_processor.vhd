@@ -100,7 +100,7 @@ architecture rtl of esm_pdw_sample_processor is
 
   signal w_buffer_full              : std_logic;
   signal w_buffer_next_index        : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
-  signal w_buffer_next_ack          : std_logic;
+  signal w_buffer_next_start        : std_logic;
 
   signal w_fifo_full                : std_logic;
   signal w_fifo_wr_data             : esm_pdw_fifo_data_t;
@@ -131,6 +131,8 @@ begin
       r_reset_index <= r_reset_index + 1;
     end if;
   end process;
+
+  --TODO: error check channel index collisions - need 3? cycles for processing a given channel
 
   process(Clk)
   begin
@@ -288,7 +290,7 @@ begin
   Pdw_data  <= unpack(w_fifo_rd_data);
   Pdw_valid <= not(w_fifo_empty);
 
-  w_buffer_next_ack <= to_stdlogic(r1_context.state = S_IDLE) and Dwell_active and r1_new_detect;
+  w_buffer_next_start <= to_stdlogic(r1_context.state = S_IDLE) and Dwell_active and r1_new_detect;
 
   i_sample_buffer : entity esm_lib.esm_pdw_sample_buffer
   generic map (
@@ -301,7 +303,7 @@ begin
 
     Buffer_full         => w_buffer_full,
     Buffer_next_index   => w_buffer_next_index,
-    Buffer_next_ack     => w_buffer_next_ack,
+    Buffer_next_start   => w_buffer_next_start,
 
     Input_valid         => r1_context.recording_active,
     Input_frame_index   => r1_context.recording_frame_index,

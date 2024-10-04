@@ -13,7 +13,7 @@ library dsp_lib;
 library esm_lib;
   use esm_lib.esm_pkg.all;
 
-entity esm_pdw_decoder is
+entity esm_pdw_encoder is
 generic (
   AXI_DATA_WIDTH  : natural;
   DATA_WIDTH      : natural;
@@ -33,23 +33,23 @@ port (
 
   Input_ctrl          : in  channelizer_control_t;
   Input_data          : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
-  Input_pwr           : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  Input_power         : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   Axis_ready          : in  std_logic;
   Axis_valid          : out std_logic;
   Axis_data           : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   Axis_last           : out std_logic
 );
-end entity esm_pdw_decoder;
+end entity esm_pdw_encoder;
 
-architecture rtl of esm_pdw_decoder is
+architecture rtl of esm_pdw_encoder is
 
   constant CHANNEL_INDEX_WIDTH        : natural := clog2(NUM_CHANNELS);
-  constant THRESHOLD_LATENCY          : natural := 5;
   constant THRESHOLD_WAIT_CYCLES      : natural := NUM_CHANNELS * 256;
   constant DWELL_STOP_WAIT_CYCLES     : natural := NUM_CHANNELS * 4;
   constant IQ_WIDTH                   : natural := 16;
-  constant IQ_DELAY                   : natural := 8;
+  constant IQ_DELAY_SAMPLES           : natural := 8;
+  constant IQ_DELAY_LATENCY           : natural := 4;
   constant BUFFERED_SAMPLES_PER_FRAME : natural := 40;
   constant BUFFERED_SAMPLE_PADDING    : natural := 4;
   constant PDW_FIFO_DEPTH             : natural := 32;
@@ -69,21 +69,18 @@ architecture rtl of esm_pdw_decoder is
   signal s_state                    : state_t;
   signal r_threshold_wait_count     : unsigned(clog2(THRESHOLD_WAIT_CYCLES) - 1 downto 0);
   signal r_stop_wait_count          : unsigned(clog2(DWELL_STOP_WAIT_CYCLES) - 1 downto 0);
+  signal r_clear_index              : unsigned(clog2(NUM_CHANNELS) - 1 downto 0);
 
   signal r_dwell_active             : std_logic;
   signal r_dwell_data               : esm_dwell_metadata_t;
   signal r_dwell_sequence_num       : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   signal w_iq_scaled                : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
-  signal w_threshold_factor         : unsigned(ESM_THRESHOLD_FACTOR_WIDTH - 1 downto 0);
-
-  signal w_piped_ctrl               : channelizer_control_t;
-  --signal w_piped_data               : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);  --TODO: IFM?
-  signal w_piped_pwr                : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-  signal w_piped_threshold          : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal w_threshold                : unsigned(ESM_THRESHOLD_FACTOR_WIDTH - 1 downto 0);
 
   signal w_delayed_iq_ctrl          : channelizer_control_t;
   signal w_delayed_iq_data          : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
+  signal w_delayed_iq_power         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   signal w_pdw_ready                : std_logic;
   signal w_pdw_valid                : std_logic;
@@ -125,50 +122,26 @@ begin
   w_iq_scaled(0) <= Input_data(0)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
   w_iq_scaled(1) <= Input_data(1)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
 
-  w_threshold_factor <= Dwell_data.threshold_factor_wide when WIDE_BANDWIDTH else Dwell_data.threshold_factor_narrow;
-
-  i_threshold : entity esm_lib.esm_pdw_threshold
-  generic map (
-    DATA_WIDTH          => IQ_WIDTH,
-    CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
-    LATENCY             => THRESHOLD_LATENCY
-  )
-  port map (
-    Clk                     => Clk,
-
-    Dwell_active            => Dwell_active,
-    Dwell_threshold_factor  => w_threshold_factor,
-
-    Input_ctrl              => Input_ctrl,
-    Input_data              => w_iq_scaled,
-    Input_pwr               => Input_pwr,
-
-    Output_ctrl             => w_piped_ctrl,
-    Output_data             => open, --w_piped_data, TODO: IFM?
-    Output_pwr              => w_piped_pwr,
-    Output_threshold        => w_piped_threshold
-  );
-
   i_iq_delay : entity esm_lib.esm_pdw_iq_delay
   generic map (
     DATA_WIDTH          => IQ_WIDTH,
     CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
-    LATENCY             => THRESHOLD_LATENCY,
-    DELAY               => IQ_DELAY
+    LATENCY             => IQ_DELAY_LATENCY,
+    DELAY_SAMPLES       => IQ_DELAY_SAMPLES
   )
   port map (
-    Clk         => Clk,
+    Clk           => Clk,
 
-    Input_ctrl  => Input_ctrl,
-    Input_data  => w_iq_scaled,
+    Input_ctrl    => Input_ctrl,
+    Input_data    => w_iq_scaled,
+    Input_power   => Input_power,
 
-    Output_ctrl => w_delayed_iq_ctrl,
-    Output_data => w_delayed_iq_data
+    Output_ctrl   => w_delayed_iq_ctrl,
+    Output_data   => w_delayed_iq_data,
+    Output_power  => w_delayed_iq_power
   );
 
-  assert (w_delayed_iq_ctrl = w_piped_ctrl)
-    report "Threshold/IQ delay control mismatch."
-    severity failure;
+  w_threshold <= r_dwell_data.threshold_wide when WIDE_BANDWIDTH else r_dwell_data.threshold_narrow;
 
   i_sample_processor : entity esm_lib.esm_pdw_sample_processor
   generic map (
@@ -184,10 +157,10 @@ begin
 
     Dwell_active            => r_dwell_active,
 
-    Input_ctrl              => w_piped_ctrl
+    Input_ctrl              => w_delayed_iq_ctrl
     Input_iq_delayed        => w_delayed_iq_data,
-    Input_pwr               => w_piped_pwr,
-    Input_threshold         => w_piped_threshold,
+    Input_power             => w_delayed_iq_power,
+    Input_threshold         => w_threshold,
 
     Pdw_ready               => w_pdw_ready,
     Pdw_valid               => w_pdw_valid,
@@ -272,6 +245,12 @@ begin
         r_stop_wait_count <= (others => '0');
       else
         r_stop_wait_count <= r_stop_wait_count + 1;
+      end if;
+
+      if (s_state /= S_CLEAR) then
+        r_clear_index <= (others => '0');
+      else
+        r_clear_index <= r_clear_index + 1;
       end if;
     end if;
   end process;

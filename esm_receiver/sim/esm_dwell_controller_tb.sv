@@ -172,10 +172,10 @@ module esm_dwell_controller_tb;
     packed_entry[95  :  64] = entry.entry_data.duration;
     packed_entry[103 :  96] = entry.entry_data.gain;
     packed_entry[111 : 104] = entry.entry_data.fast_lock_profile;
-    packed_entry[143 : 128] = entry.entry_data.threshold_narrow;
-    packed_entry[159 : 144] = entry.entry_data.threshold_wide;
-    packed_entry[223 : 160] = entry.entry_data.channel_mask_narrow;
-    packed_entry[231 : 224] = entry.entry_data.channel_mask_wide;
+    packed_entry[159 : 128] = entry.entry_data.threshold_narrow;
+    packed_entry[191 : 160] = entry.entry_data.threshold_wide;
+    packed_entry[255 : 192] = entry.entry_data.channel_mask_narrow;
+    packed_entry[263 : 256] = entry.entry_data.channel_mask_wide;
 
     config_data[0] = esm_control_magic_num;
     config_data[1] = config_seq_num++;

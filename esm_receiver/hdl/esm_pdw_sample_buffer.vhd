@@ -24,7 +24,7 @@ port (
 
   Buffer_full         : out std_logic;
   Buffer_next_index   : out unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
-  Buffer_next_ack     : in  std_logic;
+  Buffer_next_start   : in  std_logic;
 
   Input_valid         : in  std_logic;
   Input_frame_index   : in  unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
@@ -100,7 +100,7 @@ begin
       if (Rst = '1') then
         r_buffer_pending <= (others => '0');
       else
-        if (Buffer_next_ack = '1') then
+        if (Buffer_next_start = '1') then
           r_buffer_pending(to_integer(w_buffer_next_index)) <= '1';
         end if;
         if ((r_output_valid = '1') and (r_output_sample_last = '1')) then
@@ -169,7 +169,7 @@ begin
   begin
     if rising_edge(Clk) then
       Error_underflow <= Output_frame_req.frame_read and not(r_buffer_pending(to_integer(Output_frame_req.frame_index)));
-      Error_overflow  <= Buffer_next_ack and w_buffer_full;
+      Error_overflow  <= Buffer_next_start and w_buffer_full;
     end if;
   end process;
 

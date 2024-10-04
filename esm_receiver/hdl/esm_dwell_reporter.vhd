@@ -73,6 +73,7 @@ architecture rtl of esm_dwell_reporter is
     S_META_4,
     S_META_5,
     S_META_6,
+    S_META_7,
 
     S_DURATION,
     S_NUM_SAMPLES,
@@ -173,6 +174,8 @@ begin
         when S_META_5 =>
           s_state <= S_META_6;
         when S_META_6 =>
+          s_state <= S_META_7;
+        when S_META_7 =>
           s_state <= S_DURATION;
 
         when S_DURATION =>
@@ -322,17 +325,21 @@ begin
 
     when S_META_3 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= (others => '0'); --std_logic_vector(Dwell_data.threshold_narrow) & std_logic_vector(Dwell_data.threshold_wide);
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_data.threshold_narrow);
 
     when S_META_4 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= (others => '0'); --std_logic_vector(Dwell_data.channel_mask_narrow(63 downto 32));
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_data.threshold_wide);
 
     when S_META_5 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= (others => '0'); --std_logic_vector(Dwell_data.channel_mask_narrow(31 downto 0));
+      w_fifo_partial_0_data   <= (others => '0'); --std_logic_vector(Dwell_data.channel_mask_narrow(63 downto 32));
 
     when S_META_6 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= (others => '0');  --std_logic_vector(Dwell_data.channel_mask_narrow(31 downto 0));
+
+    when S_META_7 =>
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= (others => '0'); --std_logic_vector(Dwell_data.channel_mask_wide) & x"000000";
 
