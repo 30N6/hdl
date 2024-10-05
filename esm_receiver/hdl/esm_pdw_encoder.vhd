@@ -116,6 +116,7 @@ begin
     report "DATA_WIDTH expected to be >= IQ_WIDTH."
     severity failure;
 
+  --TODO: test scaling in TB - try wider data_width
   w_iq_scaled(0) <= Input_data(0)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
   w_iq_scaled(1) <= Input_data(1)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
 

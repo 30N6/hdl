@@ -299,11 +299,11 @@ begin
 
     when S_PULSE_POWER_ACCUM_0 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= std_logic_vector(Pdw_Data.power_accum(31 downto 0));
+      w_fifo_partial_1_data   <= std_logic_vector(Pdw_data.power_accum(31 downto 0));
 
     when S_PULSE_POWER_ACCUM_1 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= x"0000" & std_logic_vector(Pdw_Data.power_accum(47 downto 32));
+      w_fifo_partial_1_data   <= x"0000" & std_logic_vector(Pdw_data.power_accum(47 downto 32));
 
     when S_PULSE_DURATION =>
       w_fifo_valid            <= '1';

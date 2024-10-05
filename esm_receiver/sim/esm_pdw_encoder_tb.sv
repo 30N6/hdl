@@ -8,17 +8,20 @@ typedef struct {
   int channel;
   bit last;
   int unsigned power;
+  int data_i;
+  int data_q;
 } dwell_channel_data_t;
 
 typedef dwell_channel_data_t dwell_channel_array_t [];
 
-interface dwell_stats_tx_intf (input logic Clk);
+interface dwell_data_tx_intf (input logic Clk);
   logic                                         dwell_active = 0;
   esm_dwell_metadata_t                          dwell_data;
   logic [esm_dwell_sequence_num_width - 1 : 0]  dwell_sequence_num;
 
   channelizer_control_t                         input_ctrl = {valid:0, default:0};
   logic [chan_power_width - 1 : 0]              input_pwr;
+  logic signed [15:0]                           input_data [1:0];
 
   task write(esm_dwell_metadata_t data, int unsigned seq_num, dwell_channel_data_t input_data []);
     automatic dwell_channel_data_t d;
@@ -27,7 +30,7 @@ interface dwell_stats_tx_intf (input logic Clk);
     dwell_data          = data;
     dwell_sequence_num  = seq_num;
 
-    repeat (5) @(posedge Clk);
+    repeat (4) @(posedge Clk);
 
     //$display("%0t: input_data = %p", $time, input_data);
 
@@ -38,11 +41,15 @@ interface dwell_stats_tx_intf (input logic Clk);
       input_ctrl.last       = d.last;
       input_ctrl.data_index = d.channel;
       input_pwr             = d.power;
+      input_data[0]         = d.data_i;
+      input_data[1]         = d.data_q;
       @(posedge Clk);
       input_ctrl.valid      = 0;
       input_ctrl.last       = 'x;
       input_ctrl.data_index = 'x;
       input_pwr             = 'x;
+      input_data[0]         = 'x;
+      input_data[1]         = 'x;
       repeat($urandom_range(1,0)) @(posedge Clk);
     end
 
@@ -89,6 +96,15 @@ module esm_pdw_encoder_tb;
     bit [7:0]   module_id;
     bit [7:0]   message_type;
     bit [15:0]  padding_0;
+  } esm_pdw_report_header_t;
+
+  typedef struct packed
+  {
+    bit [31:0]  magic_num;
+    bit [31:0]  sequence_num;
+    bit [7:0]   module_id;
+    bit [7:0]   message_type;
+    bit [15:0]  padding_0;
 
     bit [31:0]  dwell_sequence_num;
     bit [31:0]  pulse_sequence_num;
@@ -111,20 +127,23 @@ module esm_pdw_encoder_tb;
     bit [31:0]  pulse_count;
   } esm_pdw_summary_report_header_t;
 
+  typedef bit [$bits(esm_pdw_report_header_t) - 1 : 0]          pdw_report_header_bits_t;
   typedef bit [$bits(esm_pdw_pulse_report_header_t) - 1 : 0]    pdw_pulse_report_header_bits_t;
   typedef bit [$bits(esm_pdw_summary_report_header_t) - 1 : 0]  pdw_summary_report_header_bits_t;
 
   parameter MAX_WORDS_PER_PACKET      = 64;
+  parameter NUM_HEADER_WORDS          = ($bits(pdw_report_header_bits_t) / AXI_DATA_WIDTH);
   parameter NUM_PULSE_HEADER_WORDS    = ($bits(pdw_pulse_report_header_bits_t) / AXI_DATA_WIDTH);
   parameter NUM_SUMMARY_HEADER_WORDS  = ($bits(pdw_summary_report_header_bits_t) / AXI_DATA_WIDTH);
 
   logic Clk;
   logic Rst;
 
-  dwell_stats_tx_intf                             dwell_tx_intf (.*);
+  dwell_data_tx_intf                              dwell_tx_intf (.*);
   axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf   (.*);
 
   int unsigned  report_seq_num = 0;
+  int unsigned  pulse_seq_num = 0;
   expect_t      expected_data [$];
   int           num_received = 0;
   logic         r_axi_rx_ready;
@@ -154,7 +173,7 @@ module esm_pdw_encoder_tb;
     .DATA_WIDTH     (16),
     .NUM_CHANNELS   (NUM_CHANNELS),
     .MODULE_ID      (MODULE_ID),
-    .WIDE_BANDWIDTH (0)
+    .WIDE_BANDWIDTH (NUM_CHANNELS < 64)
   )
   dut
   (
@@ -168,7 +187,7 @@ module esm_pdw_encoder_tb;
     .Dwell_sequence_num (dwell_tx_intf.dwell_sequence_num),
 
     .Input_ctrl         (dwell_tx_intf.input_ctrl),
-    .Input_data         (),
+    .Input_data         (dwell_tx_intf.input_data),
     .Input_pwr          (dwell_tx_intf.input_pwr),
 
     .Axis_ready         (r_axi_rx_ready),
@@ -186,9 +205,9 @@ module esm_pdw_encoder_tb;
     repeat(100) @(posedge Clk);
   endtask
 
-  function automatic esm_dwell_report_header_t unpack_report_header(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
-    esm_dwell_report_header_t   report_header;
-    dwell_report_header_bits_t  packed_report_header;
+  function automatic esm_pdw_report_header_t unpack_report_header(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
+    esm_pdw_report_header_t   report_header;
+    pdw_report_header_bits_t  packed_report_header;
 
     //$display("unpack_report: data=%p", data);
 
@@ -199,103 +218,137 @@ module esm_pdw_encoder_tb;
 
     //$display("unpack_report: packed=%X", packed_report_header);
 
-    report_header = esm_dwell_report_header_t'(packed_report_header);
+    report_header = esm_pdw_report_header_t'(packed_report_header);
     return report_header;
   endfunction
 
+  function automatic esm_pdw_summary_report_header_t unpack_summary_report_header(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
+    esm_pdw_summary_report_header_t   report_header;
+    pdw_summary_report_header_bits_t  packed_report_header;
+
+    //$display("unpack_report: data=%p", data);
+
+    for (int i = 0; i < $size(packed_report_header)/AXI_DATA_WIDTH; i++) begin
+      //$display("unpack_report_header [%0d] = %X", i, data[0]);
+      packed_report_header[(NUM_SUMMARY_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH] = data.pop_front();
+    end
+
+    //$display("unpack_report: packed=%X", packed_report_header);
+
+    report_header = esm_pdw_summary_report_header_t'(packed_report_header);
+    return report_header;
+  endfunction
+
+  function automatic esm_pdw_pulse_report_header_t unpack_pulse_report_header(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
+    esm_pdw_pulse_report_header_t   report_header;
+    pdw_pulse_report_header_bits_t  packed_report_header;
+
+    //$display("unpack_report: data=%p", data);
+
+    for (int i = 0; i < $size(packed_report_header)/AXI_DATA_WIDTH; i++) begin
+      //$display("unpack_report_header [%0d] = %X", i, data[0]);
+      packed_report_header[(NUM_PULSE_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH] = data.pop_front();
+    end
+
+    //$display("unpack_report: packed=%X", packed_report_header);
+
+    report_header = esm_pdw_pulse_report_header_t'(packed_report_header);
+    return report_header;
+  endfunction
 
   function automatic bit data_match(logic [AXI_DATA_WIDTH - 1 : 0] a [$], logic [AXI_DATA_WIDTH - 1 : 0] b []);
-    esm_dwell_report_header_t report_a = unpack_report_header(a);
-    esm_dwell_report_header_t report_b = unpack_report_header(b);
+    esm_pdw_report_header_t header_a = unpack_report_header(a);
+    esm_pdw_report_header_t header_b = unpack_report_header(b);
 
     if (a.size() != b.size()) begin
       $display("%0t: size mismatch: a=%0d b=%0d", $time, a.size(), b.size());
       return 0;
     end
 
-    //$display("a[0]=%X b[0]=%X  size: %0d %0d", a[0], b[0], a.size(), b.size());
-
-    if (report_a.magic_num !== report_b.magic_num) begin
-      $display("magic_num mismatch: %X %X", report_a.magic_num, report_b.magic_num);
+    if (header_a.magic_num !== header_b.magic_num) begin
+      $display("magic_num mismatch: %X %X", header_a.magic_num, header_b.magic_num);
       return 0;
     end
 
-    if (report_a.sequence_num !== report_b.sequence_num) begin
-      $display("sequence_num mismatch: %X %X", report_a.sequence_num, report_b.sequence_num);
+    if (header_a.sequence_num !== header_b.sequence_num) begin
+      $display("sequence_num mismatch: %X %X", header_a.sequence_num, header_b.sequence_num);
       return 0;
     end
 
-    if (report_a.module_id !== report_b.module_id) begin
-      $display("module_id mismatch: %X %X", report_a.module_id, report_b.module_id);
+    if (header_a.module_id !== header_b.module_id) begin
+      $display("module_id mismatch: %X %X", header_a.module_id, header_b.module_id);
       return 0;
     end
 
-    if (report_a.message_type !== report_b.message_type) begin
-      $display("message_type mismatch: %X %X", report_a.message_type, report_b.message_type);
+    if (header_a.message_type !== header_b.message_type) begin
+      $display("message_type mismatch: %X %X", header_a.message_type, header_b.message_type);
       return 0;
     end
 
-    if (report_a.dwell_sequence_num !== report_b.dwell_sequence_num) begin
-      $display("dwell_sequence_num mismatch: %X %X", report_a.dwell_sequence_num, report_b.dwell_sequence_num);
-      return 0;
-    end
+    if (header_a.message_type == esm_report_message_type_pdw_summary) begin
+      esm_pdw_summary_report_header_t report_a = unpack_summary_report_header(a);
+      esm_pdw_summary_report_header_t report_b = unpack_summary_report_header(b);
 
-    if (report_a.tag !== report_b.tag) begin
-      $display("tag mismatch: %X %X", report_a.tag, report_b.tag);
-      return 0;
-    end
-    if (report_a.frequency !== report_b.frequency) begin
-      $display("frequency mismatch: %X %X", report_a.frequency, report_b.frequency);
-      return 0;
-    end
-    if (report_a.duration_requested !== report_b.duration_requested) begin
-      $display("duration_requested mismatch: %X %X", report_a.duration_requested, report_b.duration_requested);
-      return 0;
-    end
-    if (report_a.gain !== report_b.gain) begin
-      $display("gain mismatch: %X %X", report_a.gain, report_b.gain);
-      return 0;
-    end
-    if (report_a.fast_lock_profile !== report_b.fast_lock_profile) begin
-      $display("fast_lock_profile mismatch: %X %X", report_a.fast_lock_profile, report_b.fast_lock_profile);
-      return 0;
-    end
-    if (report_a.threshold_narrow !== report_b.threshold_narrow) begin
-      $display("threshold_narrow mismatch: %X %X", report_a.threshold_narrow, report_b.threshold_narrow);
-      return 0;
-    end
-    if (report_a.threshold_wide !== report_b.threshold_wide) begin
-      $display("threshold_wide mismatch: %X %X", report_a.threshold_wide, report_b.threshold_wide);
-      return 0;
-    end
-    if (report_a.channel_mask_narrow !== report_b.channel_mask_narrow) begin
-      $display("channel_mask_narrow mismatch: %X %X", report_a.channel_mask_narrow, report_b.channel_mask_narrow);
-      return 0;
-    end
-    if (report_a.channel_mask_wide !== report_b.channel_mask_wide) begin
-      $display("channel_mask_wide mismatch: %X %X", report_a.channel_mask_wide, report_b.channel_mask_wide);
-      return 0;
-    end
-
-    /*
-    if (report_a.duration_actual !== report_b.duration_actual) begin
-      $display("duration_actual mismatch: %X %X", report_a.duration_actual, report_b.duration_actual);
-      return 0;
-    end
-    */
-    if (report_a.num_samples !== report_b.num_samples) begin
-      $display("num_samples mismatch: %X %X", report_a.num_samples, report_b.num_samples);
-      return 0;
-    end
-
-    for (int i = NUM_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
-      if (a[i] !== b[i]) begin
-        $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
+      if (report_a.pulse_count !== report_b.pulse_count) begin
+        $display("pulse_count mismatch: %X %X", report_a.pulse_count, report_b.pulse_count);
         return 0;
       end
-    end
 
-    //TODO: check channel data
+      for (int i = NUM_SUMMARY_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
+        if (a[i] !== b[i]) begin
+          $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
+          return 0;
+        end
+      end
+
+    end else if (header_a.message_type == esm_report_message_type_pdw_pulse) begin
+      esm_pdw_pulse_report_header_t report_a = unpack_pulse_report_header(a);
+      esm_pdw_pulse_report_header_t report_b = unpack_pulse_report_header(b);
+
+      if (report_a.dwell_sequence_num !== report_b.dwell_sequence_num) begin
+        $display("dwell_sequence_num mismatch: %X %X", report_a.dwell_sequence_num, report_b.dwell_sequence_num);
+        return 0;
+      end
+      if (report_a.pulse_sequence_num !== report_b.pulse_sequence_num) begin
+        $display("pulse_sequence_num mismatch: %X %X", report_a.pulse_sequence_num, report_b.pulse_sequence_num);
+        return 0;
+      end
+      if (report_a.pulse_channel !== report_b.pulse_channel) begin
+        $display("pulse_channel mismatch: %X %X", report_a.pulse_channel, report_b.pulse_channel);
+        return 0;
+      end
+      if (report_a.pulse_threshold !== report_b.pulse_threshold) begin
+        $display("pulse_threshold mismatch: %X %X", report_a.pulse_threshold, report_b.pulse_threshold);
+        return 0;
+      end
+      if (report_a.pulse_power_accum !== report_b.pulse_power_accum) begin
+        $display("pulse_power_accum mismatch: %X %X", report_a.pulse_power_accum, report_b.pulse_power_accum);
+        return 0;
+      end
+      if (report_a.pulse_duration !== report_b.pulse_duration) begin
+        $display("pulse_duration mismatch: %X %X", report_a.pulse_duration, report_b.pulse_duration);
+        return 0;
+      end
+      if (report_a.pulse_frequency !== report_b.pulse_frequency) begin
+        $display("pulse_frequency mismatch: %X %X", report_a.pulse_frequency, report_b.pulse_frequency);
+        return 0;
+      end
+      /*if (report_a.pulse_start_time !== report_b.pulse_start_time) begin
+        $display("pulse_start_time mismatch: %X %X", report_a.pulse_start_time, report_b.pulse_start_time);
+        return 0;
+      end*/
+
+      for (int i = NUM_PULSE_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
+        if (a[i] !== b[i]) begin
+          $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
+          return 0;
+        end
+      end
+
+    end else begin
+      $display("invalid message type: %X", header_a.message_type);
+      return 0;
+    end if;
 
     return 1;
   endfunction
@@ -328,87 +381,101 @@ module esm_pdw_encoder_tb;
     end
   end
 
-  function automatic void expect_reports(esm_dwell_metadata_t dwell_data, int unsigned dwell_seq_num, dwell_channel_data_t  dwell_input []);
-    int channels_per_packet = (MAX_WORDS_PER_PACKET - NUM_HEADER_WORDS) / 4;
-    int num_packets = (NUM_CHANNELS + channels_per_packet - 1) / channels_per_packet;
+  function automatic void expect_reports(esm_dwell_metadata_t dwell_data, int unsigned dwell_seq_num, dwell_channel_data_t dwell_input []);
     int num_padding_words = 0;
-    int channel_index = 0;
+    bit [NUM_CHANNELS - 1 : 0]  pulse_active = '0;
+    longint unsigned            pulse_power_accum [NUM_CHANNELS] = {default:0};
+    int                         pulse_duration [NUM_CHANNELS] = {default:0};
+    int                         pulse_count = 0;
 
-    longint unsigned channel_accum [NUM_CHANNELS] = {default:0};
-    int unsigned channel_max [NUM_CHANNELS] = {default:0};
+    int unsigned new_threshold = (NUM_CHANNELS < 64) ? dwell_data.threshold_wide : dwell_data.threshold_narrow;
+    int unsigned continued_threshold = new_threshold / 2;
 
     //$display("%0t: num_header_words=%0d channels_per_packet=%0d num_packets=%0d", $time, NUM_HEADER_WORDS, channels_per_packet, num_packets);
 
     for (int i = 0; i < dwell_input.size(); i++) begin
-      channel_accum[dwell_input[i].channel] += dwell_input[i].power;
-      channel_max[dwell_input[i].channel] = (dwell_input[i].power > channel_max[dwell_input[i].channel]) ? dwell_input[i].power : channel_max[dwell_input[i].channel];
+      dwell_channel_data_t di = dwell_input[i];
+      int i_ch                = dwell_input[i].channel;
+
+      if (pulse_active[i_ch]) begin
+        pulse_duration[i_ch]++;
+        pulse_power_accum[i_ch] += di.power;
+
+        if ((di.power <= continued_threshold) or (i == (dwell_input.size() - 1))) begin
+          expect_t r;
+          esm_pdw_pulse_report_header_t report_header;
+          pdw_pulse_report_header_bits_t report_header_packed;
+
+          report_header.magic_num           = esm_report_magic_num;
+          report_header.sequence_num        = report_seq_num;
+          report_header.module_id           = MODULE_ID;
+          report_header.message_type        = esm_report_message_type_pdw_pulse;
+
+          report_header.dwell_sequence_num  = dwell_seq_num;
+          report_header.pulse_sequence_num  = pulse_seq_num;
+          report_header.pulse_channel       = i_ch;
+          report_header.pulse_threshold     = new_threshold;
+          report_header.pulse_power_accum   = pulse_power_accum[i_ch];
+          report_header.pulse_duration      = pulse_duration[i_ch];
+          report_header.pulse_frequency     = 0;
+          report_header.pulse_start_time    = 0;
+
+          report_header_packed = pdw_pulse_report_header_bits_t'(report_header);
+          //$display("report_packed: %X", report_header_packed);
+          $display("pulse_report_header: %p", report_header);
+
+          for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
+            r.data.push_back(report_header_packed[(NUM_PULSE_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
+          end
+          num_padding_words = MAX_WORDS_PER_PACKET - r.data.size();
+          for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
+            r.data.push_back(0);
+          end
+          expected_data.push_back(r);
+          report_seq_num++;
+
+          pulse_seq_num++;
+          pulse_active[i_ch] = 0;
+          pulse_duration[i_ch] = 0;
+          pulse_power_accum[i_ch] = 0;
+        end
+      end else if (!pulse_active[i_ch] && (di.power > new_threshold)) begin
+        pulse_active[i_ch] = 1;
+        pulse_duration[i_ch] = 1;
+        pulse_power_accum[i_ch] = di.power;
+        pulse_count++;
+      end
     end
 
-    for (int i_packet = 0; i_packet < num_packets; i_packet++) begin
+    assert (!pulse_active) else $error("unexpected pulse_active: %X", pulse_active);
+
+    begin
       expect_t r;
-      esm_dwell_report_header_t   report_header;
-      dwell_report_header_bits_t  report_header_packed;
+      esm_pdw_summary_report_header_t report_header;
+      pdw_summary_report_header_bits_t report_header_packed;
 
-      report_header.magic_num               = esm_report_magic_num;
-      report_header.sequence_num            = report_seq_num;
-      report_header.module_id               = MODULE_ID;
-      report_header.message_type            = esm_report_message_type_dwell_stats;
-      report_header.dwell_sequence_num      = dwell_seq_num;
-      report_header.tag                     = dwell_data.tag;
-      report_header.frequency               = dwell_data.frequency;
-      report_header.duration_requested      = dwell_data.duration;
-      report_header.gain                    = dwell_data.gain;
-      report_header.fast_lock_profile       = dwell_data.fast_lock_profile;
-      report_header.threshold_narrow        = dwell_data.threshold_narrow;
-      report_header.threshold_wide          = dwell_data.threshold_wide;
-      report_header.channel_mask_narrow     = 0; //dwell_data.channel_mask_narrow;
-      report_header.channel_mask_wide       = 0; //dwell_data.channel_mask_wide;
-      report_header.duration_actual         = 0;
-      report_header.num_samples             = dwell_input.size();
-      report_header.ts_dwell_start          = 0;
-      report_header.ts_dwell_end            = 0;
+      report_header.magic_num           = esm_report_magic_num;
+      report_header.sequence_num        = report_seq_num;
+      report_header.module_id           = MODULE_ID;
+      report_header.message_type        = esm_report_message_type_pdw_summary;
 
-      report_header_packed = dwell_report_header_bits_t'(report_header);
+      report_header.pulse_count         = pulse_count;
+
+      report_header_packed = pdw_summary_report_header_bits_t'(report_header);
       //$display("report_packed: %X", report_header_packed);
-      $display("report_header: %p", report_header);
+      $display("pulse_report_header: %p", report_header);
 
       for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
-        r.data.push_back(report_header_packed[(NUM_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
+        r.data.push_back(report_header_packed[(NUM_SUMMARY_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
       end
-
-      for (int i_channel = 0; i_channel < channels_per_packet; i_channel++) begin
-        bit [31:0] words [4];
-        if (channel_index >= NUM_CHANNELS) begin
-          break;
-        end
-
-        words[0] = channel_index;
-        words[1] = channel_accum[channel_index][63:32];
-        words[2] = channel_accum[channel_index][31:0];
-        words[3] = channel_max[channel_index];
-        for (int i = 0; i < $size(words); i++) begin
-          r.data.push_back(words[i]);
-        end
-        channel_index++;
-      end
-
       num_padding_words = MAX_WORDS_PER_PACKET - r.data.size();
       for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
         r.data.push_back(0);
       end
-
-      /*for (int i = 0; i < r.data.size(); i++) begin
-        $display("r.data[%02d]=%X", i, r.data[i]);
-      end*/
-
       expected_data.push_back(r);
-
-      /*$display("report_header: %p", report_header);
-      $display("report_header_packed: %p", report_header_packed);
-      $display("axi report: %p [0]", r.data, r.data[0]);*/
-
       report_seq_num++;
     end
+
   endfunction
 
   function automatic esm_dwell_metadata_t randomize_dwell_metadata();
@@ -446,6 +513,7 @@ module esm_pdw_encoder_tb;
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
       $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
       report_seq_num = 0;
+      pulse_seq_num = 0;
 
       for (int i_dwell = 0; i_dwell < 100; i_dwell++) begin
         int unsigned          dwell_seq_num   = $urandom;

@@ -7,6 +7,8 @@ library common_lib;
 
 library axi_lib;
 
+library mem_lib;
+
 library dsp_lib;
   use dsp_lib.dsp_pkg.all;
 
@@ -167,7 +169,7 @@ begin
       when S_IDLE =>
         r2_context.threshold                <= r1_input_threshold;
         r2_context.power_accum              <= resize_up(r1_input_pwr, ESM_PDW_POWER_ACCUM_WIDTH);
-        r2_context.duration                 <= (others => '0');
+        r2_context.duration                 <= (0 => 1, others => '0');
         r2_context.recording_skipped        <= '0';
         r2_context.recording_active         <= '0';
         r2_context.recording_frame_index    <= (others => '-');
@@ -264,7 +266,7 @@ begin
   w_fifo_wr_data.buffered_frame_index <= r1_context.recording_frame_index;
   w_fifo_wr_data.buffered_frame_valid <= not(r1_context.recording_skipped);
 
-  i_pdw_fifo : entity esm_lib.xpm_fallthough_fifo
+  i_pdw_fifo : entity mem_lib.xpm_fallthough_fifo
   generic map (
     FIFO_DEPTH        => PDW_FIFO_DEPTH,
     FIFO_WIDTH        => ESM_PDW_FIFO_DATA_WIDTH,
