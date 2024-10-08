@@ -64,6 +64,8 @@ architecture rtl of esm_pdw_encoder is
   signal r_rst                      : std_logic;
   signal r_enable                   : std_logic;
 
+  signal r_timestamp                : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+
   signal s_state                    : state_t;
   signal r_stop_wait_count          : unsigned(clog2(DWELL_STOP_WAIT_CYCLES) - 1 downto 0);
   signal r_clear_index              : unsigned(clog2(NUM_CHANNELS) - 1 downto 0);
@@ -103,11 +105,29 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      if (Rst = '1') then
+        r_timestamp <= (others => '0');
+      else
+        r_timestamp <= r_timestamp + 1;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
       r_dwell_active <= Dwell_active;
 
       if (s_state = S_IDLE) then
         r_dwell_data          <= Dwell_data;
         r_dwell_sequence_num  <= Dwell_sequence_num;
+        r_dwell_timestamp     <= r_timestamp;
+      end if;
+
+      if (s_state = S_IDLE) then
+        r_dwell_duration <= (others => '0');
+      elsif (s_state = S_S_ACTIVE) then
+        r_dwell_duration <= r_dwell_duration + 1;
       end if;
     end if;
   end process;
@@ -152,6 +172,8 @@ begin
   port map (
     Clk                     => Clk,
     Rst                     => r_rst
+
+    Timestamp               => r_timestamp,
 
     Dwell_active            => r_dwell_active,
 
@@ -253,9 +275,13 @@ begin
     Clk                 => Clk,
     Rst                 => r_rst,
 
+    Timestamp           => r_timestamp,
+
     Dwell_done          => w_dwell_done,
     Dwell_data          => r_dwell_data,
     Dwell_sequence_num  => r_dwell_sequence_num,
+    Dwell_timestamp     => r_dwell_timestamp,
+    Dwell_duration      => r_dwell_duration,
 
     Pdw_ready           => w_pdw_ready,
     Pdw_valid           => w_pdw_valid,

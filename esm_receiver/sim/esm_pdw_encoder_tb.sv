@@ -124,7 +124,10 @@ module esm_pdw_encoder_tb;
     bit [7:0]   message_type;
     bit [15:0]  padding_0;
 
-    bit [31:0]  pulse_count;
+    bit [31:0]  dwell_sequence_num;
+    bit [63:0]  dwell_start_time;
+    bit [31:0]  dwell_duration;
+    bit [31:0]  dwell_pulse_count;
   } esm_pdw_summary_report_header_t;
 
   typedef bit [$bits(esm_pdw_report_header_t) - 1 : 0]          pdw_report_header_bits_t;
@@ -288,6 +291,13 @@ module esm_pdw_encoder_tb;
     if (header_a.message_type == esm_report_message_type_pdw_summary) begin
       esm_pdw_summary_report_header_t report_a = unpack_summary_report_header(a);
       esm_pdw_summary_report_header_t report_b = unpack_summary_report_header(b);
+
+      //TODO: check dwell_duration
+
+      if (report_a.dwell_sequence_num !== report_b.dwell_sequence_num) begin
+        $display("dwell_sequence_num mismatch: %X %X", report_a.dwell_sequence_num, report_b.dwell_sequence_num);
+        return 0;
+      end
 
       if (report_a.pulse_count !== report_b.pulse_count) begin
         $display("pulse_count mismatch: %X %X", report_a.pulse_count, report_b.pulse_count);
@@ -459,7 +469,10 @@ module esm_pdw_encoder_tb;
       report_header.module_id           = MODULE_ID;
       report_header.message_type        = esm_report_message_type_pdw_summary;
 
-      report_header.pulse_count         = pulse_count;
+      report_header.dwell_sequence_num  = dwell_seq_num;
+      report_header.dwell_start_time    = 0;
+      report_header.dwell_duration      = 0; //TODO
+      report_header.dwell_pulse_count   = pulse_count;
 
       report_header_packed = pdw_summary_report_header_bits_t'(report_header);
       //$display("report_packed: %X", report_header_packed);
@@ -485,22 +498,94 @@ module esm_pdw_encoder_tb;
     r.duration                = $urandom;
     r.gain                    = $urandom;
     r.fast_lock_profile       = $urandom;
-    r.threshold_narrow        = $urandom;
-    r.threshold_wide          = $urandom;
+    r.threshold_narrow        = $urandom_range(10e6, 1000);
+    r.threshold_wide          = $urandom_range(10e6, 1000);
     r.channel_mask_narrow     = {$urandom, $urandom};
     r.channel_mask_wide       = $urandom;
     return r;
   endfunction
 
-  function automatic dwell_channel_array_t randomize_dwell_input();
-    dwell_channel_array_t r = new [$urandom_range(2000, 500)];
-    int channel_index = 0;
+  function automatic dwell_channel_array_t randomize_dwell_input(esm_dwell_metadata_t dwell_data);
+    dwell_channel_array_t r; // = new [$urandom_range(10000, 500)];
+    dwell_channel_array_t channel_data [NUM_CHANNELS][];
+    int pulse_start_time [NUM_CHANNELS][$];
+    int pulse_duration [NUM_CHANNELS][$];
+    int time_offset [NUM_CHANNELS];
+    int max_dwell_time = $urandom_range(10000, 500);
+    int threshold = (NUM_CHANNELS < 64) ? dwell_data.threshold_wide : dwell_data.threshold_narrow;
+    int rnd = 0;
+
+    for (int i = 0; i < NUM_CHANNELS; i++) begin
+      pulse_start_time[i].delete();
+      pulse_duration[i].delete();
+      time_offset[i] = 0;
+
+      if ($urandom_range(99) < 50) begin
+        time_offset[i] = $urandom_range(100);
+        int num_pulses = $urandom_range(10, 1);
+
+        for (int p = 0; p < num_pulses; p++) begin
+          pulse_start_time[i].push_back(time_offset[i]);
+
+          rnd = $urandom_range(99);
+          if (rnd < 25) begin
+            pulse_duration[i].push_back($urandom_range(5,1));
+          end else if (rnd < 50) begin
+            pulse_duration[i].push_back($urandom_range(50,10));
+          end else if (rnd < 75) begin
+            pulse_duration[i].push_back($urandom_range(500,100));
+          end else begin
+            pulse_duration[i].push_back($urandom_range(5000,1000));
+          end
+
+          time_offset[i] += pulse_duration[i][p];
+
+          rnd = $urandom_range(99);
+          if (rnd < 30) begin
+            time_offset[i] += $urandom_range(10, 5);
+          end else if (rnd < 70) begin
+            time_offset[i] += $urandom_range(100, 20);
+          end else begin
+            time_offset[i] += $urandom_range(1000, 200);
+          end
+        end
+
+        if (time_offset[i] > max_dwell_time) begin
+          max_dwell_time = time_offset[i];
+        end
+      end
+    end
+
+    max_dwell_time += $urandom_range(100, 10);
+
+    for (int i = 0; i < NUM_CHANNELS; i++) begin
+      channel_data[i] = new[max_dwell_time];
+
+      for (int j = 0; j < max_dwell_time; j++) begin
+        channel_data[i][j].channel_index  = i;
+        channel_data[i][j].last           = (i == (NUM_CHANNELS - 1));
+        channel_data[i][j].data_i         = $urandom_range(100);
+        channel_data[i][j].data_q         = $urandom_range(100);
+        channel_data[i][j].power          = $urandom_range(threshold / 4, 1);
+      end
+
+      for (int p = 0; p < pulse_start_time[i].size(); p++) begin
+        int ps = pulse_start_time[i][p];
+        int pd = pulse_duration[i][p];
+        for (int j = ps; j < (ps + pd); j++) begin
+          channel_data[i][j].data_i = $urandom_range(1000);
+          channel_data[i][j].data_q = $urandom_range(1000);
+          channel_data[i][j].power  = $urandom_range(threshold * 2, threshold + 1);
+        end
+      end
+    end
+
+    r = new [NUM_CHANNELS * max_dwell_time];
 
     for (int i = 0; i < r.size(); i++) begin
-      r[i].channel  = channel_index;
-      r[i].last     = (channel_index == (NUM_CHANNELS - 1));
-      r[i].power    = $urandom;
-      channel_index = (channel_index + 1) % NUM_CHANNELS;
+      int channel_index = i % NUM_CHANNELS;
+      int sample_index = i / NUM_CHANNELS;
+      r[i] = channel_data[channel_index][sample_index];
     end
 
     return r;
@@ -518,7 +603,7 @@ module esm_pdw_encoder_tb;
       for (int i_dwell = 0; i_dwell < 100; i_dwell++) begin
         int unsigned          dwell_seq_num   = $urandom;
         esm_dwell_metadata_t  dwell_data      = randomize_dwell_metadata();
-        dwell_channel_data_t  dwell_input []  = randomize_dwell_input();
+        dwell_channel_data_t  dwell_input []  = randomize_dwell_input(dwell_data);
 
         expect_reports(dwell_data, dwell_seq_num, dwell_input);
         dwell_tx_intf.write(dwell_data, dwell_seq_num, dwell_input);

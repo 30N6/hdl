@@ -27,6 +27,8 @@ port (
   Clk                     : in  std_logic;
   Rst                     : in  std_logic;
 
+  Timestamp               : in  unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+
   Dwell_active            : in  std_logic;
 
   Input_ctrl              : in  channelizer_control_t;
@@ -75,7 +77,6 @@ architecture rtl of esm_pdw_sample_processor is
 
   type channel_context_array_t is array (natural range <>) of channel_context_t;
 
-  signal r_timestamp                : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
   signal r_reset_index              : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
 
   signal m_channel_context          : channel_context_array_t(2**CHANNEL_INDEX_WIDTH - 1 downto 0);
@@ -115,17 +116,6 @@ architecture rtl of esm_pdw_sample_processor is
   signal w_sample_buffer_underflow  : std_logic;
 
 begin
-
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      if (Rst = '1') then
-        r_timestamp <= (others => '0');
-      else
-        r_timestamp <= r_timestamp + 1;
-      end if;
-    end if;
-  end process;
 
   process(Clk)
   begin
@@ -175,7 +165,7 @@ begin
         r2_context.recording_frame_index    <= (others => '-');
         r2_context.recording_sample_index   <= (others => '-');
         r2_context.recording_sample_padding <= (others => '0');
-        r2_context.ts_start                 <= r_timestamp;
+        r2_context.ts_start                 <= Timestamp;
 
         if ((Dwell_active = '1') and (r1_new_detect = '1') and (w_fifo_full = '0')) then
           r2_context.state                  <= S_ACTIVE;

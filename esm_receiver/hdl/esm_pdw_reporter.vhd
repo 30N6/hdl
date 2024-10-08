@@ -27,6 +27,8 @@ port (
   Dwell_done          : in  std_logic;
   Dwell_data          : in  esm_dwell_metadata_t;
   Dwell_sequence_num  : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  Dwell_timestamp     : in  unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+  Dwell_duration      : in  unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
 
   Pdw_ready           : out std_logic;
   Pdw_valid           : in  std_logic;
@@ -60,7 +62,11 @@ architecture rtl of esm_pdw_reporter is
     S_SUMMARY_HEADER_0,
     S_SUMMARY_HEADER_1,
     S_SUMMARY_HEADER_2,
-    S_SUMMARY_PULSE_COUNT,
+    S_SUMMARY_DWELL_SEQ_NUM,
+    S_SUMMARY_DWELL_START_TIME_0,
+    S_SUMMARY_DWELL_START_TIME_1,
+    S_SUMMARY_DWELL_DURATION,
+    S_SUMMARY_DWELL_PULSE_COUNT,
     S_SUMMARY_PAD,
     S_SUMMARY_DONE,
 
@@ -198,8 +204,16 @@ begin
         when S_SUMMARY_HEADER_1 =>
           s_state <= S_SUMMARY_HEADER_2;
         when S_SUMMARY_HEADER_2 =>
-          s_state <= S_SUMMARY_PULSE_COUNT;
-        when S_SUMMARY_PULSE_COUNT =>
+          s_state <= S_SUMMARY_DWELL_SEQ_NUM;
+        when S_SUMMARY_DWELL_SEQ_NUM =>
+          s_state <= S_SUMMARY_DWELL_START_TIME_0;
+        when S_SUMMARY_DWELL_START_TIME_0 =>
+          s_state <= S_SUMMARY_DWELL_START_TIME_1;
+        when S_SUMMARY_DWELL_START_TIME_1 =>
+          s_state <= S_SUMMARY_DWELL_DURATION;
+        when S_SUMMARY_DWELL_DURATION =>
+          s_state <= S_SUMMARY_DWELL_PULSE_COUNT;
+        when S_SUMMARY_DWELL_PULSE_COUNT =>
           s_state <= S_SUMMARY_PAD;
         when S_SUMMARY_PAD =>
           if (r_words_in_msg = (MAX_WORDS_PER_PACKET - 1)) then
@@ -337,9 +351,25 @@ begin
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= std_logic_vector(MODULE_ID) & std_logic_vector(ESM_REPORT_MESSAGE_TYPE_PDW_PULSE) & x"0000";
 
-    when S_SUMMARY_PULSE_COUNT =>
+    when S_SUMMARY_DWELL_SEQ_NUM =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(r_pulse_count) & x"0000";
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_sequence_num);
+
+    when S_SUMMARY_DWELL_START_TIME_0 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= x"0000" & std_logic_vector(Dwell_timestamp(47 downto 32));
+
+    when S_SUMMARY_DWELL_START_TIME_1 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_timestamp(31 downto 0));
+
+    when S_SUMMARY_DWELL_DURATION =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_duration);
+
+    when S_SUMMARY_DWELL_PULSE_COUNT =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= x"0000" & std_logic_vector(r_pulse_count);
 
     when S_PULSE_PAD | S_SUMMARY_PAD =>
       w_fifo_valid            <= '1';
