@@ -20,8 +20,8 @@ interface dwell_data_tx_intf (input logic Clk);
   logic [esm_dwell_sequence_num_width - 1 : 0]  dwell_sequence_num;
 
   channelizer_control_t                         input_ctrl = {valid:0, default:0};
-  logic [chan_power_width - 1 : 0]              input_pwr;
-  logic signed [15:0]                           input_data [1:0];
+  logic [chan_power_width - 1 : 0]              input_power;
+  logic signed [15:0]                           input_iq [1:0];
 
   task write(esm_dwell_metadata_t data, int unsigned seq_num, dwell_channel_data_t input_data []);
     automatic dwell_channel_data_t d;
@@ -40,16 +40,16 @@ interface dwell_data_tx_intf (input logic Clk);
       input_ctrl.valid      = 1;
       input_ctrl.last       = d.last;
       input_ctrl.data_index = d.channel;
-      input_pwr             = d.power;
-      input_data[0]         = d.data_i;
-      input_data[1]         = d.data_q;
+      input_power           = d.power;
+      input_iq[0]           = d.data_i;
+      input_iq[1]           = d.data_q;
       @(posedge Clk);
       input_ctrl.valid      = 0;
       input_ctrl.last       = 'x;
       input_ctrl.data_index = 'x;
-      input_pwr             = 'x;
-      input_data[0]         = 'x;
-      input_data[1]         = 'x;
+      input_power           = 'x;
+      input_iq[0]           = 'x;
+      input_iq[1]           = 'x;
       repeat($urandom_range(1,0)) @(posedge Clk);
     end
 
@@ -190,8 +190,8 @@ module esm_pdw_encoder_tb;
     .Dwell_sequence_num (dwell_tx_intf.dwell_sequence_num),
 
     .Input_ctrl         (dwell_tx_intf.input_ctrl),
-    .Input_data         (dwell_tx_intf.input_data),
-    .Input_pwr          (dwell_tx_intf.input_pwr),
+    .Input_data         (dwell_tx_intf.input_iq),
+    .Input_power        (dwell_tx_intf.input_power),
 
     .Axis_ready         (r_axi_rx_ready),
     .Axis_valid         (w_axi_rx_valid),
@@ -299,8 +299,8 @@ module esm_pdw_encoder_tb;
         return 0;
       end
 
-      if (report_a.pulse_count !== report_b.pulse_count) begin
-        $display("pulse_count mismatch: %X %X", report_a.pulse_count, report_b.pulse_count);
+      if (report_a.dwell_pulse_count !== report_b.dwell_pulse_count) begin
+        $display("pulse_count mismatch: %X %X", report_a.dwell_pulse_count, report_b.dwell_pulse_count);
         return 0;
       end
 
@@ -358,7 +358,7 @@ module esm_pdw_encoder_tb;
     end else begin
       $display("invalid message type: %X", header_a.message_type);
       return 0;
-    end if;
+    end
 
     return 1;
   endfunction
@@ -411,7 +411,7 @@ module esm_pdw_encoder_tb;
         pulse_duration[i_ch]++;
         pulse_power_accum[i_ch] += di.power;
 
-        if ((di.power <= continued_threshold) or (i == (dwell_input.size() - 1))) begin
+        if ((di.power <= continued_threshold) || (i == (dwell_input.size() - 1))) begin
           expect_t r;
           esm_pdw_pulse_report_header_t report_header;
           pdw_pulse_report_header_bits_t report_header_packed;
@@ -507,7 +507,7 @@ module esm_pdw_encoder_tb;
 
   function automatic dwell_channel_array_t randomize_dwell_input(esm_dwell_metadata_t dwell_data);
     dwell_channel_array_t r; // = new [$urandom_range(10000, 500)];
-    dwell_channel_array_t channel_data [NUM_CHANNELS][];
+    dwell_channel_array_t channel_data [NUM_CHANNELS];
     int pulse_start_time [NUM_CHANNELS][$];
     int pulse_duration [NUM_CHANNELS][$];
     int time_offset [NUM_CHANNELS];
@@ -521,8 +521,8 @@ module esm_pdw_encoder_tb;
       time_offset[i] = 0;
 
       if ($urandom_range(99) < 50) begin
-        time_offset[i] = $urandom_range(100);
         int num_pulses = $urandom_range(10, 1);
+        time_offset[i] = $urandom_range(100);
 
         for (int p = 0; p < num_pulses; p++) begin
           pulse_start_time[i].push_back(time_offset[i]);
@@ -562,11 +562,11 @@ module esm_pdw_encoder_tb;
       channel_data[i] = new[max_dwell_time];
 
       for (int j = 0; j < max_dwell_time; j++) begin
-        channel_data[i][j].channel_index  = i;
-        channel_data[i][j].last           = (i == (NUM_CHANNELS - 1));
-        channel_data[i][j].data_i         = $urandom_range(100);
-        channel_data[i][j].data_q         = $urandom_range(100);
-        channel_data[i][j].power          = $urandom_range(threshold / 4, 1);
+        channel_data[i][j].channel  = i;
+        channel_data[i][j].last     = (i == (NUM_CHANNELS - 1));
+        channel_data[i][j].data_i   = $urandom_range(100);
+        channel_data[i][j].data_q   = $urandom_range(100);
+        channel_data[i][j].power    = $urandom_range(threshold / 4, 1);
       end
 
       for (int p = 0; p < pulse_start_time[i].size(); p++) begin

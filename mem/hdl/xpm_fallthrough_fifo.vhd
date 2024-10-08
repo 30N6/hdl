@@ -12,7 +12,7 @@ entity xpm_fallthough_fifo is
 generic (
   FIFO_DEPTH        : natural;
   FIFO_WIDTH        : natural;
-  ALMOST_FULL_LEVEL : natural
+  ALMOST_FULL_LEVEL : natural := 5
 );
 port (
   Clk           : in  std_logic;
@@ -24,7 +24,7 @@ port (
   Full          : out std_logic;
 
   Rd_en         : in  std_logic;
-  Rd_data       : out std_logic_vector(FIFO_DEPTH - 1 downto 0);
+  Rd_data       : out std_logic_vector(FIFO_WIDTH - 1 downto 0);
   Empty         : out std_logic;
 
   Overflow      : out std_logic;

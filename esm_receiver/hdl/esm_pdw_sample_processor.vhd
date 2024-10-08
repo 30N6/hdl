@@ -247,7 +247,7 @@ begin
 
   w_fifo_wr_en                        <= to_stdlogic(r1_context.state = S_STORE_REPORT);
   w_fifo_wr_data.sequence_num         <= r_sequence_num;
-  w_fifo_wr_data.channel              <= r1_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  w_fifo_wr_data.channel              <= resize_up(r1_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0), ESM_CHANNEL_INDEX_WIDTH);
   w_fifo_wr_data.power_accum          <= r1_context.power_accum;
   w_fifo_wr_data.power_threshold      <= r1_context.threshold;
   w_fifo_wr_data.duration             <= r1_context.duration;
@@ -259,8 +259,7 @@ begin
   i_pdw_fifo : entity mem_lib.xpm_fallthough_fifo
   generic map (
     FIFO_DEPTH        => PDW_FIFO_DEPTH,
-    FIFO_WIDTH        => ESM_PDW_FIFO_DATA_WIDTH,
-    ALMOST_FULL_LEVEL => PDW_FIFO_DEPTH-1
+    FIFO_WIDTH        => ESM_PDW_FIFO_DATA_WIDTH
   )
   port map (
     Clk         => Clk,
