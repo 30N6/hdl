@@ -76,6 +76,7 @@ architecture rtl of esm_pdw_reporter is
     S_PULSE_DWELL_SEQ_NUM,
     S_PULSE_SEQ_NUM,
     S_PULSE_CHANNEL,
+    S_PULSE_THRESHOLD,
     S_PULSE_POWER_ACCUM_0,
     S_PULSE_POWER_ACCUM_1,
     S_PULSE_DURATION,
@@ -160,7 +161,7 @@ begin
         when S_PULSE_POWER_ACCUM_1 =>
           s_state <= S_PULSE_DURATION;
         when S_PULSE_DURATION =>
-          s_state <= S_PULSE_FREQUENCY =>
+          s_state <= S_PULSE_FREQUENCY;
         when S_PULSE_FREQUENCY =>
           s_state <= S_PULSE_START_TIME_0;
         when S_PULSE_START_TIME_0 =>
@@ -235,7 +236,7 @@ begin
 
   Buffered_frame_req.frame_index  <= Pdw_data.buffered_frame_index;
   Buffered_frame_req.frame_read   <= to_stdlogic(s_state = S_BUFFER_READ);
-  Pdw_ready                       <= to_stdlogic(S_PDW_READ);
+  Pdw_ready                       <= to_stdlogic(s_state = S_PDW_READ);
   Report_ack                      <= to_stdlogic(s_state = S_REPORT_ACK);
 
   process(Clk)

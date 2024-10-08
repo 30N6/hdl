@@ -33,8 +33,8 @@ port (
 
   Input_ctrl              : in  channelizer_control_t;
   Input_iq_delayed        : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
-  Input_pwr               : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-  Input_threshold         : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0)
+  Input_power             : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  Input_threshold         : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   Pdw_ready               : in  std_logic;
   Pdw_valid               : out std_logic;
@@ -83,13 +83,13 @@ architecture rtl of esm_pdw_sample_processor is
 
   signal r0_input_ctrl              : channelizer_control_t;
   signal r0_input_iq                : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
-  signal r0_input_pwr               : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r0_input_power             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r0_input_threshold         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r0_context                 : channel_context_t;
 
   signal r1_input_ctrl              : channelizer_control_t;
   signal r1_input_iq                : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
-  signal r1_input_pwr               : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r1_input_power             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r1_input_threshold         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r1_context                 : channel_context_t;
   signal r1_new_detect              : std_logic;
@@ -131,7 +131,7 @@ begin
     if rising_edge(Clk) then
       r0_input_ctrl       <= Input_ctrl;
       r0_input_iq         <= Input_iq_delayed;
-      r0_input_pwr        <= Input_pwr;
+      r0_input_power      <= Input_power;
       r0_input_threshold  <= Input_threshold;
       r0_context          <= m_channel_context(to_integer(Input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0)));
     end if;
@@ -142,11 +142,11 @@ begin
     if rising_edge(Clk) then
       r1_input_ctrl       <= r0_input_ctrl;
       r1_input_iq         <= r0_input_iq;
-      r1_input_pwr        <= r0_input_pwr;
+      r1_input_power      <= r0_input_power;
       r1_input_threshold  <= r0_input_threshold;
       r1_context          <= r0_context;
-      r1_new_detect       <= to_stdlogic(r0_input_pwr > r0_input_threshold);
-      r1_continued_detect <= to_stdlogic(r0_input_pwr > shift_right(r0_context.threshold, 1)); -- reduce threshold by 3 dB after pulse has started
+      r1_new_detect       <= to_stdlogic(r0_input_power > r0_input_threshold);
+      r1_continued_detect <= to_stdlogic(r0_input_power > shift_right(r0_context.threshold, 1)); -- reduce threshold by 3 dB after pulse has started
     end if;
   end process;
 
@@ -158,8 +158,8 @@ begin
       case r1_context.state is
       when S_IDLE =>
         r2_context.threshold                <= r1_input_threshold;
-        r2_context.power_accum              <= resize_up(r1_input_pwr, ESM_PDW_POWER_ACCUM_WIDTH);
-        r2_context.duration                 <= (0 => 1, others => '0');
+        r2_context.power_accum              <= resize_up(r1_input_power, ESM_PDW_POWER_ACCUM_WIDTH);
+        r2_context.duration                 <= (0 => '1', others => '0');
         r2_context.recording_skipped        <= '0';
         r2_context.recording_active         <= '0';
         r2_context.recording_frame_index    <= (others => '-');
@@ -176,7 +176,7 @@ begin
 
       when S_ACTIVE =>
         r2_context.duration     <= r1_context.duration + 1; --TODO: clamp
-        r2_context.power_accum  <= r1_context.power_accum + r1_input_pwr; --TODO: clamp
+        r2_context.power_accum  <= r1_context.power_accum + r1_input_power; --TODO: clamp
 
         if (r1_context.recording_active = '1') then
           if (r1_context.recording_sample_index = (BUFFERED_SAMPLES_PER_FRAME - 1)) then
@@ -196,7 +196,7 @@ begin
 
       when S_PAD_RECORDING =>
         if (r1_context.recording_active = '1') then
-          if ((r1_context.recording_sample_padding = (BUFFERED_SAMPLE_PADDING - 1)) or (r1_context.recording_sample_index = (BUFFERED_SAMPLES_PER_FRAME - 1)) then
+          if ((r1_context.recording_sample_padding = (BUFFERED_SAMPLE_PADDING - 1)) or (r1_context.recording_sample_index = (BUFFERED_SAMPLES_PER_FRAME - 1))) then
             r2_context.recording_active         <= '0';
             r2_context.state                    <= S_STORE_REPORT;
           else
@@ -250,7 +250,7 @@ begin
   w_fifo_wr_data.channel              <= r1_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
   w_fifo_wr_data.power_accum          <= r1_context.power_accum;
   w_fifo_wr_data.power_threshold      <= r1_context.threshold;
-  w_fifo_wr_data.num_samples          <= r1_context.duration;
+  w_fifo_wr_data.duration             <= r1_context.duration;
   w_fifo_wr_data.frequency            <= (others => '0');
   w_fifo_wr_data.pulse_start_time     <= r1_context.ts_start;
   w_fifo_wr_data.buffered_frame_index <= r1_context.recording_frame_index;
@@ -260,9 +260,9 @@ begin
   generic map (
     FIFO_DEPTH        => PDW_FIFO_DEPTH,
     FIFO_WIDTH        => ESM_PDW_FIFO_DATA_WIDTH,
-    ALMOST_FULL_LEVEL => PDW_FIFO_DEPTH-1,
+    ALMOST_FULL_LEVEL => PDW_FIFO_DEPTH-1
   )
-  port (
+  port map (
     Clk         => Clk,
     Rst         => Rst,
 
@@ -286,12 +286,12 @@ begin
 
   i_sample_buffer : entity esm_lib.esm_pdw_sample_buffer
   generic map (
-    DATA_WIDTH        => IQ_WIDTH,
+    DATA_WIDTH        => DATA_WIDTH,
     SAMPLES_PER_FRAME => BUFFERED_SAMPLES_PER_FRAME
   )
   port map (
     Clk                 => Clk,
-    Rst                 => r_rst,
+    Rst                 => Rst,
 
     Buffer_full         => w_buffer_full,
     Buffer_next_index   => w_buffer_next_index,

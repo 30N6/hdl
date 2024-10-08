@@ -57,8 +57,10 @@ architecture rtl of esm_pdw_encoder is
   (
     S_IDLE,
     S_ACTIVE,
+    S_DWELL_STOP_WAIT,
     S_DWELL_DONE,
-    S_FLUSH_REPORTS
+    S_REPORT_WAIT,
+    S_CLEAR --TODO: still needed? might have originally been for the threshold module
   );
 
   signal r_rst                      : std_logic;
@@ -73,9 +75,11 @@ architecture rtl of esm_pdw_encoder is
   signal r_dwell_active             : std_logic;
   signal r_dwell_data               : esm_dwell_metadata_t;
   signal r_dwell_sequence_num       : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal r_dwell_timestamp          : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+  signal r_dwell_duration           : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
 
   signal w_iq_scaled                : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
-  signal w_threshold                : unsigned(ESM_THRESHOLD_FACTOR_WIDTH - 1 downto 0);
+  signal w_threshold                : unsigned(ESM_THRESHOLD_WIDTH - 1 downto 0);
 
   signal w_delayed_iq_ctrl          : channelizer_control_t;
   signal w_delayed_iq_data          : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
@@ -87,6 +91,9 @@ architecture rtl of esm_pdw_encoder is
   signal w_frame_req                : esm_pdw_sample_buffer_req_t;
   signal w_frame_ack                : esm_pdw_sample_buffer_ack_t;
   signal w_frame_data               : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+
+  signal w_dwell_done               : std_logic;
+  signal w_report_ack               : std_logic;
 
   signal w_pdw_fifo_overflow        : std_logic;
   signal w_sample_buffer_underflow  : std_logic;  --TODO: use
@@ -126,7 +133,7 @@ begin
 
       if (s_state = S_IDLE) then
         r_dwell_duration <= (others => '0');
-      elsif (s_state = S_S_ACTIVE) then
+      elsif (s_state = S_ACTIVE) then
         r_dwell_duration <= r_dwell_duration + 1;
       end if;
     end if;
@@ -171,13 +178,13 @@ begin
   )
   port map (
     Clk                     => Clk,
-    Rst                     => r_rst
+    Rst                     => r_rst,
 
     Timestamp               => r_timestamp,
 
     Dwell_active            => r_dwell_active,
 
-    Input_ctrl              => w_delayed_iq_ctrl
+    Input_ctrl              => w_delayed_iq_ctrl,
     Input_iq_delayed        => w_delayed_iq_data,
     Input_power             => w_delayed_iq_power,
     Input_threshold         => w_threshold,
@@ -216,11 +223,11 @@ begin
             s_state <= S_ACTIVE;
           end if;
 
-        when S_DWELL_STOP =>
-          if (r_stop_wait_count = (DWELL_STOP_CYCLES - 1)) then
+        when S_DWELL_STOP_WAIT =>
+          if (r_stop_wait_count = (DWELL_STOP_WAIT_CYCLES - 1)) then
             s_state <= S_DWELL_DONE;
           else
-            s_state <= S_DWELL_STOP;
+            s_state <= S_DWELL_STOP_WAIT;
           end if;
 
         when S_DWELL_DONE =>
@@ -248,7 +255,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (s_state /= S_DWELL_STOP) then
+      if (s_state /= S_DWELL_STOP_WAIT) then
         r_stop_wait_count <= (others => '0');
       else
         r_stop_wait_count <= r_stop_wait_count + 1;
@@ -274,8 +281,6 @@ begin
   port map (
     Clk                 => Clk,
     Rst                 => r_rst,
-
-    Timestamp           => r_timestamp,
 
     Dwell_done          => w_dwell_done,
     Dwell_data          => r_dwell_data,
