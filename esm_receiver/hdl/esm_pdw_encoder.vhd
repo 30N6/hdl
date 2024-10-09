@@ -90,7 +90,7 @@ architecture rtl of esm_pdw_encoder is
   signal w_pdw_data                 : esm_pdw_fifo_data_t;
   signal w_frame_req                : esm_pdw_sample_buffer_req_t;
   signal w_frame_ack                : esm_pdw_sample_buffer_ack_t;
-  signal w_frame_data               : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+  signal w_frame_data               : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
 
   signal w_dwell_done               : std_logic;
   signal w_report_ack               : std_logic;

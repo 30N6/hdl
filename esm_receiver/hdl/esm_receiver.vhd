@@ -51,7 +51,7 @@ end entity esm_receiver;
 architecture rtl of esm_receiver is
 
   constant AXI_FIFO_DEPTH           : natural := 64;
-  constant NUM_D2H_MUX_INPUTS       : natural := 3;
+  constant NUM_D2H_MUX_INPUTS       : natural := 5;
   constant CHANNELIZER8_DATA_WIDTH  : natural := IQ_WIDTH + 3 + 3; -- +4 for filter, +3 for ifft
   constant CHANNELIZER64_DATA_WIDTH : natural := IQ_WIDTH + 4 + 6; -- +4 for filter, +6 for ifft
 
@@ -280,7 +280,7 @@ begin
     AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
     DATA_WIDTH      => CHANNELIZER64_DATA_WIDTH,
     NUM_CHANNELS    => 64,
-    MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_WIDE
+    MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_NARROW
   )
   port map (
     Clk                 => data_clk,
@@ -302,22 +302,78 @@ begin
     Axis_last           => w_d2h_mux_in_last(1)
   );
 
+  i_pdw_encoder_8 : entity esm_lib.esm_pdw_encoder
+  generic map (
+    AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
+    DATA_WIDTH      => CHANNELIZER8_DATA_WIDTH,
+    NUM_CHANNELS    => 8,
+    MODULE_ID       => ESM_MODULE_ID_PDW_WIDE,
+    WIDE_BANDWIDTH  => TRUE
+  )
+  port map (
+    Clk                 => data_clk,
+    Rst                 => r_combined_rst,
+
+    Enable              => w_enable_chan(0),
+
+    Dwell_active        => w_dwell_active,
+    Dwell_data          => w_dwell_data,
+    Dwell_sequence_num  => w_dwell_sequence_num,
+
+    Input_ctrl          => w_channelizer8_chan_control,
+    Input_data          => w_channelizer8_chan_data,
+    Input_power         => w_channelizer8_chan_pwr,
+
+    Axis_ready          => w_d2h_mux_in_ready(2),
+    Axis_valid          => w_d2h_mux_in_valid(2),
+    Axis_data           => w_d2h_mux_in_data(2),
+    Axis_last           => w_d2h_mux_in_last(2)
+  );
+
+  i_pdw_encoder_64 : entity esm_lib.esm_pdw_encoder
+  generic map (
+    AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
+    DATA_WIDTH      => CHANNELIZER64_DATA_WIDTH,
+    NUM_CHANNELS    => 64,
+    MODULE_ID       => ESM_MODULE_ID_PDW_NARROW,
+    WIDE_BANDWIDTH  => FALSE
+  )
+  port map (
+    Clk                 => data_clk,
+    Rst                 => r_combined_rst,
+
+    Enable              => w_enable_chan(1),
+
+    Dwell_active        => w_dwell_active,
+    Dwell_data          => w_dwell_data,
+    Dwell_sequence_num  => w_dwell_sequence_num,
+
+    Input_ctrl          => w_channelizer64_chan_control,
+    Input_data          => w_channelizer64_chan_data,
+    Input_power         => w_channelizer64_chan_pwr,
+
+    Axis_ready          => w_d2h_mux_in_ready(3),
+    Axis_valid          => w_d2h_mux_in_valid(3),
+    Axis_data           => w_d2h_mux_in_data(3),
+    Axis_last           => w_d2h_mux_in_last(3)
+  );
+
   process(data_clk)
   begin
     if rising_edge(data_clk) then
-      r_test_8_chn  <= w_channelizer8_chan_control.valid  or or_reduce(std_logic_vector(w_channelizer8_chan_control.data_index)  & std_logic_vector(w_channelizer8_chan_data(0))  & std_logic_vector(w_channelizer8_chan_data(1)))  or w_channelizer8_overflow;
+      r_test_8_chn  <= '0'; --w_channelizer8_chan_control.valid  or or_reduce(std_logic_vector(w_channelizer8_chan_control.data_index)  & std_logic_vector(w_channelizer8_chan_data(0))  & std_logic_vector(w_channelizer8_chan_data(1)))  or w_channelizer8_overflow;
       r_test_8_fft  <= w_channelizer8_fft_control.valid  or or_reduce(std_logic_vector(w_channelizer8_fft_control.data_index)  & std_logic_vector(w_channelizer8_fft_data(0))  & std_logic_vector(w_channelizer8_fft_data(1)));
-      r_test_64_chn <= w_channelizer64_chan_control.valid or or_reduce(std_logic_vector(w_channelizer64_chan_control.data_index) & std_logic_vector(w_channelizer64_chan_data(0)) & std_logic_vector(w_channelizer64_chan_data(1))) or w_channelizer64_overflow;
+      r_test_64_chn <= '0'; --w_channelizer64_chan_control.valid or or_reduce(std_logic_vector(w_channelizer64_chan_control.data_index) & std_logic_vector(w_channelizer64_chan_data(0)) & std_logic_vector(w_channelizer64_chan_data(1))) or w_channelizer64_overflow;
       r_test_64_fft <= w_channelizer64_fft_control.valid or or_reduce(std_logic_vector(w_channelizer64_fft_control.data_index) & std_logic_vector(w_channelizer64_fft_data(0)) & std_logic_vector(w_channelizer64_fft_data(1)));
-      r_test_dwell  <= w_dwell_active or or_reduce(w_dwell_data.tag) or or_reduce(w_dwell_data.frequency) or or_reduce(w_dwell_data.duration) or or_reduce(w_dwell_data.gain) or or_reduce(w_dwell_data.fast_lock_profile) or or_reduce(w_dwell_data.threshold_narrow) or or_reduce(w_dwell_data.threshold_wide) or or_reduce(w_dwell_data.channel_mask_narrow) or or_reduce(w_dwell_data.channel_mask_wide);
+      r_test_dwell  <= '0'; --w_dwell_active or or_reduce(w_dwell_data.tag) or or_reduce(w_dwell_data.frequency) or or_reduce(w_dwell_data.duration) or or_reduce(w_dwell_data.gain) or or_reduce(w_dwell_data.fast_lock_profile) or or_reduce(w_dwell_data.threshold_narrow) or or_reduce(w_dwell_data.threshold_wide) or or_reduce(w_dwell_data.channel_mask_narrow) or or_reduce(w_dwell_data.channel_mask_wide);
       r_test        <= r_test_8_chn or r_test_8_fft or r_test_64_chn or r_test_64_fft or r_test_dwell;
       --r_test <= w_channelizer_valid or or_reduce(std_logic_vector(w_channelizer_index) & std_logic_vector(w_channelizer_data(0)) & std_logic_vector(w_channelizer_data(1))) or w_channelizer_overflow;
     end if;
   end process;
 
-  w_d2h_mux_in_valid(2) <= r_test;
-  w_d2h_mux_in_data(2)  <= (others => '0');
-  w_d2h_mux_in_last(2)  <= r_test;
+  w_d2h_mux_in_valid(4) <= r_test;
+  w_d2h_mux_in_data(4)  <= (others => '0');
+  w_d2h_mux_in_last(4)  <= r_test;
 
   i_d2h_mux : entity axi_lib.axis_mux
   generic map (

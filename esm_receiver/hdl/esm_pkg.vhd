@@ -20,7 +20,8 @@ package esm_pkg is
   constant ESM_MODULE_ID_DWELL_CONTROLLER               : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"01";
   constant ESM_MODULE_ID_DWELL_STATS_NARROW             : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"02";
   constant ESM_MODULE_ID_DWELL_STATS_WIDE               : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"03";
-  constant ESM_MODULE_ID_PDW                            : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"04";
+  constant ESM_MODULE_ID_PDW_NARROW                     : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"04";
+  constant ESM_MODULE_ID_PDW_WIDE                       : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"05";
 
   constant ESM_CONTROL_MESSAGE_TYPE_ENABLE              : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"00";
   constant ESM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY         : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"01";
