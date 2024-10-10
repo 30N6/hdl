@@ -102,6 +102,11 @@ architecture rtl of esm_receiver is
   signal r_test                       : std_logic;
   signal r_test_dwell                 : std_logic;
 
+  signal w_d2h_fifo_in_ready          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
+  signal w_d2h_fifo_in_valid          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
+  signal w_d2h_fifo_in_data           : std_logic_vector_array_t(NUM_D2H_MUX_INPUTS -1 downto 0)(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_d2h_fifo_in_last           : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
+
   signal w_d2h_mux_in_ready           : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
   signal w_d2h_mux_in_valid           : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
   signal w_d2h_mux_in_data            : std_logic_vector_array_t(NUM_D2H_MUX_INPUTS -1 downto 0)(AXI_DATA_WIDTH - 1 downto 0);
@@ -269,10 +274,10 @@ begin
     Input_data          => w_channelizer8_chan_data,
     Input_pwr           => w_channelizer8_chan_pwr,
 
-    Axis_ready          => w_d2h_mux_in_ready(0),
-    Axis_valid          => w_d2h_mux_in_valid(0),
-    Axis_data           => w_d2h_mux_in_data(0),
-    Axis_last           => w_d2h_mux_in_last(0)
+    Axis_ready          => w_d2h_fifo_in_ready(0),
+    Axis_valid          => w_d2h_fifo_in_valid(0),
+    Axis_data           => w_d2h_fifo_in_data(0),
+    Axis_last           => w_d2h_fifo_in_last(0)
   );
 
   i_dwell_stats_64 : entity esm_lib.esm_dwell_stats
@@ -296,10 +301,10 @@ begin
     Input_data          => w_channelizer64_chan_data,
     Input_pwr           => w_channelizer64_chan_pwr,
 
-    Axis_ready          => w_d2h_mux_in_ready(1),
-    Axis_valid          => w_d2h_mux_in_valid(1),
-    Axis_data           => w_d2h_mux_in_data(1),
-    Axis_last           => w_d2h_mux_in_last(1)
+    Axis_ready          => w_d2h_fifo_in_ready(1),
+    Axis_valid          => w_d2h_fifo_in_valid(1),
+    Axis_data           => w_d2h_fifo_in_data(1),
+    Axis_last           => w_d2h_fifo_in_last(1)
   );
 
   i_pdw_encoder_8 : entity esm_lib.esm_pdw_encoder
@@ -324,10 +329,10 @@ begin
     Input_data          => w_channelizer8_chan_data,
     Input_power         => w_channelizer8_chan_pwr,
 
-    Axis_ready          => w_d2h_mux_in_ready(2),
-    Axis_valid          => w_d2h_mux_in_valid(2),
-    Axis_data           => w_d2h_mux_in_data(2),
-    Axis_last           => w_d2h_mux_in_last(2)
+    Axis_ready          => w_d2h_fifo_in_ready(2),
+    Axis_valid          => w_d2h_fifo_in_valid(2),
+    Axis_data           => w_d2h_fifo_in_data(2),
+    Axis_last           => w_d2h_fifo_in_last(2)
   );
 
   i_pdw_encoder_64 : entity esm_lib.esm_pdw_encoder
@@ -352,10 +357,10 @@ begin
     Input_data          => w_channelizer64_chan_data,
     Input_power         => w_channelizer64_chan_pwr,
 
-    Axis_ready          => w_d2h_mux_in_ready(3),
-    Axis_valid          => w_d2h_mux_in_valid(3),
-    Axis_data           => w_d2h_mux_in_data(3),
-    Axis_last           => w_d2h_mux_in_last(3)
+    Axis_ready          => w_d2h_fifo_in_ready(3),
+    Axis_valid          => w_d2h_fifo_in_valid(3),
+    Axis_data           => w_d2h_fifo_in_data(3),
+    Axis_last           => w_d2h_fifo_in_last(3)
   );
 
   process(data_clk)
@@ -371,9 +376,30 @@ begin
     end if;
   end process;
 
-  w_d2h_mux_in_valid(4) <= r_test;
-  w_d2h_mux_in_data(4)  <= (others => '0');
-  w_d2h_mux_in_last(4)  <= r_test;
+  w_d2h_fifo_in_valid(4) <= r_test;
+  w_d2h_fifo_in_data(4)  <= (others => '0');
+  w_d2h_fifo_in_last(4)  <= r_test;
+
+  g_d2h_fifo : for i in 0 to (NUM_D2H_MUX_INPUTS - 1) generate
+    i_fifo : entity axi_lib.axis_minififo
+    generic map (
+      AXI_DATA_WIDTH => AXI_DATA_WIDTH
+    )
+    port map (
+      Clk           => data_clk,
+      Rst           => r_combined_rst,
+
+      S_axis_ready  => w_d2h_fifo_in_ready(i),
+      S_axis_valid  => w_d2h_fifo_in_valid(i),
+      S_axis_data   => w_d2h_fifo_in_data(i),
+      S_axis_last   => w_d2h_fifo_in_last(i),
+
+      M_axis_ready  => w_d2h_mux_in_ready(i),
+      M_axis_valid  => w_d2h_mux_in_valid(i),
+      M_axis_data   => w_d2h_mux_in_data(i),
+      M_axis_last   => w_d2h_mux_in_last(i)
+    );
+  end generate g_d2h_fifo;
 
   i_d2h_mux : entity axi_lib.axis_mux
   generic map (

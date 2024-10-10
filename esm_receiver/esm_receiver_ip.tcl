@@ -10,6 +10,7 @@ custom_ip_files esm_receiver [list \
   {"../axi/hdl/axis_async_fifo.vhd"       "axi_lib"}      \
   {"../axi/hdl/axis_sync_fifo.vhd"        "axi_lib"}      \
   {"../axi/hdl/axis_mux.vhd"              "axi_lib"}      \
+  {"../axi/hdl/axis_minififo.vhd"         "axi_lib"}      \
   {"../clock/hdl/adc_clk_mult_clk_wiz.v"  "clock_lib"}    \
   {"../clock/hdl/adc_clk_mult.v"          "clock_lib"}    \
   {"../mem/hdl/ram_sdp.vhd"               "mem_lib"}      \
