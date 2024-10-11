@@ -246,7 +246,7 @@ begin
       if (Rst = '1') then
         r_sequence_num <= (others => '0');
       else
-        if (r2_context.state = S_STORE_REPORT) then
+        if (r3_context.state = S_STORE_REPORT) then
           r_sequence_num <= r_sequence_num + 1;
         end if;
       end if;
@@ -262,16 +262,16 @@ begin
     end if;
   end process;
 
-  w_fifo_wr_en                        <= to_stdlogic(r2_context.state = S_STORE_REPORT);
+  w_fifo_wr_en                        <= to_stdlogic(r3_context.state = S_STORE_REPORT);
   w_fifo_wr_data.sequence_num         <= r_sequence_num;
-  w_fifo_wr_data.channel              <= resize_up(r2_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0), ESM_CHANNEL_INDEX_WIDTH);
-  w_fifo_wr_data.power_accum          <= r2_context.power_accum;
-  w_fifo_wr_data.power_threshold      <= r2_context.threshold;
-  w_fifo_wr_data.duration             <= r2_context.duration;
+  w_fifo_wr_data.channel              <= resize_up(r3_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0), ESM_CHANNEL_INDEX_WIDTH);
+  w_fifo_wr_data.power_accum          <= r3_context.power_accum;
+  w_fifo_wr_data.power_threshold      <= r3_context.threshold;
+  w_fifo_wr_data.duration             <= r3_context.duration;
   w_fifo_wr_data.frequency            <= (others => '0');
-  w_fifo_wr_data.pulse_start_time     <= r2_context.ts_start;
-  w_fifo_wr_data.buffered_frame_index <= r2_context.recording_frame_index;
-  w_fifo_wr_data.buffered_frame_valid <= not(r2_context.recording_skipped);
+  w_fifo_wr_data.pulse_start_time     <= r3_context.ts_start;
+  w_fifo_wr_data.buffered_frame_index <= r3_context.recording_frame_index;
+  w_fifo_wr_data.buffered_frame_valid <= not(r3_context.recording_skipped);
 
   i_pdw_fifo : entity mem_lib.xpm_fallthough_fifo
   generic map (
@@ -298,7 +298,7 @@ begin
   Pdw_data  <= unpack(w_fifo_rd_data);
   Pdw_valid <= not(w_fifo_empty);
 
-  w_buffer_next_start <= to_stdlogic(r2_context.state = S_IDLE) and Dwell_active and r2_new_detect;
+  w_buffer_next_start <= to_stdlogic(r2_context.state = S_IDLE) and Dwell_active and r2_new_detect and not(w_fifo_full) and not(w_buffer_full);
 
   i_sample_buffer : entity esm_lib.esm_pdw_sample_buffer
   generic map (

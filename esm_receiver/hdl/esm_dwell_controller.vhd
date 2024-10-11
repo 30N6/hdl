@@ -74,7 +74,7 @@ architecture rtl of esm_dwell_controller is
   signal w_pll_pre_lock_done        : std_logic;
   signal w_pll_locked               : std_logic;
   signal w_pll_post_lock_done       : std_logic;
-  signal w_dwell_done               : std_logic;
+  signal r_dwell_done               : std_logic;
 
   signal r_dwell_start_time_check   : std_logic;
   signal w_delay_start              : std_logic;
@@ -174,7 +174,6 @@ begin
   w_pll_pre_lock_done   <= to_stdlogic(r_pll_pre_lock_cycles = (PLL_PRE_LOCK_DELAY_CYCLES - 1));
   w_pll_locked          <= r_ad9361_status(6);
   w_pll_post_lock_done  <= to_stdlogic(r_pll_post_lock_cycles = (PLL_POST_LOCK_DELAY_CYCLES - 1));
-  w_dwell_done          <= to_stdlogic(r_dwell_entry_d.duration = r_dwell_cycles);
 
   process(Clk)
   begin
@@ -230,7 +229,7 @@ begin
           end if;
 
         when S_DWELL_ACTIVE =>
-          if (w_dwell_done = '1') then
+          if (r_dwell_done = '1') then
             s_state <= S_DWELL_DONE;
           else
             s_state <= S_DWELL_ACTIVE;
@@ -313,8 +312,10 @@ begin
     if rising_edge(Clk) then
       if (s_state = S_START_WAIT) then
         r_dwell_cycles <= (others => '0');
+        r_dwell_done   <= '0';
       else
         r_dwell_cycles <= r_dwell_cycles + 1;
+        r_dwell_done   <= to_stdlogic(r_dwell_entry_d.duration = (r_dwell_cycles + 1));
       end if;
     end if;
   end process;

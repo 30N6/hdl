@@ -117,6 +117,11 @@ architecture rtl of esm_receiver is
   signal w_d2h_mux_out_data           : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   signal w_d2h_mux_out_last           : std_logic;
 
+  signal w_d2h_minififo_out_ready     : std_logic;
+  signal w_d2h_minififo_out_valid     : std_logic;
+  signal w_d2h_minififo_out_data      : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_d2h_minififo_out_last      : std_logic;
+
   signal w_config_axis_ready          : std_logic;
   signal w_config_axis_valid          : std_logic;
   signal w_config_axis_data           : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
@@ -421,6 +426,25 @@ begin
     M_axis_last     => w_d2h_mux_out_last
   );
 
+  i_mux_fifo : entity axi_lib.axis_minififo
+  generic map (
+    AXI_DATA_WIDTH => AXI_DATA_WIDTH
+  )
+  port map (
+    Clk           => data_clk,
+    Rst           => r_combined_rst,
+
+    S_axis_ready  => w_d2h_mux_out_ready,
+    S_axis_valid  => w_d2h_mux_out_valid,
+    S_axis_data   => w_d2h_mux_out_data,
+    S_axis_last   => w_d2h_mux_out_last,
+
+    M_axis_ready  => w_d2h_minififo_out_ready,
+    M_axis_valid  => w_d2h_minififo_out_valid,
+    M_axis_data   => w_d2h_minififo_out_data,
+    M_axis_last   => w_d2h_minififo_out_last
+  );
+
   i_master_axis_fifo : entity axi_lib.axis_async_fifo
   generic map (
     FIFO_DEPTH      => AXI_FIFO_DEPTH,
@@ -429,10 +453,10 @@ begin
   port map (
     S_axis_clk      => data_clk,
     S_axis_resetn   => not(r_combined_rst),
-    S_axis_ready    => w_d2h_mux_out_ready,
-    S_axis_valid    => w_d2h_mux_out_valid,
-    S_axis_data     => w_d2h_mux_out_data,
-    S_axis_last     => w_d2h_mux_out_last,
+    S_axis_ready    => w_d2h_minififo_out_ready,
+    S_axis_valid    => w_d2h_minififo_out_valid,
+    S_axis_data     => w_d2h_minififo_out_data,
+    S_axis_last     => w_d2h_minififo_out_last,
 
     M_axis_clk      => M_axis_clk,
     M_axis_ready    => M_axis_ready,
