@@ -102,6 +102,7 @@ architecture rtl of esm_pdw_reporter is
   signal w_fifo_ready           : std_logic;
 
   signal w_fifo_valid           : std_logic;
+  signal w_fifo_valid_opt       : std_logic;
   signal w_fifo_last            : std_logic;
   signal w_fifo_partial_0_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   signal w_fifo_partial_1_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
@@ -270,13 +271,13 @@ begin
     if rising_edge(Clk) then
       if (s_state = S_CHECK_START) then
         r_words_in_msg <= (others => '0');
-      elsif (w_fifo_valid = '1') then
+      elsif (w_fifo_valid_opt = '1') then
         r_words_in_msg <= r_words_in_msg + 1;
       end if;
     end if;
   end process;
 
-  process(Clk)
+  process(all)
   begin
     w_fifo_valid  <= '0';
     w_fifo_last   <= '0';
@@ -381,10 +382,31 @@ begin
     end case;
   end process;
 
+  process(all)
+  begin
+    w_fifo_valid_opt <= '1';
+    case s_state is
+    when S_IDLE             =>  w_fifo_valid_opt <= '0';
+    when S_CHECK_START      =>  w_fifo_valid_opt <= '0';
+    when S_SUMMARY_DONE     =>  w_fifo_valid_opt <= '0';
+    when S_PULSE_DONE       =>  w_fifo_valid_opt <= '0';
+    when S_BUFFER_READ      =>  w_fifo_valid_opt <= '0';
+    when S_BUFFERED_SAMPLE  =>  w_fifo_valid_opt <= Buffered_frame_ack.sample_valid;
+    when S_PDW_READ         =>  w_fifo_valid_opt <= '0';
+    when S_REPORT_ACK       =>  w_fifo_valid_opt <= '0';
+    when others => null;
+    end case;
+  end process;
+
+  --TODO: PSL assert instead?
+  assert (w_fifo_valid_opt = w_fifo_valid)
+    report "w_fifo_valid_opt mismatch."
+    severity failure;
+
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_fifo_valid          <= w_fifo_valid;
+      r_fifo_valid          <= w_fifo_valid_opt;
       r_fifo_partial_0_data <= w_fifo_partial_0_data;
       r_fifo_partial_1_data <= w_fifo_partial_1_data;
       r_fifo_last           <= w_fifo_last;

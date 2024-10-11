@@ -51,7 +51,7 @@ end entity esm_receiver;
 architecture rtl of esm_receiver is
 
   constant AXI_FIFO_DEPTH           : natural := 64;
-  constant NUM_D2H_MUX_INPUTS       : natural := 5;
+  constant NUM_D2H_MUX_INPUTS       : natural := 4;
   constant CHANNELIZER8_DATA_WIDTH  : natural := IQ_WIDTH + 3 + 3; -- +4 for filter, +3 for ifft
   constant CHANNELIZER64_DATA_WIDTH : natural := IQ_WIDTH + 4 + 6; -- +4 for filter, +6 for ifft
 
@@ -224,8 +224,8 @@ begin
     Output_chan_data      => w_channelizer8_chan_data,
     Output_chan_pwr       => w_channelizer8_chan_pwr,
 
-    Output_fft_ctrl       => w_channelizer8_fft_control,
-    Output_fft_data       => w_channelizer8_fft_data,
+    Output_fft_ctrl       => w_channelizer8_fft_control,  --TODO: unused
+    Output_fft_data       => w_channelizer8_fft_data, --TODO: unused
 
     Error_filter_overflow => w_channelizer8_overflow,
     Error_mux_overflow    => open,
@@ -247,10 +247,10 @@ begin
 
     Output_chan_ctrl      => w_channelizer64_chan_control,
     Output_chan_data      => w_channelizer64_chan_data,
-
-    Output_fft_ctrl       => w_channelizer64_fft_control,
-    Output_fft_data       => w_channelizer64_fft_data,
     Output_chan_pwr       => w_channelizer64_chan_pwr,
+
+    Output_fft_ctrl       => w_channelizer64_fft_control, --TODO: unused
+    Output_fft_data       => w_channelizer64_fft_data, --TODO: unused
 
     Error_filter_overflow => w_channelizer64_overflow,
     Error_mux_overflow    => open,
@@ -367,23 +367,6 @@ begin
     Axis_data           => w_d2h_fifo_in_data(3),
     Axis_last           => w_d2h_fifo_in_last(3)
   );
-
-  process(data_clk)
-  begin
-    if rising_edge(data_clk) then
-      r_test_8_chn  <= '0'; --w_channelizer8_chan_control.valid  or or_reduce(std_logic_vector(w_channelizer8_chan_control.data_index)  & std_logic_vector(w_channelizer8_chan_data(0))  & std_logic_vector(w_channelizer8_chan_data(1)))  or w_channelizer8_overflow;
-      r_test_8_fft  <= w_channelizer8_fft_control.valid  or or_reduce(std_logic_vector(w_channelizer8_fft_control.data_index)  & std_logic_vector(w_channelizer8_fft_data(0))  & std_logic_vector(w_channelizer8_fft_data(1)));
-      r_test_64_chn <= '0'; --w_channelizer64_chan_control.valid or or_reduce(std_logic_vector(w_channelizer64_chan_control.data_index) & std_logic_vector(w_channelizer64_chan_data(0)) & std_logic_vector(w_channelizer64_chan_data(1))) or w_channelizer64_overflow;
-      r_test_64_fft <= w_channelizer64_fft_control.valid or or_reduce(std_logic_vector(w_channelizer64_fft_control.data_index) & std_logic_vector(w_channelizer64_fft_data(0)) & std_logic_vector(w_channelizer64_fft_data(1)));
-      r_test_dwell  <= '0'; --w_dwell_active or or_reduce(w_dwell_data.tag) or or_reduce(w_dwell_data.frequency) or or_reduce(w_dwell_data.duration) or or_reduce(w_dwell_data.gain) or or_reduce(w_dwell_data.fast_lock_profile) or or_reduce(w_dwell_data.threshold_narrow) or or_reduce(w_dwell_data.threshold_wide) or or_reduce(w_dwell_data.channel_mask_narrow) or or_reduce(w_dwell_data.channel_mask_wide);
-      r_test        <= r_test_8_chn or r_test_8_fft or r_test_64_chn or r_test_64_fft or r_test_dwell;
-      --r_test <= w_channelizer_valid or or_reduce(std_logic_vector(w_channelizer_index) & std_logic_vector(w_channelizer_data(0)) & std_logic_vector(w_channelizer_data(1))) or w_channelizer_overflow;
-    end if;
-  end process;
-
-  w_d2h_fifo_in_valid(4) <= r_test;
-  w_d2h_fifo_in_data(4)  <= (others => '0');
-  w_d2h_fifo_in_last(4)  <= r_test;
 
   g_d2h_fifo : for i in 0 to (NUM_D2H_MUX_INPUTS - 1) generate
     i_fifo : entity axi_lib.axis_minififo

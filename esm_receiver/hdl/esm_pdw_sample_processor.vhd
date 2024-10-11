@@ -65,7 +65,9 @@ architecture rtl of esm_pdw_sample_processor is
   type channel_context_t is record
     state                     : channel_state_t;
     threshold                 : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-    power_accum               : unsigned(ESM_PDW_POWER_ACCUM_WIDTH - 1 downto 0);
+    power_accum_a             : unsigned(ESM_PDW_POWER_ACCUM_WIDTH - 16 - 1 downto 0);
+    power_accum_ac            : std_logic;
+    power_accum_b             : unsigned(15 downto 0);
     duration                  : unsigned(ESM_PDW_CYCLE_COUNT_WIDTH - 1 downto 0);
     recording_skipped         : std_logic;
     recording_active          : std_logic;
@@ -101,9 +103,12 @@ architecture rtl of esm_pdw_sample_processor is
   signal r2_new_detect              : std_logic;
   signal r2_continued_detect        : std_logic;
 
+  signal r3_input_ctrl              : channelizer_control_t;
   signal r3_context                 : channel_context_t;
   signal r3_context_wr_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r3_context_wr_valid        : std_logic;
+
+  signal w3_power_accum_b           : unsigned(15 downto 0);
 
   signal r_sequence_num             : unsigned(31 downto 0);
 
@@ -112,8 +117,8 @@ architecture rtl of esm_pdw_sample_processor is
   signal w_buffer_next_start        : std_logic;
 
   signal w_fifo_full                : std_logic;
-  signal w_fifo_wr_data             : esm_pdw_fifo_data_t;
-  signal w_fifo_wr_en               : std_logic;
+  signal r_fifo_wr_data             : esm_pdw_fifo_data_t;
+  signal r_fifo_wr_en               : std_logic;
   signal w_fifo_empty               : std_logic;
   signal w_fifo_rd_data             : std_logic_vector(ESM_PDW_FIFO_DATA_WIDTH - 1 downto 0);
 
@@ -170,12 +175,15 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r3_context <= r2_context;
+      r3_input_ctrl <= r2_input_ctrl;
+      r3_context    <= r2_context;
 
       case r2_context.state is
       when S_IDLE =>
         r3_context.threshold                <= r2_input_threshold;
-        r3_context.power_accum              <= resize_up(r2_input_power, ESM_PDW_POWER_ACCUM_WIDTH);
+        r3_context.power_accum_a            <= resize_up(r2_input_power, ESM_PDW_POWER_ACCUM_WIDTH - 16);
+        r3_context.power_accum_ac           <= '0';
+        r3_context.power_accum_b            <= (others => '0');
         r3_context.duration                 <= (0 => '1', others => '0');
         r3_context.recording_skipped        <= '0';
         r3_context.recording_active         <= '0';
@@ -192,8 +200,10 @@ begin
         end if;
 
       when S_ACTIVE =>
-        r3_context.duration     <= r2_context.duration + 1; --TODO: clamp
-        r3_context.power_accum  <= r2_context.power_accum + r2_input_power; --TODO: clamp
+        r3_context.duration <= r2_context.duration + 1; --TODO: clamp
+
+        (r3_context.power_accum_ac, r3_context.power_accum_a) <= ('0' & r2_context.power_accum_a) + r2_input_power; --TODO: clamp
+        r3_context.power_accum_b <= r2_context.power_accum_b + unsigned'('0' & r2_context.power_accum_ac);
 
         if (r2_context.recording_active = '1') then
           if (r2_context.recording_sample_index = (BUFFERED_SAMPLES_PER_FRAME - 1)) then
@@ -262,28 +272,35 @@ begin
     end if;
   end process;
 
-  w_fifo_wr_en                        <= to_stdlogic(r3_context.state = S_STORE_REPORT);
-  w_fifo_wr_data.sequence_num         <= r_sequence_num;
-  w_fifo_wr_data.channel              <= resize_up(r3_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0), ESM_CHANNEL_INDEX_WIDTH);
-  w_fifo_wr_data.power_accum          <= r3_context.power_accum;
-  w_fifo_wr_data.power_threshold      <= r3_context.threshold;
-  w_fifo_wr_data.duration             <= r3_context.duration;
-  w_fifo_wr_data.frequency            <= (others => '0');
-  w_fifo_wr_data.pulse_start_time     <= r3_context.ts_start;
-  w_fifo_wr_data.buffered_frame_index <= r3_context.recording_frame_index;
-  w_fifo_wr_data.buffered_frame_valid <= not(r3_context.recording_skipped);
+  w3_power_accum_b <= r3_context.power_accum_b + unsigned'('0' & r3_context.power_accum_ac);
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_fifo_wr_en                        <= to_stdlogic(r3_context.state = S_STORE_REPORT);
+      r_fifo_wr_data.sequence_num         <= r_sequence_num;
+      r_fifo_wr_data.channel              <= resize_up(r3_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0), ESM_CHANNEL_INDEX_WIDTH);
+      r_fifo_wr_data.power_accum          <= w3_power_accum_b & r3_context.power_accum_a;
+      r_fifo_wr_data.power_threshold      <= r3_context.threshold;
+      r_fifo_wr_data.duration             <= r3_context.duration;
+      r_fifo_wr_data.frequency            <= (others => '0');
+      r_fifo_wr_data.pulse_start_time     <= r3_context.ts_start;
+      r_fifo_wr_data.buffered_frame_index <= r3_context.recording_frame_index;
+      r_fifo_wr_data.buffered_frame_valid <= not(r3_context.recording_skipped);
+    end if;
+  end process;
 
   i_pdw_fifo : entity mem_lib.xpm_fallthough_fifo
   generic map (
-    FIFO_DEPTH        => PDW_FIFO_DEPTH,
-    FIFO_WIDTH        => ESM_PDW_FIFO_DATA_WIDTH
+    FIFO_DEPTH  => PDW_FIFO_DEPTH,
+    FIFO_WIDTH  => ESM_PDW_FIFO_DATA_WIDTH
   )
   port map (
     Clk         => Clk,
     Rst         => Rst,
 
-    Wr_en       => w_fifo_wr_en,
-    Wr_data     => pack(w_fifo_wr_data),
+    Wr_en       => r_fifo_wr_en,
+    Wr_data     => pack(r_fifo_wr_data),
     Almost_full => open,
     Full        => w_fifo_full,
 

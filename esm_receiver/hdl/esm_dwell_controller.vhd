@@ -80,6 +80,7 @@ architecture rtl of esm_dwell_controller is
   signal w_delay_start              : std_logic;
 
   signal r_global_counter           : unsigned(31 downto 0);
+  signal r_global_counter_is_zero   : std_logic;
   signal r_dwell_cycles             : unsigned(31 downto 0);
   signal r_dwell_repeat             : unsigned(3 downto 0);
   signal r_instruction_index        : unsigned(ESM_DWELL_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
@@ -170,7 +171,7 @@ begin
     end if;
   end process;
 
-  w_instructions_done   <= not(r_instruction_data.valid) or (r_instruction_data.global_counter_check and to_stdlogic(r_global_counter = 0));
+  w_instructions_done   <= not(r_instruction_data.valid) or (r_instruction_data.global_counter_check and r_global_counter_is_zero);
   w_pll_pre_lock_done   <= to_stdlogic(r_pll_pre_lock_cycles = (PLL_PRE_LOCK_DELAY_CYCLES - 1));
   w_pll_locked          <= r_ad9361_status(6);
   w_pll_post_lock_done  <= to_stdlogic(r_pll_post_lock_cycles = (PLL_POST_LOCK_DELAY_CYCLES - 1));
@@ -259,11 +260,13 @@ begin
   begin
     if rising_edge(Clk) then
       if (s_state = S_IDLE) then
-        r_global_counter    <= r_dwell_program_data.global_counter_init;
-        r_instruction_index <= (others => '0');
+        r_global_counter          <= r_dwell_program_data.global_counter_init;
+        r_global_counter_is_zero  <= to_stdlogic(r_dwell_program_data.global_counter_init = 0);
+        r_instruction_index       <= (others => '0');
       elsif (s_state = S_DWELL_DONE) then
         if (r_instruction_data.global_counter_dec = '1') then
-          r_global_counter <= r_global_counter - 1;
+          r_global_counter          <= r_global_counter - 1;
+          r_global_counter_is_zero  <= to_stdlogic(r_global_counter = 1);
         end if;
 
         if (r_dwell_repeat = 0) then
@@ -315,7 +318,7 @@ begin
         r_dwell_done   <= '0';
       else
         r_dwell_cycles <= r_dwell_cycles + 1;
-        r_dwell_done   <= to_stdlogic(r_dwell_entry_d.duration = (r_dwell_cycles + 1));
+        r_dwell_done   <= to_stdlogic(r_dwell_entry_d.duration = r_dwell_cycles);
       end if;
     end if;
   end process;
