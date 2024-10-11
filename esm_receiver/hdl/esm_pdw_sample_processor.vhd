@@ -92,12 +92,18 @@ architecture rtl of esm_pdw_sample_processor is
   signal r1_input_power             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r1_input_threshold         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r1_context                 : channel_context_t;
-  signal r1_new_detect              : std_logic;
-  signal r1_continued_detect        : std_logic;
 
+  signal r2_input_ctrl              : channelizer_control_t;
+  signal r2_input_iq                : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+  signal r2_input_power             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r2_input_threshold         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r2_context                 : channel_context_t;
-  signal r2_context_wr_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal r2_context_wr_valid        : std_logic;
+  signal r2_new_detect              : std_logic;
+  signal r2_continued_detect        : std_logic;
+
+  signal r3_context                 : channel_context_t;
+  signal r3_context_wr_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r3_context_wr_valid        : std_logic;
 
   signal r_sequence_num             : unsigned(31 downto 0);
 
@@ -145,80 +151,91 @@ begin
       r1_input_power      <= r0_input_power;
       r1_input_threshold  <= r0_input_threshold;
       r1_context          <= r0_context;
-      r1_new_detect       <= to_stdlogic(r0_input_power > r0_input_threshold);
-      r1_continued_detect <= to_stdlogic(r0_input_power > shift_right(r0_context.threshold, 1)); -- reduce threshold by 3 dB after pulse has started
     end if;
   end process;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r2_context <= r1_context;
+      r2_input_ctrl       <= r1_input_ctrl;
+      r2_input_iq         <= r1_input_iq;
+      r2_input_power      <= r1_input_power;
+      r2_input_threshold  <= r1_input_threshold;
+      r2_context          <= r1_context;
+      r2_new_detect       <= to_stdlogic(r1_input_power > r1_input_threshold);
+      r2_continued_detect <= to_stdlogic(r1_input_power > shift_right(r1_context.threshold, 1)); -- reduce threshold by 3 dB after pulse has started
+    end if;
+  end process;
 
-      case r1_context.state is
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r3_context <= r2_context;
+
+      case r2_context.state is
       when S_IDLE =>
-        r2_context.threshold                <= r1_input_threshold;
-        r2_context.power_accum              <= resize_up(r1_input_power, ESM_PDW_POWER_ACCUM_WIDTH);
-        r2_context.duration                 <= (0 => '1', others => '0');
-        r2_context.recording_skipped        <= '0';
-        r2_context.recording_active         <= '0';
-        r2_context.recording_frame_index    <= (others => '-');
-        r2_context.recording_sample_index   <= (others => '-');
-        r2_context.recording_sample_padding <= (others => '0');
-        r2_context.ts_start                 <= Timestamp;
+        r3_context.threshold                <= r2_input_threshold;
+        r3_context.power_accum              <= resize_up(r2_input_power, ESM_PDW_POWER_ACCUM_WIDTH);
+        r3_context.duration                 <= (0 => '1', others => '0');
+        r3_context.recording_skipped        <= '0';
+        r3_context.recording_active         <= '0';
+        r3_context.recording_frame_index    <= (others => '-');
+        r3_context.recording_sample_index   <= (others => '-');
+        r3_context.recording_sample_padding <= (others => '0');
+        r3_context.ts_start                 <= Timestamp;
 
-        if ((Dwell_active = '1') and (r1_new_detect = '1') and (w_fifo_full = '0')) then
-          r2_context.state                  <= S_ACTIVE;
-          r2_context.recording_skipped      <= w_buffer_full;
-          r2_context.recording_active       <= not(w_buffer_full);
-          r2_context.recording_frame_index  <= w_buffer_next_index;
+        if ((Dwell_active = '1') and (r2_new_detect = '1') and (w_fifo_full = '0')) then
+          r3_context.state                  <= S_ACTIVE;
+          r3_context.recording_skipped      <= w_buffer_full;
+          r3_context.recording_active       <= not(w_buffer_full);
+          r3_context.recording_frame_index  <= w_buffer_next_index;
         end if;
 
       when S_ACTIVE =>
-        r2_context.duration     <= r1_context.duration + 1; --TODO: clamp
-        r2_context.power_accum  <= r1_context.power_accum + r1_input_power; --TODO: clamp
+        r3_context.duration     <= r2_context.duration + 1; --TODO: clamp
+        r3_context.power_accum  <= r2_context.power_accum + r2_input_power; --TODO: clamp
 
-        if (r1_context.recording_active = '1') then
-          if (r1_context.recording_sample_index = (BUFFERED_SAMPLES_PER_FRAME - 1)) then
-            r2_context.recording_active <= '0';
+        if (r2_context.recording_active = '1') then
+          if (r2_context.recording_sample_index = (BUFFERED_SAMPLES_PER_FRAME - 1)) then
+            r3_context.recording_active <= '0';
           else
-            r2_context.recording_sample_index <= r1_context.recording_sample_index + 1;
+            r3_context.recording_sample_index <= r2_context.recording_sample_index + 1;
           end if;
         end if;
 
-        if ((Dwell_active = '0') or (r1_continued_detect = '0')) then
-          if ((r1_context.recording_active = '0') or (r1_context.recording_sample_index = (BUFFERED_SAMPLES_PER_FRAME - 1))) then
-            r2_context.state <= S_STORE_REPORT;
+        if ((Dwell_active = '0') or (r2_continued_detect = '0')) then
+          if ((r2_context.recording_active = '0') or (r2_context.recording_sample_index = (BUFFERED_SAMPLES_PER_FRAME - 1))) then
+            r3_context.state <= S_STORE_REPORT;
           else
-            r2_context.state <= S_PAD_RECORDING;
+            r3_context.state <= S_PAD_RECORDING;
           end if;
         end if;
 
       when S_PAD_RECORDING =>
-        if (r1_context.recording_active = '1') then
-          if ((r1_context.recording_sample_padding = (BUFFERED_SAMPLE_PADDING - 1)) or (r1_context.recording_sample_index = (BUFFERED_SAMPLES_PER_FRAME - 1))) then
-            r2_context.recording_active         <= '0';
-            r2_context.state                    <= S_STORE_REPORT;
+        if (r2_context.recording_active = '1') then
+          if ((r2_context.recording_sample_padding = (BUFFERED_SAMPLE_PADDING - 1)) or (r2_context.recording_sample_index = (BUFFERED_SAMPLES_PER_FRAME - 1))) then
+            r3_context.recording_active         <= '0';
+            r3_context.state                    <= S_STORE_REPORT;
           else
-            r2_context.recording_sample_padding <= r1_context.recording_sample_padding + 1;
-            r2_context.recording_sample_index   <= r1_context.recording_sample_index + 1;
+            r3_context.recording_sample_padding <= r2_context.recording_sample_padding + 1;
+            r3_context.recording_sample_index   <= r2_context.recording_sample_index + 1;
           end if;
         else
-          r2_context.state <= S_STORE_REPORT;
+          r3_context.state <= S_STORE_REPORT;
         end if;
 
       when S_STORE_REPORT =>
-        r2_context.state <= S_IDLE;
+        r3_context.state <= S_IDLE;
 
       end case;
 
       if (Rst = '1') then
-        r2_context_wr_index <= r_reset_index;
-        r2_context_wr_valid <= '1';
-        r2_context.state    <= S_IDLE;
+        r3_context_wr_index <= r_reset_index;
+        r3_context_wr_valid <= '1';
+        r3_context.state    <= S_IDLE;
       else
-        r2_context_wr_index <= r1_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
-        r2_context_wr_valid <= r1_input_ctrl.valid;
+        r3_context_wr_index <= r2_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
+        r3_context_wr_valid <= r2_input_ctrl.valid;
       end if;
     end if;
   end process;
@@ -229,7 +246,7 @@ begin
       if (Rst = '1') then
         r_sequence_num <= (others => '0');
       else
-        if (r1_context.state = S_STORE_REPORT) then
+        if (r2_context.state = S_STORE_REPORT) then
           r_sequence_num <= r_sequence_num + 1;
         end if;
       end if;
@@ -239,22 +256,22 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (r2_context_wr_valid = '1') then
-        m_channel_context(to_integer(r2_context_wr_index)) <= r2_context;
+      if (r3_context_wr_valid = '1') then
+        m_channel_context(to_integer(r3_context_wr_index)) <= r3_context;
       end if;
     end if;
   end process;
 
-  w_fifo_wr_en                        <= to_stdlogic(r1_context.state = S_STORE_REPORT);
+  w_fifo_wr_en                        <= to_stdlogic(r2_context.state = S_STORE_REPORT);
   w_fifo_wr_data.sequence_num         <= r_sequence_num;
-  w_fifo_wr_data.channel              <= resize_up(r1_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0), ESM_CHANNEL_INDEX_WIDTH);
-  w_fifo_wr_data.power_accum          <= r1_context.power_accum;
-  w_fifo_wr_data.power_threshold      <= r1_context.threshold;
-  w_fifo_wr_data.duration             <= r1_context.duration;
+  w_fifo_wr_data.channel              <= resize_up(r2_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0), ESM_CHANNEL_INDEX_WIDTH);
+  w_fifo_wr_data.power_accum          <= r2_context.power_accum;
+  w_fifo_wr_data.power_threshold      <= r2_context.threshold;
+  w_fifo_wr_data.duration             <= r2_context.duration;
   w_fifo_wr_data.frequency            <= (others => '0');
-  w_fifo_wr_data.pulse_start_time     <= r1_context.ts_start;
-  w_fifo_wr_data.buffered_frame_index <= r1_context.recording_frame_index;
-  w_fifo_wr_data.buffered_frame_valid <= not(r1_context.recording_skipped);
+  w_fifo_wr_data.pulse_start_time     <= r2_context.ts_start;
+  w_fifo_wr_data.buffered_frame_index <= r2_context.recording_frame_index;
+  w_fifo_wr_data.buffered_frame_valid <= not(r2_context.recording_skipped);
 
   i_pdw_fifo : entity mem_lib.xpm_fallthough_fifo
   generic map (
@@ -281,7 +298,7 @@ begin
   Pdw_data  <= unpack(w_fifo_rd_data);
   Pdw_valid <= not(w_fifo_empty);
 
-  w_buffer_next_start <= to_stdlogic(r1_context.state = S_IDLE) and Dwell_active and r1_new_detect;
+  w_buffer_next_start <= to_stdlogic(r2_context.state = S_IDLE) and Dwell_active and r2_new_detect;
 
   i_sample_buffer : entity esm_lib.esm_pdw_sample_buffer
   generic map (
@@ -296,10 +313,10 @@ begin
     Buffer_next_index   => w_buffer_next_index,
     Buffer_next_start   => w_buffer_next_start,
 
-    Input_valid         => r1_context.recording_active,
-    Input_frame_index   => r1_context.recording_frame_index,
-    Input_sample_index  => r1_context.recording_sample_index,
-    Input_data          => r1_input_iq,
+    Input_valid         => r2_context.recording_active,
+    Input_frame_index   => r2_context.recording_frame_index,
+    Input_sample_index  => r2_context.recording_sample_index,
+    Input_data          => r2_input_iq,
 
     Output_frame_req    => Buffered_frame_req,
     Output_frame_ack    => Buffered_frame_ack,
