@@ -208,30 +208,30 @@ begin
 
   w_adc_data_in <= (r_adc_data_q, r_adc_data_i);
 
-  i_channelizer_8 : entity dsp_lib.channelizer_8
-  generic map (
-    INPUT_DATA_WIDTH  => IQ_WIDTH,
-    OUTPUT_DATA_WIDTH => CHANNELIZER8_DATA_WIDTH
-  )
-  port map (
-    Clk                   => data_clk,
-    Rst                   => r_combined_rst,
-
-    Input_valid           => r_adc_valid, --TODO: gated x4
-    Input_data            => w_adc_data_in,
-
-    Output_chan_ctrl      => w_channelizer8_chan_control,
-    Output_chan_data      => w_channelizer8_chan_data,
-    Output_chan_pwr       => w_channelizer8_chan_pwr,
-
-    Output_fft_ctrl       => w_channelizer8_fft_control,  --TODO: unused
-    Output_fft_data       => w_channelizer8_fft_data, --TODO: unused
-
-    Error_filter_overflow => w_channelizer8_overflow,
-    Error_mux_overflow    => open,
-    Error_mux_underflow   => open,
-    Error_mux_collision   => open
-  );
+  --i_channelizer_8 : entity dsp_lib.channelizer_8
+  --generic map (
+  --  INPUT_DATA_WIDTH  => IQ_WIDTH,
+  --  OUTPUT_DATA_WIDTH => CHANNELIZER8_DATA_WIDTH
+  --)
+  --port map (
+  --  Clk                   => data_clk,
+  --  Rst                   => r_combined_rst,
+  --
+  --  Input_valid           => r_adc_valid, --TODO: gated x4
+  --  Input_data            => w_adc_data_in,
+  --
+  --  Output_chan_ctrl      => w_channelizer8_chan_control,
+  --  Output_chan_data      => w_channelizer8_chan_data,
+  --  Output_chan_pwr       => w_channelizer8_chan_pwr,
+  --
+  --  Output_fft_ctrl       => w_channelizer8_fft_control,  --TODO: unused
+  --  Output_fft_data       => w_channelizer8_fft_data, --TODO: unused
+  --
+  --  Error_filter_overflow => w_channelizer8_overflow,
+  --  Error_mux_overflow    => open,
+  --  Error_mux_underflow   => open,
+  --  Error_mux_collision   => open
+  --);
 
   i_channelizer_64 : entity dsp_lib.channelizer_64
   generic map (
@@ -258,32 +258,35 @@ begin
     Error_mux_collision   => open
   );
 
-  i_dwell_stats_8 : entity esm_lib.esm_dwell_stats
-  generic map (
-    AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
-    DATA_WIDTH      => CHANNELIZER8_DATA_WIDTH,
-    NUM_CHANNELS    => 8,
-    MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_WIDE
-  )
-  port map (
-    Clk                 => data_clk,
-    Rst                 => r_combined_rst,
-
-    Enable              => w_enable_chan(0),
-
-    Dwell_active        => w_dwell_active,
-    Dwell_data          => w_dwell_data,
-    Dwell_sequence_num  => w_dwell_sequence_num,
-
-    Input_ctrl          => w_channelizer8_chan_control,
-    Input_data          => w_channelizer8_chan_data,
-    Input_pwr           => w_channelizer8_chan_pwr,
-
-    Axis_ready          => w_d2h_fifo_in_ready(0),
-    Axis_valid          => w_d2h_fifo_in_valid(0),
-    Axis_data           => w_d2h_fifo_in_data(0),
-    Axis_last           => w_d2h_fifo_in_last(0)
-  );
+  --i_dwell_stats_8 : entity esm_lib.esm_dwell_stats
+  --generic map (
+  --  AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
+  --  DATA_WIDTH      => CHANNELIZER8_DATA_WIDTH,
+  --  NUM_CHANNELS    => 8,
+  --  MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_WIDE
+  --)
+  --port map (
+  --  Clk                 => data_clk,
+  --  Rst                 => r_combined_rst,
+  --
+  --  Enable              => w_enable_chan(0),
+  --
+  --  Dwell_active        => w_dwell_active,
+  --  Dwell_data          => w_dwell_data,
+  --  Dwell_sequence_num  => w_dwell_sequence_num,
+  --
+  --  Input_ctrl          => w_channelizer8_chan_control,
+  --  Input_data          => w_channelizer8_chan_data,
+  --  Input_pwr           => w_channelizer8_chan_pwr,
+  --
+  --  Axis_ready          => w_d2h_fifo_in_ready(0),
+  --  Axis_valid          => w_d2h_fifo_in_valid(0),
+  --  Axis_data           => w_d2h_fifo_in_data(0),
+  --  Axis_last           => w_d2h_fifo_in_last(0)
+  --);
+  w_d2h_fifo_in_valid(0)  <= '0';
+  w_d2h_fifo_in_data(0)   <= (others => '0');
+  w_d2h_fifo_in_last(0)   <= '0';
 
   i_dwell_stats_64 : entity esm_lib.esm_dwell_stats
   generic map (
@@ -312,33 +315,36 @@ begin
     Axis_last           => w_d2h_fifo_in_last(1)
   );
 
-  i_pdw_encoder_8 : entity esm_lib.esm_pdw_encoder
-  generic map (
-    AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
-    DATA_WIDTH      => CHANNELIZER8_DATA_WIDTH,
-    NUM_CHANNELS    => 8,
-    MODULE_ID       => ESM_MODULE_ID_PDW_WIDE,
-    WIDE_BANDWIDTH  => TRUE
-  )
-  port map (
-    Clk                 => data_clk,
-    Rst                 => r_combined_rst,
-
-    Enable              => w_enable_chan(0),
-
-    Dwell_active        => w_dwell_active,
-    Dwell_data          => w_dwell_data,
-    Dwell_sequence_num  => w_dwell_sequence_num,
-
-    Input_ctrl          => w_channelizer8_chan_control,
-    Input_data          => w_channelizer8_chan_data,
-    Input_power         => w_channelizer8_chan_pwr,
-
-    Axis_ready          => w_d2h_fifo_in_ready(2),
-    Axis_valid          => w_d2h_fifo_in_valid(2),
-    Axis_data           => w_d2h_fifo_in_data(2),
-    Axis_last           => w_d2h_fifo_in_last(2)
-  );
+  --i_pdw_encoder_8 : entity esm_lib.esm_pdw_encoder
+  --generic map (
+  --  AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
+  --  DATA_WIDTH      => CHANNELIZER8_DATA_WIDTH,
+  --  NUM_CHANNELS    => 8,
+  --  MODULE_ID       => ESM_MODULE_ID_PDW_WIDE,
+  --  WIDE_BANDWIDTH  => TRUE
+  --)
+  --port map (
+  --  Clk                 => data_clk,
+  --  Rst                 => r_combined_rst,
+  --
+  --  Enable              => w_enable_chan(0),
+  --
+  --  Dwell_active        => w_dwell_active,
+  --  Dwell_data          => w_dwell_data,
+  --  Dwell_sequence_num  => w_dwell_sequence_num,
+  --
+  --  Input_ctrl          => w_channelizer8_chan_control,
+  --  Input_data          => w_channelizer8_chan_data,
+  --  Input_power         => w_channelizer8_chan_pwr,
+  --
+  --  Axis_ready          => w_d2h_fifo_in_ready(2),
+  --  Axis_valid          => w_d2h_fifo_in_valid(2),
+  --  Axis_data           => w_d2h_fifo_in_data(2),
+  --  Axis_last           => w_d2h_fifo_in_last(2)
+  --);
+  w_d2h_fifo_in_valid(2)  <= '0';
+  w_d2h_fifo_in_data(2)   <= (others => '0');
+  w_d2h_fifo_in_last(2)   <= '0';
 
   i_pdw_encoder_64 : entity esm_lib.esm_pdw_encoder
   generic map (
