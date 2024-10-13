@@ -200,10 +200,12 @@ begin
         end if;
 
       when S_ACTIVE =>
-        r3_context.duration <= r2_context.duration + 1; --TODO: clamp
 
-        (r3_context.power_accum_ac, r3_context.power_accum_a) <= ('0' & r2_context.power_accum_a) + r2_input_power; --TODO: clamp
-        r3_context.power_accum_b <= r2_context.power_accum_b + unsigned'('0' & r2_context.power_accum_ac);
+        if (r2_continued_detect = '1') then
+          r3_context.duration                                   <= r2_context.duration + 1; --TODO: clamp
+          (r3_context.power_accum_ac, r3_context.power_accum_a) <= ('0' & r2_context.power_accum_a) + r2_input_power; --TODO: clamp
+          r3_context.power_accum_b                              <= r2_context.power_accum_b + unsigned'('0' & r2_context.power_accum_ac);
+        end if;
 
         if (r2_context.recording_active = '1') then
           if (r2_context.recording_sample_index = (BUFFERED_SAMPLES_PER_FRAME - 1)) then

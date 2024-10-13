@@ -263,6 +263,9 @@ module esm_pdw_encoder_tb;
     esm_pdw_report_header_t header_a = unpack_report_header(a);
     esm_pdw_report_header_t header_b = unpack_report_header(b);
 
+    $display("%0t: data_match: header_a=%p", $time, header_a);
+    $display("%0t: data_match: header_b=%p", $time, header_b);
+
     if (a.size() != b.size()) begin
       $display("%0t: size mismatch: a=%0d b=%0d", $time, a.size(), b.size());
       return 0;
@@ -292,6 +295,9 @@ module esm_pdw_encoder_tb;
       esm_pdw_summary_report_header_t report_a = unpack_summary_report_header(a);
       esm_pdw_summary_report_header_t report_b = unpack_summary_report_header(b);
 
+      $display("%0t: data_match: report_a=%p", $time, report_a);
+      $display("%0t: data_match: report_b=%p", $time, report_b);
+
       //TODO: check dwell_duration
 
       if (report_a.dwell_sequence_num !== report_b.dwell_sequence_num) begin
@@ -314,6 +320,9 @@ module esm_pdw_encoder_tb;
     end else if (header_a.message_type == esm_report_message_type_pdw_pulse) begin
       esm_pdw_pulse_report_header_t report_a = unpack_pulse_report_header(a);
       esm_pdw_pulse_report_header_t report_b = unpack_pulse_report_header(b);
+
+      $display("%0t: data_match: report_a=%p", $time, report_a);
+      $display("%0t: data_match: report_b=%p", $time, report_b);
 
       if (report_a.dwell_sequence_num !== report_b.dwell_sequence_num) begin
         $display("dwell_sequence_num mismatch: %X %X", report_a.dwell_sequence_num, report_b.dwell_sequence_num);
@@ -406,12 +415,15 @@ module esm_pdw_encoder_tb;
     for (int i = 0; i < dwell_input.size(); i++) begin
       dwell_channel_data_t di = dwell_input[i];
       int i_ch                = dwell_input[i].channel;
+      bit continued_detect    = (di.power > continued_threshold);
 
       if (pulse_active[i_ch]) begin
-        pulse_duration[i_ch]++;
-        pulse_power_accum[i_ch] += di.power;
+        if (continued_detect) begin
+          pulse_duration[i_ch]++;
+          pulse_power_accum[i_ch] += di.power;
+        end
 
-        if ((di.power <= continued_threshold) || (i == (dwell_input.size() - 1))) begin
+        if (!continued_detect || (i == (dwell_input.size() - 1))) begin
           expect_t r;
           esm_pdw_pulse_report_header_t report_header;
           pdw_pulse_report_header_bits_t report_header_packed;
@@ -432,7 +444,7 @@ module esm_pdw_encoder_tb;
 
           report_header_packed = pdw_pulse_report_header_bits_t'(report_header);
           //$display("report_packed: %X", report_header_packed);
-          $display("pulse_report_header: %p", report_header);
+          $display("pulse_report_header ex: %p", report_header);
 
           for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
             r.data.push_back(report_header_packed[(NUM_PULSE_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
@@ -476,7 +488,7 @@ module esm_pdw_encoder_tb;
 
       report_header_packed = pdw_summary_report_header_bits_t'(report_header);
       //$display("report_packed: %X", report_header_packed);
-      $display("pulse_report_header: %p", report_header);
+      $display("pulse_report_header ex: %p", report_header);
 
       for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
         r.data.push_back(report_header_packed[(NUM_SUMMARY_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);

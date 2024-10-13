@@ -24,6 +24,7 @@ port (
   Clk                 : in  std_logic;
   Rst                 : in  std_logic;
 
+  Dwell_active        : in  std_logic;
   Dwell_done          : in  std_logic;
   Dwell_data          : in  esm_dwell_metadata_t;
   Dwell_sequence_num  : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
@@ -128,17 +129,19 @@ begin
       else
         case s_state is
         when S_IDLE =>
-          if (Dwell_done = '1') then
+          if (Dwell_active = '1') then
             s_state <= S_CHECK_START;
           else
             s_state <= S_IDLE;
           end if;
 
         when S_CHECK_START =>
-          if (Pdw_valid = '0') then
-            s_state <= S_SUMMARY_HEADER_0;
-          elsif (w_fifo_almost_full = '0') then
+          if (w_fifo_almost_full = '1') then
+            s_state <= S_CHECK_START;
+          elsif (Pdw_valid = '1') then
             s_state <= S_PULSE_HEADER_0;
+          elsif (Dwell_done = '1') then
+            s_state <= S_SUMMARY_HEADER_0;
           else
             s_state <= S_CHECK_START;
           end if;
@@ -315,11 +318,11 @@ begin
 
     when S_PULSE_POWER_ACCUM_0 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= std_logic_vector(Pdw_data.power_accum(31 downto 0));
+      w_fifo_partial_1_data   <= x"0000" & std_logic_vector(Pdw_data.power_accum(47 downto 32));
 
     when S_PULSE_POWER_ACCUM_1 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= x"0000" & std_logic_vector(Pdw_data.power_accum(47 downto 32));
+      w_fifo_partial_1_data   <= std_logic_vector(Pdw_data.power_accum(31 downto 0));
 
     when S_PULSE_DURATION =>
       w_fifo_valid            <= '1';
@@ -331,11 +334,11 @@ begin
 
     when S_PULSE_START_TIME_0 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= std_logic_vector(Pdw_data.pulse_start_time(31 downto 0));
+      w_fifo_partial_1_data   <= x"0000" & std_logic_vector(Pdw_data.pulse_start_time(47 downto 32));
 
     when S_PULSE_START_TIME_1 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= x"0000" & std_logic_vector(Pdw_data.pulse_start_time(47 downto 32));
+      w_fifo_partial_1_data   <= std_logic_vector(Pdw_data.pulse_start_time(31 downto 0));
 
     when S_BUFFERED_SAMPLE =>
       w_fifo_valid            <= Buffered_frame_ack.sample_valid;

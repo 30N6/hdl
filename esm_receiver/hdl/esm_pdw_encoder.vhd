@@ -56,10 +56,9 @@ architecture rtl of esm_pdw_encoder is
   type state_t is
   (
     S_IDLE,
-    S_ACTIVE,
+    S_DWELL_ACTIVE,
     S_DWELL_STOP_WAIT,
     S_DWELL_DONE,
-    S_REPORT_WAIT,
     S_CLEAR --TODO: still needed? might have originally been for the threshold module
   );
 
@@ -81,9 +80,7 @@ architecture rtl of esm_pdw_encoder is
   signal w_iq_scaled                : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
   signal w_threshold                : unsigned(ESM_THRESHOLD_WIDTH - 1 downto 0);
 
-  signal w_delayed_iq_ctrl          : channelizer_control_t;
   signal w_delayed_iq_data          : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
-  signal w_delayed_iq_power         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   signal w_pdw_ready                : std_logic;
   signal w_pdw_valid                : std_logic;
@@ -92,6 +89,7 @@ architecture rtl of esm_pdw_encoder is
   signal w_frame_ack                : esm_pdw_sample_buffer_ack_t;
   signal w_frame_data               : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
 
+  signal w_dwell_active             : std_logic;
   signal w_dwell_done               : std_logic;
   signal w_report_ack               : std_logic;
 
@@ -133,7 +131,7 @@ begin
 
       if (s_state = S_IDLE) then
         r_dwell_duration <= (others => '0');
-      elsif (s_state = S_ACTIVE) then
+      elsif (s_state = S_DWELL_ACTIVE) then
         r_dwell_duration <= r_dwell_duration + 1;
       end if;
     end if;
@@ -161,9 +159,9 @@ begin
     Input_data    => w_iq_scaled,
     Input_power   => Input_power,
 
-    Output_ctrl   => w_delayed_iq_ctrl,
+    Output_ctrl   => open, --unused
     Output_data   => w_delayed_iq_data,
-    Output_power  => w_delayed_iq_power
+    Output_power  => open --unused
   );
 
   w_threshold <= r_dwell_data.threshold_wide when WIDE_BANDWIDTH else r_dwell_data.threshold_narrow;
@@ -184,9 +182,9 @@ begin
 
     Dwell_active            => r_dwell_active,
 
-    Input_ctrl              => w_delayed_iq_ctrl,
+    Input_ctrl              => Input_ctrl,
     Input_iq_delayed        => w_delayed_iq_data,
-    Input_power             => w_delayed_iq_power,
+    Input_power             => Input_power,
     Input_threshold         => w_threshold,
 
     Pdw_ready               => w_pdw_ready,
@@ -211,16 +209,16 @@ begin
         case s_state is
         when S_IDLE =>
           if ((r_enable = '1') and (r_dwell_active = '1')) then
-            s_state <= S_ACTIVE;
+            s_state <= S_DWELL_ACTIVE;
           else
             s_state <= S_IDLE;
           end if;
 
-        when S_ACTIVE =>
+        when S_DWELL_ACTIVE =>
           if (r_dwell_active = '0') then
             s_state <= S_DWELL_DONE;
           else
-            s_state <= S_ACTIVE;
+            s_state <= S_DWELL_ACTIVE;
           end if;
 
         when S_DWELL_STOP_WAIT =>
@@ -231,13 +229,10 @@ begin
           end if;
 
         when S_DWELL_DONE =>
-          s_state <= S_REPORT_WAIT;
-
-        when S_REPORT_WAIT =>
           if (w_report_ack = '1') then
             s_state <= S_CLEAR;
           else
-            s_state <= S_REPORT_WAIT;
+            s_state <= S_DWELL_DONE;
           end if;
 
         when S_CLEAR =>
@@ -269,6 +264,7 @@ begin
     end if;
   end process;
 
+  w_dwell_active <= to_stdlogic(s_state = S_DWELL_ACTIVE);
   w_dwell_done <= to_stdlogic(s_state = S_DWELL_DONE);
 
   i_reporter : entity esm_lib.esm_pdw_reporter
@@ -282,6 +278,7 @@ begin
     Clk                 => Clk,
     Rst                 => r_rst,
 
+    Dwell_active        => w_dwell_active,
     Dwell_done          => w_dwell_done,
     Dwell_data          => r_dwell_data,
     Dwell_sequence_num  => r_dwell_sequence_num,
