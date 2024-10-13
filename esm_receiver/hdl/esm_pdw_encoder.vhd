@@ -50,7 +50,7 @@ architecture rtl of esm_pdw_encoder is
   constant IQ_DELAY_SAMPLES           : natural := 8;
   constant IQ_DELAY_LATENCY           : natural := 4;
   constant BUFFERED_SAMPLES_PER_FRAME : natural := 40;
-  constant BUFFERED_SAMPLE_PADDING    : natural := 4;
+  constant BUFFERED_SAMPLE_PADDING    : natural := 16;
   constant PDW_FIFO_DEPTH             : natural := 32;
 
   type state_t is
@@ -80,6 +80,8 @@ architecture rtl of esm_pdw_encoder is
   signal w_iq_scaled                : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
   signal w_threshold                : unsigned(ESM_THRESHOLD_WIDTH - 1 downto 0);
 
+  signal w_pipelined_ctrl           : channelizer_control_t;
+  signal w_pipelined_power          : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal w_delayed_iq_data          : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
 
   signal w_pdw_ready                : std_logic;
@@ -153,15 +155,15 @@ begin
     DELAY_SAMPLES       => IQ_DELAY_SAMPLES
   )
   port map (
-    Clk           => Clk,
+    Clk                     => Clk,
 
-    Input_ctrl    => Input_ctrl,
-    Input_data    => w_iq_scaled,
-    Input_power   => Input_power,
+    Input_ctrl              => Input_ctrl,
+    Input_data              => w_iq_scaled,
+    Input_power             => Input_power,
 
-    Output_ctrl   => open, --unused
-    Output_data   => w_delayed_iq_data,
-    Output_power  => open --unused
+    Output_pipelined_ctrl   => w_pipelined_ctrl,
+    Output_pipelined_power  => w_pipelined_power,
+    Output_delayed_data     => w_delayed_iq_data
   );
 
   w_threshold <= r_dwell_data.threshold_wide when WIDE_BANDWIDTH else r_dwell_data.threshold_narrow;
@@ -182,9 +184,9 @@ begin
 
     Dwell_active            => r_dwell_active,
 
-    Input_ctrl              => Input_ctrl,
+    Input_ctrl              => w_pipelined_ctrl,
     Input_iq_delayed        => w_delayed_iq_data,
-    Input_power             => Input_power,
+    Input_power             => w_pipelined_power,
     Input_threshold         => w_threshold,
 
     Pdw_ready               => w_pdw_ready,

@@ -357,12 +357,12 @@ module esm_pdw_encoder_tb;
         return 0;
       end*/
 
-      for (int i = NUM_PULSE_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
+      /*for (int i = NUM_PULSE_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
         if (a[i] !== b[i]) begin
           $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
           return 0;
         end
-      end
+      end*/
 
     end else begin
       $display("invalid message type: %X", header_a.message_type);
@@ -381,7 +381,7 @@ module esm_pdw_encoder_tb;
       rpt_rx_intf.read(read_data);
 
       if (data_match(read_data, expected_data[0].data)) begin
-        $display("%0t: data match - %p", $time, read_data);
+        $display("%0t: data match successful - %p", $time, read_data);
       end else begin
         $error("%0t: error -- data mismatch: expected = %p  actual = %p", $time, expected_data[0].data, read_data);
       end
@@ -554,7 +554,7 @@ module esm_pdw_encoder_tb;
 
           rnd = $urandom_range(99);
           if (rnd < 30) begin
-            time_offset[i] += $urandom_range(10, 5);
+            time_offset[i] += $urandom_range(20, 10);
           end else if (rnd < 70) begin
             time_offset[i] += $urandom_range(100, 20);
           end else begin

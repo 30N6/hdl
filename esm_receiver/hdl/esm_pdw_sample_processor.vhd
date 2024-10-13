@@ -115,6 +115,7 @@ architecture rtl of esm_pdw_sample_processor is
   signal w_buffer_full              : std_logic;
   signal w_buffer_next_index        : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
   signal w_buffer_next_start        : std_logic;
+  signal w_buffer_wr_en             : std_logic;
 
   signal w_fifo_full                : std_logic;
   signal r_fifo_wr_data             : esm_pdw_fifo_data_t;
@@ -188,7 +189,7 @@ begin
         r3_context.recording_skipped        <= '0';
         r3_context.recording_active         <= '0';
         r3_context.recording_frame_index    <= (others => '-');
-        r3_context.recording_sample_index   <= (others => '-');
+        r3_context.recording_sample_index   <= (others => '0');
         r3_context.recording_sample_padding <= (others => '0');
         r3_context.ts_start                 <= Timestamp;
 
@@ -258,7 +259,7 @@ begin
       if (Rst = '1') then
         r_sequence_num <= (others => '0');
       else
-        if (r3_context.state = S_STORE_REPORT) then
+        if ((r3_context_wr_valid = '1') and (r3_context.state = S_STORE_REPORT)) then
           r_sequence_num <= r_sequence_num + 1;
         end if;
       end if;
@@ -279,7 +280,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_fifo_wr_en                        <= to_stdlogic(r3_context.state = S_STORE_REPORT);
+      r_fifo_wr_en                        <= r3_context_wr_valid and to_stdlogic(r3_context.state = S_STORE_REPORT);
       r_fifo_wr_data.sequence_num         <= r_sequence_num;
       r_fifo_wr_data.channel              <= resize_up(r3_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0), ESM_CHANNEL_INDEX_WIDTH);
       r_fifo_wr_data.power_accum          <= w3_power_accum_b & r3_context.power_accum_a;
@@ -317,7 +318,8 @@ begin
   Pdw_data  <= unpack(w_fifo_rd_data);
   Pdw_valid <= not(w_fifo_empty);
 
-  w_buffer_next_start <= to_stdlogic(r2_context.state = S_IDLE) and Dwell_active and r2_new_detect and not(w_fifo_full) and not(w_buffer_full);
+  w_buffer_next_start <= to_stdlogic(r2_context.state = S_IDLE) and Dwell_active and r2_input_ctrl.valid and r2_new_detect and not(w_fifo_full) and not(w_buffer_full);
+  w_buffer_wr_en      <= r2_input_ctrl.valid and r2_context.recording_active;
 
   i_sample_buffer : entity esm_lib.esm_pdw_sample_buffer
   generic map (
@@ -332,7 +334,7 @@ begin
     Buffer_next_index   => w_buffer_next_index,
     Buffer_next_start   => w_buffer_next_start,
 
-    Input_valid         => r2_context.recording_active,
+    Input_valid         => w_buffer_wr_en,
     Input_frame_index   => r2_context.recording_frame_index,
     Input_sample_index  => r2_context.recording_sample_index,
     Input_data          => r2_input_iq,

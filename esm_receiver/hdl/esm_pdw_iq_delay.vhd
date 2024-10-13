@@ -21,15 +21,15 @@ generic (
   DELAY_SAMPLES       : natural
 );
 port (
-  Clk           : in  std_logic;
+  Clk                     : in  std_logic;
 
-  Input_ctrl    : in  channelizer_control_t;
-  Input_data    : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
-  Input_power   : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  Input_ctrl              : in  channelizer_control_t;
+  Input_data              : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+  Input_power             : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  Output_ctrl   : out channelizer_control_t;
-  Output_data   : out signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
-  Output_power  : out unsigned(CHAN_POWER_WIDTH - 1 downto 0)
+  Output_pipelined_ctrl   : out channelizer_control_t;
+  Output_pipelined_power  : out unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  Output_delayed_data     : out signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0)
 );
 end entity esm_pdw_iq_delay;
 
@@ -37,7 +37,7 @@ architecture rtl of esm_pdw_iq_delay is
 
   constant DELAY_INDEX_WIDTH  : natural := clog2(DELAY_SAMPLES);
   constant MEM_ADDR_WIDTH     : natural := CHANNEL_INDEX_WIDTH + DELAY_INDEX_WIDTH;
-  constant MEM_DATA_WIDTH     : natural := 2*DATA_WIDTH + CHAN_POWER_WIDTH;
+  constant MEM_DATA_WIDTH     : natural := 2*DATA_WIDTH;
 
   signal m_delay_mem          : std_logic_vector_array_t(2**MEM_ADDR_WIDTH - 1 downto 0)(MEM_DATA_WIDTH - 1 downto 0);
   signal m_index_mem          : unsigned_array_t(2**CHANNEL_INDEX_WIDTH - 1 downto 0)(DELAY_INDEX_WIDTH - 1 downto 0) := (others => (others => '0'));
@@ -55,10 +55,13 @@ architecture rtl of esm_pdw_iq_delay is
   signal w0_wr_data           : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
 
   signal r1_input_ctrl        : channelizer_control_t;
+  signal r1_input_power       : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r1_rd_data           : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
   signal r2_input_ctrl        : channelizer_control_t;
+  signal r2_input_power       : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r2_rd_data           : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
   signal r3_input_ctrl        : channelizer_control_t;
+  signal r3_input_power       : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r3_rd_data           : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
 
 begin
@@ -88,7 +91,7 @@ begin
 
   w0_wr_delay_index <= r0_wr_delay_index + 1;
   w0_wr_addr        <= w0_chan_index & r0_wr_delay_index;
-  w0_wr_data        <= std_logic_vector(r0_input_power) & std_logic_vector(r0_input_data(1)) & std_logic_vector(r0_input_data(0));
+  w0_wr_data        <= std_logic_vector(r0_input_data(1)) & std_logic_vector(r0_input_data(0));
 
   process(Clk)
   begin
@@ -103,30 +106,33 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r1_input_ctrl <= r0_input_ctrl;
-      r1_rd_data    <= m_delay_mem(to_integer(w0_rd_addr));
+      r1_input_ctrl   <= r0_input_ctrl;
+      r1_input_power  <= r0_input_power;
+      r1_rd_data      <= m_delay_mem(to_integer(w0_rd_addr));
     end if;
   end process;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r2_input_ctrl <= r1_input_ctrl;
-      r2_rd_data    <= r1_rd_data;
+      r2_input_ctrl   <= r1_input_ctrl;
+      r2_input_power  <= r1_input_power;
+      r2_rd_data      <= r1_rd_data;
     end if;
   end process;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r3_input_ctrl <= r2_input_ctrl;
-      r3_rd_data    <= r2_rd_data;
+      r3_input_ctrl   <= r2_input_ctrl;
+      r3_input_power  <= r2_input_power;
+      r3_rd_data      <= r2_rd_data;
     end if;
   end process;
 
-  Output_ctrl    <= r3_input_ctrl;
-  Output_data(0) <= signed(r3_rd_data(DATA_WIDTH - 1 downto 0));
-  Output_data(1) <= signed(r3_rd_data(2*DATA_WIDTH - 1 downto DATA_WIDTH));
-  Output_power   <= unsigned(r3_rd_data(MEM_DATA_WIDTH - 1 downto 2*DATA_WIDTH));
+  Output_pipelined_ctrl   <= r3_input_ctrl;
+  Output_pipelined_power  <= r3_input_power;
+  Output_delayed_data(0)  <= signed(r3_rd_data(DATA_WIDTH - 1 downto 0));
+  Output_delayed_data(1)  <= signed(r3_rd_data(2*DATA_WIDTH - 1 downto DATA_WIDTH));
 
 end architecture rtl;
