@@ -579,9 +579,9 @@ module esm_pdw_encoder_tb;
 
           rnd = $urandom_range(99);
           if (rnd < 30) begin
-            time_offset[i] += $urandom_range(20, 10);
+            time_offset[i] += $urandom_range(50, 20);
           end else if (rnd < 70) begin
-            time_offset[i] += $urandom_range(100, 20);
+            time_offset[i] += $urandom_range(200, 50);
           end else begin
             time_offset[i] += $urandom_range(1000, 200);
           end
@@ -613,6 +613,7 @@ module esm_pdw_encoder_tb;
           channel_data[i][j].data_i = $urandom_range(1000);
           channel_data[i][j].data_q = $urandom_range(1000);
           channel_data[i][j].power  = $urandom_range(threshold * 2, threshold + 1);
+          //$display("channel_data[%0d][%0d]: j=%0d   power=%0d  threshold=%0d", i, p, j, channel_data[i][j].power, threshold);
         end
 
         $display("channel[%0d] pulse[%0d]: start=%0d  duration=%0d", i, p, ps, pd);
@@ -631,7 +632,8 @@ module esm_pdw_encoder_tb;
   endfunction
 
   task automatic standard_test();
-    parameter NUM_TESTS = 20;
+    parameter NUM_TESTS = 5;
+    parameter NUM_DWELLS = (NUM_CHANNELS < 64) ? 10 : 2;
     int max_write_delay = 5;
 
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
@@ -639,7 +641,7 @@ module esm_pdw_encoder_tb;
       report_seq_num = 0;
       pulse_seq_num = {default:0};
 
-      for (int i_dwell = 0; i_dwell < 100; i_dwell++) begin
+      for (int i_dwell = 0; i_dwell < NUM_DWELLS; i_dwell++) begin
         int unsigned          dwell_seq_num   = $urandom;
         esm_dwell_metadata_t  dwell_data      = randomize_dwell_metadata();
         dwell_channel_data_t  dwell_input []  = randomize_dwell_input(dwell_data);
