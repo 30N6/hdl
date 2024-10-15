@@ -218,7 +218,7 @@ begin
 
         when S_DWELL_ACTIVE =>
           if (r_dwell_active = '0') then
-            s_state <= S_DWELL_DONE;
+            s_state <= S_DWELL_STOP_WAIT;
           else
             s_state <= S_DWELL_ACTIVE;
           end if;

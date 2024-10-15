@@ -146,8 +146,8 @@ module esm_pdw_encoder_tb;
   axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf   (.*);
 
   int unsigned  report_seq_num = 0;
-  int unsigned  pulse_seq_num = 0;
-  expect_t      expected_data [$];
+  int unsigned  pulse_seq_num [NUM_CHANNELS] = {default:0};
+  expect_t      expected_data [NUM_CHANNELS][$];
   int           num_received = 0;
   logic         r_axi_rx_ready;
   logic         w_axi_rx_valid;
@@ -162,7 +162,7 @@ module esm_pdw_encoder_tb;
 
   initial begin
     Rst = 1;
-    @(posedge Clk);
+    repeat(100) @(posedge Clk);
     Rst = 0;
   end
 
@@ -259,6 +259,20 @@ module esm_pdw_encoder_tb;
     return report_header;
   endfunction
 
+  function automatic int get_data_channel(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
+    esm_pdw_report_header_t header = unpack_report_header(data);
+
+    if (header.message_type == esm_report_message_type_pdw_summary) begin
+      return 0;
+    end else if (header.message_type == esm_report_message_type_pdw_pulse) begin
+      esm_pdw_pulse_report_header_t report = unpack_pulse_report_header(data);
+      return report.pulse_channel;
+    end else begin
+      $error("get_data_channel: unknown message type");
+      return 0;
+    end
+  endfunction
+
   function automatic bit data_match(logic [AXI_DATA_WIDTH - 1 : 0] a [$], logic [AXI_DATA_WIDTH - 1 : 0] b []);
     esm_pdw_report_header_t header_a = unpack_report_header(a);
     esm_pdw_report_header_t header_b = unpack_report_header(b);
@@ -276,10 +290,11 @@ module esm_pdw_encoder_tb;
       return 0;
     end
 
-    if (header_a.sequence_num !== header_b.sequence_num) begin
+    //PDWs can be reordered -- only check for summaries
+    /*if (header_a.sequence_num !== header_b.sequence_num) begin
       $display("sequence_num mismatch: %X %X", header_a.sequence_num, header_b.sequence_num);
       return 0;
-    end
+    end*/
 
     if (header_a.module_id !== header_b.module_id) begin
       $display("module_id mismatch: %X %X", header_a.module_id, header_b.module_id);
@@ -299,6 +314,11 @@ module esm_pdw_encoder_tb;
       $display("%0t: data_match: report_b=%p", $time, report_b);
 
       //TODO: check dwell_duration
+
+      if (header_a.sequence_num !== header_b.sequence_num) begin
+        $display("sequence_num mismatch: %X %X", header_a.sequence_num, header_b.sequence_num);
+        return 0;
+      end
 
       if (report_a.dwell_sequence_num !== report_b.dwell_sequence_num) begin
         $display("dwell_sequence_num mismatch: %X %X", report_a.dwell_sequence_num, report_b.dwell_sequence_num);
@@ -378,24 +398,29 @@ module esm_pdw_encoder_tb;
     wait_for_reset();
 
     forever begin
+      int channel;
       rpt_rx_intf.read(read_data);
 
-      if (data_match(read_data, expected_data[0].data)) begin
+      channel = get_data_channel(read_data);
+
+      if (data_match(read_data, expected_data[channel][0].data)) begin
         $display("%0t: data match successful - %p", $time, read_data);
       end else begin
-        $error("%0t: error -- data mismatch: expected = %p  actual = %p", $time, expected_data[0].data, read_data);
+        $error("%0t: error -- data mismatch on channel=%0d: expected = %p  actual = %p", $time, channel, expected_data[channel][0].data, read_data);
       end
       num_received++;
-      void'(expected_data.pop_front());
+      void'(expected_data[channel].pop_front());
     end
   end
 
   final begin
-    if ( expected_data.size() != 0 ) begin
-      $error("Unexpected data remaining in queue:");
-      while ( expected_data.size() != 0 ) begin
-        $display("%p", expected_data[0].data);
-        void'(expected_data.pop_front());
+    for (int i_channel = 0; i_channel < NUM_CHANNELS; i_channel++) begin
+      if ( expected_data[i_channel].size() != 0 ) begin
+        $error("Unexpected data remaining in queue %0d:", i_channel);
+        while ( expected_data[i_channel].size() != 0 ) begin
+          $display("%p", expected_data[i_channel][0].data);
+          void'(expected_data[i_channel].pop_front());
+        end
       end
     end
   end
@@ -434,7 +459,7 @@ module esm_pdw_encoder_tb;
           report_header.message_type        = esm_report_message_type_pdw_pulse;
 
           report_header.dwell_sequence_num  = dwell_seq_num;
-          report_header.pulse_sequence_num  = pulse_seq_num;
+          report_header.pulse_sequence_num  = pulse_seq_num[i_ch];
           report_header.pulse_channel       = i_ch;
           report_header.pulse_threshold     = new_threshold;
           report_header.pulse_power_accum   = pulse_power_accum[i_ch];
@@ -453,10 +478,10 @@ module esm_pdw_encoder_tb;
           for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
             r.data.push_back(0);
           end
-          expected_data.push_back(r);
+          expected_data[i_ch].push_back(r);
           report_seq_num++;
 
-          pulse_seq_num++;
+          pulse_seq_num[i_ch]++;
           pulse_active[i_ch] = 0;
           pulse_duration[i_ch] = 0;
           pulse_power_accum[i_ch] = 0;
@@ -497,7 +522,7 @@ module esm_pdw_encoder_tb;
       for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
         r.data.push_back(0);
       end
-      expected_data.push_back(r);
+      expected_data[0].push_back(r);  //summaries are processed in the channel 0 queue
       report_seq_num++;
     end
 
@@ -589,6 +614,8 @@ module esm_pdw_encoder_tb;
           channel_data[i][j].data_q = $urandom_range(1000);
           channel_data[i][j].power  = $urandom_range(threshold * 2, threshold + 1);
         end
+
+        $display("channel[%0d] pulse[%0d]: start=%0d  duration=%0d", i, p, ps, pd);
       end
     end
 
@@ -610,7 +637,7 @@ module esm_pdw_encoder_tb;
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
       $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
       report_seq_num = 0;
-      pulse_seq_num = 0;
+      pulse_seq_num = {default:0};
 
       for (int i_dwell = 0; i_dwell < 100; i_dwell++) begin
         int unsigned          dwell_seq_num   = $urandom;
@@ -624,7 +651,16 @@ module esm_pdw_encoder_tb;
 
         begin
           int wait_cycles = 0;
-          while ((expected_data.size() != 0) && (wait_cycles < 1e5)) begin
+          while (1) begin
+            bit expected_empty = 1;
+            for (int i_channel = 0; i_channel < NUM_CHANNELS; i_channel++) begin
+              expected_empty &= (expected_data[i_channel].size() == 0);
+            end
+
+            if (expected_empty || (wait_cycles > 1e5)) begin
+              break;
+            end
+
             @(posedge Clk);
             wait_cycles++;
           end

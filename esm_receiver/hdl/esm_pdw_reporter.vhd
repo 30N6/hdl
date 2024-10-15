@@ -354,7 +354,7 @@ begin
 
     when S_SUMMARY_HEADER_2 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(MODULE_ID) & std_logic_vector(ESM_REPORT_MESSAGE_TYPE_PDW_PULSE) & x"0000";
+      w_fifo_partial_0_data   <= std_logic_vector(MODULE_ID) & std_logic_vector(ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY) & x"0000";
 
     when S_SUMMARY_DWELL_SEQ_NUM =>
       w_fifo_valid            <= '1';

@@ -64,6 +64,7 @@ architecture rtl of esm_pdw_sample_processor is
 
   type channel_context_t is record
     state                     : channel_state_t;
+    pulse_seq_num             : unsigned(ESM_PDW_SEQUENCE_NUM_WIDTH - 1 downto 0);
     threshold                 : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
     power_accum_a             : unsigned(ESM_PDW_POWER_ACCUM_WIDTH - 16 - 1 downto 0);
     power_accum_ac            : std_logic;
@@ -102,15 +103,15 @@ architecture rtl of esm_pdw_sample_processor is
   signal r2_context                 : channel_context_t;
   signal r2_new_detect              : std_logic;
   signal r2_continued_detect        : std_logic;
+  signal r2_seq_num_next            : unsigned(ESM_PDW_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   signal r3_input_ctrl              : channelizer_control_t;
   signal r3_context                 : channel_context_t;
   signal r3_context_wr_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r3_context_wr_valid        : std_logic;
+  signal r3_pulse_seq_num           : unsigned(ESM_PDW_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   signal w3_power_accum_b           : unsigned(15 downto 0);
-
-  signal r_sequence_num             : unsigned(31 downto 0);
 
   signal w_buffer_full              : std_logic;
   signal w_buffer_next_index        : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
@@ -170,14 +171,16 @@ begin
       r2_context          <= r1_context;
       r2_new_detect       <= to_stdlogic(r1_input_power > r1_input_threshold);
       r2_continued_detect <= to_stdlogic(r1_input_power > shift_right(r1_context.threshold, 1)); -- reduce threshold by 3 dB after pulse has started
+      r2_seq_num_next     <= r1_context.pulse_seq_num + 1;
     end if;
   end process;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r3_input_ctrl <= r2_input_ctrl;
-      r3_context    <= r2_context;
+      r3_input_ctrl     <= r2_input_ctrl;
+      r3_context        <= r2_context;
+      r3_pulse_seq_num  <= r2_context.pulse_seq_num;
 
       case r2_context.state is
       when S_IDLE =>
@@ -238,30 +241,19 @@ begin
         end if;
 
       when S_STORE_REPORT =>
-        r3_context.state <= S_IDLE;
+        r3_context.state          <= S_IDLE;
+        r3_context.pulse_seq_num  <= r2_seq_num_next;
 
       end case;
 
       if (Rst = '1') then
-        r3_context_wr_index <= r_reset_index;
-        r3_context_wr_valid <= '1';
-        r3_context.state    <= S_IDLE;
+        r3_context_wr_index       <= r_reset_index;
+        r3_context_wr_valid       <= '1';
+        r3_context.state          <= S_IDLE;
+        r3_context.pulse_seq_num  <= (others => '0');
       else
         r3_context_wr_index <= r2_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
         r3_context_wr_valid <= r2_input_ctrl.valid;
-      end if;
-    end if;
-  end process;
-
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      if (Rst = '1') then
-        r_sequence_num <= (others => '0');
-      else
-        if ((r3_context_wr_valid = '1') and (r3_context.state = S_STORE_REPORT)) then
-          r_sequence_num <= r_sequence_num + 1;
-        end if;
       end if;
     end if;
   end process;
@@ -281,7 +273,7 @@ begin
   begin
     if rising_edge(Clk) then
       r_fifo_wr_en                        <= r3_context_wr_valid and to_stdlogic(r3_context.state = S_STORE_REPORT);
-      r_fifo_wr_data.sequence_num         <= r_sequence_num;
+      r_fifo_wr_data.sequence_num         <= r3_pulse_seq_num;
       r_fifo_wr_data.channel              <= resize_up(r3_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0), ESM_CHANNEL_INDEX_WIDTH);
       r_fifo_wr_data.power_accum          <= w3_power_accum_b & r3_context.power_accum_a;
       r_fifo_wr_data.power_threshold      <= r3_context.threshold;
