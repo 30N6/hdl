@@ -30,6 +30,8 @@ port (
   Output_last     : out std_logic;
   Output_i        : out signed(DATA_WIDTH - 1 downto 0);
   Output_q        : out signed(DATA_WIDTH - 1 downto 0)
+
+  --TODO: overflow error check
 );
 end entity pfb_demux_2x;
 

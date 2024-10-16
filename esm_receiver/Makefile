@@ -9,6 +9,7 @@ LIBRARY_NAME := esm_receiver
 GENERIC_DEPS += ../common/hdl/common_pkg.vhd
 GENERIC_DEPS += ../common/hdl/math_pkg.vhd
 GENERIC_DEPS += ../common/hdl/reset_extender.vhd
+GENERIC_DEPS += ../common/hdl/clk_x4_phase_marker.vhd
 GENERIC_DEPS += ../axi/hdl/axis_async_fifo.vhd
 GENERIC_DEPS += ../axi/hdl/axis_sync_fifo.vhd
 GENERIC_DEPS += ../axi/hdl/axis_mux.vhd

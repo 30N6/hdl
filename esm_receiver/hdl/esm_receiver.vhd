@@ -50,14 +50,19 @@ end entity esm_receiver;
 
 architecture rtl of esm_receiver is
 
-  constant AXI_FIFO_DEPTH           : natural := 64;
-  constant NUM_D2H_MUX_INPUTS       : natural := 4;
-  constant CHANNELIZER8_DATA_WIDTH  : natural := IQ_WIDTH + 3 + 3; -- +4 for filter, +3 for ifft
-  constant CHANNELIZER64_DATA_WIDTH : natural := IQ_WIDTH + 4 + 6; -- +4 for filter, +6 for ifft
+  constant AXI_FIFO_DEPTH             : natural := 64;
+  constant NUM_D2H_MUX_INPUTS         : natural := 4;
+  constant CHANNELIZER8_DATA_WIDTH    : natural := IQ_WIDTH + 3 + 3; -- +4 for filter, +3 for ifft
+  constant CHANNELIZER64_DATA_WIDTH   : natural := IQ_WIDTH + 4 + 6; -- +4 for filter, +6 for ifft
 
-  constant AD9361_BIT_PIPE_DEPTH    : natural := 3;
+  constant PLL_PRE_LOCK_DELAY_CYCLES  : natural := 2048;
+  constant PLL_POST_LOCK_DELAY_CYCLES : natural := 2048;
+
+  constant AD9361_BIT_PIPE_DEPTH      : natural := 3;
 
   signal data_clk                     : std_logic;
+
+  signal w_clk_x4_p0                  : std_logic;
 
   signal w_config_rst                 : std_logic;
   signal r_combined_rst               : std_logic;
@@ -68,7 +73,7 @@ architecture rtl of esm_receiver is
 
   signal w_ad9361_control             : std_logic_vector(3 downto 0);
   signal r_ad9361_control             : std_logic_vector_array_t(AD9361_BIT_PIPE_DEPTH - 1 downto 0)(3 downto 0);
-  signal r_ad9361_status              : std_logic_vector_array_t(AD9361_BIT_PIPE_DEPTH - 1 downto 0)(7 downto 0); --TODO: async reg
+  signal r_ad9361_status              : std_logic_vector_array_t(AD9361_BIT_PIPE_DEPTH - 1 downto 0)(7 downto 0);
 
   signal w_dwell_active               : std_logic;
   signal w_dwell_data                 : esm_dwell_metadata_t;
@@ -77,6 +82,10 @@ architecture rtl of esm_receiver is
   signal r_adc_valid                  : std_logic;
   signal r_adc_data_i                 : signed(IQ_WIDTH - 1 downto 0);
   signal r_adc_data_q                 : signed(IQ_WIDTH - 1 downto 0);
+
+  signal r_adc_valid_x4               : std_logic;
+  signal r_adc_data_i_x4              : signed(IQ_WIDTH - 1 downto 0);
+  signal r_adc_data_q_x4              : signed(IQ_WIDTH - 1 downto 0);
 
   signal w_adc_data_in                : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
 
@@ -127,11 +136,16 @@ architecture rtl of esm_receiver is
   signal w_config_axis_data           : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   signal w_config_axis_last           : std_logic;
 
+  attribute ASYNC_REG : string;
+  attribute ASYNC_REG of r_ad9361_status : signal is "TRUE";
+
 begin
 
   --TODO: use axi clock to generate 250 MHz
   --TODO: cdc fifo for adc data_clk -- limit max rate to 1/4
+
   --TODO: handle gaps in pfb -- need fifo-based design?
+
   i_clocking : entity clock_lib.adc_clk_mult
   port map (
     Clk_x1  => Adc_clk,
@@ -140,6 +154,17 @@ begin
     locked  => open,
     Clk_x2  => open,
     Clk_x4  => data_clk
+  );
+
+  i_phase_marker : entity common_lib.clk_x4_phase_marker
+  port map (
+    Clk       => Adc_clk,
+    Clk_x4    => data_clk,
+
+    Clk_x4_p0 => w_clk_x4_p0,
+    Clk_x4_p1 => open,
+    Clk_x4_p2 => open,
+    Clk_x4_p3 => open
   );
 
   process(data_clk)
@@ -171,8 +196,8 @@ begin
 
   i_dwell_controller : entity esm_lib.esm_dwell_controller
   generic map (
-    PLL_PRE_LOCK_DELAY_CYCLES   => 2048,
-    PLL_POST_LOCK_DELAY_CYCLES  => 2048
+    PLL_PRE_LOCK_DELAY_CYCLES   => PLL_PRE_LOCK_DELAY_CYCLES,
+    PLL_POST_LOCK_DELAY_CYCLES  => PLL_POST_LOCK_DELAY_CYCLES
   )
   port map (
     Clk                 => data_clk,
@@ -206,7 +231,16 @@ begin
     end if;
   end process;
 
-  w_adc_data_in <= (r_adc_data_q, r_adc_data_i);
+  process(data_clk)
+  begin
+    if rising_edge(data_clk) then
+      r_adc_valid_x4   <= r_adc_valid and w_clk_x4_p0;
+      r_adc_data_i_x4  <= r_adc_data_i;
+      r_adc_data_q_x4  <= r_adc_data_q;
+    end if;
+  end process;
+
+  w_adc_data_in <= (r_adc_data_q_x4, r_adc_data_i_x4);
 
   --i_channelizer_8 : entity dsp_lib.channelizer_8
   --generic map (
@@ -217,7 +251,7 @@ begin
   --  Clk                   => data_clk,
   --  Rst                   => r_combined_rst,
   --
-  --  Input_valid           => r_adc_valid, --TODO: gated x4
+  --  Input_valid           => r_adc_valid_x4,
   --  Input_data            => w_adc_data_in,
   --
   --  Output_chan_ctrl      => w_channelizer8_chan_control,
@@ -242,7 +276,7 @@ begin
     Clk                   => data_clk,
     Rst                   => r_combined_rst,
 
-    Input_valid           => r_adc_valid, --TODO: gated
+    Input_valid           => r_adc_valid_x4,
     Input_data            => w_adc_data_in,
 
     Output_chan_ctrl      => w_channelizer64_chan_control,
