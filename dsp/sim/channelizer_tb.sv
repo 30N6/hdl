@@ -59,6 +59,8 @@ module channelizer_tb;
   expect_t                                expected_data [$];
   int                                     num_received = 0;
   int                                     num_matched = 0;
+  logic                                   w_warning_demux_gap;
+  logic                                   w_error_demux_overflow;
   logic                                   w_error_filter_overflow;
   logic                                   w_error_mux_overflow;
   logic                                   w_error_mux_underflow;
@@ -107,6 +109,8 @@ module channelizer_tb;
         .Output_fft_ctrl        (w_fft_output_control),
         .Output_fft_data        (w_fft_output_iq),
 
+        .Warning_demux_gap      (w_warning_demux_gap),
+        .Error_demux_overflow   (w_error_demux_overflow),
         .Error_filter_overflow  (w_error_filter_overflow),
         .Error_mux_overflow     (w_error_mux_overflow),
         .Error_mux_underflow    (w_error_mux_underflow),
@@ -128,6 +132,8 @@ module channelizer_tb;
         .Output_fft_ctrl        (w_fft_output_control),
         .Output_fft_data        (w_fft_output_iq),
 
+        .Warning_demux_gap      (w_warning_demux_gap),
+        .Error_demux_overflow   (w_error_demux_overflow),
         .Error_filter_overflow  (w_error_filter_overflow),
         .Error_mux_overflow     (w_error_mux_overflow),
         .Error_mux_underflow    (w_error_mux_underflow),
@@ -149,6 +155,8 @@ module channelizer_tb;
         .Output_fft_ctrl        (w_fft_output_control),
         .Output_fft_data        (w_fft_output_iq),
 
+        .Warning_demux_gap      (w_warning_demux_gap),
+        .Error_demux_overflow   (w_error_demux_overflow),
         .Error_filter_overflow  (w_error_filter_overflow),
         .Error_mux_overflow     (w_error_mux_overflow),
         .Error_mux_underflow    (w_error_mux_underflow),
@@ -176,6 +184,12 @@ module channelizer_tb;
 
   always_ff @(posedge Clk) begin
     if (!Rst) begin
+      if (w_warning_demux_gap) begin
+        $warning("%0t: demux gap warning", $time);
+      end
+      if (w_error_demux_overflow) begin
+        $error("%0t: demux overflow error", $time);
+      end
       if (w_error_filter_overflow) begin
         $error("%0t: filter overflow error", $time);
       end

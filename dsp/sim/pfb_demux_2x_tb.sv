@@ -7,6 +7,7 @@ typedef struct {
   int data_i;
   int data_q;
   int index;
+  bit last;
   int original_sample_index;
   int original_frame_index;
 } pfb_transaction_t;
@@ -30,6 +31,7 @@ endinterface
 
 interface pfb_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
   logic                             valid;
+  logic                             last;
   logic [4:0]                       index;
   logic signed [DATA_WIDTH - 1 : 0] data_i;
   logic signed [DATA_WIDTH - 1 : 0] data_q;
@@ -40,6 +42,7 @@ interface pfb_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
       rx.data_i <= data_i;
       rx.data_q <= data_q;
       rx.index  <= index;
+      rx.last   <= last;
       v         <= valid;
       @(posedge Clk);
     end while (v !== 1);
@@ -49,8 +52,8 @@ endinterface
 module pfb_demux_2x_tb;
   parameter time CLK_HALF_PERIOD = 4ns;
   parameter DATA_WIDTH = 16;
-  parameter CHANNEL_COUNT = 32;
-  parameter CHANNEL_INDEX_WIDTH = $clog2(CHANNEL_COUNT);
+  parameter NUM_CHANNELS = 32;
+  parameter CHANNEL_INDEX_WIDTH = $clog2(NUM_CHANNELS);
 
   typedef struct
   {
@@ -81,23 +84,27 @@ module pfb_demux_2x_tb;
   end
 
   pfb_demux_2x #(
-    .CHANNEL_COUNT        (CHANNEL_COUNT),
+    .NUM_CHANNELS         (NUM_CHANNELS),
     .CHANNEL_INDEX_WIDTH  (CHANNEL_INDEX_WIDTH),
     .DATA_WIDTH           (DATA_WIDTH)
   )
   dut
   (
-    .Clk            (Clk),
-    .Rst            (Rst),
+    .Clk                  (Clk),
+    .Rst                  (Rst),
 
-    .Input_valid    (tx_intf.valid),
-    .Input_i        (tx_intf.data_i),
-    .Input_q        (tx_intf.data_q),
+    .Input_valid          (tx_intf.valid),
+    .Input_i              (tx_intf.data_i),
+    .Input_q              (tx_intf.data_q),
 
-    .Output_valid   (rx_intf.valid),
-    .Output_channel (rx_intf.index),
-    .Output_i       (rx_intf.data_i),
-    .Output_q       (rx_intf.data_q)
+    .Output_valid         (rx_intf.valid),
+    .Output_channel       (rx_intf.index),
+    .Output_last          (rx_intf.last),
+    .Output_i             (rx_intf.data_i),
+    .Output_q             (rx_intf.data_q),
+
+    .Error_input_overflow (),
+    .Warning_input_gap    ()
   );
 
   task automatic wait_for_reset();
@@ -186,6 +193,7 @@ module pfb_demux_2x_tb;
 
         e.data                        = tx_data[output_sample];
         e.data.index                  = output_channel;
+        e.data.last                   = (output_channel == 0);
         e.data.original_sample_index  = output_sample;
         e.data.original_frame_index   = output_frame;
         expected_data.push_back(e);

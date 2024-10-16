@@ -6,38 +6,37 @@ library common_lib;
   use common_lib.common_pkg.all;
   use common_lib.math_pkg.all;
 
-library mem_lib;
-
 library dsp_lib;
   use dsp_lib.dsp_pkg.all;
 
 entity pfb_demux_2x is
 generic (
-  CHANNEL_COUNT       : natural;
+  NUM_CHANNELS        : natural;
   CHANNEL_INDEX_WIDTH : natural;
   DATA_WIDTH          : natural
 );
 port (
-  Clk             : in  std_logic;
-  Rst             : in  std_logic;
+  Clk                   : in  std_logic;
+  Rst                   : in  std_logic;
 
-  Input_valid     : in  std_logic;  -- 1/4 expected rate
-  Input_i         : in  signed(DATA_WIDTH - 1 downto 0);
-  Input_q         : in  signed(DATA_WIDTH - 1 downto 0);
+  Input_valid           : in  std_logic;  -- 1/4 expected rate
+  Input_i               : in  signed(DATA_WIDTH - 1 downto 0);
+  Input_q               : in  signed(DATA_WIDTH - 1 downto 0);
 
-  Output_valid    : out std_logic;  -- 1/2 expected rate
-  Output_channel  : out unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  Output_last     : out std_logic;
-  Output_i        : out signed(DATA_WIDTH - 1 downto 0);
-  Output_q        : out signed(DATA_WIDTH - 1 downto 0)
+  Output_valid          : out std_logic;  -- 1/2 expected rate
+  Output_channel        : out unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  Output_last           : out std_logic;
+  Output_i              : out signed(DATA_WIDTH - 1 downto 0);
+  Output_q              : out signed(DATA_WIDTH - 1 downto 0);
 
-  --TODO: overflow error check
+  Error_input_overflow  : out std_logic;
+  Warning_input_gap     : out std_logic
 );
 end entity pfb_demux_2x;
 
 architecture rtl of pfb_demux_2x is
 
-  constant BUFFER_DEPTH       : natural := 2 * CHANNEL_COUNT;
+  constant BUFFER_DEPTH       : natural := 2 * NUM_CHANNELS;
   constant BUFFER_INDEX_WIDTH : natural := clog2(BUFFER_DEPTH);
   constant READ_CYCLE_COUNT   : natural := 2 * BUFFER_DEPTH;
   constant READ_CYCLE_WIDTH   : natural := clog2(READ_CYCLE_COUNT);
@@ -45,7 +44,7 @@ architecture rtl of pfb_demux_2x is
   function get_read_index_map return unsigned_array_t is
     variable r : unsigned_array_t(READ_CYCLE_COUNT - 1 downto 0)(BUFFER_INDEX_WIDTH - 1 downto 0);
   begin
-    if (CHANNEL_COUNT = 8) then
+    if (NUM_CHANNELS = 8) then
       for i in 0 to 7 loop
         r(i) := to_unsigned(i, BUFFER_INDEX_WIDTH);
       end loop;
@@ -62,7 +61,7 @@ architecture rtl of pfb_demux_2x is
         r(i) := to_unsigned(i - 28, BUFFER_INDEX_WIDTH);
       end loop;
 
-    elsif (CHANNEL_COUNT = 16) then
+    elsif (NUM_CHANNELS = 16) then
       for i in 0 to 15 loop
         r(i) := to_unsigned(i, BUFFER_INDEX_WIDTH);
       end loop;
@@ -79,7 +78,7 @@ architecture rtl of pfb_demux_2x is
         r(i) := to_unsigned(i - 56, BUFFER_INDEX_WIDTH);
       end loop;
 
-    elsif (CHANNEL_COUNT = 32) then
+    elsif (NUM_CHANNELS = 32) then
       for i in 0 to 31 loop
         r(i) := to_unsigned(i, BUFFER_INDEX_WIDTH);
       end loop;
@@ -96,7 +95,7 @@ architecture rtl of pfb_demux_2x is
         r(i) := to_unsigned(i - 112, BUFFER_INDEX_WIDTH);
       end loop;
 
-    elsif (CHANNEL_COUNT = 64) then
+    elsif (NUM_CHANNELS = 64) then
       for i in 0 to 63 loop
         r(i) := to_unsigned(i, BUFFER_INDEX_WIDTH);
       end loop;
@@ -132,7 +131,16 @@ architecture rtl of pfb_demux_2x is
   signal r_output_valid     : std_logic;
   signal w_read_cycle_next  : unsigned(READ_CYCLE_WIDTH - 1 downto 0);
 
+  signal r_input_valid      : std_logic_vector(3 downto 0);
+
 begin
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_input_valid <= r_input_valid(2 downto 0) & Input_valid;
+    end if;
+  end process;
 
   process(Clk)
   begin
@@ -154,7 +162,7 @@ begin
         if (Input_valid = '1') then
           r_write_index <= r_write_index + 1;
 
-          if (r_write_index = (CHANNEL_COUNT / 2)) then
+          if (r_write_index = (NUM_CHANNELS / 2)) then
             r_write_valid <= '1';
           end if;
         end if;
@@ -193,6 +201,14 @@ begin
       Output_last    <= to_stdlogic(r_read_channel = 0);
       Output_i       <= m_buffer_i(to_integer(r_read_index));
       Output_q       <= m_buffer_q(to_integer(r_read_index));
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Error_input_overflow  <= Input_valid and or_reduce(r_input_valid(2 downto 0));
+      Warning_input_gap     <= Input_valid and not(or_reduce(r_input_valid));
     end if;
   end process;
 

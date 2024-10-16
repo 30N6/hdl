@@ -28,6 +28,8 @@ port (
   Output_fft_ctrl       : out channelizer_control_t;
   Output_fft_data       : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
+  Warning_demux_gap     : out std_logic;
+  Error_demux_overflow  : out std_logic;
   Error_filter_overflow : out std_logic;
   Error_mux_overflow    : out std_logic;
   Error_mux_underflow   : out std_logic;
@@ -117,6 +119,8 @@ begin
     Output_fft_ctrl       => Output_fft_ctrl,
     Output_fft_data       => Output_fft_data,
 
+    Warning_demux_gap     => Warning_demux_gap,
+    Error_demux_overflow  => Error_demux_overflow,
     Error_filter_overflow => Error_filter_overflow,
     Error_mux_overflow    => Error_mux_overflow,
     Error_mux_underflow   => Error_mux_underflow,

@@ -261,6 +261,8 @@ begin
   --  Output_fft_ctrl       => w_channelizer8_fft_control,  --TODO: unused
   --  Output_fft_data       => w_channelizer8_fft_data, --TODO: unused
   --
+  --  Warning_demux_gap     => open, --TODO
+  --  Error_demux_overflow  => open, --TODO
   --  Error_filter_overflow => w_channelizer8_overflow,
   --  Error_mux_overflow    => open,
   --  Error_mux_underflow   => open,
@@ -286,7 +288,9 @@ begin
     Output_fft_ctrl       => w_channelizer64_fft_control, --TODO: unused
     Output_fft_data       => w_channelizer64_fft_data, --TODO: unused
 
-    Error_filter_overflow => w_channelizer64_overflow,
+    Warning_demux_gap     => open, --TODO
+    Error_demux_overflow  => open, --TODO
+    Error_filter_overflow => w_channelizer64_overflow,  --TODO
     Error_mux_overflow    => open,
     Error_mux_underflow   => open,
     Error_mux_collision   => open

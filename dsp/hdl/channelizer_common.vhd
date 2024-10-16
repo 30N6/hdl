@@ -33,6 +33,8 @@ port (
   Output_fft_ctrl       : out channelizer_control_t;
   Output_fft_data       : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
+  Warning_demux_gap     : out std_logic;
+  Error_demux_overflow  : out std_logic;
   Error_filter_overflow : out std_logic;
   Error_mux_overflow    : out std_logic;
   Error_mux_underflow   : out std_logic;
@@ -53,6 +55,8 @@ architecture rtl of channelizer_common is
   signal w_demux_index          : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal w_demux_last           : std_logic;
   signal w_demux_data           : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  signal w_demux_overflow       : std_logic;
+  signal w_demux_gap            : std_logic;
 
   signal w_filter_valid         : std_logic;
   signal w_filter_index         : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
@@ -104,23 +108,26 @@ begin
 
   i_demux : entity dsp_lib.pfb_demux_2x
   generic map (
-    CHANNEL_COUNT       => NUM_CHANNELS,  --TODO: consistent naming of generics
+    NUM_CHANNELS        => NUM_CHANNELS,
     CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
     DATA_WIDTH          => INPUT_DATA_WIDTH
   )
   port map (
-    Clk             => Clk,
-    Rst             => r_rst,
+    Clk                   => Clk,
+    Rst                   => r_rst,
 
-    Input_valid     => Input_valid,
-    Input_i         => Input_data(0),
-    Input_q         => Input_data(1),
+    Input_valid           => Input_valid,
+    Input_i               => Input_data(0),
+    Input_q               => Input_data(1),
 
-    Output_valid    => w_demux_valid,
-    Output_channel  => w_demux_index,
-    Output_last     => w_demux_last,
-    Output_i        => w_demux_data(0),
-    Output_q        => w_demux_data(1)
+    Output_valid          => w_demux_valid,
+    Output_channel        => w_demux_index,
+    Output_last           => w_demux_last,
+    Output_i              => w_demux_data(0),
+    Output_q              => w_demux_data(1),
+
+    Error_input_overflow  => w_demux_overflow,
+    Warning_input_gap     => w_demux_gap
   );
 
   i_filter : entity dsp_lib.pfb_filter
@@ -301,6 +308,8 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      Warning_demux_gap     <= w_demux_gap;
+      Error_demux_overflow  <= w_demux_overflow;
       Error_filter_overflow <= w_filter_overflow;
       Error_mux_overflow    <= w_mux_error_overflow;
       Error_mux_underflow   <= w_mux_error_underflow;
