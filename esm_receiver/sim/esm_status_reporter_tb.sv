@@ -81,13 +81,26 @@ module esm_status_reporter_tb;
     bit [63:0]  timestamp;
   } esm_status_report_header_t;
 
-  /*typedef struct packed
+  typedef struct packed
   {
-    esm_channelizer_warnings_t  channelizer_warnings;
-    esm_channelizer_errors_t    channelizer_errors;
-  } esm_status_flags_sv_t;*/
+    bit chan1_error_mux_collision;
+    bit chan1_error_mux_underflow;
+    bit chan1_error_mux_overflow;
+    bit chan1_error_filter_overflow;
+    bit chan1_error_demux_overflow;
+
+    bit chan0_error_mux_collision;
+    bit chan0_error_mux_underflow;
+    bit chan0_error_mux_overflow;
+    bit chan0_error_filter_overflow;
+    bit chan0_error_demux_overflow;
+
+    bit chan1_warning_demux_gap;
+    bit chan0_warning_demux_gap;
+  } esm_status_flags_packed_t;
 
   typedef bit [$bits(esm_status_report_header_t) - 1 : 0] esm_status_report_header_bits_t;
+  typedef bit [$bits(esm_status_flags_packed_t) - 1 : 0] esm_status_flags_packed_bits_t;
 
   parameter MAX_WORDS_PER_PACKET = 64;
   parameter NUM_HEADER_WORDS = ($bits(esm_status_report_header_t) / AXI_DATA_WIDTH);
@@ -209,10 +222,10 @@ module esm_status_reporter_tb;
       return 0;
     end
 
-    /*if (report_a.status !== report_b.status) begin
+    if (report_a.status !== report_b.status) begin
       $display("status mismatch: %X %X", report_a.status, report_b.status);
       return 0;
-    end*/
+    end
 
     for (int i = NUM_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
       if (a[i] !== b[i]) begin
@@ -257,13 +270,30 @@ module esm_status_reporter_tb;
     expect_t                          r;
     esm_status_report_header_t        report_header;
     esm_status_report_header_bits_t   report_header_packed;
+    esm_status_flags_packed_t         status_flags;
+    esm_status_flags_packed_bits_t    status_flags_packed;
+
+    status_flags.chan0_warning_demux_gap      = input_data.channelizer_warnings[0].demux_gap;
+    status_flags.chan1_warning_demux_gap      = input_data.channelizer_warnings[1].demux_gap;
+    status_flags.chan0_error_demux_overflow   = input_data.channelizer_errors[0].demux_overflow;
+    status_flags.chan0_error_filter_overflow  = input_data.channelizer_errors[0].filter_overflow;
+    status_flags.chan0_error_mux_overflow     = input_data.channelizer_errors[0].mux_overflow;
+    status_flags.chan0_error_mux_underflow    = input_data.channelizer_errors[0].mux_underflow;
+    status_flags.chan0_error_mux_collision    = input_data.channelizer_errors[0].mux_collision;
+    status_flags.chan1_error_demux_overflow   = input_data.channelizer_errors[1].demux_overflow;
+    status_flags.chan1_error_filter_overflow  = input_data.channelizer_errors[1].filter_overflow;
+    status_flags.chan1_error_mux_overflow     = input_data.channelizer_errors[1].mux_overflow;
+    status_flags.chan1_error_mux_underflow    = input_data.channelizer_errors[1].mux_underflow;
+    status_flags.chan1_error_mux_collision    = input_data.channelizer_errors[1].mux_collision;
+
+    status_flags_packed = esm_status_flags_packed_bits_t'(status_flags);
 
     report_header.magic_num     = esm_report_magic_num;
     report_header.sequence_num  = report_seq_num;
     report_header.module_id     = MODULE_ID;
     report_header.message_type  = esm_report_message_type_status;
     report_header.enables       = {27'h0, input_data.enable_pdw_encoder, input_data.enable_channelizer, 1'b1};
-    report_header.status        = 0; //TODO
+    report_header.status        = status_flags_packed;
     report_header.timestamp     = 0;
 
     report_header_packed = esm_status_report_header_bits_t'(report_header);
