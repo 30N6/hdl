@@ -22,6 +22,7 @@ port (
   Axis_data     : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
 
   Rst_out       : out std_logic;
+  Enable_status : out std_logic;
   Enable_chan   : out std_logic_vector(1 downto 0);
   Enable_pdw    : out std_logic_vector(1 downto 0);
 
@@ -156,9 +157,10 @@ begin
         Enable_pdw  <= (others => '0');
       else
         if ((r_axis_valid = '1') and (s_state = S_ACTIVE_CONFIG_CONTROL) and (r_first = '1') and (r_message_type = ESM_CONTROL_MESSAGE_TYPE_ENABLE)) then
-          Rst_out     <= r_axis_data(24);
-          Enable_chan <= r_axis_data(17 downto 16);
-          Enable_pdw  <= r_axis_data(9 downto 8);
+          Rst_out       <= r_axis_data(24);
+          Enable_chan   <= r_axis_data(17 downto 16);
+          Enable_pdw    <= r_axis_data(9 downto 8);
+          Enable_status <= r_axis_data(0);
         end if;
       end if;
     end if;

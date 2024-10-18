@@ -51,7 +51,7 @@ end entity esm_receiver;
 architecture rtl of esm_receiver is
 
   constant AXI_FIFO_DEPTH             : natural := 64;
-  constant NUM_D2H_MUX_INPUTS         : natural := 4;
+  constant NUM_D2H_MUX_INPUTS         : natural := 5;
   constant CHANNELIZER8_DATA_WIDTH    : natural := IQ_WIDTH + 3 + 3; -- +4 for filter, +3 for ifft
   constant CHANNELIZER64_DATA_WIDTH   : natural := IQ_WIDTH + 4 + 6; -- +4 for filter, +6 for ifft
 
@@ -60,6 +60,8 @@ architecture rtl of esm_receiver is
 
   constant AD9361_BIT_PIPE_DEPTH      : natural := 3;
 
+  constant HEARTBEAT_INTERVAL         : natural := 31250000;
+
   signal data_clk                     : std_logic;
 
   signal w_clk_x4_p0                  : std_logic;
@@ -67,6 +69,7 @@ architecture rtl of esm_receiver is
   signal w_config_rst                 : std_logic;
   signal r_combined_rst               : std_logic;
 
+  signal w_enable_status              : std_logic;
   signal w_enable_chan                : std_logic_vector(1 downto 0);
   signal w_enable_pdw                 : std_logic_vector(1 downto 0);
   signal w_module_config              : esm_config_data_t;
@@ -92,24 +95,17 @@ architecture rtl of esm_receiver is
   signal w_channelizer8_chan_control  : channelizer_control_t;
   signal w_channelizer8_chan_data     : signed_array_t(1 downto 0)(CHANNELIZER8_DATA_WIDTH - 1 downto 0);
   signal w_channelizer8_chan_pwr      : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-
   signal w_channelizer8_fft_control   : channelizer_control_t;
   signal w_channelizer8_fft_data      : signed_array_t(1 downto 0)(CHANNELIZER8_DATA_WIDTH - 1 downto 0);
-  signal w_channelizer8_overflow      : std_logic;
 
   signal w_channelizer64_chan_control : channelizer_control_t;
   signal w_channelizer64_chan_data    : signed_array_t(1 downto 0)(CHANNELIZER64_DATA_WIDTH - 1 downto 0);
   signal w_channelizer64_chan_pwr     : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal w_channelizer64_fft_control  : channelizer_control_t;
   signal w_channelizer64_fft_data     : signed_array_t(1 downto 0)(CHANNELIZER64_DATA_WIDTH - 1 downto 0);
-  signal w_channelizer64_overflow     : std_logic;
 
-  signal r_test_8_chn                 : std_logic;
-  signal r_test_8_fft                 : std_logic;
-  signal r_test_64_chn                : std_logic;
-  signal r_test_64_fft                : std_logic;
-  signal r_test                       : std_logic;
-  signal r_test_dwell                 : std_logic;
+  signal w_channelizer_warnings       : esm_channelizer_warnings_array_t(1 downto 0);
+  signal w_channelizer_errors         : esm_channelizer_errors_array_t(1 downto 0);
 
   signal w_d2h_fifo_in_ready          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
   signal w_d2h_fifo_in_valid          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
@@ -186,6 +182,7 @@ begin
     Axis_data     => w_config_axis_data,
 
     Rst_out       => w_config_rst,
+    Enable_status => w_enable_status,
     Enable_chan   => w_enable_chan,
     Enable_pdw    => w_enable_pdw,
 
@@ -259,13 +256,20 @@ begin
   --  Output_fft_ctrl       => w_channelizer8_fft_control,  --TODO: unused
   --  Output_fft_data       => w_channelizer8_fft_data, --TODO: unused
   --
-  --  Warning_demux_gap     => open, --TODO
-  --  Error_demux_overflow  => open, --TODO
-  --  Error_filter_overflow => w_channelizer8_overflow,
-  --  Error_mux_overflow    => open,
-  --  Error_mux_underflow   => open,
-  --  Error_mux_collision   => open
+  --  Warning_demux_gap     => w_channelizer_warnings(0).demux_gap,
+  --  Error_demux_overflow  => w_channelizer_errors(0).demux_overflow,
+  --  Error_filter_overflow => w_channelizer_errors(0).filter_overflow,
+  --  Error_mux_overflow    => w_channelizer_errors(0).mux_overflow,
+  --  Error_mux_underflow   => w_channelizer_errors(0).mux_underflow,
+  --  Error_mux_collision   => w_channelizer_errors(0).mux_collision
   --);
+
+  w_channelizer_warnings(0).demux_gap     <= '0';
+  w_channelizer_errors(0).demux_overflow  <= '0';
+  w_channelizer_errors(0).filter_overflow <= '0';
+  w_channelizer_errors(0).mux_overflow    <= '0';
+  w_channelizer_errors(0).mux_underflow   <= '0';
+  w_channelizer_errors(0).mux_collision   <= '0';
 
   i_channelizer_64 : entity dsp_lib.channelizer_64
   generic map (
@@ -286,12 +290,12 @@ begin
     Output_fft_ctrl       => w_channelizer64_fft_control, --TODO: unused
     Output_fft_data       => w_channelizer64_fft_data, --TODO: unused
 
-    Warning_demux_gap     => open, --TODO
-    Error_demux_overflow  => open, --TODO
-    Error_filter_overflow => w_channelizer64_overflow,  --TODO
-    Error_mux_overflow    => open,
-    Error_mux_underflow   => open,
-    Error_mux_collision   => open
+    Warning_demux_gap     => w_channelizer_warnings(1).demux_gap,
+    Error_demux_overflow  => w_channelizer_errors(1).demux_overflow,
+    Error_filter_overflow => w_channelizer_errors(1).filter_overflow,
+    Error_mux_overflow    => w_channelizer_errors(1).mux_overflow,
+    Error_mux_underflow   => w_channelizer_errors(1).mux_underflow,
+    Error_mux_collision   => w_channelizer_errors(1).mux_collision
   );
 
   --i_dwell_stats_8 : entity esm_lib.esm_dwell_stats
@@ -408,6 +412,29 @@ begin
     Axis_valid          => w_d2h_fifo_in_valid(3),
     Axis_data           => w_d2h_fifo_in_data(3),
     Axis_last           => w_d2h_fifo_in_last(3)
+  );
+
+  i_status_reporter : entity esm_lib.esm_status_reporter
+  generic map (
+    AXI_DATA_WIDTH        => AXI_DATA_WIDTH,
+    MODULE_ID             => ESM_MODULE_ID_STATUS,
+    HEARTBEAT_INTERVAL    => HEARTBEAT_INTERVAL
+  )
+  port map (
+    Clk                   => data_clk,
+    Rst                   => r_combined_rst,
+
+    Enable_status         => w_enable_status,
+    Enable_channelizer    => w_enable_chan,
+    Enable_pdw_encoder    => w_enable_pdw,
+
+    Channelizer_warnings  => w_channelizer_warnings,
+    Channelizer_errors    => w_channelizer_errors,
+
+    Axis_ready            => w_d2h_fifo_in_ready(4),
+    Axis_valid            => w_d2h_fifo_in_valid(4),
+    Axis_data             => w_d2h_fifo_in_data(4),
+    Axis_last             => w_d2h_fifo_in_last(4)
   );
 
   g_d2h_fifo : for i in 0 to (NUM_D2H_MUX_INPUTS - 1) generate

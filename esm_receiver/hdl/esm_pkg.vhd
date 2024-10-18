@@ -22,8 +22,7 @@ package esm_pkg is
   constant ESM_MODULE_ID_DWELL_STATS_WIDE               : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"03";
   constant ESM_MODULE_ID_PDW_NARROW                     : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"04";
   constant ESM_MODULE_ID_PDW_WIDE                       : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"05";
-  constant ESM_MODULE_ID_STATUS_NARROW                  : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"06";
-  constant ESM_MODULE_ID_STATUS_WIDE                    : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"07";
+  constant ESM_MODULE_ID_STATUS                         : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"06";
 
   constant ESM_CONTROL_MESSAGE_TYPE_ENABLE              : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"00";
   constant ESM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY         : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"01";
@@ -236,6 +235,8 @@ package esm_pkg is
     demux_gap       : std_logic;
   end record;
 
+  type esm_channelizer_warnings_array_t is array (natural range <>) of esm_channelizer_warnings_t;
+
   constant ESM_CHANNELIZER_WARNINGS_WIDTH : natural := 1;
 
   type esm_channelizer_errors_t is record
@@ -248,12 +249,14 @@ package esm_pkg is
 
   constant ESM_CHANNELIZER_ERRORS_WIDTH : natural := 5;
 
+  type esm_channelizer_errors_array_t is array (natural range <>) of esm_channelizer_errors_t;
+
   type esm_status_flags_t is record
-    channelizer_warnings  : esm_channelizer_warnings_t;
-    channelizer_errors    : esm_channelizer_errors_t;
+    channelizer_warnings  : esm_channelizer_warnings_array_t(1 downto 0);
+    channelizer_errors    : esm_channelizer_errors_array_t(1 downto 0);
   end record;
 
-  constant ESM_STATUS_FLAGS_WIDTH : natural := ESM_CHANNELIZER_WARNINGS_WIDTH + ESM_CHANNELIZER_ERRORS_WIDTH;
+  constant ESM_STATUS_FLAGS_WIDTH : natural := 2*ESM_CHANNELIZER_WARNINGS_WIDTH + 2*ESM_CHANNELIZER_ERRORS_WIDTH;
 
   function unpack(v : std_logic_vector) return esm_dwell_metadata_t;
   function unpack(v : std_logic_vector) return esm_message_dwell_entry_t;
@@ -384,15 +387,18 @@ package body esm_pkg is
     r(1) := v.filter_overflow;
     r(2) := v.mux_overflow;
     r(3) := v.mux_underflow;
-    r(5) := v.mux_collision;
+    r(4) := v.mux_collision;
     return r;
   end function;
 
   function pack(v : esm_status_flags_t) return std_logic_vector is
     variable r : std_logic_vector(ESM_STATUS_FLAGS_WIDTH - 1 downto 0);
   begin
-      r(ESM_CHANNELIZER_WARNINGS_WIDTH - 1 downto 0) := pack(v.channelizer_warnings);
-      r(ESM_CHANNELIZER_ERRORS_WIDTH + ESM_CHANNELIZER_WARNINGS_WIDTH - 1 downto ESM_CHANNELIZER_WARNINGS_WIDTH) := pack(v.channelizer_errors);
+      r(ESM_CHANNELIZER_WARNINGS_WIDTH - 1 downto 0)                                := pack(v.channelizer_warnings(0));
+      r(2*ESM_CHANNELIZER_WARNINGS_WIDTH - 1 downto ESM_CHANNELIZER_WARNINGS_WIDTH) := pack(v.channelizer_warnings(1));
+
+      r(ESM_CHANNELIZER_ERRORS_WIDTH + 2*ESM_CHANNELIZER_WARNINGS_WIDTH - 1 downto 2*ESM_CHANNELIZER_WARNINGS_WIDTH)                                  := pack(v.channelizer_errors(0));
+      r(2*ESM_CHANNELIZER_ERRORS_WIDTH + 2*ESM_CHANNELIZER_WARNINGS_WIDTH - 1 downto ESM_CHANNELIZER_ERRORS_WIDTH + 2*ESM_CHANNELIZER_WARNINGS_WIDTH) := pack(v.channelizer_errors(1));
     return r;
   end function;
 

@@ -14,18 +14,18 @@ entity esm_status_reporter is
 generic (
   AXI_DATA_WIDTH        : natural;
   MODULE_ID             : unsigned;
-  HEARTBEAT_INTERVAL    : unsigned
+  HEARTBEAT_INTERVAL    : natural
 );
 port (
   Clk                   : in  std_logic;
   Rst                   : in  std_logic;
 
   Enable_status         : in  std_logic;
-  Enable_channelizer    : in  std_logic;
-  Enable_pdw_encoder    : in  std_logic;
+  Enable_channelizer    : in  std_logic_vector(1 downto 0);
+  Enable_pdw_encoder    : in  std_logic_vector(1 downto 0);
 
-  Channelizer_warnings  : in  esm_channelizer_warnings_t;
-  Channelizer_errors    : in  esm_channelizer_errors_t;
+  Channelizer_warnings  : in  esm_channelizer_warnings_array_t(1 downto 0);
+  Channelizer_errors    : in  esm_channelizer_errors_array_t(1 downto 0);
 
   Axis_ready            : in  std_logic;
   Axis_valid            : out std_logic;
@@ -63,10 +63,10 @@ architecture rtl of esm_status_reporter is
   signal r_timestamp            : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
 
   signal r_enable_status        : std_logic;
-  signal r_enable_channelizer   : std_logic;
-  signal r_enable_pdw_encoder   : std_logic;
-  signal r_channelizer_warnings : esm_channelizer_warnings_t;
-  signal r_channelizer_errors   : esm_channelizer_errors_t;
+  signal r_enable_channelizer   : std_logic_vector(1 downto 0);
+  signal r_enable_pdw_encoder   : std_logic_vector(1 downto 0);
+  signal r_channelizer_warnings : esm_channelizer_warnings_array_t(1 downto 0);
+  signal r_channelizer_errors   : esm_channelizer_errors_array_t(1 downto 0);
 
   signal w_status_flags         : esm_status_flags_t;
   signal r_status_flags_latched : std_logic_vector(ESM_STATUS_FLAGS_WIDTH - 1 downto 0);
@@ -112,10 +112,11 @@ begin
       if (Rst = '1') then
         r_status_timer <= (others => '0');
       else
-        if ((r_enable_status = '0') or (r_status_timer = (HEARTBEAT_INTERVAL - 1))) then
+        if ((r_enable_status = '0') or (r_status_trigger = '1')) then
           r_status_timer <= (others => '0');
         else
           r_status_timer <= r_status_timer + 1;
+
         end if;
       end if;
     end if;
@@ -124,7 +125,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_status_trigger <= to_stdlogic(r_status_timer = (HEARTBEAT_INTERVAL - 1));
+      r_status_trigger <= to_stdlogic(r_status_timer = (HEARTBEAT_INTERVAL - 2));
     end if;
   end process;
 
@@ -263,7 +264,7 @@ begin
 
     when S_ENABLES =>
       w_fifo_valid  <= '1';
-      w_fifo_data   <= x"0000000" & '0' & r_enable_pdw_encoder & r_enable_channelizer & r_enable_status;
+      w_fifo_data   <= x"000000" & "000" & r_enable_pdw_encoder & r_enable_channelizer & r_enable_status;
 
     when S_STATUS =>
       w_fifo_valid  <= '1';

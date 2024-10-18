@@ -51,6 +51,7 @@ custom_ip_files esm_receiver [list \
   {"./hdl/esm_pdw_sample_processor.vhd"     "esm_lib"}      \
   {"./hdl/esm_pdw_reporter.vhd"             "esm_lib"}      \
   {"./hdl/esm_pdw_encoder.vhd"              "esm_lib"}      \
+  {"./hdl/esm_status_reporter.vhd"          "esm_lib"}      \
   {"./hdl/esm_receiver.vhd"                 "esm_lib"}      \
 ]
 
