@@ -23,11 +23,13 @@ port (
 
   Input_valid           : in  std_logic;
   Input_index           : in  unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  Input_last            : in  std_logic;
   Input_curr_iq         : in  signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
   Input_prev_iq         : in  signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
   Output_valid          : out std_logic;
   Output_index          : out unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  Output_last           : out std_logic;
   Output_iq             : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
   Error_input_overflow  : out std_logic
@@ -36,17 +38,39 @@ end entity pfb_filter_stage;
 
 architecture rtl of pfb_filter_stage is
 
-  signal w_coef_data        : signed(COEF_WIDTH - 1 downto 0);
+  signal r0_input_valid     : std_logic;
+  signal r0_input_index     : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r0_input_last      : std_logic;
+  signal r0_input_curr_iq   : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r0_input_prev_iq   : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
-  signal r_input_valid      : std_logic_vector(1 downto 0);
-  signal r_input_index      : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal r_input_sub_index  : unsigned(0 downto 0);
-  signal r_input_curr_iq    : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
-  signal r_input_prev_iq    : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  signal r1_input_valid     : std_logic;
+  signal r1_input_index     : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r1_input_last      : std_logic;
+  signal r1_input_curr_iq   : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r1_input_prev_iq   : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  signal r1_coef_data       : signed(COEF_WIDTH - 1 downto 0);
+
+  signal r2_input_valid     : std_logic_vector(1 downto 0);
+  signal r2_input_index     : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r2_input_last      : std_logic;
+  signal r2_input_sub_index : unsigned(0 downto 0);
+  signal r2_input_curr_iq   : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r2_input_prev_iq   : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  signal r2_coef_data       : signed(COEF_WIDTH - 1 downto 0);
+
+  signal r3_input_valid     : std_logic_vector(1 downto 0);
+  signal r3_input_index     : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r3_input_last      : std_logic;
+  signal r3_input_sub_index : unsigned(0 downto 0);
+  signal r3_input_curr_iq   : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r3_input_prev_iq   : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  signal r3_coef_data       : signed(COEF_WIDTH - 1 downto 0);
 
   signal w_mult_valid       : std_logic;
   signal w_mult_index       : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal w_mult_sub_index   : unsigned(0 downto 0);
+  signal w_mult_last        : std_logic;
   signal w_mult_data        : signed(OUTPUT_DATA_WIDTH - 1 downto 0);
 
   signal r_mult_valid       : std_logic;
@@ -59,27 +83,63 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (Input_valid = '1') then
-        r_input_valid     <= (others => '1');
-        r_input_curr_iq   <= Input_curr_iq;
-        r_input_prev_iq   <= Input_prev_iq;
-        r_input_sub_index <= "1";
+      r0_input_valid    <= Input_valid;
+      r0_input_index    <= Input_index;
+      r0_input_last     <= Input_last;
+      r0_input_curr_iq  <= Input_curr_iq;
+      r0_input_prev_iq  <= Input_prev_iq;
+      end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r1_input_valid    <= r0_input_valid;
+      r1_input_index    <= r0_input_index;
+      r1_input_last     <= r0_input_last;
+      r1_input_curr_iq  <= r0_input_curr_iq;
+      r1_input_prev_iq  <= r0_input_prev_iq;
+      r1_coef_data      <= COEF_DATA(to_integer(r0_input_index));
+      end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (r1_input_valid = '1') then
+        r2_input_valid     <= (others => '1');
+        r2_input_curr_iq   <= r1_input_curr_iq;
+        r2_input_prev_iq   <= r1_input_prev_iq;
+        r2_input_sub_index <= "1";
       else
-        r_input_valid      <= r_input_valid(0)   & '0';
-        r_input_curr_iq(1) <= r_input_curr_iq(0);
-        r_input_curr_iq(0) <= (others => '0');
-        r_input_prev_iq(1) <= r_input_prev_iq(0);
-        r_input_prev_iq(0) <= (others => '0');
-        r_input_sub_index  <= "0";
+        r2_input_valid      <= r2_input_valid(0)   & '0';
+        r2_input_curr_iq(1) <= r2_input_curr_iq(0);
+        r2_input_curr_iq(0) <= (others => '0');
+        r2_input_prev_iq(1) <= r2_input_prev_iq(0);
+        r2_input_prev_iq(0) <= (others => '0');
+        r2_input_sub_index  <= "0";
       end if;
 
-      if (Input_valid = '1') then
-        r_input_index <= Input_index;
+      if (r1_input_valid = '1') then
+        r2_input_index  <= r1_input_index;
+        r2_input_last   <= r1_input_last;
+        r2_coef_data    <= r1_coef_data;
       end if;
     end if;
   end process;
 
-  w_coef_data <= COEF_DATA(to_integer(r_input_index));
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r3_input_valid      <= r2_input_valid;
+      r3_input_index      <= r2_input_index;
+      r3_input_sub_index  <= r2_input_sub_index;
+      r3_input_last       <= r2_input_last;
+      r3_input_curr_iq    <= r2_input_curr_iq;
+      r3_coef_data        <= r2_coef_data;
+      r3_input_prev_iq    <= r2_input_prev_iq;
+    end if;
+  end process;
 
   i_mult : entity dsp_lib.pfb_filter_mult
   generic map (
@@ -95,16 +155,18 @@ begin
   port map (
     Clk             => Clk,
 
-    Input_valid     => r_input_valid(1),
-    Input_index     => r_input_index,
-    Input_sub_index => r_input_sub_index,
-    Input_a         => r_input_curr_iq(1),
-    Input_b         => w_coef_data,
-    Input_c         => r_input_prev_iq(1),
+    Input_valid     => r3_input_valid(1),
+    Input_index     => r3_input_index,
+    Input_sub_index => r3_input_sub_index,
+    Input_last      => r3_input_last,
+    Input_a         => r3_input_curr_iq(1),
+    Input_b         => r3_coef_data,
+    Input_c         => r3_input_prev_iq(1),
 
     Output_valid      => w_mult_valid,
     Output_index      => w_mult_index,
     Output_sub_index  => w_mult_sub_index,
+    Output_last       => w_mult_last,
     Output_data       => w_mult_data
   );
 
@@ -125,13 +187,14 @@ begin
 
   Output_valid  <= w_mult_valid and to_stdlogic(w_mult_sub_index = 0);
   Output_index  <= w_mult_index;
+  Output_last   <= w_mult_last;
   Output_iq(0)  <= w_mult_data;
   Output_iq(1)  <= r_mult_data;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Error_input_overflow <= Input_valid and r_input_valid(0);
+      Error_input_overflow <= r0_input_valid and r1_input_valid;
     end if;
   end process;
 

@@ -7,16 +7,17 @@ typedef struct {
   int data_i;
   int data_q;
   int index;
+  bit last;
   int original_sample_index;
   int original_frame_index;
-} pfb_32_transaction_t;
+} pfb_transaction_t;
 
-interface pfb_32_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
+interface pfb_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
   logic                             valid = 0;
   logic signed [DATA_WIDTH - 1 : 0] data_i;
   logic signed [DATA_WIDTH - 1 : 0] data_q;
 
-  task write(input pfb_32_transaction_t tx);
+  task write(input pfb_transaction_t tx);
     data_i  <= tx.data_i;
     data_q  <= tx.data_q;
     valid   <= 1;
@@ -28,41 +29,45 @@ interface pfb_32_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
   endtask
 endinterface
 
-interface pfb_32_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
+interface pfb_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
   logic                             valid;
+  logic                             last;
   logic [4:0]                       index;
   logic signed [DATA_WIDTH - 1 : 0] data_i;
   logic signed [DATA_WIDTH - 1 : 0] data_q;
 
-  task read(output pfb_32_transaction_t rx);
+  task read(output pfb_transaction_t rx);
     logic v;
     do begin
       rx.data_i <= data_i;
       rx.data_q <= data_q;
       rx.index  <= index;
+      rx.last   <= last;
       v         <= valid;
       @(posedge Clk);
     end while (v !== 1);
   endtask
 endinterface
 
-module pfb_32_demux_tb;
+module pfb_demux_2x_tb;
   parameter time CLK_HALF_PERIOD = 4ns;
   parameter DATA_WIDTH = 16;
+  parameter NUM_CHANNELS = 32;
+  parameter CHANNEL_INDEX_WIDTH = $clog2(NUM_CHANNELS);
 
   typedef struct
   {
-    pfb_32_transaction_t data;
+    pfb_transaction_t data;
   } expect_t;
 
   logic Clk;
   logic Rst;
 
-  pfb_32_tx_intf #(.DATA_WIDTH(DATA_WIDTH)) tx_intf (.*);
-  pfb_32_rx_intf #(.DATA_WIDTH(DATA_WIDTH)) rx_intf (.*);
-  expect_t                                  expected_data [$];
-  int                                       num_received = 0;
-  int                                       num_matched = 0;
+  pfb_tx_intf #(.DATA_WIDTH(DATA_WIDTH))  tx_intf (.*);
+  pfb_rx_intf #(.DATA_WIDTH(DATA_WIDTH))  rx_intf (.*);
+  expect_t                                expected_data [$];
+  int                                     num_received = 0;
+  int                                     num_matched = 0;
 
   initial begin
     Clk = 0;
@@ -78,22 +83,28 @@ module pfb_32_demux_tb;
     Rst = 0;
   end
 
-  pfb_32_demux #(
-    .DATA_WIDTH(DATA_WIDTH)
+  pfb_demux_2x #(
+    .NUM_CHANNELS         (NUM_CHANNELS),
+    .CHANNEL_INDEX_WIDTH  (CHANNEL_INDEX_WIDTH),
+    .DATA_WIDTH           (DATA_WIDTH)
   )
   dut
   (
-    .Clk            (Clk),
-    .Rst            (Rst),
+    .Clk                  (Clk),
+    .Rst                  (Rst),
 
-    .Input_valid    (tx_intf.valid),
-    .Input_i        (tx_intf.data_i),
-    .Input_q        (tx_intf.data_q),
+    .Input_valid          (tx_intf.valid),
+    .Input_i              (tx_intf.data_i),
+    .Input_q              (tx_intf.data_q),
 
-    .Output_valid   (rx_intf.valid),
-    .Output_channel (rx_intf.index),
-    .Output_i       (rx_intf.data_i),
-    .Output_q       (rx_intf.data_q)
+    .Output_valid         (rx_intf.valid),
+    .Output_channel       (rx_intf.index),
+    .Output_last          (rx_intf.last),
+    .Output_i             (rx_intf.data_i),
+    .Output_q             (rx_intf.data_q),
+
+    .Error_input_overflow (),
+    .Warning_input_gap    ()
   );
 
   task automatic wait_for_reset();
@@ -102,7 +113,7 @@ module pfb_32_demux_tb;
     end while (Rst);
   endtask
 
-  function automatic bit compare_data(pfb_32_transaction_t r, pfb_32_transaction_t e);
+  function automatic bit compare_data(pfb_transaction_t r, pfb_transaction_t e);
     if (e.index !== r.index) begin
       return 0;
     end
@@ -116,7 +127,7 @@ module pfb_32_demux_tb;
   endfunction
 
   initial begin
-    automatic pfb_32_transaction_t read_data;
+    automatic pfb_transaction_t read_data;
 
     wait_for_reset();
 
@@ -147,7 +158,7 @@ module pfb_32_demux_tb;
 
   task automatic standard_tests();
     parameter NUM_TESTS = 20;
-    pfb_32_transaction_t tx_data[] = new[256*32];
+    pfb_transaction_t tx_data[] = new[256*32];
     int output_sample_index [32][512];
 
     for (int i_channel = 0; i_channel < 32; i_channel++) begin
@@ -182,6 +193,7 @@ module pfb_32_demux_tb;
 
         e.data                        = tx_data[output_sample];
         e.data.index                  = output_channel;
+        e.data.last                   = (output_channel == 0);
         e.data.original_sample_index  = output_sample;
         e.data.original_frame_index   = output_frame;
         expected_data.push_back(e);

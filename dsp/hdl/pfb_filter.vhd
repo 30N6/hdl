@@ -25,11 +25,13 @@ port (
 
   Input_valid           : in  std_logic;
   Input_index           : in  unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  Input_last            : in  std_logic;
   Input_i               : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
   Input_q               : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
 
   Output_valid          : out std_logic;
   Output_index          : out unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  Output_last           : out std_logic;
   Output_i              : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
   Output_q              : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
 
@@ -55,11 +57,13 @@ architecture rtl of pfb_filter is
 
   signal r_input_valid        : std_logic;
   signal r_input_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r_input_last         : std_logic;
   signal r_input_iq           : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
   signal w_stage_prev_iq      : stage_iq_array_t(NUM_COEFS_PER_CHANNEL - 1 downto 0);
   signal w_stage_output_valid : std_logic_vector(NUM_COEFS_PER_CHANNEL - 1 downto 0);
   signal w_stage_output_index : unsigned_array_t(NUM_COEFS_PER_CHANNEL - 1 downto 0)(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_stage_output_last  : std_logic_vector(NUM_COEFS_PER_CHANNEL - 1 downto 0);
   signal w_stage_output_iq    : stage_iq_array_t(NUM_COEFS_PER_CHANNEL - 1 downto 0);
   signal w_stage_overflow     : std_logic_vector(NUM_COEFS_PER_CHANNEL - 1 downto 0);
 
@@ -70,6 +74,7 @@ begin
     if rising_edge(Clk) then
       r_input_valid <= Input_valid;
       r_input_index <= Input_index;
+      r_input_last  <= Input_last;
       r_input_iq    <= Input_i & Input_q;
     end if;
   end process;
@@ -89,11 +94,13 @@ begin
 
       Input_valid           => r_input_valid,
       Input_index           => r_input_index,
+      Input_last            => r_input_last,
       Input_curr_iq         => r_input_iq,
       Input_prev_iq         => w_stage_prev_iq(i),
 
       Output_valid          => w_stage_output_valid(i),
       Output_index          => w_stage_output_index(i),
+      Output_last           => w_stage_output_last(i),
       Output_iq             => w_stage_output_iq(i),
 
       Error_input_overflow  => w_stage_overflow(i)
@@ -107,12 +114,16 @@ begin
       )
       port map (
         Clk           => Clk,
+        Rst           => Rst,
 
         Input_valid   => w_stage_output_valid(i + 1),
         Input_index   => w_stage_output_index(i + 1),
+        Input_last    => w_stage_output_last(i + 1),
         Input_data    => w_stage_output_iq(i + 1),
 
+        Output_valid  => r_input_valid,
         Output_index  => r_input_index,
+        Output_last   => r_input_last,
         Output_data   => w_stage_prev_iq(i)
       );
     else generate
@@ -122,6 +133,7 @@ begin
 
   Output_valid          <= w_stage_output_valid(0);
   Output_index          <= w_stage_output_index(0);
+  Output_last           <= w_stage_output_last(0);
   (Output_i, Output_q)  <= w_stage_output_iq(0);
 
   process(Clk)

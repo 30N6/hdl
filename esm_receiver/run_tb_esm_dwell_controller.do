@@ -2,8 +2,8 @@
 # for each new project. There should be no need to
 # modify the rest of the script.
 
-set tb_lib      dsp_lib
-set tb_name     pfb_filter_tb
+set tb_lib      esm_lib
+set tb_name     esm_dwell_controller_tb
 set top_level   $tb_lib.$tb_name
 
 set xilinx_dir  C:/Xilinx/Vivado/2022.2/data/verilog/src
@@ -17,13 +17,15 @@ set library_file_list [list \
     ../common/hdl/math_pkg.vhd \
     ../common/sim/math_pkg_sv.sv \
     ] \
-  dsp_lib [list \
-    ./hdl/dsp_pkg.vhd \
-    ./hdl/pfb_filter_buffer.vhd \
-    ./hdl/pfb_filter_mult.vhd \
-    ./hdl/pfb_filter_stage.vhd \
-    ./hdl/pfb_filter.vhd \
-    ./sim/pfb_filter_tb.sv \
+  mem_lib [list \
+    ../mem/hdl/ram_sdp.vhd \
+    ] \
+  esm_lib [list \
+    ./hdl/esm_pkg.vhd \
+    ./hdl/esm_config.vhd \
+    ./hdl/esm_dwell_config_decoder.vhd \
+    ./hdl/esm_dwell_controller.vhd \
+    ./sim/esm_dwell_controller_tb.sv \
     ] \
 ]
 
@@ -32,6 +34,7 @@ set incdir_list [list \
   ./hdl \
   ../common/hdl \
   ../common/sim \
+  ../mem/hdl \
   $xilinx_dir \
 ]
 
@@ -92,7 +95,6 @@ foreach {library file_list} $library_file_list {
 }
 set last_compile_time $time_now
 
-# Load the simulation
 vsim -suppress 12110 $top_level glbl.glbl
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2

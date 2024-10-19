@@ -15,31 +15,34 @@ generic (
   OUTPUT_DATA_WIDTH : natural
 );
 port (
-  Clk             : in  std_logic;
-  Rst             : in  std_logic;
+  Clk                   : in  std_logic;
+  Rst                   : in  std_logic;
 
-  Input_valid     : in  std_logic;
-  Input_data      : in  signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
+  Input_valid           : in  std_logic;
+  Input_data            : in  signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
-  Output_valid    : out std_logic;
-  Output_index    : out unsigned(4 downto 0);
-  Output_data     : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  Output_chan_ctrl      : out channelizer_control_t;
+  Output_chan_data      : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  Output_chan_pwr       : out unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  Error_overflow  : out std_logic
+  Output_fft_ctrl       : out channelizer_control_t;
+  Output_fft_data       : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+
+  Warning_demux_gap     : out std_logic;
+  Error_demux_overflow  : out std_logic;
+  Error_filter_overflow : out std_logic;
+  Error_mux_overflow    : out std_logic;
+  Error_mux_underflow   : out std_logic;
+  Error_mux_collision   : out std_logic
 );
 end entity channelizer_32;
 
 architecture rtl of channelizer_32 is
 
-  constant NUM_CHANNELS             : natural := 32;
-  constant CHANNEL_INDEX_WIDTH      : natural := clog2(NUM_CHANNELS);
-
-  constant NUM_COEFS                : natural := 384;
-  constant COEF_WIDTH               : natural := 18;
-  constant FILTER_DATA_WIDTH        : natural := INPUT_DATA_WIDTH + clog2(NUM_COEFS / NUM_CHANNELS);
-  constant FFT_DATA_WIDTH           : natural := FILTER_DATA_WIDTH + clog2(NUM_CHANNELS);
-
-  constant COEF_DATA                : signed_array_t(NUM_COEFS - 1 downto 0)(COEF_WIDTH - 1 downto 0) := (
+  constant NUM_CHANNELS : natural := 32;
+  constant NUM_COEFS    : natural := 384;
+  constant COEF_WIDTH   : natural := 18;
+  constant COEF_DATA    : signed_array_t(NUM_COEFS - 1 downto 0)(COEF_WIDTH - 1 downto 0) := (
       0 => "000000000000000000",   1 => "111111111111111110",   2 => "111111111111111011",   3 => "111111111111110111",   4 => "111111111111110011",   5 => "111111111111101110",   6 => "111111111111101001",   7 => "111111111111100011",
       8 => "111111111111011100",   9 => "111111111111010110",  10 => "111111111111001111",  11 => "111111111111001001",  12 => "111111111111000011",  13 => "111111111110111110",  14 => "111111111110111001",  15 => "111111111110110111",
      16 => "111111111110110101",  17 => "111111111110110110",  18 => "111111111110111000",  19 => "111111111110111101",  20 => "111111111111000101",  21 => "111111111111001111",  22 => "111111111111011101",  23 => "111111111111101101",
@@ -90,124 +93,38 @@ architecture rtl of channelizer_32 is
     376 => "111111111111100000", 377 => "111111111111100110", 378 => "111111111111101011", 379 => "111111111111110000", 380 => "111111111111110100", 381 => "111111111111111000", 382 => "111111111111111100", 383 => "111111111111111110"
   );
 
-  signal r_rst                : std_logic;
-
-  signal w_demux_valid        : std_logic;
-  signal w_demux_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_demux_data         : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
-
-  signal w_filter_valid       : std_logic;
-  signal w_filter_index       : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_filter_data        : signed_array_t(1 downto 0)(FILTER_DATA_WIDTH - 1 downto 0);
-  signal w_filter_overflow    : std_logic;
-
-  signal w_fft_input_control  : fft32_control_t;
-  signal w_fft_output_control : fft32_control_t;
-  signal w_fft_data           : signed_array_t(1 downto 0)(FFT_DATA_WIDTH - 1 downto 0);
-  signal w_fft_overflow       : std_logic;
-
 begin
 
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      r_rst <= Rst;
-    end if;
-  end process;
-
-  i_demux : entity dsp_lib.pfb_32_demux
+  i_channelizer : entity dsp_lib.channelizer_common
   generic map (
-    DATA_WIDTH => INPUT_DATA_WIDTH
-  )
-  port map (
-    Clk             => Clk,
-    Rst             => r_rst,
-
-    Input_valid     => Input_valid,
-    Input_i         => Input_data(0),
-    Input_q         => Input_data(1),
-
-    Output_valid    => w_demux_valid,
-    Output_channel  => w_demux_index,
-    Output_i        => w_demux_data(0),
-    Output_q        => w_demux_data(1)
-  );
-
-  i_filter : entity dsp_lib.pfb_filter
-  generic map (
-    NUM_CHANNELS        => NUM_CHANNELS,
-    CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
-    INPUT_DATA_WIDTH    => INPUT_DATA_WIDTH,
-    OUTPUT_DATA_WIDTH   => FILTER_DATA_WIDTH,
-    COEF_WIDTH          => COEF_WIDTH,
-    NUM_COEFS           => NUM_COEFS,
-    COEF_DATA           => COEF_DATA
+    INPUT_DATA_WIDTH  => INPUT_DATA_WIDTH,
+    OUTPUT_DATA_WIDTH => OUTPUT_DATA_WIDTH,
+    NUM_CHANNELS      => NUM_CHANNELS,
+    NUM_COEFS         => NUM_COEFS,
+    COEF_WIDTH        => COEF_WIDTH,
+    COEF_DATA         => COEF_DATA,
+    FFT_PATH_ENABLE   => false
   )
   port map (
     Clk                   => Clk,
-    Rst                   => r_rst,
+    Rst                   => Rst,
 
-    Input_valid           => w_demux_valid,
-    Input_index           => w_demux_index,
-    Input_i               => w_demux_data(0),
-    Input_q               => w_demux_data(1),
+    Input_valid           => Input_valid,
+    Input_data            => Input_data,
 
-    Output_valid          => w_filter_valid,
-    Output_index          => w_filter_index,
-    Output_i              => w_filter_data(0),
-    Output_q              => w_filter_data(1),
+    Output_chan_ctrl      => Output_chan_ctrl,
+    Output_chan_data      => Output_chan_data,
+    Output_chan_pwr       => Output_chan_pwr,
 
-    Error_input_overflow  => w_filter_overflow
+    Output_fft_ctrl       => Output_fft_ctrl,
+    Output_fft_data       => Output_fft_data,
+
+    Warning_demux_gap     => Warning_demux_gap,
+    Error_demux_overflow  => Error_demux_overflow,
+    Error_filter_overflow => Error_filter_overflow,
+    Error_mux_overflow    => Error_mux_overflow,
+    Error_mux_underflow   => Error_mux_underflow,
+    Error_mux_collision   => Error_mux_collision
   );
-
-  w_fft_input_control.valid       <= w_filter_valid;
-  w_fft_input_control.last        <= to_stdlogic(w_filter_index = 0);
-  w_fft_input_control.reverse     <= '1;
-  w_fft_input_control.data_index  <= w_filter_index;
-  w_fft_input_control.tag         <= (others => '0');
-
-  i_ifft : entity dsp_lib.fft_32
-  generic map (
-    INPUT_DATA_WIDTH  => FILTER_DATA_WIDTH,
-    OUTPUT_DATA_WIDTH => FFT_DATA_WIDTH
-  )
-  port map (
-    Clk                   => Clk,
-    Rst                   => r_rst,
-
-    Input_control         => w_fft_input_control,
-    Input_i               => w_filter_data(0),
-    Input_q               => w_filter_data(1),
-
-    Output_control        => w_fft_output_control,
-    Output_i              => w_fft_data(0),
-    Output_q              => w_fft_data(1),
-
-    Error_input_overflow  => w_fft_overflow
-  );
-
-  i_baseband : entity dsp_lib.pfb_baseband_2x
-  generic map (
-    CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
-    DATA_WIDTH          => FFT_DATA_WIDTH
-  )
-  port map (
-    Clk           => Clk,
-
-    Input_valid   => w_fft_output_control.valid,
-    Input_index   => w_fft_output_control.data_index,
-    Input_data    => w_fft_data,
-
-    Output_valid  => Output_valid,
-    Output_index  => Output_index,
-    Output_data   => Output_data
-  );
-
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      Error_overflow <= w_filter_overflow or w_fft_overflow;
-    end if;
-  end process;
 
 end architecture rtl;

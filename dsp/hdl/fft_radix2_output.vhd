@@ -40,26 +40,44 @@ end entity fft_radix2_output;
 
 architecture rtl of fft_radix2_output is
 
-  constant K_WIDTH                : natural := INPUT_DATA_WIDTH + TWIDDLE_DATA_WIDTH + 1;
-  constant OUTPUT_SCALED_WIDTH    : natural := K_WIDTH + 2; -- k + k + d
+  constant K_WIDTH              : natural := INPUT_DATA_WIDTH + TWIDDLE_DATA_WIDTH + 1;
+  constant OUTPUT_SCALED_WIDTH  : natural := K_WIDTH + 2; -- k + k + d
 
-  signal r0_chan0_i         : signed(INPUT_DATA_WIDTH - 1 downto 0);
-  signal r0_chan0_q         : signed(INPUT_DATA_WIDTH - 1 downto 0);
-  signal r0_chan1_a         : signed(INPUT_DATA_WIDTH - 1 downto 0);
-  signal r0_chan1_b         : signed(INPUT_DATA_WIDTH - 1 downto 0);
-  signal r0_chan1_a_plus_b  : signed(INPUT_DATA_WIDTH downto 0);
-  signal r0_chan1_c         : signed(TWIDDLE_DATA_WIDTH - 1 downto 0);
-  signal r0_chan1_c_plus_d  : signed(TWIDDLE_DATA_WIDTH downto 0);
-  signal r0_chan1_d_minus_c : signed(TWIDDLE_DATA_WIDTH downto 0);
+  signal r0_chan0_i             : signed(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r0_chan0_q             : signed(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r0_chan1_a             : signed(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r0_chan1_b             : signed(INPUT_DATA_WIDTH - 1 downto 0);
+  signal r0_chan1_a_plus_b      : signed(INPUT_DATA_WIDTH downto 0);
+  signal r0_chan1_c             : signed(TWIDDLE_DATA_WIDTH - 1 downto 0);
+  signal r0_chan1_c_plus_d      : signed(TWIDDLE_DATA_WIDTH downto 0);
+  signal r0_chan1_d_minus_c     : signed(TWIDDLE_DATA_WIDTH downto 0);
 
-  signal r1_chan0_scaled_i  : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
-  signal r1_chan0_scaled_q  : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
-  signal r1_k1              : signed(K_WIDTH - 1 downto 0); -- k1 = c * (a+b)
-  signal r1_k2              : signed(K_WIDTH - 1 downto 0); -- k2 = a * (d-c)
-  signal r1_k3              : signed(K_WIDTH - 1 downto 0); -- k3 = b * (c+d)
+  signal r1_chan0_scaled_i      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r1_chan0_scaled_q      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r1_k1                  : signed(K_WIDTH - 1 downto 0); -- k1 = c * (a+b)
+  signal r1_k2                  : signed(K_WIDTH - 1 downto 0); -- k2 = a * (d-c)
+  signal r1_k3                  : signed(K_WIDTH - 1 downto 0); -- k3 = b * (c+d)
 
-  signal r2_output_scaled_i : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
-  signal r2_output_scaled_q : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
+  signal r2_chan0_scaled_i      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r2_chan0_scaled_q      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r2_k1                  : signed(K_WIDTH - 1 downto 0);
+  signal r2_k2                  : signed(K_WIDTH - 1 downto 0);
+  signal r2_k3                  : signed(K_WIDTH - 1 downto 0);
+
+  signal r3_chan0_scaled_i      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r3_chan0_scaled_q      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r3_k1                  : signed(K_WIDTH - 1 downto 0);
+  signal r3_k2                  : signed(K_WIDTH - 1 downto 0);
+  signal r3_k3                  : signed(K_WIDTH - 1 downto 0);
+
+  signal r4_chan0_scaled_i      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r4_chan0_scaled_q      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r4_k1                  : signed(K_WIDTH - 1 downto 0);
+  signal r4_k2                  : signed(K_WIDTH - 1 downto 0);
+  signal r4_k3                  : signed(K_WIDTH - 1 downto 0);
+
+  signal r5_output_scaled_i     : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
+  signal r5_output_scaled_q     : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
 
 begin
 
@@ -67,7 +85,7 @@ begin
     report "Invalid output width - expecting 1 bit of growth per stage."
     severity failure;
 
-  assert (LATENCY = 3)
+  assert (LATENCY = 6)
     report "Invalid latency."
     severity failure;
 
@@ -102,12 +120,45 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r2_output_scaled_i  <= resize_up(r1_chan0_scaled_i, OUTPUT_SCALED_WIDTH) + r1_k1 - r1_k3;
-      r2_output_scaled_q  <= resize_up(r1_chan0_scaled_q, OUTPUT_SCALED_WIDTH) + r1_k1 + r1_k2;
+      r2_chan0_scaled_i <= r1_chan0_scaled_i;
+      r2_chan0_scaled_q <= r1_chan0_scaled_q;
+      r2_k1             <= r1_k1;
+      r2_k2             <= r1_k2;
+      r2_k3             <= r1_k3;
     end if;
   end process;
 
-  Output_i <= r2_output_scaled_i(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
-  Output_q <= r2_output_scaled_q(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r3_chan0_scaled_i <= r2_chan0_scaled_i;
+      r3_chan0_scaled_q <= r2_chan0_scaled_q;
+      r3_k1             <= r2_k1;
+      r3_k2             <= r2_k2;
+      r3_k3             <= r2_k3;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r4_chan0_scaled_i <= r3_chan0_scaled_i;
+      r4_chan0_scaled_q <= r3_chan0_scaled_q;
+      r4_k1             <= r3_k1;
+      r4_k2             <= r3_k2;
+      r4_k3             <= r3_k3;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r5_output_scaled_i  <= resize_up(r4_chan0_scaled_i, OUTPUT_SCALED_WIDTH) + r4_k1 - r4_k3;
+      r5_output_scaled_q  <= resize_up(r4_chan0_scaled_q, OUTPUT_SCALED_WIDTH) + r4_k1 + r4_k2;
+    end if;
+  end process;
+
+  Output_i <= r5_output_scaled_i(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
+  Output_q <= r5_output_scaled_q(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
 
 end architecture rtl;

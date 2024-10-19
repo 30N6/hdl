@@ -3,7 +3,7 @@
 # modify the rest of the script.
 
 set tb_lib      dsp_lib
-set tb_name     pfb_filter_tb
+set tb_name     pfb_demux_2x_tb
 set top_level   $tb_lib.$tb_name
 
 set xilinx_dir  C:/Xilinx/Vivado/2022.2/data/verilog/src
@@ -19,11 +19,8 @@ set library_file_list [list \
     ] \
   dsp_lib [list \
     ./hdl/dsp_pkg.vhd \
-    ./hdl/pfb_filter_buffer.vhd \
-    ./hdl/pfb_filter_mult.vhd \
-    ./hdl/pfb_filter_stage.vhd \
-    ./hdl/pfb_filter.vhd \
-    ./sim/pfb_filter_tb.sv \
+    ./hdl/pfb_demux_2x.vhd \
+    ./sim/pfb_demux_2x_tb.sv \
     ] \
 ]
 
@@ -93,7 +90,7 @@ foreach {library file_list} $library_file_list {
 set last_compile_time $time_now
 
 # Load the simulation
-vsim -suppress 12110 $top_level glbl.glbl
+vsim -suppress 12110 $top_level glbl.glbl   -GCHANNEL_COUNT=32
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all

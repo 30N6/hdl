@@ -2,8 +2,8 @@
 # for each new project. There should be no need to
 # modify the rest of the script.
 
-set tb_lib      dsp_lib
-set tb_name     fft_32_tb
+set tb_lib      axi_lib
+set tb_name     axis_mux_tb
 set top_level   $tb_lib.$tb_name
 
 set xilinx_dir  C:/Xilinx/Vivado/2022.2/data/verilog/src
@@ -14,21 +14,10 @@ set library_file_list [list \
   ] \
   common_lib [list \
     ../common/hdl/common_pkg.vhd \
-    ../common/hdl/math_pkg.vhd \
-    ../common/sim/math_pkg_sv.sv \
     ] \
-  mem_lib [list \
-    ../mem/hdl/ram_sdp.vhd \
-    ] \
-  dsp_lib [list \
-    ./hdl/dsp_pkg.vhd \
-    ./hdl/fft_4.vhd \
-    ./hdl/fft_4_serializer.vhd \
-    ./hdl/fft_32_twiddle_mem.vhd \
-    ./hdl/fft_radix2_output.vhd \
-    ./hdl/fft_32_radix2_stage.vhd \
-    ./hdl/fft_32.vhd \
-    ./sim/fft_32_tb.sv \
+  axi_lib [list \
+    ./hdl/axis_mux.vhd \
+    ./sim/axis_mux_tb.sv \
     ] \
 ]
 
@@ -37,7 +26,6 @@ set incdir_list [list \
   ./hdl \
   ../common/hdl \
   ../common/sim \
-  ../mem/hdl \
   $xilinx_dir \
 ]
 
@@ -88,9 +76,9 @@ foreach {library file_list} $library_file_list {
   foreach file $file_list {
     if { $last_compile_time < [file mtime $file] } {
       if [regexp {.vhdl?$} $file] {
-        vcom -2008 -mixedsvvh -suppress 12110 -work $library $file
+        vcom -2008 -mixedsvvh -work $library $file
       } else {
-        vlog +define+SIM -sv -mixedsvvh -suppress 12110 -timescale "1 ns / 1 ns" {*}[split $vlog_lib_str] -work $library $file {*}[split $incdir_str " "]
+        vlog +define+SIM -sv -mixedsvvh -timescale "1 ns / 1 ns" {*}[split $vlog_lib_str] -work $library $file {*}[split $incdir_str " "]
       }
       set last_compile_time 0
     }
@@ -98,10 +86,8 @@ foreach {library file_list} $library_file_list {
 }
 set last_compile_time $time_now
 
-#TODO: non-gui mode
-
 # Load the simulation
-vsim -suppress 12110 $top_level glbl.glbl
+vsim $top_level glbl.glbl
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all
