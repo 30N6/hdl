@@ -22,23 +22,29 @@ generic (
   WIDE_BANDWIDTH  : boolean
 );
 port (
-  Clk                 : in  std_logic;
-  Rst                 : in  std_logic;
+  Clk                           : in  std_logic;
+  Rst                           : in  std_logic;
 
-  Enable              : in  std_logic;
+  Enable                        : in  std_logic;
 
-  Dwell_active        : in  std_logic;
-  Dwell_data          : in  esm_dwell_metadata_t;
-  Dwell_sequence_num  : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  Dwell_active                  : in  std_logic;
+  Dwell_data                    : in  esm_dwell_metadata_t;
+  Dwell_sequence_num            : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
-  Input_ctrl          : in  channelizer_control_t;
-  Input_data          : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
-  Input_power         : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  Input_ctrl                    : in  channelizer_control_t;
+  Input_data                    : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+  Input_power                   : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  Axis_ready          : in  std_logic;
-  Axis_valid          : out std_logic;
-  Axis_data           : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  Axis_last           : out std_logic
+  Axis_ready                    : in  std_logic;
+  Axis_valid                    : out std_logic;
+  Axis_data                     : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  Axis_last                     : out std_logic;
+
+  Error_pdw_fifo_overflow       : out std_logic;
+  Error_sample_buffer_underflow : out std_logic;
+  Error_sample_buffer_overflow  : out std_logic;
+  Error_reporter_timeout        : out std_logic;
+  Error_reporter_overflow       : out std_logic
 );
 end entity esm_pdw_encoder;
 
@@ -96,8 +102,10 @@ architecture rtl of esm_pdw_encoder is
   signal w_report_ack               : std_logic;
 
   signal w_pdw_fifo_overflow        : std_logic;
-  signal w_sample_buffer_underflow  : std_logic;  --TODO: use
-  signal w_sample_buffer_overflow   : std_logic;  --TODO: use
+  signal w_sample_buffer_underflow  : std_logic;
+  signal w_sample_buffer_overflow   : std_logic;
+  signal w_reporter_timeout         : std_logic;
+  signal w_reporter_overflow        : std_logic;
 
 begin
 
@@ -300,7 +308,21 @@ begin
     Axis_ready          => Axis_ready,
     Axis_valid          => Axis_valid,
     Axis_data           => Axis_data,
-    Axis_last           => Axis_last
+    Axis_last           => Axis_last,
+
+    Error_timeout       => w_reporter_timeout,
+    Error_overflow      => w_reporter_overflow
   );
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Error_pdw_fifo_overflow       <= w_pdw_fifo_overflow;
+      Error_sample_buffer_underflow <= w_sample_buffer_underflow;
+      Error_sample_buffer_overflow  <= w_sample_buffer_overflow;
+      Error_reporter_timeout        <= w_reporter_timeout;
+      Error_reporter_overflow       <= w_reporter_overflow;
+    end if;
+  end process;
 
 end architecture rtl;

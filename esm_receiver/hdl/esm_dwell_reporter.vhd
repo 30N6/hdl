@@ -43,7 +43,10 @@ port (
   Axis_ready          : in  std_logic;
   Axis_valid          : out std_logic;
   Axis_data           : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  Axis_last           : out std_logic
+  Axis_last           : out std_logic;
+
+  Error_timeout       : out std_logic;
+  Error_overflow      : out std_logic
 );
 end entity esm_dwell_reporter;
 
@@ -52,6 +55,8 @@ architecture rtl of esm_dwell_reporter is
   constant FIFO_DEPTH             : natural := 1024;
   constant MAX_WORDS_PER_PACKET   : natural := 64;
   constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - MAX_WORDS_PER_PACKET - 10;
+
+  constant TIMEOUT_CYCLES         : natural := 1024;
 
   type state_t is
   (
@@ -116,6 +121,8 @@ architecture rtl of esm_dwell_reporter is
   signal r_fifo_last            : std_logic;
   signal r_fifo_partial_0_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   signal r_fifo_partial_1_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+
+  signal r_timeout              : unsigned(clog2(TIMEOUT_CYCLES) - 1 downto 0);
 
 begin
 
@@ -392,6 +399,10 @@ begin
     end case;
   end process;
 
+  assert ((s_state = S_IDLE) or (w_fifo_ready = '1'))
+    report "Ready expected to be high."
+    severity failure;
+
   process(Clk)
   begin
     if rising_edge(Clk) then
@@ -401,11 +412,6 @@ begin
       r_fifo_last           <= w_fifo_last;
     end if;
  end process;
-
-  --TODO: error bit
-  assert ((s_state = S_IDLE) or (w_fifo_ready = '1'))
-    report "Ready expected to be high."
-    severity failure;
 
   i_fifo : entity axi_lib.axis_sync_fifo
   generic map (
@@ -430,6 +436,23 @@ begin
     M_axis_last   => Axis_last
   );
 
-  --TODO: timeout error
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (s_state = S_IDLE) then
+        r_timeout <= (others => '0');
+      else
+        r_timeout <= r_timeout + 1;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Error_timeout   <= to_stdlogic(r_timeout = (TIMEOUT_CYCLES - 1));
+      Error_overflow  <= r_fifo_valid and not(w_fifo_ready);
+    end if;
+  end process;
 
 end architecture rtl;

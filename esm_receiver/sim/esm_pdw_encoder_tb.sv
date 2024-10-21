@@ -151,6 +151,8 @@ module esm_pdw_encoder_tb;
   int           num_received = 0;
   logic         r_axi_rx_ready;
   logic         w_axi_rx_valid;
+  logic         w_error_reporter_timeout;
+  logic         w_error_reporter_overflow;
 
   initial begin
     Clk = 0;
@@ -180,26 +182,42 @@ module esm_pdw_encoder_tb;
   )
   dut
   (
-    .Clk                (Clk),
-    .Rst                (Rst),
+    .Clk                            (Clk),
+    .Rst                            (Rst),
 
-    .Enable             (1'b1),
+    .Enable                         (1'b1),
 
-    .Dwell_active       (dwell_tx_intf.dwell_active),
-    .Dwell_data         (dwell_tx_intf.dwell_data),
-    .Dwell_sequence_num (dwell_tx_intf.dwell_sequence_num),
+    .Dwell_active                   (dwell_tx_intf.dwell_active),
+    .Dwell_data                     (dwell_tx_intf.dwell_data),
+    .Dwell_sequence_num             (dwell_tx_intf.dwell_sequence_num),
 
-    .Input_ctrl         (dwell_tx_intf.input_ctrl),
-    .Input_data         (dwell_tx_intf.input_iq),
-    .Input_power        (dwell_tx_intf.input_power),
+    .Input_ctrl                     (dwell_tx_intf.input_ctrl),
+    .Input_data                     (dwell_tx_intf.input_iq),
+    .Input_power                    (dwell_tx_intf.input_power),
 
-    .Axis_ready         (r_axi_rx_ready),
-    .Axis_valid         (w_axi_rx_valid),
-    .Axis_data          (rpt_rx_intf.data),
-    .Axis_last          (rpt_rx_intf.last)
+    .Axis_ready                     (r_axi_rx_ready),
+    .Axis_valid                     (w_axi_rx_valid),
+    .Axis_data                      (rpt_rx_intf.data),
+    .Axis_last                      (rpt_rx_intf.last),
+
+    .Error_pdw_fifo_overflow        (w_error_pdw_fifo_overflow),
+    .Error_sample_buffer_underflow  (w_error_sample_buffer_underflow),
+    .Error_sample_buffer_overflow   (w_error_sample_buffer_overflow),
+    .Error_reporter_timeout         (w_error_reporter_timeout),
+    .Error_reporter_overflow        (w_error_reporter_overflow)
   );
 
   assign rpt_rx_intf.valid = w_axi_rx_valid && r_axi_rx_ready;
+
+  always_ff @(posedge Clk) begin
+    if (!Rst) begin
+      if (w_error_pdw_fifo_overflow)        $error("pdw fifo overflow");
+      if (w_error_sample_buffer_underflow)  $error("sample buffer underflow");
+      if (w_error_sample_buffer_overflow)   $error("sample buffer overflow");
+      if (w_error_reporter_timeout)         $error("reporter timeout");
+      if (w_error_reporter_overflow)        $error("reporter overflow");
+    end
+  end
 
   task automatic wait_for_reset();
     do begin

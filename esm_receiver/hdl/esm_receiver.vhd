@@ -106,6 +106,7 @@ architecture rtl of esm_receiver is
 
   signal w_channelizer_warnings       : esm_channelizer_warnings_array_t(1 downto 0);
   signal w_channelizer_errors         : esm_channelizer_errors_array_t(1 downto 0);
+  signal w_dwell_stats_errors         : esm_dwell_stats_errors_array_t(1 downto 0);
 
   signal w_d2h_fifo_in_ready          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
   signal w_d2h_fifo_in_valid          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
@@ -306,27 +307,33 @@ begin
   --  MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_WIDE
   --)
   --port map (
-  --  Clk                 => data_clk,
-  --  Rst                 => r_combined_rst,
+  --  Clk                     => data_clk,
+  --  Rst                     => r_combined_rst,
   --
-  --  Enable              => w_enable_chan(0),
+  --  Enable                  => w_enable_chan(0),
   --
-  --  Dwell_active        => w_dwell_active,
-  --  Dwell_data          => w_dwell_data,
-  --  Dwell_sequence_num  => w_dwell_sequence_num,
+  --  Dwell_active            => w_dwell_active,
+  --  Dwell_data              => w_dwell_data,
+  --  Dwell_sequence_num      => w_dwell_sequence_num,
   --
-  --  Input_ctrl          => w_channelizer8_chan_control,
-  --  Input_data          => w_channelizer8_chan_data,
-  --  Input_pwr           => w_channelizer8_chan_pwr,
+  --  Input_ctrl              => w_channelizer8_chan_control,
+  --  Input_data              => w_channelizer8_chan_data,
+  --  Input_pwr               => w_channelizer8_chan_pwr,
   --
-  --  Axis_ready          => w_d2h_fifo_in_ready(0),
-  --  Axis_valid          => w_d2h_fifo_in_valid(0),
-  --  Axis_data           => w_d2h_fifo_in_data(0),
-  --  Axis_last           => w_d2h_fifo_in_last(0)
+  --  Axis_ready              => w_d2h_fifo_in_ready(0),
+  --  Axis_valid              => w_d2h_fifo_in_valid(0),
+  --  Axis_data               => w_d2h_fifo_in_data(0),
+  --  Axis_last               => w_d2h_fifo_in_last(0),
+  --
+  -- Error_reporter_timeout   => w_dwell_stats_errors(0).reporter_timeout,
+  -- Error_reporter_overflow  => w_dwell_stats_errors(0).reporter_overflow
   --);
   w_d2h_fifo_in_valid(0)  <= '0';
   w_d2h_fifo_in_data(0)   <= (others => '0');
   w_d2h_fifo_in_last(0)   <= '0';
+
+  w_dwell_stats_errors(0).reporter_timeout  <= '0';
+  w_dwell_stats_errors(0).reporter_overflow <= '0';
 
   i_dwell_stats_64 : entity esm_lib.esm_dwell_stats
   generic map (
@@ -336,23 +343,26 @@ begin
     MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_NARROW
   )
   port map (
-    Clk                 => data_clk,
-    Rst                 => r_combined_rst,
+    Clk                     => data_clk,
+    Rst                     => r_combined_rst,
 
-    Enable              => w_enable_chan(1),
+    Enable                  => w_enable_chan(1),
 
-    Dwell_active        => w_dwell_active,
-    Dwell_data          => w_dwell_data,
-    Dwell_sequence_num  => w_dwell_sequence_num,
+    Dwell_active            => w_dwell_active,
+    Dwell_data              => w_dwell_data,
+    Dwell_sequence_num      => w_dwell_sequence_num,
 
-    Input_ctrl          => w_channelizer64_chan_control,
-    Input_data          => w_channelizer64_chan_data,
-    Input_pwr           => w_channelizer64_chan_pwr,
+    Input_ctrl              => w_channelizer64_chan_control,
+    Input_data              => w_channelizer64_chan_data,
+    Input_pwr               => w_channelizer64_chan_pwr,
 
-    Axis_ready          => w_d2h_fifo_in_ready(1),
-    Axis_valid          => w_d2h_fifo_in_valid(1),
-    Axis_data           => w_d2h_fifo_in_data(1),
-    Axis_last           => w_d2h_fifo_in_last(1)
+    Axis_ready              => w_d2h_fifo_in_ready(1),
+    Axis_valid              => w_d2h_fifo_in_valid(1),
+    Axis_data               => w_d2h_fifo_in_data(1),
+    Axis_last               => w_d2h_fifo_in_last(1),
+
+    Error_reporter_timeout  => w_dwell_stats_errors(1).reporter_timeout,
+    Error_reporter_overflow => w_dwell_stats_errors(1).reporter_overflow
   );
 
   --i_pdw_encoder_8 : entity esm_lib.esm_pdw_encoder
@@ -364,27 +374,39 @@ begin
   --  WIDE_BANDWIDTH  => TRUE
   --)
   --port map (
-  --  Clk                 => data_clk,
-  --  Rst                 => r_combined_rst,
+  --  Clk                           => data_clk,
+  --  Rst                           => r_combined_rst,
   --
-  --  Enable              => w_enable_chan(0),
+  --  Enable                        => w_enable_chan(0),
   --
-  --  Dwell_active        => w_dwell_active,
-  --  Dwell_data          => w_dwell_data,
-  --  Dwell_sequence_num  => w_dwell_sequence_num,
+  --  Dwell_active                  => w_dwell_active,
+  --  Dwell_data                    => w_dwell_data,
+  --  Dwell_sequence_num            => w_dwell_sequence_num,
   --
-  --  Input_ctrl          => w_channelizer8_chan_control,
-  --  Input_data          => w_channelizer8_chan_data,
-  --  Input_power         => w_channelizer8_chan_pwr,
+  --  Input_ctrl                    => w_channelizer8_chan_control,
+  --  Input_data                    => w_channelizer8_chan_data,
+  --  Input_power                   => w_channelizer8_chan_pwr,
   --
-  --  Axis_ready          => w_d2h_fifo_in_ready(2),
-  --  Axis_valid          => w_d2h_fifo_in_valid(2),
-  --  Axis_data           => w_d2h_fifo_in_data(2),
-  --  Axis_last           => w_d2h_fifo_in_last(2)
+  --  Axis_ready                    => w_d2h_fifo_in_ready(2),
+  --  Axis_valid                    => w_d2h_fifo_in_valid(2),
+  --  Axis_data                     => w_d2h_fifo_in_data(2),
+  --  Axis_last                     => w_d2h_fifo_in_last(2),
+  --
+  --  Error_pdw_fifo_overflow       => w_dwell_stats_errors(0).pdw_fifo_overflow,
+  --  Error_sample_buffer_underflow => w_dwell_stats_errors(0).sample_buffer_underflow,
+  --  Error_sample_buffer_overflow  => w_dwell_stats_errors(0).sample_buffer_overflow,
+  --  Error_reporter_timeout        => w_dwell_stats_errors(0).reporter_timeout,
+  --  Error_reporter_overflow       => w_dwell_stats_errors(0).reporter_overflow
   --);
   w_d2h_fifo_in_valid(2)  <= '0';
   w_d2h_fifo_in_data(2)   <= (others => '0');
   w_d2h_fifo_in_last(2)   <= '0';
+
+  w_dwell_stats_errors(0).pdw_fifo_overflow       <= '0';
+  w_dwell_stats_errors(0).sample_buffer_underflow <= '0';
+  w_dwell_stats_errors(0).sample_buffer_overflow  <= '0';
+  w_dwell_stats_errors(0).reporter_timeout        <= '0';
+  w_dwell_stats_errors(0).reporter_overflow       <= '0';
 
   i_pdw_encoder_64 : entity esm_lib.esm_pdw_encoder
   generic map (
@@ -395,23 +417,29 @@ begin
     WIDE_BANDWIDTH  => FALSE
   )
   port map (
-    Clk                 => data_clk,
-    Rst                 => r_combined_rst,
+    Clk                           => data_clk,
+    Rst                           => r_combined_rst,
 
-    Enable              => w_enable_chan(1),
+    Enable                        => w_enable_chan(1),
 
-    Dwell_active        => w_dwell_active,
-    Dwell_data          => w_dwell_data,
-    Dwell_sequence_num  => w_dwell_sequence_num,
+    Dwell_active                  => w_dwell_active,
+    Dwell_data                    => w_dwell_data,
+    Dwell_sequence_num            => w_dwell_sequence_num,
 
-    Input_ctrl          => w_channelizer64_chan_control,
-    Input_data          => w_channelizer64_chan_data,
-    Input_power         => w_channelizer64_chan_pwr,
+    Input_ctrl                    => w_channelizer64_chan_control,
+    Input_data                    => w_channelizer64_chan_data,
+    Input_power                   => w_channelizer64_chan_pwr,
 
-    Axis_ready          => w_d2h_fifo_in_ready(3),
-    Axis_valid          => w_d2h_fifo_in_valid(3),
-    Axis_data           => w_d2h_fifo_in_data(3),
-    Axis_last           => w_d2h_fifo_in_last(3)
+    Axis_ready                    => w_d2h_fifo_in_ready(3),
+    Axis_valid                    => w_d2h_fifo_in_valid(3),
+    Axis_data                     => w_d2h_fifo_in_data(3),
+    Axis_last                     => w_d2h_fifo_in_last(3),
+
+    Error_pdw_fifo_overflow       => w_dwell_stats_errors(1).pdw_fifo_overflow,
+    Error_sample_buffer_underflow => w_dwell_stats_errors(1).sample_buffer_underflow,
+    Error_sample_buffer_overflow  => w_dwell_stats_errors(1).sample_buffer_overflow,
+    Error_reporter_timeout        => w_dwell_stats_errors(1).reporter_timeout,
+    Error_reporter_overflow       => w_dwell_stats_errors(1).reporter_overflow
   );
 
   i_status_reporter : entity esm_lib.esm_status_reporter

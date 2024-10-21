@@ -44,7 +44,10 @@ port (
   Axis_ready          : in  std_logic;
   Axis_valid          : out std_logic;
   Axis_data           : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  Axis_last           : out std_logic
+  Axis_last           : out std_logic;
+
+  Error_timeout       : out std_logic;
+  Error_overflow      : out std_logic
 );
 end entity esm_pdw_reporter;
 
@@ -53,6 +56,8 @@ architecture rtl of esm_pdw_reporter is
   constant FIFO_DEPTH             : natural := 1024;
   constant MAX_WORDS_PER_PACKET   : natural := 64;
   constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - MAX_WORDS_PER_PACKET - 10;
+
+  constant TIMEOUT_CYCLES         : natural := 1024;
 
   type state_t is
   (
@@ -114,6 +119,8 @@ architecture rtl of esm_pdw_reporter is
   signal r_fifo_partial_1_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
 
   signal r_pulse_count          : unsigned(15 downto 0);
+
+  signal r_timeout              : unsigned(clog2(TIMEOUT_CYCLES) - 1 downto 0);
 
 begin
 
@@ -318,19 +325,19 @@ begin
 
     when S_PULSE_POWER_ACCUM_0 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= x"0000" & std_logic_vector(Pdw_data.power_accum(47 downto 32));
+      w_fifo_partial_0_data   <= x"0000" & std_logic_vector(Pdw_data.power_accum(47 downto 32));
 
     when S_PULSE_POWER_ACCUM_1 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= std_logic_vector(Pdw_data.power_accum(31 downto 0));
+      w_fifo_partial_0_data   <= std_logic_vector(Pdw_data.power_accum(31 downto 0));
 
     when S_PULSE_DURATION =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= std_logic_vector(Pdw_data.duration);
+      w_fifo_partial_0_data   <= std_logic_vector(Pdw_data.duration);
 
     when S_PULSE_FREQUENCY =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= x"0000" & std_logic_vector(Pdw_data.frequency);
+      w_fifo_partial_0_data   <= x"0000" & std_logic_vector(Pdw_data.frequency);
 
     when S_PULSE_START_TIME_0 =>
       w_fifo_valid            <= '1';
@@ -346,35 +353,35 @@ begin
 
     when S_SUMMARY_HEADER_0 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= ESM_REPORT_MAGIC_NUM;
+      w_fifo_partial_1_data   <= ESM_REPORT_MAGIC_NUM;
 
     when S_SUMMARY_HEADER_1 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(r_packet_seq_num);
+      w_fifo_partial_1_data   <= std_logic_vector(r_packet_seq_num);
 
     when S_SUMMARY_HEADER_2 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(MODULE_ID) & std_logic_vector(ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY) & x"0000";
+      w_fifo_partial_1_data   <= std_logic_vector(MODULE_ID) & std_logic_vector(ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY) & x"0000";
 
     when S_SUMMARY_DWELL_SEQ_NUM =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(Dwell_sequence_num);
+      w_fifo_partial_1_data   <= std_logic_vector(Dwell_sequence_num);
 
     when S_SUMMARY_DWELL_START_TIME_0 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= x"0000" & std_logic_vector(Dwell_timestamp(47 downto 32));
+      w_fifo_partial_1_data   <= x"0000" & std_logic_vector(Dwell_timestamp(47 downto 32));
 
     when S_SUMMARY_DWELL_START_TIME_1 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(Dwell_timestamp(31 downto 0));
+      w_fifo_partial_1_data   <= std_logic_vector(Dwell_timestamp(31 downto 0));
 
     when S_SUMMARY_DWELL_DURATION =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(Dwell_duration);
+      w_fifo_partial_1_data   <= std_logic_vector(Dwell_duration);
 
     when S_SUMMARY_DWELL_PULSE_COUNT =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= x"0000" & std_logic_vector(r_pulse_count);
+      w_fifo_partial_1_data   <= x"0000" & std_logic_vector(r_pulse_count);
 
     when S_PULSE_PAD | S_SUMMARY_PAD =>
       w_fifo_valid            <= '1';
@@ -401,9 +408,12 @@ begin
     end case;
   end process;
 
-  --TODO: PSL assert instead?
   assert (w_fifo_valid_opt = w_fifo_valid)
     report "w_fifo_valid_opt mismatch."
+    severity failure;
+
+  assert ((s_state = S_IDLE) or (w_fifo_ready = '1'))
+    report "Ready expected to be high."
     severity failure;
 
   process(Clk)
@@ -415,11 +425,6 @@ begin
       r_fifo_last           <= w_fifo_last;
     end if;
  end process;
-
-  --TODO: error bit
-  assert ((s_state = S_IDLE) or (w_fifo_ready = '1'))
-    report "Ready expected to be high."
-    severity failure;
 
   i_fifo : entity axi_lib.axis_sync_fifo
   generic map (
@@ -444,6 +449,23 @@ begin
     M_axis_last   => Axis_last
   );
 
-  --TODO: timeout error
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if ((s_state = S_IDLE) or (s_state = S_CHECK_START)) then
+        r_timeout <= (others => '0');
+      else
+        r_timeout <= r_timeout + 1;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Error_timeout   <= to_stdlogic(r_timeout = (TIMEOUT_CYCLES - 1));
+      Error_overflow  <= r_fifo_valid and not(w_fifo_ready);
+    end if;
+  end process;
 
 end architecture rtl;
