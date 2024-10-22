@@ -107,6 +107,7 @@ architecture rtl of esm_receiver is
   signal w_channelizer_warnings       : esm_channelizer_warnings_array_t(1 downto 0);
   signal w_channelizer_errors         : esm_channelizer_errors_array_t(1 downto 0);
   signal w_dwell_stats_errors         : esm_dwell_stats_errors_array_t(1 downto 0);
+  signal w_pdw_encoder_errors         : esm_pdw_encoder_errors_array_t(1 downto 0);
 
   signal w_d2h_fifo_in_ready          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
   signal w_d2h_fifo_in_valid          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
@@ -392,21 +393,21 @@ begin
   --  Axis_data                     => w_d2h_fifo_in_data(2),
   --  Axis_last                     => w_d2h_fifo_in_last(2),
   --
-  --  Error_pdw_fifo_overflow       => w_dwell_stats_errors(0).pdw_fifo_overflow,
-  --  Error_sample_buffer_underflow => w_dwell_stats_errors(0).sample_buffer_underflow,
-  --  Error_sample_buffer_overflow  => w_dwell_stats_errors(0).sample_buffer_overflow,
-  --  Error_reporter_timeout        => w_dwell_stats_errors(0).reporter_timeout,
-  --  Error_reporter_overflow       => w_dwell_stats_errors(0).reporter_overflow
+  --  Error_pdw_fifo_overflow       => w_pdw_encoder_errors(0).pdw_fifo_overflow,
+  --  Error_sample_buffer_underflow => w_pdw_encoder_errors(0).sample_buffer_underflow,
+  --  Error_sample_buffer_overflow  => w_pdw_encoder_errors(0).sample_buffer_overflow,
+  --  Error_reporter_timeout        => w_pdw_encoder_errors(0).reporter_timeout,
+  --  Error_reporter_overflow       => w_pdw_encoder_errors(0).reporter_overflow
   --);
   w_d2h_fifo_in_valid(2)  <= '0';
   w_d2h_fifo_in_data(2)   <= (others => '0');
   w_d2h_fifo_in_last(2)   <= '0';
 
-  w_dwell_stats_errors(0).pdw_fifo_overflow       <= '0';
-  w_dwell_stats_errors(0).sample_buffer_underflow <= '0';
-  w_dwell_stats_errors(0).sample_buffer_overflow  <= '0';
-  w_dwell_stats_errors(0).reporter_timeout        <= '0';
-  w_dwell_stats_errors(0).reporter_overflow       <= '0';
+  w_pdw_encoder_errors(0).pdw_fifo_overflow       <= '0';
+  w_pdw_encoder_errors(0).sample_buffer_underflow <= '0';
+  w_pdw_encoder_errors(0).sample_buffer_overflow  <= '0';
+  w_pdw_encoder_errors(0).reporter_timeout        <= '0';
+  w_pdw_encoder_errors(0).reporter_overflow       <= '0';
 
   i_pdw_encoder_64 : entity esm_lib.esm_pdw_encoder
   generic map (
@@ -435,11 +436,11 @@ begin
     Axis_data                     => w_d2h_fifo_in_data(3),
     Axis_last                     => w_d2h_fifo_in_last(3),
 
-    Error_pdw_fifo_overflow       => w_dwell_stats_errors(1).pdw_fifo_overflow,
-    Error_sample_buffer_underflow => w_dwell_stats_errors(1).sample_buffer_underflow,
-    Error_sample_buffer_overflow  => w_dwell_stats_errors(1).sample_buffer_overflow,
-    Error_reporter_timeout        => w_dwell_stats_errors(1).reporter_timeout,
-    Error_reporter_overflow       => w_dwell_stats_errors(1).reporter_overflow
+    Error_pdw_fifo_overflow       => w_pdw_encoder_errors(1).pdw_fifo_overflow,
+    Error_sample_buffer_underflow => w_pdw_encoder_errors(1).sample_buffer_underflow,
+    Error_sample_buffer_overflow  => w_pdw_encoder_errors(1).sample_buffer_overflow,
+    Error_reporter_timeout        => w_pdw_encoder_errors(1).reporter_timeout,
+    Error_reporter_overflow       => w_pdw_encoder_errors(1).reporter_overflow
   );
 
   i_status_reporter : entity esm_lib.esm_status_reporter
@@ -458,6 +459,8 @@ begin
 
     Channelizer_warnings  => w_channelizer_warnings,
     Channelizer_errors    => w_channelizer_errors,
+    Dwell_stats_errors    => w_dwell_stats_errors,
+    Pdw_encoder_errors    => w_pdw_encoder_errors,
 
     Axis_ready            => w_d2h_fifo_in_ready(4),
     Axis_valid            => w_d2h_fifo_in_valid(4),

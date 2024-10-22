@@ -26,6 +26,8 @@ port (
 
   Channelizer_warnings  : in  esm_channelizer_warnings_array_t(1 downto 0);
   Channelizer_errors    : in  esm_channelizer_errors_array_t(1 downto 0);
+  Dwell_stats_errors    : in  esm_dwell_stats_errors_array_t(1 downto 0);
+  Pdw_encoder_errors    : in  esm_pdw_encoder_errors_array_t(1 downto 0);
 
   Axis_ready            : in  std_logic;
   Axis_valid            : out std_logic;
@@ -39,6 +41,8 @@ architecture rtl of esm_status_reporter is
   constant FIFO_DEPTH             : natural := 256;
   constant MAX_WORDS_PER_PACKET   : natural := 64;
   constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - MAX_WORDS_PER_PACKET - 10;
+
+  constant TIMEOUT_CYCLES         : natural := 1024;
 
   type state_t is
   (
@@ -67,6 +71,8 @@ architecture rtl of esm_status_reporter is
   signal r_enable_pdw_encoder   : std_logic_vector(1 downto 0);
   signal r_channelizer_warnings : esm_channelizer_warnings_array_t(1 downto 0);
   signal r_channelizer_errors   : esm_channelizer_errors_array_t(1 downto 0);
+  signal r_dwell_stats_errors   : esm_dwell_stats_errors_array_t(1 downto 0);
+  signal r_pdw_encoder_errors   : esm_pdw_encoder_errors_array_t(1 downto 0);
 
   signal w_status_flags         : esm_status_flags_t;
   signal r_status_flags_latched : std_logic_vector(ESM_STATUS_FLAGS_WIDTH - 1 downto 0);
@@ -89,6 +95,10 @@ architecture rtl of esm_status_reporter is
   signal r_fifo_last            : std_logic;
   signal r_fifo_data            : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
 
+  signal r_timeout              : unsigned(clog2(TIMEOUT_CYCLES) - 1 downto 0);
+  signal r_error_timeout        : std_logic;
+  signal r_error_overflow       : std_logic;
+
 begin
 
   assert (AXI_DATA_WIDTH = 32)
@@ -103,6 +113,8 @@ begin
       r_enable_pdw_encoder    <= Enable_pdw_encoder;
       r_channelizer_warnings  <= Channelizer_warnings;
       r_channelizer_errors    <= Channelizer_errors;
+      r_dwell_stats_errors    <= Dwell_stats_errors;
+      r_pdw_encoder_errors    <= Pdw_encoder_errors;
     end if;
   end process;
 
@@ -129,8 +141,12 @@ begin
     end if;
   end process;
 
-  w_status_flags.channelizer_warnings <= r_channelizer_warnings;
-  w_status_flags.channelizer_errors   <= r_channelizer_errors;
+  w_status_flags.channelizer_warnings                     <= r_channelizer_warnings;
+  w_status_flags.channelizer_errors                       <= r_channelizer_errors;
+  w_status_flags.dwell_stats_errors                       <= r_dwell_stats_errors;
+  w_status_flags.pdw_encoder_errors                       <= r_pdw_encoder_errors;
+  w_status_flags.status_reporter_errors.reporter_timeout  <= r_error_timeout;
+  w_status_flags.status_reporter_errors.reporter_overflow <= r_error_overflow;
 
   process(Clk)
   begin
@@ -296,7 +312,6 @@ begin
     end if;
  end process;
 
-  --TODO: error bit
   assert ((s_state = S_IDLE) or (w_fifo_ready = '1'))
     report "Ready expected to be high."
     severity failure;
@@ -324,6 +339,23 @@ begin
     M_axis_last   => Axis_last
   );
 
-  --TODO: timeout error
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (s_state = S_IDLE) then
+        r_timeout <= (others => '0');
+      else
+        r_timeout <= r_timeout + 1;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_error_timeout   <= to_stdlogic(r_timeout = (TIMEOUT_CYCLES - 1));
+      r_error_overflow  <= r_fifo_valid and not(w_fifo_ready);
+    end if;
+  end process;
 
 end architecture rtl;
