@@ -50,6 +50,8 @@ end entity esm_receiver;
 
 architecture rtl of esm_receiver is
 
+  constant ENABLE_WIDE_CHANNEL        : boolean := false;
+
   constant AXI_FIFO_DEPTH             : natural := 64;
   constant NUM_D2H_MUX_INPUTS         : natural := 5;
   constant CHANNELIZER8_DATA_WIDTH    : natural := IQ_WIDTH + 3 + 3; -- +4 for filter, +3 for ifft
@@ -239,39 +241,41 @@ begin
 
   w_adc_data_in <= (r_adc_data_q_x4, r_adc_data_i_x4);
 
-  --i_channelizer_8 : entity dsp_lib.channelizer_8
-  --generic map (
-  --  INPUT_DATA_WIDTH  => IQ_WIDTH,
-  --  OUTPUT_DATA_WIDTH => CHANNELIZER8_DATA_WIDTH
-  --)
-  --port map (
-  --  Clk                   => data_clk,
-  --  Rst                   => r_combined_rst,
-  --
-  --  Input_valid           => r_adc_valid_x4,
-  --  Input_data            => w_adc_data_in,
-  --
-  --  Output_chan_ctrl      => w_channelizer8_chan_control,
-  --  Output_chan_data      => w_channelizer8_chan_data,
-  --  Output_chan_pwr       => w_channelizer8_chan_pwr,
-  --
-  --  Output_fft_ctrl       => w_channelizer8_fft_control,  --TODO: unused
-  --  Output_fft_data       => w_channelizer8_fft_data, --TODO: unused
-  --
-  --  Warning_demux_gap     => w_channelizer_warnings(0).demux_gap,
-  --  Error_demux_overflow  => w_channelizer_errors(0).demux_overflow,
-  --  Error_filter_overflow => w_channelizer_errors(0).filter_overflow,
-  --  Error_mux_overflow    => w_channelizer_errors(0).mux_overflow,
-  --  Error_mux_underflow   => w_channelizer_errors(0).mux_underflow,
-  --  Error_mux_collision   => w_channelizer_errors(0).mux_collision
-  --);
+  g_wide_channelizer : if (ENABLE_WIDE_CHANNEL) generate
+    i_channelizer_8 : entity dsp_lib.channelizer_8
+    generic map (
+      INPUT_DATA_WIDTH  => IQ_WIDTH,
+      OUTPUT_DATA_WIDTH => CHANNELIZER8_DATA_WIDTH
+    )
+    port map (
+      Clk                   => data_clk,
+      Rst                   => r_combined_rst,
 
-  w_channelizer_warnings(0).demux_gap     <= '0';
-  w_channelizer_errors(0).demux_overflow  <= '0';
-  w_channelizer_errors(0).filter_overflow <= '0';
-  w_channelizer_errors(0).mux_overflow    <= '0';
-  w_channelizer_errors(0).mux_underflow   <= '0';
-  w_channelizer_errors(0).mux_collision   <= '0';
+      Input_valid           => r_adc_valid_x4,
+      Input_data            => w_adc_data_in,
+
+      Output_chan_ctrl      => w_channelizer8_chan_control,
+      Output_chan_data      => w_channelizer8_chan_data,
+      Output_chan_pwr       => w_channelizer8_chan_pwr,
+
+      Output_fft_ctrl       => w_channelizer8_fft_control,  --TODO: unused
+      Output_fft_data       => w_channelizer8_fft_data, --TODO: unused
+
+      Warning_demux_gap     => w_channelizer_warnings(0).demux_gap,
+      Error_demux_overflow  => w_channelizer_errors(0).demux_overflow,
+      Error_filter_overflow => w_channelizer_errors(0).filter_overflow,
+      Error_mux_overflow    => w_channelizer_errors(0).mux_overflow,
+      Error_mux_underflow   => w_channelizer_errors(0).mux_underflow,
+      Error_mux_collision   => w_channelizer_errors(0).mux_collision
+    );
+  else generate
+    w_channelizer_warnings(0).demux_gap     <= '0';
+    w_channelizer_errors(0).demux_overflow  <= '0';
+    w_channelizer_errors(0).filter_overflow <= '0';
+    w_channelizer_errors(0).mux_overflow    <= '0';
+    w_channelizer_errors(0).mux_underflow   <= '0';
+    w_channelizer_errors(0).mux_collision   <= '0';
+  end generate g_wide_channelizer;
 
   i_channelizer_64 : entity dsp_lib.channelizer_64
   generic map (
@@ -300,41 +304,44 @@ begin
     Error_mux_collision   => w_channelizer_errors(1).mux_collision
   );
 
-  --i_dwell_stats_8 : entity esm_lib.esm_dwell_stats
-  --generic map (
-  --  AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
-  --  DATA_WIDTH      => CHANNELIZER8_DATA_WIDTH,
-  --  NUM_CHANNELS    => 8,
-  --  MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_WIDE
-  --)
-  --port map (
-  --  Clk                     => data_clk,
-  --  Rst                     => r_combined_rst,
-  --
-  --  Enable                  => w_enable_chan(0),
-  --
-  --  Dwell_active            => w_dwell_active,
-  --  Dwell_data              => w_dwell_data,
-  --  Dwell_sequence_num      => w_dwell_sequence_num,
-  --
-  --  Input_ctrl              => w_channelizer8_chan_control,
-  --  Input_data              => w_channelizer8_chan_data,
-  --  Input_pwr               => w_channelizer8_chan_pwr,
-  --
-  --  Axis_ready              => w_d2h_fifo_in_ready(0),
-  --  Axis_valid              => w_d2h_fifo_in_valid(0),
-  --  Axis_data               => w_d2h_fifo_in_data(0),
-  --  Axis_last               => w_d2h_fifo_in_last(0),
-  --
-  -- Error_reporter_timeout   => w_dwell_stats_errors(0).reporter_timeout,
-  -- Error_reporter_overflow  => w_dwell_stats_errors(0).reporter_overflow
-  --);
-  w_d2h_fifo_in_valid(0)  <= '0';
-  w_d2h_fifo_in_data(0)   <= (others => '0');
-  w_d2h_fifo_in_last(0)   <= '0';
+  g_wide_dwell_stats : if (ENABLE_WIDE_CHANNEL) generate
+    i_dwell_stats_8 : entity esm_lib.esm_dwell_stats
+    generic map (
+      AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
+      DATA_WIDTH      => CHANNELIZER8_DATA_WIDTH,
+      NUM_CHANNELS    => 8,
+      MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_WIDE
+    )
+    port map (
+      Clk                     => data_clk,
+      Rst                     => r_combined_rst,
 
-  w_dwell_stats_errors(0).reporter_timeout  <= '0';
-  w_dwell_stats_errors(0).reporter_overflow <= '0';
+      Enable                  => w_enable_chan(0),
+
+      Dwell_active            => w_dwell_active,
+      Dwell_data              => w_dwell_data,
+      Dwell_sequence_num      => w_dwell_sequence_num,
+
+      Input_ctrl              => w_channelizer8_chan_control,
+      Input_data              => w_channelizer8_chan_data,
+      Input_pwr               => w_channelizer8_chan_pwr,
+
+      Axis_ready              => w_d2h_fifo_in_ready(0),
+      Axis_valid              => w_d2h_fifo_in_valid(0),
+      Axis_data               => w_d2h_fifo_in_data(0),
+      Axis_last               => w_d2h_fifo_in_last(0),
+
+    Error_reporter_timeout   => w_dwell_stats_errors(0).reporter_timeout,
+    Error_reporter_overflow  => w_dwell_stats_errors(0).reporter_overflow
+    );
+  else generate
+    w_d2h_fifo_in_valid(0)  <= '0';
+    w_d2h_fifo_in_data(0)   <= (others => '0');
+    w_d2h_fifo_in_last(0)   <= '0';
+
+    w_dwell_stats_errors(0).reporter_timeout  <= '0';
+    w_dwell_stats_errors(0).reporter_overflow <= '0';
+  end generate g_wide_dwell_stats;
 
   i_dwell_stats_64 : entity esm_lib.esm_dwell_stats
   generic map (
@@ -366,48 +373,51 @@ begin
     Error_reporter_overflow => w_dwell_stats_errors(1).reporter_overflow
   );
 
-  --i_pdw_encoder_8 : entity esm_lib.esm_pdw_encoder
-  --generic map (
-  --  AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
-  --  DATA_WIDTH      => CHANNELIZER8_DATA_WIDTH,
-  --  NUM_CHANNELS    => 8,
-  --  MODULE_ID       => ESM_MODULE_ID_PDW_WIDE,
-  --  WIDE_BANDWIDTH  => TRUE
-  --)
-  --port map (
-  --  Clk                           => data_clk,
-  --  Rst                           => r_combined_rst,
-  --
-  --  Enable                        => w_enable_chan(0),
-  --
-  --  Dwell_active                  => w_dwell_active,
-  --  Dwell_data                    => w_dwell_data,
-  --  Dwell_sequence_num            => w_dwell_sequence_num,
-  --
-  --  Input_ctrl                    => w_channelizer8_chan_control,
-  --  Input_data                    => w_channelizer8_chan_data,
-  --  Input_power                   => w_channelizer8_chan_pwr,
-  --
-  --  Axis_ready                    => w_d2h_fifo_in_ready(2),
-  --  Axis_valid                    => w_d2h_fifo_in_valid(2),
-  --  Axis_data                     => w_d2h_fifo_in_data(2),
-  --  Axis_last                     => w_d2h_fifo_in_last(2),
-  --
-  --  Error_pdw_fifo_overflow       => w_pdw_encoder_errors(0).pdw_fifo_overflow,
-  --  Error_sample_buffer_underflow => w_pdw_encoder_errors(0).sample_buffer_underflow,
-  --  Error_sample_buffer_overflow  => w_pdw_encoder_errors(0).sample_buffer_overflow,
-  --  Error_reporter_timeout        => w_pdw_encoder_errors(0).reporter_timeout,
-  --  Error_reporter_overflow       => w_pdw_encoder_errors(0).reporter_overflow
-  --);
-  w_d2h_fifo_in_valid(2)  <= '0';
-  w_d2h_fifo_in_data(2)   <= (others => '0');
-  w_d2h_fifo_in_last(2)   <= '0';
+  g_wide_pdw_encoder : if (ENABLE_WIDE_CHANNEL) generate
+    i_pdw_encoder_8 : entity esm_lib.esm_pdw_encoder
+    generic map (
+      AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
+      DATA_WIDTH      => CHANNELIZER8_DATA_WIDTH,
+      NUM_CHANNELS    => 8,
+      MODULE_ID       => ESM_MODULE_ID_PDW_WIDE,
+      WIDE_BANDWIDTH  => TRUE
+    )
+    port map (
+      Clk                           => data_clk,
+      Rst                           => r_combined_rst,
 
-  w_pdw_encoder_errors(0).pdw_fifo_overflow       <= '0';
-  w_pdw_encoder_errors(0).sample_buffer_underflow <= '0';
-  w_pdw_encoder_errors(0).sample_buffer_overflow  <= '0';
-  w_pdw_encoder_errors(0).reporter_timeout        <= '0';
-  w_pdw_encoder_errors(0).reporter_overflow       <= '0';
+      Enable                        => w_enable_chan(0),
+
+      Dwell_active                  => w_dwell_active,
+      Dwell_data                    => w_dwell_data,
+      Dwell_sequence_num            => w_dwell_sequence_num,
+
+      Input_ctrl                    => w_channelizer8_chan_control,
+      Input_data                    => w_channelizer8_chan_data,
+      Input_power                   => w_channelizer8_chan_pwr,
+
+      Axis_ready                    => w_d2h_fifo_in_ready(2),
+      Axis_valid                    => w_d2h_fifo_in_valid(2),
+      Axis_data                     => w_d2h_fifo_in_data(2),
+      Axis_last                     => w_d2h_fifo_in_last(2),
+
+      Error_pdw_fifo_overflow       => w_pdw_encoder_errors(0).pdw_fifo_overflow,
+      Error_sample_buffer_underflow => w_pdw_encoder_errors(0).sample_buffer_underflow,
+      Error_sample_buffer_overflow  => w_pdw_encoder_errors(0).sample_buffer_overflow,
+      Error_reporter_timeout        => w_pdw_encoder_errors(0).reporter_timeout,
+      Error_reporter_overflow       => w_pdw_encoder_errors(0).reporter_overflow
+    );
+  else generate
+    w_d2h_fifo_in_valid(2)  <= '0';
+    w_d2h_fifo_in_data(2)   <= (others => '0');
+    w_d2h_fifo_in_last(2)   <= '0';
+
+    w_pdw_encoder_errors(0).pdw_fifo_overflow       <= '0';
+    w_pdw_encoder_errors(0).sample_buffer_underflow <= '0';
+    w_pdw_encoder_errors(0).sample_buffer_overflow  <= '0';
+    w_pdw_encoder_errors(0).reporter_timeout        <= '0';
+    w_pdw_encoder_errors(0).reporter_overflow       <= '0';
+  end generate g_wide_pdw_encoder;
 
   i_pdw_encoder_64 : entity esm_lib.esm_pdw_encoder
   generic map (

@@ -111,6 +111,12 @@ architecture rtl of esm_pdw_sample_processor is
   signal r3_context_wr_valid        : std_logic;
   signal r3_pulse_seq_num           : unsigned(ESM_PDW_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
+  signal r3_update_power            : std_logic;
+  signal r3_new_power_accum_a       : unsigned(ESM_PDW_POWER_ACCUM_WIDTH - 16 - 1 downto 0);
+  signal r3_new_power_accum_ac      : std_logic;
+  signal r3_new_power_accum_b       : unsigned(15 downto 0);
+
+  signal w3_context                 : channel_context_t;
   signal w3_power_accum_b           : unsigned(15 downto 0);
 
   signal w_buffer_full              : std_logic;
@@ -182,6 +188,10 @@ begin
       r3_context        <= r2_context;
       r3_pulse_seq_num  <= r2_context.pulse_seq_num;
 
+      r3_update_power                               <= r2_continued_detect and to_stdlogic(r2_context.state = S_ACTIVE);
+      (r3_new_power_accum_ac, r3_new_power_accum_a) <= ('0' & r2_context.power_accum_a) + r2_input_power; --TODO: clamp
+      r3_new_power_accum_b                          <= r2_context.power_accum_b + unsigned'('0' & r2_context.power_accum_ac);
+
       case r2_context.state is
       when S_IDLE =>
         r3_context.threshold                <= r2_input_threshold;
@@ -206,9 +216,7 @@ begin
       when S_ACTIVE =>
 
         if (r2_continued_detect = '1') then
-          r3_context.duration                                   <= r2_context.duration + 1; --TODO: clamp
-          (r3_context.power_accum_ac, r3_context.power_accum_a) <= ('0' & r2_context.power_accum_a) + r2_input_power; --TODO: clamp
-          r3_context.power_accum_b                              <= r2_context.power_accum_b + unsigned'('0' & r2_context.power_accum_ac);
+          r3_context.duration <= r2_context.duration + 1; --TODO: clamp
         end if;
 
         if (r2_context.recording_active = '1') then
@@ -258,16 +266,31 @@ begin
     end if;
   end process;
 
-  process(Clk)
+  process(all)
   begin
-    if rising_edge(Clk) then
-      if (r3_context_wr_valid = '1') then
-        m_channel_context(to_integer(r3_context_wr_index)) <= r3_context;
-      end if;
+    w3_context <= r3_context;
+
+    if (r3_update_power = '1') then
+      w3_context.power_accum_a  <= r3_new_power_accum_a;
+      w3_context.power_accum_ac <= r3_new_power_accum_ac;
+      w3_context.power_accum_b  <= r3_new_power_accum_b;
+    else
+      w3_context.power_accum_a  <= r3_context.power_accum_a;
+      w3_context.power_accum_ac <= r3_context.power_accum_ac;
+      w3_context.power_accum_b  <= r3_context.power_accum_b;
     end if;
   end process;
 
   w3_power_accum_b <= r3_context.power_accum_b + unsigned'('0' & r3_context.power_accum_ac);
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (r3_context_wr_valid = '1') then
+        m_channel_context(to_integer(r3_context_wr_index)) <= w3_context;
+      end if;
+    end if;
+  end process;
 
   process(Clk)
   begin
