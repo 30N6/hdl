@@ -24,7 +24,7 @@ begin
 
     locked  => open,
     Clk_x2  => open,
-    Clk_x4  => data_clk
+    Clk_x4  => Adc_clk_x4
   );
 
 end architecture rtl;
