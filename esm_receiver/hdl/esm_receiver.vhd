@@ -23,6 +23,7 @@ generic (
 );
 port (
   Adc_clk         : in  std_logic;
+  Adc_clk_x4      : in  std_logic;
   Adc_rst         : in  std_logic;
 
   Ad9361_control  : out std_logic_vector(3 downto 0);
@@ -63,8 +64,6 @@ architecture rtl of esm_receiver is
   constant AD9361_BIT_PIPE_DEPTH      : natural := 3;
 
   constant HEARTBEAT_INTERVAL         : natural := 31250000;
-
-  signal data_clk                     : std_logic;
 
   signal w_clk_x4_p0                  : std_logic;
 
@@ -144,20 +143,10 @@ begin
   --TODO: use axi clock to generate 250 MHz
   --TODO: cdc fifo for adc data_clk -- limit max rate to 1/4
 
-  i_clocking : entity clock_lib.adc_clk_mult
-  port map (
-    Clk_x1  => Adc_clk,
-    reset   => Adc_rst,
-
-    locked  => open,
-    Clk_x2  => open,
-    Clk_x4  => data_clk
-  );
-
   i_phase_marker : entity common_lib.clk_x4_phase_marker
   port map (
     Clk       => Adc_clk,
-    Clk_x4    => data_clk,
+    Clk_x4    => Adc_clk_x4,
 
     Clk_x4_p0 => w_clk_x4_p0,
     Clk_x4_p1 => open,
@@ -165,9 +154,9 @@ begin
     Clk_x4_p3 => open
   );
 
-  process(data_clk)
+  process(Adc_clk_x4)
   begin
-    if rising_edge(data_clk) then
+    if rising_edge(Adc_clk_x4) then
       r_combined_rst <= Adc_rst or w_config_rst;
     end if;
   end process;
@@ -177,7 +166,7 @@ begin
     AXI_DATA_WIDTH => AXI_DATA_WIDTH
   )
   port map (
-    Clk           => data_clk,
+    Clk           => Adc_clk_x4,
     Rst           => Adc_rst,
 
     Axis_ready    => w_config_axis_ready,
@@ -199,7 +188,7 @@ begin
     PLL_POST_LOCK_DELAY_CYCLES  => PLL_POST_LOCK_DELAY_CYCLES
   )
   port map (
-    Clk                 => data_clk,
+    Clk                 => Adc_clk_x4,
     Rst                 => r_combined_rst,
 
     Module_config       => w_module_config,
@@ -230,9 +219,9 @@ begin
     end if;
   end process;
 
-  process(data_clk)
+  process(Adc_clk_x4)
   begin
-    if rising_edge(data_clk) then
+    if rising_edge(Adc_clk_x4) then
       r_adc_valid_x4   <= r_adc_valid and w_clk_x4_p0;
       r_adc_data_i_x4  <= r_adc_data_i;
       r_adc_data_q_x4  <= r_adc_data_q;
@@ -248,7 +237,7 @@ begin
       OUTPUT_DATA_WIDTH => CHANNELIZER8_DATA_WIDTH
     )
     port map (
-      Clk                   => data_clk,
+      Clk                   => Adc_clk_x4,
       Rst                   => r_combined_rst,
 
       Input_valid           => r_adc_valid_x4,
@@ -283,7 +272,7 @@ begin
     OUTPUT_DATA_WIDTH => CHANNELIZER64_DATA_WIDTH
   )
   port map (
-    Clk                   => data_clk,
+    Clk                   => Adc_clk_x4,
     Rst                   => r_combined_rst,
 
     Input_valid           => r_adc_valid_x4,
@@ -313,7 +302,7 @@ begin
       MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_WIDE
     )
     port map (
-      Clk                     => data_clk,
+      Clk                     => Adc_clk_x4,
       Rst                     => r_combined_rst,
 
       Enable                  => w_enable_chan(0),
@@ -351,7 +340,7 @@ begin
     MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_NARROW
   )
   port map (
-    Clk                     => data_clk,
+    Clk                     => Adc_clk_x4,
     Rst                     => r_combined_rst,
 
     Enable                  => w_enable_chan(1),
@@ -383,7 +372,7 @@ begin
       WIDE_BANDWIDTH  => TRUE
     )
     port map (
-      Clk                           => data_clk,
+      Clk                           => Adc_clk_x4,
       Rst                           => r_combined_rst,
 
       Enable                        => w_enable_chan(0),
@@ -428,7 +417,7 @@ begin
     WIDE_BANDWIDTH  => FALSE
   )
   port map (
-    Clk                           => data_clk,
+    Clk                           => Adc_clk_x4,
     Rst                           => r_combined_rst,
 
     Enable                        => w_enable_chan(1),
@@ -460,7 +449,7 @@ begin
     HEARTBEAT_INTERVAL    => HEARTBEAT_INTERVAL
   )
   port map (
-    Clk                   => data_clk,
+    Clk                   => Adc_clk_x4,
     Rst                   => r_combined_rst,
 
     Enable_status         => w_enable_status,
@@ -484,7 +473,7 @@ begin
       AXI_DATA_WIDTH => AXI_DATA_WIDTH
     )
     port map (
-      Clk           => data_clk,
+      Clk           => Adc_clk_x4,
       Rst           => r_combined_rst,
 
       S_axis_ready  => w_d2h_fifo_in_ready(i),
@@ -505,7 +494,7 @@ begin
     AXI_DATA_WIDTH  => AXI_DATA_WIDTH
   )
   port map (
-    Clk             => data_clk,
+    Clk             => Adc_clk_x4,
     Rst             => r_combined_rst,
 
     S_axis_ready    => w_d2h_mux_in_ready,
@@ -524,7 +513,7 @@ begin
     AXI_DATA_WIDTH => AXI_DATA_WIDTH
   )
   port map (
-    Clk           => data_clk,
+    Clk           => Adc_clk_x4,
     Rst           => r_combined_rst,
 
     S_axis_ready  => w_d2h_mux_out_ready,
@@ -544,7 +533,7 @@ begin
     AXI_DATA_WIDTH  => AXI_DATA_WIDTH
   )
   port map (
-    S_axis_clk      => data_clk,
+    S_axis_clk      => Adc_clk_x4,
     S_axis_resetn   => not(r_combined_rst),
     S_axis_ready    => w_d2h_minififo_out_ready,
     S_axis_valid    => w_d2h_minififo_out_valid,
@@ -571,7 +560,7 @@ begin
     S_axis_data     => S_axis_data,
     S_axis_last     => S_axis_last,
 
-    M_axis_clk      => data_clk,
+    M_axis_clk      => Adc_clk_x4,
     M_axis_ready    => w_config_axis_ready,
     M_axis_valid    => w_config_axis_valid,
     M_axis_data     => w_config_axis_data,

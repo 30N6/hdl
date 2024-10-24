@@ -12,8 +12,6 @@ custom_ip_files esm_receiver [list \
   {"../axi/hdl/axis_sync_fifo.vhd"          "axi_lib"}      \
   {"../axi/hdl/axis_mux.vhd"                "axi_lib"}      \
   {"../axi/hdl/axis_minififo.vhd"           "axi_lib"}      \
-  {"../clock/hdl/adc_clk_mult_clk_wiz.v"    "clock_lib"}    \
-  {"../clock/hdl/adc_clk_mult.v"            "clock_lib"}    \
   {"../mem/hdl/ram_sdp.vhd"                 "mem_lib"}      \
   {"../mem/hdl/xpm_fallthrough_fifo.vhd"    "mem_lib"}      \
   {"../dsp/hdl/dsp_pkg.vhd"                 "dsp_lib"}      \

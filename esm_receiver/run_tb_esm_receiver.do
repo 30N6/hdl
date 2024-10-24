@@ -39,20 +39,20 @@ set library_file_list [list \
     ../dsp/hdl/filter_moving_avg.vhd \
     ../dsp/hdl/mag_approximation.vhd \
     ../dsp/hdl/pipeline_delay.vhd \
-    ../dsp/hdl/fft_mux.vhd \
     ../dsp/hdl/fft_sample_fifo.vhd \
+    ../dsp/hdl/fft_mux.vhd \
     ../dsp/hdl/fft_4.vhd \
     ../dsp/hdl/fft_4_serializer.vhd \
-    ../dsp/hdl/fft_pipelined.vhd \
-    ../dsp/hdl/fft_radix2_stage.vhd \
     ../dsp/hdl/fft_twiddle_mem.vhd \
     ../dsp/hdl/fft_radix2_output.vhd \
+    ../dsp/hdl/fft_radix2_stage.vhd \
+    ../dsp/hdl/fft_pipelined.vhd \
     ../dsp/hdl/pfb_demux_2x.vhd \
     ../dsp/hdl/pfb_baseband_2x.vhd \
-    ../dsp/hdl/pfb_filter.vhd \
     ../dsp/hdl/pfb_filter_buffer.vhd \
     ../dsp/hdl/pfb_filter_mult.vhd \
     ../dsp/hdl/pfb_filter_stage.vhd \
+    ../dsp/hdl/pfb_filter.vhd \
     ../dsp/hdl/channelizer_power.vhd \
     ../dsp/hdl/channelizer_common.vhd \
     ../dsp/hdl/channelizer_8.vhd \
@@ -138,13 +138,15 @@ foreach {library file_list} $library_file_list {
       if [regexp {.vhdl?$} $file] {
         vcom -2008 -mixedsvvh -suppress 12110 -work $library $file
       } else {
-        vlog +define+SIM -sv -mixedsvvh -suppress 12110 -timescale "1 ns / 1 ns" {*}[split $vlog_lib_str] -work $library $file {*}[split $incdir_str " "]
+        vlog +define+SIM -sv -mixedsvvh -suppress 12110 -timescale "1 ns / 1 ns" {*}[split $vlog_lib_str] -L unisim -L unisim_ver -work $library $file {*}[split $incdir_str " "]
       }
       set last_compile_time 0
     }
   }
 }
 set last_compile_time $time_now
+
+#-L unisim -L unisim_ver
 
 vsim -suppress 12110 $top_level glbl.glbl
 set NumericStdNoWarnings 1

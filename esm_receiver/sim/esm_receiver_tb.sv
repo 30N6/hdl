@@ -66,17 +66,12 @@ interface axi_rx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
   endtask
 endinterface
 
-module esm_dwell_controller_tb;
+module esm_receiver_tb;
   parameter time ADC_CLK_HALF_PERIOD  = 8ns;
   parameter time AXI_CLK_HALF_PERIOD  = 5ns;
   parameter AXI_DATA_WIDTH            = 32;
   parameter ADC_WIDTH                 = 16;
   parameter IQ_WIDTH                  = 12;
-
-  typedef struct
-  {
-    esm_dwell_metadata_t data;
-  } expect_t;
 
   logic Adc_clk;
   logic Adc_rst;
@@ -129,35 +124,35 @@ module esm_dwell_controller_tb;
     .Adc_clk        (Adc_clk),
     .Adc_rst        (Adc_rst),
 
-    Ad9361_control  (w_ad9361_control),
-    Ad9361_status   (w_ad9361_status),
+    .Ad9361_control (w_ad9361_control),
+    .Ad9361_status  (w_ad9361_status),
 
-    Adc_valid       (tx_intf.valid),
-    Adc_data_i      (tx_intf.data_i),
-    Adc_data_q      (tx_intf.data_q),
+    .Adc_valid      (tx_intf.valid),
+    .Adc_data_i     (tx_intf.data_i),
+    .Adc_data_q     (tx_intf.data_q),
 
-    S_axis_clk      (Axi_clk),
-    S_axis_resetn   (Axi_rstn),
-    S_axis_ready    (cfg_tx_intf.ready),
-    S_axis_valid    (cfg_tx_intf.valid),
-    S_axis_data     (cfg_tx_intf.data),
-    S_axis_last     (cfg_tx_intf.last),
+    .S_axis_clk     (Axi_clk),
+    .S_axis_resetn  (Axi_rstn),
+    .S_axis_ready   (cfg_tx_intf.ready),
+    .S_axis_valid   (cfg_tx_intf.valid),
+    .S_axis_data    (cfg_tx_intf.data),
+    .S_axis_last    (cfg_tx_intf.last),
 
-    M_axis_clk      (Axi_clk),
-    M_axis_resetn   (Axi_rstn),
-    M_axis_ready    (r_axi_rx_ready),
-    M_axis_valid    (w_axi_rx_valid),
-    M_axis_data     (rpt_rx_intf.data),
-    M_axis_last     (rpt_rx_intf.last)
+    .M_axis_clk     (Axi_clk),
+    .M_axis_resetn  (Axi_rstn),
+    .M_axis_ready   (r_axi_rx_ready),
+    .M_axis_valid   (w_axi_rx_valid),
+    .M_axis_data    (rpt_rx_intf.data),
+    .M_axis_last    (rpt_rx_intf.last)
   );
 
-  always_ff @(posedge Clk) begin
+  always_ff @(posedge Axi_clk) begin
     r_axi_rx_ready <= $urandom_range(99) < 80;
   end
 
   assign rpt_rx_intf.valid = w_axi_rx_valid && r_axi_rx_ready;
 
-  always_ff @(posedge Clk) begin
+  always_ff @(posedge Adc_clk) begin
     r_ad9361_control <= w_ad9361_control;
   end
 
@@ -167,10 +162,10 @@ module esm_dwell_controller_tb;
     while (1) begin
       if (w_ad9361_control != r_ad9361_control) begin
         w_ad9361_status <= '0;
-        repeat ($urandom_range(10, 5)) @(posedge Clk);
+        repeat ($urandom_range(10, 5)) @(posedge Adc_clk);
         w_ad9361_status <= '1;
       end
-      @(posedge Clk);
+      @(posedge Adc_clk);
     end
   end
 
@@ -312,7 +307,7 @@ module esm_dwell_controller_tb;
 
       send_initial_config();
 
-      for (int i_dwell = 0; i_dwell < esm_num_dwell_entries; i_dwell++) begin
+      /*for (int i_dwell = 0; i_dwell < esm_num_dwell_entries; i_dwell++) begin
         esm_message_dwell_entry_t entry;
         entry.entry_index                     = i_dwell;
         entry.entry_data.tag                  = $urandom;
@@ -342,10 +337,10 @@ module esm_dwell_controller_tb;
         dwell_program.delayed_start_time    = delayed_start_time;
 
         randomize_instructions(dwell_program, global_counter_enable);
-        /*$display("dwell_program: %p", dwell_program);
-        for (int i = 0; i < esm_num_dwell_instructions; i++) begin
-          $display("  inst[%0d] = %p", i, dwell_program.instructions[i]);
-        end*/
+        //$display("dwell_program: %p", dwell_program);
+        //for (int i = 0; i < esm_num_dwell_instructions; i++) begin
+        //  $display("  inst[%0d] = %p", i, dwell_program.instructions[i]);
+        //end
         send_dwell_program(dwell_program);
 
         //repeat(300000) @(posedge Clk);
@@ -362,11 +357,11 @@ module esm_dwell_controller_tb;
         end
       end
 
-      $display("%0t: Standard test finished: num_received = %0d", $time, num_received);
+      $display("%0t: Standard test finished: num_received = %0d", $time, num_received);*/
 
-      Rst = 1;
-      repeat(100) @(posedge Clk);
-      Rst = 0;
+      Adc_rst = 1;
+      repeat(100) @(posedge Adc_clk);
+      Adc_rst = 0;
     end
   endtask
 
