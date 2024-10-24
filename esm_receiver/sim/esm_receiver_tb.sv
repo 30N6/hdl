@@ -74,6 +74,7 @@ module esm_receiver_tb;
   parameter IQ_WIDTH                  = 12;
 
   logic Adc_clk;
+  logic Adc_clk_x4;
   logic Adc_rst;
   logic Axi_clk;
   logic Axi_rstn;
@@ -100,6 +101,14 @@ module esm_receiver_tb;
   end
 
   initial begin
+    Adc_clk_x4 = 0;
+    forever begin
+      #(ADC_CLK_HALF_PERIOD/4);
+      Adc_clk_x4 = ~Adc_clk_x4;
+    end
+  end
+
+  initial begin
     Axi_clk = 0;
     forever begin
       #(AXI_CLK_HALF_PERIOD);
@@ -122,6 +131,7 @@ module esm_receiver_tb;
   esm_receiver #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH), .ADC_WIDTH(ADC_WIDTH), .IQ_WIDTH(IQ_WIDTH)) dut
   (
     .Adc_clk        (Adc_clk),
+    .Adc_clk_x4     (Adc_clk_x4),
     .Adc_rst        (Adc_rst),
 
     .Ad9361_control (w_ad9361_control),
@@ -157,8 +167,8 @@ module esm_receiver_tb;
   end
 
   initial begin
-    w_ad9361_status <= 0;
-
+    w_ad9361_status <= '1;
+    /*w_ad9361_status <= 0;
     while (1) begin
       if (w_ad9361_control != r_ad9361_control) begin
         w_ad9361_status <= '0;
@@ -166,7 +176,7 @@ module esm_receiver_tb;
         w_ad9361_status <= '1;
       end
       @(posedge Adc_clk);
-    end
+    end*/
   end
 
   task automatic wait_for_reset();
@@ -182,7 +192,8 @@ module esm_receiver_tb;
   endtask
 
   task automatic send_initial_config();
-    bit [31:0] config_data [][] = '{{esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h00030300}, {esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h00030300}};
+    bit [31:0] config_data [][] = '{{esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h00030300},
+                                    {esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h00030300}};
     foreach (config_data[i]) begin
       write_config(config_data[i]);
     end
@@ -307,24 +318,47 @@ module esm_receiver_tb;
 
       send_initial_config();
 
-      /*for (int i_dwell = 0; i_dwell < esm_num_dwell_entries; i_dwell++) begin
+      for (int i_dwell = 0; i_dwell < esm_num_dwell_entries; i_dwell++) begin
         esm_message_dwell_entry_t entry;
         entry.entry_index                     = i_dwell;
         entry.entry_data.tag                  = $urandom;
         entry.entry_data.frequency            = $urandom;
-        entry.entry_data.duration             = $urandom_range(1000);
+        entry.entry_data.duration             = 10000;
         entry.entry_data.gain                 = $urandom;
-        entry.entry_data.fast_lock_profile    = $urandom;
-        entry.entry_data.threshold_narrow     = $urandom;
+        entry.entry_data.fast_lock_profile    = i_dwell;
+        entry.entry_data.threshold_narrow     = 100;
         entry.entry_data.threshold_wide       = $urandom;
-        entry.entry_data.channel_mask_narrow  = $urandom;
-        entry.entry_data.channel_mask_wide    = $urandom;
+        entry.entry_data.channel_mask_narrow  = 64'hFFFFFFFFFFFFFFFF;
+        entry.entry_data.channel_mask_wide    = 8'hFF;
 
         send_dwell_entry(entry);
         dwell_entry_mem[i_dwell] = entry.entry_data;
       end
 
-      for (int i_rep = 0; i_rep < 10; i_rep++) begin
+      begin
+        esm_message_dwell_program_t dwell_program;
+        dwell_program.enable_program        = 1;
+        dwell_program.enable_delayed_start  = 0;
+        dwell_program.global_counter_init   = 0;
+        dwell_program.delayed_start_time    = 0;
+
+        //for (int i_dwell = 0; i_dwell < esm_num_dwell_entries; i_dwell++) begin
+        for (int i_dwell = 0; i_dwell < 10; i_dwell++) begin
+          dwell_program.instructions[i_dwell].valid                   = 1;
+          dwell_program.instructions[i_dwell].global_counter_check    = 0;
+          dwell_program.instructions[i_dwell].global_counter_dec      = 0;
+          dwell_program.instructions[i_dwell].repeat_count            = 0;
+          dwell_program.instructions[i_dwell].entry_index             = i_dwell;
+          dwell_program.instructions[i_dwell].next_instruction_index  = i_dwell + 1;
+        end
+        dwell_program.instructions[10].valid = 0;
+
+        send_dwell_program(dwell_program);
+      end
+
+      repeat(50000) @(posedge Adc_clk);
+
+      /*for (int i_rep = 0; i_rep < 10; i_rep++) begin
         int global_counter_init   = $urandom_range(500);
         bit global_counter_enable = $urandom;
         int delayed_start_time    = $urandom_range(5000);

@@ -152,9 +152,10 @@ begin
   begin
     if rising_edge(Clk) then
       if (Rst = '1') then
-        Rst_out     <= '0';
-        Enable_chan <= (others => '0');
-        Enable_pdw  <= (others => '0');
+        Rst_out       <= '0';
+        Enable_chan   <= (others => '0');
+        Enable_pdw    <= (others => '0');
+        Enable_status <= '0';
       else
         if ((r_axis_valid = '1') and (s_state = S_ACTIVE_CONFIG_CONTROL) and (r_first = '1') and (r_message_type = ESM_CONTROL_MESSAGE_TYPE_ENABLE)) then
           Rst_out       <= r_axis_data(24);
