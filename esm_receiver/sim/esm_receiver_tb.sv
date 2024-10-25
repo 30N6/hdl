@@ -192,8 +192,8 @@ module esm_receiver_tb;
   endtask
 
   task automatic send_initial_config();
-    bit [31:0] config_data [][] = '{{esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h00030300},
-                                    {esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h00030300}};
+    bit [31:0] config_data [][] = '{{esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h01000000},
+                                    {esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h00030301}};
     foreach (config_data[i]) begin
       write_config(config_data[i]);
     end
