@@ -32,6 +32,7 @@ set library_file_list [list \
   mem_lib [list \
     ../mem/hdl/ram_sdp.vhd \
     ../mem/hdl/xpm_fallthrough_fifo.vhd \
+    ../mem/hdl/xpm_async_fifo.vhd \
     ] \
   dsp_lib [list \
     ../dsp/hdl/dsp_pkg.vhd \
@@ -138,7 +139,7 @@ foreach {library file_list} $library_file_list {
       if [regexp {.vhdl?$} $file] {
         vcom -2008 -mixedsvvh -suppress 12110 -work $library $file
       } else {
-        vlog +define+SIM -sv -mixedsvvh -suppress 12110 -timescale "1 ns / 1 ns" {*}[split $vlog_lib_str] -L unisim -L unisim_ver -work $library $file {*}[split $incdir_str " "]
+        vlog +define+SIM -sv -mixedsvvh -suppress 12110 -timescale "1 ns / 1 ns" {*}[split $vlog_lib_str] -work $library $file {*}[split $incdir_str " "]
       }
       set last_compile_time 0
     }

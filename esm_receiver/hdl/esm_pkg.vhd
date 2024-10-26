@@ -230,6 +230,7 @@ package esm_pkg is
     module_id                 : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0);
     message_type              : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0);
   end record;
+  constant ESM_CONFIG_DATA_WIDTH : natural := 3 + 32 + ESM_MODULE_ID_WIDTH + ESM_MESSAGE_TYPE_WIDTH;
 
   type esm_channelizer_warnings_t is record
     demux_gap       : std_logic;
@@ -298,6 +299,8 @@ package esm_pkg is
   function unpack(v : std_logic_vector) return esm_message_dwell_program_header_t;
   function unpack(v : std_logic_vector) return esm_dwell_instruction_t;
   function unpack(v : std_logic_vector) return esm_pdw_fifo_data_t;
+  function unpack(v : std_logic_vector) return esm_config_data_t;
+
   function pack(v : esm_pdw_fifo_data_t) return std_logic_vector;
   function pack(v : esm_channelizer_warnings_t) return std_logic_vector;
   function pack(v : esm_channelizer_errors_t) return std_logic_vector;
@@ -305,6 +308,7 @@ package esm_pkg is
   function pack(v : esm_pdw_encoder_errors_t) return std_logic_vector;
   function pack(v : esm_status_reporter_errors_t) return std_logic_vector;
   function pack(v : esm_status_flags_t) return std_logic_vector;
+  function pack(v : esm_config_data_t) return std_logic_vector;
 
 end package esm_pkg;
 
@@ -394,6 +398,24 @@ package body esm_pkg is
     return r;
   end function;
 
+  function unpack(v : std_logic_vector) return esm_config_data_t is
+    variable r : esm_config_data_t;
+  begin
+    assert (v'length = ESM_CONFIG_DATA_WIDTH)
+      report "Invalid length."
+      severity failure;
+
+    r.valid         := v(0);
+    r.first         := v(1);
+    r.last          := v(2);
+    r.data          := v(34 downto 3);
+    r.module_id     := unsigned(v(35 + ESM_MODULE_ID_WIDTH - 1 downto 35));
+    r.message_type  := unsigned(v(35 + ESM_MODULE_ID_WIDTH + ESM_MESSAGE_TYPE_WIDTH - 1 downto 35 + ESM_MODULE_ID_WIDTH));
+
+    return r;
+  end function;
+
+
   function pack(v : esm_pdw_fifo_data_t) return std_logic_vector is
     variable r : std_logic_vector(ESM_PDW_FIFO_DATA_WIDTH - 1 downto 0);
   begin
@@ -479,6 +501,19 @@ package body esm_pkg is
 
       r(ESM_STATUS_REPORTER_ERRORS_WIDTH + 2*ESM_PDW_ENCODER_ERRORS_WIDTH + 2*ESM_DWELL_STATS_ERRORS_WIDTH + 2*ESM_CHANNELIZER_ERRORS_WIDTH + 2*ESM_CHANNELIZER_WARNINGS_WIDTH - 1 downto
                                            2*ESM_PDW_ENCODER_ERRORS_WIDTH + 2*ESM_DWELL_STATS_ERRORS_WIDTH + 2*ESM_CHANNELIZER_ERRORS_WIDTH + 2*ESM_CHANNELIZER_WARNINGS_WIDTH) := pack(v.status_reporter_errors);
+    return r;
+  end function;
+
+  function pack(v : esm_config_data_t) return std_logic_vector is
+    variable r : std_logic_vector(ESM_CONFIG_DATA_WIDTH - 1 downto 0);
+  begin
+    r(0)             := v.valid;
+    r(1)             := v.first;
+    r(2)             := v.last;
+    r(34 downto 3)   := v.data;
+    r(35 + ESM_MODULE_ID_WIDTH - 1 downto 35)                                                 := std_logic_vector(v.module_id);
+    r(35 + ESM_MODULE_ID_WIDTH + ESM_MESSAGE_TYPE_WIDTH - 1 downto 35 + ESM_MODULE_ID_WIDTH)  := std_logic_vector(v.message_type);
+
     return r;
   end function;
 

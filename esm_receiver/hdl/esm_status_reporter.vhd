@@ -99,6 +99,35 @@ architecture rtl of esm_status_reporter is
   signal r_error_timeout        : std_logic;
   signal r_error_overflow       : std_logic;
 
+  attribute MARK_DEBUG : string;
+  attribute DONT_TOUCH : string;
+
+  attribute MARK_DEBUG of s_state : signal is "TRUE";
+  attribute DONT_TOUCH of s_state : signal is "TRUE";
+  attribute MARK_DEBUG of r_status_trigger : signal is "TRUE";
+  attribute DONT_TOUCH of r_status_trigger : signal is "TRUE";
+  attribute MARK_DEBUG of r_status_timer : signal is "TRUE";
+  attribute DONT_TOUCH of r_status_timer : signal is "TRUE";
+  attribute MARK_DEBUG of r_words_in_msg : signal is "TRUE";
+  attribute DONT_TOUCH of r_words_in_msg : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_almost_full : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_almost_full : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_ready : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_ready : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_valid : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_valid : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_last : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_last : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_data : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_data : signal is "TRUE";
+  attribute MARK_DEBUG of r_timeout : signal is "TRUE";
+  attribute DONT_TOUCH of r_timeout : signal is "TRUE";
+  attribute MARK_DEBUG of r_error_timeout : signal is "TRUE";
+  attribute DONT_TOUCH of r_error_timeout : signal is "TRUE";
+  attribute MARK_DEBUG of r_error_overflow : signal is "TRUE";
+  attribute DONT_TOUCH of r_error_overflow : signal is "TRUE";
+  attribute MARK_DEBUG of r_status_flags_latched : signal is "TRUE";
+  attribute DONT_TOUCH of r_status_flags_latched : signal is "TRUE";
 begin
 
   assert (AXI_DATA_WIDTH = 32)
