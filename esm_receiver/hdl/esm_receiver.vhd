@@ -53,7 +53,7 @@ architecture rtl of esm_receiver is
 
   constant ENABLE_NARROW_CHANNEL      : boolean := true;
   constant ENABLE_WIDE_CHANNEL        : boolean := false;
-  constant ENABLE_PDW_ENCODER         : boolean := true;
+  constant ENABLE_PDW_ENCODER         : boolean := false;
 
   constant AXI_FIFO_DEPTH             : natural := 64;
   constant NUM_D2H_MUX_INPUTS         : natural := 5;
