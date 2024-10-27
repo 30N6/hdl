@@ -21,6 +21,7 @@ generic (
   MODULE_ID           : unsigned
 );
 port (
+  Clk_axi             : in  std_logic;
   Clk                 : in  std_logic;
   Rst                 : in  std_logic;
 
@@ -413,27 +414,26 @@ begin
     end if;
  end process;
 
-  i_fifo : entity axi_lib.axis_sync_fifo
+  i_fifo : entity axi_lib.axis_async_fifo
   generic map (
     FIFO_DEPTH        => FIFO_DEPTH,
     ALMOST_FULL_LEVEL => FIFO_ALMOST_FULL_LEVEL,
     AXI_DATA_WIDTH    => AXI_DATA_WIDTH
   )
   port map (
-    Clk           => Clk,
-    Rst           => Rst,
+    S_axis_clk          => Clk,
+    S_axis_resetn       => not(Rst),
+    S_axis_ready        => w_fifo_ready,
+    S_axis_valid        => r_fifo_valid,
+    S_axis_data         => r_fifo_partial_0_data or r_fifo_partial_1_data,
+    S_axis_last         => r_fifo_last,
+    S_axis_almost_full  => w_fifo_almost_full,
 
-    Almost_full   => w_fifo_almost_full,
-
-    S_axis_ready  => w_fifo_ready,
-    S_axis_valid  => r_fifo_valid,
-    S_axis_data   => r_fifo_partial_0_data or r_fifo_partial_1_data,
-    S_axis_last   => r_fifo_last,
-
-    M_axis_ready  => Axis_ready,
-    M_axis_valid  => Axis_valid,
-    M_axis_data   => Axis_data,
-    M_axis_last   => Axis_last
+    M_axis_clk          => Clk_axi,
+    M_axis_ready        => Axis_ready,
+    M_axis_valid        => Axis_valid,
+    M_axis_data         => Axis_data,
+    M_axis_last         => Axis_last
   );
 
   process(Clk)

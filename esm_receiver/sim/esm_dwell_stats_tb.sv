@@ -72,10 +72,11 @@ interface axi_rx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
 endinterface
 
 module esm_dwell_stats_tb;
-  parameter time CLK_HALF_PERIOD  = 8ns;
-  parameter AXI_DATA_WIDTH        = 32;
-  parameter logic [7:0] MODULE_ID = 99;
-  parameter NUM_CHANNELS          = 64;
+  parameter time CLK_HALF_PERIOD      = 2ns;
+  parameter time AXI_CLK_HALF_PERIOD  = 5ns;
+  parameter AXI_DATA_WIDTH            = 32;
+  parameter logic [7:0] MODULE_ID     = 99;
+  parameter NUM_CHANNELS              = 64;
 
   typedef struct
   {
@@ -123,11 +124,12 @@ module esm_dwell_stats_tb;
   parameter MAX_WORDS_PER_PACKET = 64;
   parameter NUM_HEADER_WORDS = ($bits(esm_dwell_report_header_t) / AXI_DATA_WIDTH);
 
+  logic Clk_axi;
   logic Clk;
   logic Rst;
 
   dwell_stats_tx_intf                             dwell_tx_intf (.*);
-  axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf   (.*);
+  axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf   (.Clk(Clk_axi));
 
   int unsigned  report_seq_num = 0;
   expect_t      expected_data [$];
@@ -136,6 +138,14 @@ module esm_dwell_stats_tb;
   logic         w_axi_rx_valid;
   logic         w_error_reporter_timeout;
   logic         w_error_reporter_overflow;
+
+  initial begin
+    Clk_axi = 0;
+    forever begin
+      #(AXI_CLK_HALF_PERIOD);
+      Clk_axi = ~Clk_axi;
+    end
+  end
 
   initial begin
     Clk = 0;
@@ -147,11 +157,11 @@ module esm_dwell_stats_tb;
 
   initial begin
     Rst = 1;
-    @(posedge Clk);
+    repeat(10) @(posedge Clk);
     Rst = 0;
   end
 
-  always_ff @(posedge Clk) begin
+  always_ff @(posedge Clk_axi) begin
     r_axi_rx_ready <= $urandom_range(99) < 80;
   end
 
@@ -164,6 +174,7 @@ module esm_dwell_stats_tb;
   )
   dut
   (
+    .Clk_axi                  (Clk_axi),
     .Clk                      (Clk),
     .Rst                      (Rst),
 

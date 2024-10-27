@@ -17,6 +17,7 @@ generic (
   HEARTBEAT_INTERVAL    : natural
 );
 port (
+  Clk_axi               : in  std_logic;
   Clk                   : in  std_logic;
   Rst                   : in  std_logic;
 
@@ -75,6 +76,7 @@ architecture rtl of esm_status_reporter is
   signal r_pdw_encoder_errors   : esm_pdw_encoder_errors_array_t(1 downto 0);
 
   signal w_status_flags         : esm_status_flags_t;
+  signal w_status_flags_packed  : std_logic_vector(ESM_STATUS_FLAGS_WIDTH - 1 downto 0);
   signal r_status_flags_latched : std_logic_vector(ESM_STATUS_FLAGS_WIDTH - 1 downto 0);
 
   signal r_status_timer         : unsigned(clog2(HEARTBEAT_INTERVAL) - 1 downto 0);
@@ -177,14 +179,16 @@ begin
   w_status_flags.status_reporter_errors.reporter_timeout  <= r_error_timeout;
   w_status_flags.status_reporter_errors.reporter_overflow <= r_error_overflow;
 
+  w_status_flags_packed <= pack(w_status_flags);
+
   process(Clk)
   begin
     if rising_edge(Clk) then
       if (Rst = '1') then
         r_status_flags_latched <= (others => '0');
       else
-        if (or_reduce(pack(w_status_flags)) = '1') then
-          r_status_flags_latched <= r_status_flags_latched or pack(w_status_flags);
+        if (or_reduce(w_status_flags_packed) = '1') then
+          r_status_flags_latched <= r_status_flags_latched or w_status_flags_packed;
         elsif (s_state = S_STATUS) then
           r_status_flags_latched <= (others => '0');
         end if;
@@ -345,27 +349,26 @@ begin
     report "Ready expected to be high."
     severity failure;
 
-  i_fifo : entity axi_lib.axis_sync_fifo
+  i_fifo : entity axi_lib.axis_async_fifo
   generic map (
     FIFO_DEPTH        => FIFO_DEPTH,
     ALMOST_FULL_LEVEL => FIFO_ALMOST_FULL_LEVEL,
     AXI_DATA_WIDTH    => AXI_DATA_WIDTH
   )
   port map (
-    Clk           => Clk,
-    Rst           => Rst,
+    S_axis_clk          => Clk,
+    S_axis_resetn       => not(Rst),
+    S_axis_ready        => w_fifo_ready,
+    S_axis_valid        => r_fifo_valid,
+    S_axis_data         => r_fifo_data,
+    S_axis_last         => r_fifo_last,
+    S_axis_almost_full  => w_fifo_almost_full,
 
-    Almost_full   => w_fifo_almost_full,
-
-    S_axis_ready  => w_fifo_ready,
-    S_axis_valid  => r_fifo_valid,
-    S_axis_data   => r_fifo_data,
-    S_axis_last   => r_fifo_last,
-
-    M_axis_ready  => Axis_ready,
-    M_axis_valid  => Axis_valid,
-    M_axis_data   => Axis_data,
-    M_axis_last   => Axis_last
+    M_axis_clk          => Clk_axi,
+    M_axis_ready        => Axis_ready,
+    M_axis_valid        => Axis_valid,
+    M_axis_data         => Axis_data,
+    M_axis_last         => Axis_last
   );
 
   process(Clk)

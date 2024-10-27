@@ -127,11 +127,6 @@ architecture rtl of esm_receiver is
   signal w_d2h_mux_out_data           : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   signal w_d2h_mux_out_last           : std_logic;
 
-  signal w_d2h_minififo_out_ready     : std_logic;
-  signal w_d2h_minififo_out_valid     : std_logic;
-  signal w_d2h_minififo_out_data      : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal w_d2h_minififo_out_last      : std_logic;
-
   attribute ASYNC_REG : string;
   attribute ASYNC_REG of r_ad9361_status : signal is "TRUE";
 
@@ -348,6 +343,7 @@ begin
       MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_WIDE
     )
     port map (
+      Clk_axi                 => M_axis_clk,
       Clk                     => Adc_clk_x4,
       Rst                     => r_combined_rst,
 
@@ -387,6 +383,7 @@ begin
       MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_NARROW
     )
     port map (
+      Clk_axi                 => M_axis_clk,
       Clk                     => Adc_clk_x4,
       Rst                     => r_combined_rst,
 
@@ -427,6 +424,7 @@ begin
       WIDE_BANDWIDTH  => TRUE
     )
     port map (
+      Clk_axi                       => M_axis_clk,
       Clk                           => Adc_clk_x4,
       Rst                           => r_combined_rst,
 
@@ -473,6 +471,7 @@ begin
       WIDE_BANDWIDTH  => FALSE
     )
     port map (
+      Clk_axi                       => M_axis_clk,
       Clk                           => Adc_clk_x4,
       Rst                           => r_combined_rst,
 
@@ -516,6 +515,7 @@ begin
     HEARTBEAT_INTERVAL    => HEARTBEAT_INTERVAL
   )
   port map (
+    Clk_axi               => M_axis_clk,
     Clk                   => Adc_clk_x4,
     Rst                   => r_combined_rst,
 
@@ -534,14 +534,15 @@ begin
     Axis_last             => w_d2h_fifo_in_last(4)
   );
 
+  --TODO: remove
   g_d2h_fifo : for i in 0 to (NUM_D2H_MUX_INPUTS - 1) generate
     i_fifo : entity axi_lib.axis_minififo
     generic map (
       AXI_DATA_WIDTH => AXI_DATA_WIDTH
     )
     port map (
-      Clk           => Adc_clk_x4,
-      Rst           => r_combined_rst,
+      Clk           => M_axis_clk,
+      Rst           => not(M_axis_resetn),
 
       S_axis_ready  => w_d2h_fifo_in_ready(i),
       S_axis_valid  => w_d2h_fifo_in_valid(i),
@@ -561,8 +562,8 @@ begin
     AXI_DATA_WIDTH  => AXI_DATA_WIDTH
   )
   port map (
-    Clk             => Adc_clk_x4,
-    Rst             => r_combined_rst,
+    Clk             => M_axis_clk,
+    Rst             => not(M_axis_resetn),
 
     S_axis_ready    => w_d2h_mux_in_ready,
     S_axis_valid    => w_d2h_mux_in_valid,
@@ -580,38 +581,18 @@ begin
     AXI_DATA_WIDTH => AXI_DATA_WIDTH
   )
   port map (
-    Clk           => Adc_clk_x4,
-    Rst           => r_combined_rst,
+    Clk           => M_axis_clk,
+    Rst           => not(M_axis_resetn),
 
     S_axis_ready  => w_d2h_mux_out_ready,
     S_axis_valid  => w_d2h_mux_out_valid,
     S_axis_data   => w_d2h_mux_out_data,
     S_axis_last   => w_d2h_mux_out_last,
 
-    M_axis_ready  => w_d2h_minififo_out_ready,
-    M_axis_valid  => w_d2h_minififo_out_valid,
-    M_axis_data   => w_d2h_minififo_out_data,
-    M_axis_last   => w_d2h_minififo_out_last
-  );
-
-  i_master_axis_fifo : entity axi_lib.axis_async_fifo
-  generic map (
-    FIFO_DEPTH      => AXI_FIFO_DEPTH,
-    AXI_DATA_WIDTH  => AXI_DATA_WIDTH
-  )
-  port map (
-    S_axis_clk      => Adc_clk_x4,
-    S_axis_resetn   => not(r_combined_rst),
-    S_axis_ready    => w_d2h_minififo_out_ready,
-    S_axis_valid    => w_d2h_minififo_out_valid,
-    S_axis_data     => w_d2h_minififo_out_data,
-    S_axis_last     => w_d2h_minififo_out_last,
-
-    M_axis_clk      => M_axis_clk,
-    M_axis_ready    => M_axis_ready,
-    M_axis_valid    => M_axis_valid,
-    M_axis_data     => M_axis_data,
-    M_axis_last     => M_axis_last
+    M_axis_ready  => M_axis_ready,
+    M_axis_valid  => M_axis_valid,
+    M_axis_data   => M_axis_data,
+    M_axis_last   => M_axis_last
   );
 
 end architecture rtl;

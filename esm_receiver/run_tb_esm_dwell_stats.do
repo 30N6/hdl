@@ -18,7 +18,7 @@ set library_file_list [list \
     ../common/sim/math_pkg_sv.sv \
     ] \
   axi_lib [list \
-    ../axi/hdl/axis_sync_fifo.vhd \
+    ../axi/hdl/axis_async_fifo.vhd \
     ] \
   mem_lib [list \
     ../mem/hdl/ram_sdp.vhd \

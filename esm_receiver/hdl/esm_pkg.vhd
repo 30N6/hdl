@@ -278,7 +278,7 @@ package esm_pkg is
     reporter_overflow : std_logic;
   end record;
 
-  constant ESM_STATUS_REPORTER_ERRORS_WIDTH : natural := 5;
+  constant ESM_STATUS_REPORTER_ERRORS_WIDTH : natural := 2;
 
   type esm_status_flags_t is record
     channelizer_warnings    : esm_channelizer_warnings_array_t(1 downto 0);

@@ -79,10 +79,11 @@ interface axi_rx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
 endinterface
 
 module esm_pdw_encoder_tb;
-  parameter time CLK_HALF_PERIOD  = 8ns;
-  parameter AXI_DATA_WIDTH        = 32;
-  parameter logic [7:0] MODULE_ID = 99;
-  parameter NUM_CHANNELS          = 64;
+  parameter time CLK_HALF_PERIOD      = 2ns;
+  parameter time AXI_CLK_HALF_PERIOD  = 5ns;
+  parameter AXI_DATA_WIDTH            = 32;
+  parameter logic [7:0] MODULE_ID     = 99;
+  parameter NUM_CHANNELS              = 64;
 
   typedef struct
   {
@@ -139,11 +140,12 @@ module esm_pdw_encoder_tb;
   parameter NUM_PULSE_HEADER_WORDS    = ($bits(pdw_pulse_report_header_bits_t) / AXI_DATA_WIDTH);
   parameter NUM_SUMMARY_HEADER_WORDS  = ($bits(pdw_summary_report_header_bits_t) / AXI_DATA_WIDTH);
 
+  logic Clk_axi;
   logic Clk;
   logic Rst;
 
   dwell_data_tx_intf                              dwell_tx_intf (.*);
-  axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf   (.*);
+  axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf   (.Clk(Clk_axi));
 
   int unsigned  report_seq_num = 0;
   int unsigned  pulse_seq_num [NUM_CHANNELS] = {default:0};
@@ -153,6 +155,14 @@ module esm_pdw_encoder_tb;
   logic         w_axi_rx_valid;
   logic         w_error_reporter_timeout;
   logic         w_error_reporter_overflow;
+
+  initial begin
+    Clk_axi = 0;
+    forever begin
+      #(AXI_CLK_HALF_PERIOD);
+      Clk_axi = ~Clk_axi;
+    end
+  end
 
   initial begin
     Clk = 0;
@@ -168,7 +178,7 @@ module esm_pdw_encoder_tb;
     Rst = 0;
   end
 
-  always_ff @(posedge Clk) begin
+  always_ff @(posedge Clk_axi) begin
     r_axi_rx_ready <= $urandom_range(99) < 80;
   end
 
@@ -182,6 +192,7 @@ module esm_pdw_encoder_tb;
   )
   dut
   (
+    .Clk_axi                        (Clk_axi),
     .Clk                            (Clk),
     .Rst                            (Rst),
 

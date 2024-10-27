@@ -21,6 +21,7 @@ generic (
   MODULE_ID       : unsigned
 );
 port (
+  Clk_axi                 : in  std_logic;
   Clk                     : in  std_logic;
   Rst                     : in  std_logic;
 
@@ -305,6 +306,7 @@ begin
     MODULE_ID             => MODULE_ID
   )
   port map (
+    Clk_axi             => Clk_axi,
     Clk                 => Clk,
     Rst                 => r_rst,
 
