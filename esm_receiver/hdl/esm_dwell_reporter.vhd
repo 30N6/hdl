@@ -329,7 +329,8 @@ begin
 
     when S_META_2 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(resize_up(Dwell_data.gain, 8)) & std_logic_vector(resize_up(Dwell_data.fast_lock_profile, 8)) & x"0000";
+      w_fifo_partial_0_data   <= std_logic_vector(resize_up(Dwell_data.gain, 8)) & std_logic_vector(resize_up(Dwell_data.fast_lock_profile, 8)) &
+                                 std_logic_vector(to_unsigned(NUM_CHANNELS, 8)) & std_logic_vector(resize_up(r_channel_index, 8));
 
     when S_META_3 =>
       w_fifo_valid            <= '1';

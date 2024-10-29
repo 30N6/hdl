@@ -98,7 +98,8 @@ module esm_dwell_stats_tb;
     bit [31:0]  duration_requested;
     bit [7:0]   gain;
     bit [7:0]   fast_lock_profile;
-    bit [15:0]  padding_1;
+    bit [7:0]   num_channels;
+    bit [7:0]   report_starting_channel;
     bit [31:0]  threshold_narrow;
     bit [31:0]  threshold_wide;
     bit [63:0]  channel_mask_narrow;
@@ -287,6 +288,14 @@ module esm_dwell_stats_tb;
       $display("fast_lock_profile mismatch: %X %X", report_a.fast_lock_profile, report_b.fast_lock_profile);
       return 0;
     end
+    if (report_a.num_channels !== report_b.num_channels) begin
+      $display("num_channels mismatch: %X %X", report_a.num_channels, report_b.num_channels);
+      return 0;
+    end
+    if (report_a.report_starting_channel !== report_b.report_starting_channel) begin
+      $display("report_starting_channel mismatch: %X %X", report_a.report_starting_channel, report_b.report_starting_channel);
+      return 0;
+    end
     if (report_a.threshold_narrow !== report_b.threshold_narrow) begin
       $display("threshold_narrow mismatch: %X %X", report_a.threshold_narrow, report_b.threshold_narrow);
       return 0;
@@ -364,7 +373,7 @@ module esm_dwell_stats_tb;
     longint unsigned channel_accum [NUM_CHANNELS] = {default:0};
     int unsigned channel_max [NUM_CHANNELS] = {default:0};
 
-    //$display("%0t: num_header_words=%0d channels_per_packet=%0d num_packets=%0d", $time, NUM_HEADER_WORDS, channels_per_packet, num_packets);
+    $display("%0t: num_header_words=%0d channels_per_packet=%0d num_packets=%0d", $time, NUM_HEADER_WORDS, channels_per_packet, num_packets);
 
     for (int i = 0; i < dwell_input.size(); i++) begin
       channel_accum[dwell_input[i].channel] += dwell_input[i].power;
@@ -386,6 +395,8 @@ module esm_dwell_stats_tb;
       report_header.duration_requested      = dwell_data.duration;
       report_header.gain                    = dwell_data.gain;
       report_header.fast_lock_profile       = dwell_data.fast_lock_profile;
+      report_header.num_channels            = NUM_CHANNELS;
+      report_header.report_starting_channel = channel_index;
       report_header.threshold_narrow        = dwell_data.threshold_narrow;
       report_header.threshold_wide          = dwell_data.threshold_wide;
       report_header.channel_mask_narrow     = 0; //dwell_data.channel_mask_narrow;
