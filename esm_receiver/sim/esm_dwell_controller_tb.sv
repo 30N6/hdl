@@ -41,7 +41,8 @@ interface axi_tx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
 endinterface
 
 module esm_dwell_controller_tb;
-  parameter time CLK_HALF_PERIOD = 4ns;
+  parameter time CLK_HALF_PERIOD      = 2ns;
+  parameter time AXI_CLK_HALF_PERIOD  = 5ns;
   parameter AXI_DATA_WIDTH = 32;
 
   typedef struct
@@ -49,15 +50,17 @@ module esm_dwell_controller_tb;
     esm_dwell_metadata_t data;
   } expect_t;
 
+  logic Clk_axi;
   logic Clk;
   logic Rst;
 
-  axi_tx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  cfg_tx_intf (.*);
+  axi_tx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  cfg_tx_intf (.Clk(Clk_axi));
   dwell_rx_intf                                   rx_intf (.*);
 
   logic                                           w_rst_out;
   logic [1:0]                                     w_enable_chan;
   logic [1:0]                                     w_enable_pdw;
+  logic                                           w_enable_status;
   esm_config_data_t                               w_module_config;
   logic                                           w_dwell_active;
   logic                                           r_dwell_active;
@@ -75,6 +78,14 @@ module esm_dwell_controller_tb;
   int                                             num_received = 0;
 
   initial begin
+    Clk_axi = 0;
+    forever begin
+      #(AXI_CLK_HALF_PERIOD);
+      Clk_axi = ~Clk_axi;
+    end
+  end
+
+  initial begin
     Clk = 0;
     forever begin
       #(CLK_HALF_PERIOD);
@@ -90,15 +101,19 @@ module esm_dwell_controller_tb;
 
   esm_config #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH)) cfg
   (
-    .Clk           (Clk),
-    .Rst           (Rst),
+    .Clk_x4         (Clk),
 
-    .Axis_ready    (cfg_tx_intf.ready),
-    .Axis_valid    (cfg_tx_intf.valid),
-    .Axis_last     (cfg_tx_intf.last),
-    .Axis_data     (cfg_tx_intf.data),
+
+    .S_axis_clk     (Clk_axi),
+    .S_axis_resetn  (!Rst),
+    .S_axis_ready   (cfg_tx_intf.ready),
+    .S_axis_valid   (cfg_tx_intf.valid),
+    .S_axis_data    (cfg_tx_intf.data),
+    .S_axis_last    (cfg_tx_intf.last),
+
 
     .Rst_out       (w_rst_out),
+    .Enable_status (w_enable_status),
     .Enable_chan   (w_enable_chan),
     .Enable_pdw    (w_enable_pdw),
 
@@ -148,13 +163,14 @@ module esm_dwell_controller_tb;
   endtask
 
   task automatic write_config(bit [31:0] config_data []);
-    @(posedge Clk)
+    @(posedge Clk_axi)
     cfg_tx_intf.write(config_data);
-    repeat(10) @(posedge Clk);
+    repeat(10) @(posedge Clk_axi);
   endtask
 
   task automatic send_initial_config();
-    bit [31:0] config_data [][] = '{{esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h00030300}, {esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h00030300}};
+    bit [31:0] config_data [][] = '{{esm_control_magic_num, config_seq_num++, 32'h00000000, 32'hDEADBEEF, 32'h01000000, 32'hDEADBEEF},
+                                    {esm_control_magic_num, config_seq_num++, 32'h00000000, 32'hDEADBEEF, 32'h00030300, 32'hDEADBEEF}};
     foreach (config_data[i]) begin
       write_config(config_data[i]);
     end
@@ -162,27 +178,30 @@ module esm_dwell_controller_tb;
 
   task automatic send_dwell_entry(esm_message_dwell_entry_t entry);
     bit [esm_message_dwell_entry_packed_width - 1 : 0] packed_entry = '0;
-    bit [31:0] config_data [] = new[3 + esm_message_dwell_entry_packed_width/32];
+    bit [31:0] config_data [] = new[4 + esm_message_dwell_entry_packed_width/32];
 
     $display("%0t: send_dwell_entry[%0d] = %p", $time, entry.entry_index, entry.entry_data);
 
     packed_entry[7   :   0] = entry.entry_index;
-    packed_entry[47  :  32] = entry.entry_data.tag;
-    packed_entry[63  :  48] = entry.entry_data.frequency;
-    packed_entry[95  :  64] = entry.entry_data.duration;
-    packed_entry[103 :  96] = entry.entry_data.gain;
-    packed_entry[111 : 104] = entry.entry_data.fast_lock_profile;
-    packed_entry[159 : 128] = entry.entry_data.threshold_narrow;
-    packed_entry[191 : 160] = entry.entry_data.threshold_wide;
-    packed_entry[255 : 192] = entry.entry_data.channel_mask_narrow;
-    packed_entry[263 : 256] = entry.entry_data.channel_mask_wide;
+    packed_entry[63  :  32] = 32'hDEADBEEF;
+
+    packed_entry[79  :  64] = entry.entry_data.tag;
+    packed_entry[95  :  80] = entry.entry_data.frequency;
+    packed_entry[127 :  96] = entry.entry_data.duration;
+    packed_entry[135 : 128] = entry.entry_data.gain;
+    packed_entry[143 : 136] = entry.entry_data.fast_lock_profile;
+    packed_entry[191 : 160] = entry.entry_data.threshold_narrow;
+    packed_entry[223 : 192] = entry.entry_data.threshold_wide;
+    packed_entry[287 : 224] = entry.entry_data.channel_mask_narrow;
+    packed_entry[295 : 288] = entry.entry_data.channel_mask_wide;
 
     config_data[0] = esm_control_magic_num;
     config_data[1] = config_seq_num++;
     config_data[2] = {esm_module_id_dwell_controller, esm_control_message_type_dwell_entry, 16'h0000};
+    config_data[3] = 32'hDEADBEEF;
 
     for (int i = 0; i < (esm_message_dwell_entry_packed_width/32); i++) begin
-      config_data[3 + i] = packed_entry[i*32 +: 32];
+      config_data[4 + i] = packed_entry[i*32 +: 32];
     end
 
     write_config(config_data);
@@ -203,7 +222,7 @@ module esm_dwell_controller_tb;
 
   task automatic send_dwell_program(esm_message_dwell_program_t dwell_program);
     bit [esm_message_dwell_program_header_packed_width - 1 : 0] packed_header = '0;
-    bit [31:0] config_data [] = new[3 + esm_message_dwell_program_header_packed_width/32 + esm_num_dwell_instructions];
+    bit [31:0] config_data [] = new[4 + esm_message_dwell_program_header_packed_width/32 + esm_num_dwell_instructions];
 
     $display("%0t: send_dwell_program = %p", $time, dwell_program);
 
@@ -215,13 +234,14 @@ module esm_dwell_controller_tb;
     config_data[0] = esm_control_magic_num;
     config_data[1] = config_seq_num++;
     config_data[2] = {esm_module_id_dwell_controller, esm_control_message_type_dwell_program, 16'h0000};
+    config_data[3] = 32'hDEADBEEF;
 
     for (int i = 0; i < (esm_message_dwell_program_header_packed_width/32); i++) begin
-      config_data[3 + i] = packed_header[i*32 +: 32];
+      config_data[4 + i] = packed_header[i*32 +: 32];
     end
 
     for (int i = 0; i < esm_num_dwell_instructions; i++) begin
-      config_data[3 + (esm_message_dwell_program_header_packed_width/32) + i] = pack_dwell_instruction(dwell_program.instructions[i]);
+      config_data[4 + (esm_message_dwell_program_header_packed_width/32) + i] = pack_dwell_instruction(dwell_program.instructions[i]);
     end
 
     write_config(config_data);
@@ -402,11 +422,11 @@ module esm_dwell_controller_tb;
         //repeat(300000) @(posedge Clk);
 
         wait_cycles = 0;
-        while ((expected_data.size() != 0) && (wait_cycles < 3e5)) begin
+        while ((expected_data.size() != 0) && (wait_cycles < 6e5)) begin
           @(posedge Clk);
           wait_cycles++;
         end
-        assert (wait_cycles < 3e5) else $error("Timeout while waiting for expected queue to empty during standard test");
+        assert (wait_cycles < 6e5) else $error("Timeout while waiting for expected queue to empty during standard test");
 
         foreach (expected_data[i]) begin
           $display("%0t: end of rep: expected_data[%0d]=%p", $time, i, expected_data[i]);

@@ -137,6 +137,7 @@ architecture rtl of esm_receiver is
   signal w_M_axis_valid    : std_logic;
   signal w_M_axis_data     : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   signal w_M_axis_last     : std_logic;
+  signal w_M_axis_valid_ready : std_logic;
 
   attribute MARK_DEBUG of w_config_rst : signal is "TRUE";
   attribute DONT_TOUCH of w_config_rst : signal is "TRUE";
@@ -161,13 +162,15 @@ architecture rtl of esm_receiver is
   attribute DONT_TOUCH of w_M_axis_data : signal is "TRUE";
   attribute MARK_DEBUG of w_M_axis_last : signal is "TRUE";
   attribute DONT_TOUCH of w_M_axis_last : signal is "TRUE";
-
+  attribute MARK_DEBUG of w_M_axis_valid_ready : signal is "TRUE";
+  attribute DONT_TOUCH of w_M_axis_valid_ready : signal is "TRUE";
 begin
 
   w_M_axis_ready  <= M_axis_ready;
   w_M_axis_valid  <= M_axis_valid;
   w_M_axis_data   <= M_axis_data;
   w_M_axis_last   <= M_axis_last;
+  w_M_axis_valid_ready <= M_axis_valid and M_axis_ready;
 
   --TODO: use axi clock to generate 250 MHz
   --TODO: cdc fifo for adc data_clk -- limit max rate to 1/4

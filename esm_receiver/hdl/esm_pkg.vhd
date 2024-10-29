@@ -107,10 +107,11 @@ package esm_pkg is
     entry_data                : esm_dwell_metadata_t;
   end record;
 
-  constant ESM_MESSAGE_DWELL_ENTRY_PACKED_WIDTH : natural := 32 + ESM_DWELL_METADATA_PACKED_WIDTH;
+  constant ESM_MESSAGE_DWELL_ENTRY_PACKED_WIDTH : natural := 64 + ESM_DWELL_METADATA_PACKED_WIDTH;
   --type esm_message_dwell_entry_packed_t is record
   --  entry_index               : unsigned(7 downto 0);
-  --  padding                   : std_logic_vector(23 downto 0);
+  --  padding0                  : std_logic_vector(23 downto 0);
+  --  padding1                  : std_logic_vector(31 downto 0);
   --  entry_data                : esm_dwell_metadata_packed_t;
   --end record;
 
@@ -345,7 +346,7 @@ package body esm_pkg is
       severity failure;
 
     r.entry_index   := unsigned(v(ESM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0));
-    r.entry_data    := unpack(v(32 + ESM_DWELL_METADATA_PACKED_WIDTH - 1 downto 32));
+    r.entry_data    := unpack(v(64 + ESM_DWELL_METADATA_PACKED_WIDTH - 1 downto 64));
     return r;
   end function;
 

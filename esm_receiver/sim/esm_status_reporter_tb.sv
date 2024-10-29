@@ -235,6 +235,9 @@ module esm_status_reporter_tb;
     esm_status_report_header_t report_a = unpack_report_header(a);
     esm_status_report_header_t report_b = unpack_report_header(b);
 
+    $display("data_match: a=%p", report_a);
+    $display("data_match: b=%p", report_b);
+
     if (a.size() != b.size()) begin
       $display("%0t: size mismatch: a=%0d b=%0d", $time, a.size(), b.size());
       return 0;

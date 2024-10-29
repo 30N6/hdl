@@ -192,8 +192,8 @@ module esm_receiver_tb;
   endtask
 
   task automatic send_initial_config();
-    bit [31:0] config_data [][] = '{{esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h01000000},
-                                    {esm_control_magic_num, config_seq_num++, 32'h00000000, 32'h00030301}};
+    bit [31:0] config_data [][] = '{{esm_control_magic_num, config_seq_num++, 32'h00000000, 32'hDEADBEEF, 32'h01000000, 32'hDEADBEEF},
+                                    {esm_control_magic_num, config_seq_num++, 32'h00000000, 32'hDEADBEEF, 32'h00030301, 32'hDEADBEEF}};
     foreach (config_data[i]) begin
       write_config(config_data[i]);
     end
@@ -201,27 +201,30 @@ module esm_receiver_tb;
 
   task automatic send_dwell_entry(esm_message_dwell_entry_t entry);
     bit [esm_message_dwell_entry_packed_width - 1 : 0] packed_entry = '0;
-    bit [31:0] config_data [] = new[3 + esm_message_dwell_entry_packed_width/32];
+    bit [31:0] config_data [] = new[4 + esm_message_dwell_entry_packed_width/32];
 
     $display("%0t: send_dwell_entry[%0d] = %p", $time, entry.entry_index, entry.entry_data);
 
     packed_entry[7   :   0] = entry.entry_index;
-    packed_entry[47  :  32] = entry.entry_data.tag;
-    packed_entry[63  :  48] = entry.entry_data.frequency;
-    packed_entry[95  :  64] = entry.entry_data.duration;
-    packed_entry[103 :  96] = entry.entry_data.gain;
-    packed_entry[111 : 104] = entry.entry_data.fast_lock_profile;
-    packed_entry[159 : 128] = entry.entry_data.threshold_narrow;
-    packed_entry[191 : 160] = entry.entry_data.threshold_wide;
-    packed_entry[255 : 192] = entry.entry_data.channel_mask_narrow;
-    packed_entry[263 : 256] = entry.entry_data.channel_mask_wide;
+    packed_entry[63  :  32] = 32'hDEADBEEF;
+
+    packed_entry[79  :  64] = entry.entry_data.tag;
+    packed_entry[95  :  80] = entry.entry_data.frequency;
+    packed_entry[127 :  96] = entry.entry_data.duration;
+    packed_entry[135 : 128] = entry.entry_data.gain;
+    packed_entry[143 : 136] = entry.entry_data.fast_lock_profile;
+    packed_entry[191 : 160] = entry.entry_data.threshold_narrow;
+    packed_entry[223 : 192] = entry.entry_data.threshold_wide;
+    packed_entry[287 : 224] = entry.entry_data.channel_mask_narrow;
+    packed_entry[295 : 288] = entry.entry_data.channel_mask_wide;
 
     config_data[0] = esm_control_magic_num;
     config_data[1] = config_seq_num++;
     config_data[2] = {esm_module_id_dwell_controller, esm_control_message_type_dwell_entry, 16'h0000};
+    config_data[3] = 32'hDEADBEEF;
 
     for (int i = 0; i < (esm_message_dwell_entry_packed_width/32); i++) begin
-      config_data[3 + i] = packed_entry[i*32 +: 32];
+      config_data[4 + i] = packed_entry[i*32 +: 32];
     end
 
     write_config(config_data);
@@ -242,7 +245,7 @@ module esm_receiver_tb;
 
   task automatic send_dwell_program(esm_message_dwell_program_t dwell_program);
     bit [esm_message_dwell_program_header_packed_width - 1 : 0] packed_header = '0;
-    bit [31:0] config_data [] = new[3 + esm_message_dwell_program_header_packed_width/32 + esm_num_dwell_instructions];
+    bit [31:0] config_data [] = new[4 + esm_message_dwell_program_header_packed_width/32 + esm_num_dwell_instructions];
 
     $display("%0t: send_dwell_program = %p", $time, dwell_program);
 
@@ -254,13 +257,14 @@ module esm_receiver_tb;
     config_data[0] = esm_control_magic_num;
     config_data[1] = config_seq_num++;
     config_data[2] = {esm_module_id_dwell_controller, esm_control_message_type_dwell_program, 16'h0000};
+    config_data[3] = 32'hDEADBEEF;
 
     for (int i = 0; i < (esm_message_dwell_program_header_packed_width/32); i++) begin
-      config_data[3 + i] = packed_header[i*32 +: 32];
+      config_data[4 + i] = packed_header[i*32 +: 32];
     end
 
     for (int i = 0; i < esm_num_dwell_instructions; i++) begin
-      config_data[3 + (esm_message_dwell_program_header_packed_width/32) + i] = pack_dwell_instruction(dwell_program.instructions[i]);
+      config_data[4 + (esm_message_dwell_program_header_packed_width/32) + i] = pack_dwell_instruction(dwell_program.instructions[i]);
     end
 
     write_config(config_data);
@@ -321,8 +325,8 @@ module esm_receiver_tb;
       for (int i_dwell = 0; i_dwell < esm_num_dwell_entries; i_dwell++) begin
         esm_message_dwell_entry_t entry;
         entry.entry_index                     = i_dwell;
-        entry.entry_data.tag                  = $urandom;
-        entry.entry_data.frequency            = $urandom;
+        entry.entry_data.tag                  = i_dwell; //$urandom;
+        entry.entry_data.frequency            = i_dwell * 1000; //$urandom;
         entry.entry_data.duration             = 10000;
         entry.entry_data.gain                 = $urandom;
         entry.entry_data.fast_lock_profile    = i_dwell;
@@ -339,8 +343,8 @@ module esm_receiver_tb;
         esm_message_dwell_program_t dwell_program;
         dwell_program.enable_program        = 1;
         dwell_program.enable_delayed_start  = 0;
-        dwell_program.global_counter_init   = 0;
-        dwell_program.delayed_start_time    = 0;
+        dwell_program.global_counter_init   = 100;
+        dwell_program.delayed_start_time    = 200;
 
         //for (int i_dwell = 0; i_dwell < esm_num_dwell_entries; i_dwell++) begin
         for (int i_dwell = 0; i_dwell < 10; i_dwell++) begin

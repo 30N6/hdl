@@ -42,9 +42,11 @@ architecture rtl of esm_config is
     S_WORD_0,
     S_WORD_1,
     S_WORD_2,
+    S_WORD_3,
     S_DROP,
     S_ACTIVE_CONFIG_CONTROL,
-    S_ACTIVE_CONFIG_MODULE
+    S_ACTIVE_CONFIG_MODULE,
+    S_PADDING
   );
 
   signal r_axis_valid           : std_logic;
@@ -153,7 +155,10 @@ begin
             s_state <= S_WORD_2;
 
           when S_WORD_2 =>
-            if (w_module_id = ESM_MODULE_ID_CONTROL) then
+            s_state <= S_WORD_3;
+
+          when S_WORD_3 =>
+            if (r_module_id = ESM_MODULE_ID_CONTROL) then
               s_state <= S_ACTIVE_CONFIG_CONTROL;
             else
               s_state <= S_ACTIVE_CONFIG_MODULE;
@@ -163,10 +168,13 @@ begin
             s_state <= S_DROP;
 
           when S_ACTIVE_CONFIG_CONTROL =>
-            s_state <= S_ACTIVE_CONFIG_CONTROL;
+            s_state <= S_PADDING;
 
           when S_ACTIVE_CONFIG_MODULE =>
             s_state <= S_ACTIVE_CONFIG_MODULE;
+
+          when S_PADDING =>
+            s_state <= S_PADDING;
 
           end case;
 
@@ -187,7 +195,7 @@ begin
       end if;
 
       if (r_axis_valid = '1') then
-        r_first <= to_stdlogic(s_state = S_WORD_2);
+        r_first <= to_stdlogic(s_state = S_WORD_3);
       end if;
     end if;
   end process;

@@ -247,7 +247,7 @@ begin
 
         end case;
 
-        if (r_dwell_program_valid = '1') then
+        if (r_dwell_program_valid = '1') then --TODO: check this in s_idle instead?
           s_state <= S_INSTRUCTION_LOOKUP;
         elsif ((w_dwell_entry_valid = '1') or (w_dwell_instruction_valid = '1') or (w_dwell_program_valid = '1')) then
           s_state <= S_IDLE;
