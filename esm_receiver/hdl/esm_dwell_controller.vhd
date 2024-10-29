@@ -90,6 +90,39 @@ architecture rtl of esm_dwell_controller is
   signal r_dwell_active             : std_logic;
   signal r_dwell_sequence_num       : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
+
+  attribute MARK_DEBUG : string;
+  attribute DONT_TOUCH : string;
+
+  attribute MARK_DEBUG of s_state : signal is "TRUE";
+  attribute DONT_TOUCH of s_state : signal is "TRUE";
+  attribute MARK_DEBUG of r_ad9361_status : signal is "TRUE";
+  attribute DONT_TOUCH of r_ad9361_status : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_program_data : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_program_data : signal is "TRUE";
+  attribute MARK_DEBUG of w_instructions_done : signal is "TRUE";
+  attribute DONT_TOUCH of w_instructions_done : signal is "TRUE";
+  attribute MARK_DEBUG of w_pll_pre_lock_done : signal is "TRUE";
+  attribute DONT_TOUCH of w_pll_pre_lock_done : signal is "TRUE";
+  attribute MARK_DEBUG of w_pll_post_lock_done : signal is "TRUE";
+  attribute DONT_TOUCH of w_pll_post_lock_done : signal is "TRUE";
+  attribute MARK_DEBUG of w_pll_locked : signal is "TRUE";
+  attribute DONT_TOUCH of w_pll_locked : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_cycles : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_cycles : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_repeat : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_repeat : signal is "TRUE";
+  attribute MARK_DEBUG of r_instruction_index : signal is "TRUE";
+  attribute DONT_TOUCH of r_instruction_index : signal is "TRUE";
+  attribute MARK_DEBUG of r_instruction_data : signal is "TRUE";
+  attribute DONT_TOUCH of r_instruction_data : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_entry_d : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_entry_d : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_active : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_active : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_sequence_num : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_sequence_num : signal is "TRUE";
+
 begin
 
   process(Clk)
@@ -172,9 +205,9 @@ begin
   end process;
 
   w_instructions_done   <= not(r_instruction_data.valid) or (r_instruction_data.global_counter_check and r_global_counter_is_zero);
-  w_pll_pre_lock_done   <= to_stdlogic(r_pll_pre_lock_cycles = (PLL_PRE_LOCK_DELAY_CYCLES - 1));
-  w_pll_locked          <= r_ad9361_status(6);
-  w_pll_post_lock_done  <= to_stdlogic(r_pll_post_lock_cycles = (PLL_POST_LOCK_DELAY_CYCLES - 1));
+  w_pll_pre_lock_done   <= r_instruction_data.skip_pll_prelock_wait   or to_stdlogic(r_pll_pre_lock_cycles = (PLL_PRE_LOCK_DELAY_CYCLES - 1));
+  w_pll_locked          <= r_instruction_data.skip_pll_lock_check     or r_ad9361_status(6);
+  w_pll_post_lock_done  <= r_instruction_data.skip_pll_postlock_wait  or to_stdlogic(r_pll_post_lock_cycles = (PLL_POST_LOCK_DELAY_CYCLES - 1));
 
   process(Clk)
   begin

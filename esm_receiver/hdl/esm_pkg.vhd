@@ -119,6 +119,9 @@ package esm_pkg is
     valid                     : std_logic;
     global_counter_check      : std_logic;
     global_counter_dec        : std_logic;
+    skip_pll_prelock_wait     : std_logic;
+    skip_pll_lock_check       : std_logic;
+    skip_pll_postlock_wait    : std_logic;
     repeat_count              : unsigned(3 downto 0);
     entry_index               : unsigned(ESM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
     next_instruction_index    : unsigned(ESM_DWELL_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
@@ -374,6 +377,9 @@ package body esm_pkg is
     r.valid                   := v(0);
     r.global_counter_check    := v(1);
     r.global_counter_dec      := v(2);
+    r.skip_pll_prelock_wait   := v(3);
+    r.skip_pll_lock_check     := v(4);
+    r.skip_pll_postlock_wait  := v(5);
     r.repeat_count            := unsigned(v(11 downto 8));
     r.entry_index             := unsigned(v(20 downto 16));
     r.next_instruction_index  := unsigned(v(28 downto 24));
