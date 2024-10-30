@@ -108,6 +108,15 @@ architecture rtl of esm_pdw_encoder is
   signal w_reporter_timeout         : std_logic;
   signal w_reporter_overflow        : std_logic;
 
+  attribute MARK_DEBUG : string;
+  attribute DONT_TOUCH : string;
+  attribute MARK_DEBUG of r_enable : signal is "TRUE";
+  attribute DONT_TOUCH of r_enable : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_active : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_active : signal is "TRUE";
+  attribute MARK_DEBUG of s_state : signal is "TRUE";
+  attribute DONT_TOUCH of s_state : signal is "TRUE";
+
 begin
 
   process(Clk)

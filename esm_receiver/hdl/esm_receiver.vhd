@@ -53,7 +53,7 @@ architecture rtl of esm_receiver is
 
   constant ENABLE_NARROW_CHANNEL      : boolean := true;
   constant ENABLE_WIDE_CHANNEL        : boolean := false;
-  constant ENABLE_PDW_ENCODER         : boolean := false;
+  constant ENABLE_PDW_ENCODER         : boolean := true;
 
   constant AXI_FIFO_DEPTH             : natural := 64;
   constant NUM_D2H_MUX_INPUTS         : natural := 5;
@@ -153,6 +153,15 @@ architecture rtl of esm_receiver is
   attribute DONT_TOUCH of w_dwell_active : signal is "TRUE";
   attribute MARK_DEBUG of w_dwell_sequence_num : signal is "TRUE";
   attribute DONT_TOUCH of w_dwell_sequence_num : signal is "TRUE";
+
+  attribute MARK_DEBUG of w_d2h_fifo_in_ready : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_fifo_in_ready : signal is "TRUE";
+  attribute MARK_DEBUG of w_d2h_fifo_in_valid : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_fifo_in_valid : signal is "TRUE";
+  attribute MARK_DEBUG of w_d2h_fifo_in_data : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_fifo_in_data : signal is "TRUE";
+  attribute MARK_DEBUG of w_d2h_fifo_in_last : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_fifo_in_last : signal is "TRUE";
 
   attribute MARK_DEBUG of w_M_axis_ready : signal is "TRUE";
   attribute DONT_TOUCH of w_M_axis_ready : signal is "TRUE";
