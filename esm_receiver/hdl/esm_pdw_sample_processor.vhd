@@ -45,9 +45,13 @@ port (
   Buffered_frame_data     : out signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
 
   Error_fifo_overflow     : out std_logic;
+  Error_fifo_underflow    : out std_logic;
+  Error_buffer_busy       : out std_logic;
   Error_buffer_underflow  : out std_logic;
   Error_buffer_overflow   : out std_logic
 );
+begin
+  -- PSL default clock is rising_edge(Clk);
 end entity esm_pdw_sample_processor;
 
 architecture rtl of esm_pdw_sample_processor is
@@ -119,10 +123,16 @@ architecture rtl of esm_pdw_sample_processor is
   signal w3_context                 : channel_context_t;
   signal w3_power_accum_b           : unsigned(15 downto 0);
 
+  signal w_buffer_empty             : std_logic;
   signal w_buffer_full              : std_logic;
   signal w_buffer_next_index        : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
   signal w_buffer_next_start        : std_logic;
   signal w_buffer_wr_en             : std_logic;
+
+  signal w_pending_fifo_wr_en       : std_logic;
+  signal w_pending_fifo_full        : std_logic;
+  signal w_pending_fifo_rd_en       : std_logic;
+  signal w_pending_fifo_empty       : std_logic;
 
   signal w_fifo_full                : std_logic;
   signal r_fifo_wr_data             : esm_pdw_fifo_data_t;
@@ -130,6 +140,10 @@ architecture rtl of esm_pdw_sample_processor is
   signal w_fifo_empty               : std_logic;
   signal w_fifo_rd_data             : std_logic_vector(ESM_PDW_FIFO_DATA_WIDTH - 1 downto 0);
 
+  signal r_dwell_active             : std_logic;
+
+  signal w_pending_fifo_overflow    : std_logic;
+  signal w_pending_fifo_underflow   : std_logic;
   signal w_fifo_overflow            : std_logic;
   signal w_sample_buffer_overflow   : std_logic;
   signal w_sample_buffer_underflow  : std_logic;
@@ -206,8 +220,7 @@ begin
         r3_context.recording_sample_padding <= (others => '0');
         r3_context.ts_start                 <= Timestamp;
 
-        if ((Dwell_active = '1') and (r2_new_detect = '1') and (w_fifo_full = '0')) then  --TODO: this full check is wrong -- can have  multiple in flight
-          --TODO: include w_buffer_full in the check above? might be too limited -- probably need to track the fifo count
+        if ((Dwell_active = '1') and (r2_new_detect = '1') and (w_pending_fifo_full = '0')) then
           r3_context.state                  <= S_ACTIVE;
           r3_context.recording_skipped      <= w_buffer_full;
           r3_context.recording_active       <= not(w_buffer_full);
@@ -309,7 +322,32 @@ begin
     end if;
   end process;
 
-  i_pdw_fifo : entity mem_lib.xpm_fallthough_fifo
+  w_pending_fifo_wr_en <= to_stdlogic(r2_context.state = S_IDLE) and Dwell_active and r2_new_detect and not(w_pending_fifo_full);
+  w_pending_fifo_rd_en <= Pdw_ready and not(w_fifo_empty);
+
+  i_pdw_pending_fifo : entity mem_lib.xpm_fallthough_fifo
+  generic map (
+    FIFO_DEPTH  => PDW_FIFO_DEPTH,
+    FIFO_WIDTH  => 1
+  )
+  port map (
+    Clk         => Clk,
+    Rst         => Rst,
+
+    Wr_en       => w_pending_fifo_wr_en,
+    Wr_data     => (others => '0'),
+    Almost_full => open,
+    Full        => w_pending_fifo_full,
+
+    Rd_en       => w_pending_fifo_rd_en,
+    Rd_data     => open,
+    Empty       => w_pending_fifo_empty,
+
+    Overflow    => w_pending_fifo_overflow,
+    Underflow   => w_pending_fifo_underflow
+  );
+
+  i_pdw_data_fifo : entity mem_lib.xpm_fallthough_fifo
   generic map (
     FIFO_DEPTH  => PDW_FIFO_DEPTH,
     FIFO_WIDTH  => ESM_PDW_FIFO_DATA_WIDTH
@@ -334,10 +372,15 @@ begin
   Pdw_data  <= unpack(w_fifo_rd_data);
   Pdw_valid <= not(w_fifo_empty);
 
-  w_buffer_next_start <= to_stdlogic(r2_context.state = S_IDLE) and Dwell_active and r2_input_ctrl.valid and r2_new_detect and not(w_fifo_full) and not(w_buffer_full);
-  w_buffer_wr_en      <= r2_input_ctrl.valid and r2_context.recording_active;
+  -- PSL assert always (w_pending_fifo_wr_en = '1') -> eventually! (r_fifo_wr_en = '1');
+  -- PSL assert always (w_pending_fifo_full = '1') -> eventually! (w_fifo_full = '1');
+  -- PSL assert always (w_fifo_full = '1') -> (w_pending_fifo_full = '1');
+  -- PSL assert always rose(w_pending_fifo_empty) -> rose(w_fifo_empty);
 
   --TODO: need a way to flush this buffer at the end of a dwell?
+
+  w_buffer_wr_en       <= r2_input_ctrl.valid and r2_context.recording_active;
+  w_buffer_next_start  <= w_pending_fifo_wr_en and not(w_buffer_full);
 
   i_sample_buffer : entity esm_lib.esm_pdw_sample_buffer
   generic map (
@@ -348,6 +391,7 @@ begin
     Clk                 => Clk,
     Rst                 => Rst,
 
+    Buffer_empty        => w_buffer_empty,
     Buffer_full         => w_buffer_full,
     Buffer_next_index   => w_buffer_next_index,
     Buffer_next_start   => w_buffer_next_start,
@@ -357,7 +401,7 @@ begin
     Input_sample_index  => r2_context.recording_sample_index,
     Input_data          => r2_input_iq,
 
-    Output_frame_req    => Buffered_frame_req,  --TODO: need a frame_drop
+    Output_frame_req    => Buffered_frame_req,
     Output_frame_ack    => Buffered_frame_ack,
     Output_sample_data  => Buffered_frame_data,
 
@@ -368,7 +412,16 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Error_fifo_overflow     <= w_fifo_overflow;
+      r_dwell_active <= Dwell_active;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Error_fifo_overflow     <= w_fifo_overflow or w_pending_fifo_overflow;
+      Error_fifo_underflow    <= w_pending_fifo_underflow;
+      Error_buffer_busy       <= Dwell_active and not(r_dwell_active) and not(w_buffer_empty);
       Error_buffer_underflow  <= w_sample_buffer_underflow;
       Error_buffer_overflow   <= w_sample_buffer_overflow;
     end if;

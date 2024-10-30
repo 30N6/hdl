@@ -102,12 +102,16 @@ module esm_status_reporter_tb;
     bit chan1_error_pdw_reporter_timeout;
     bit chan1_error_pdw_sample_buffer_overflow;
     bit chan1_error_pdw_sample_buffer_underflow;
+    bit chan1_error_pdw_sample_buffer_busy;
+    bit chan1_error_pdw_fifo_underflow;
     bit chan1_error_pdw_fifo_overflow;
 
     bit chan0_error_pdw_reporter_overflow;
     bit chan0_error_pdw_reporter_timeout;
     bit chan0_error_pdw_sample_buffer_overflow;
     bit chan0_error_pdw_sample_buffer_underflow;
+    bit chan0_error_pdw_sample_buffer_busy;
+    bit chan0_error_pdw_fifo_underflow;
     bit chan0_error_pdw_fifo_overflow;
 
     bit chan1_error_dwell_reporter_overflow;
@@ -346,11 +350,15 @@ module esm_status_reporter_tb;
     status_flags.chan0_error_pdw_reporter_timeout         = input_data.pdw_encoder_errors[0].reporter_timeout;
     status_flags.chan0_error_pdw_sample_buffer_overflow   = input_data.pdw_encoder_errors[0].sample_buffer_overflow;
     status_flags.chan0_error_pdw_sample_buffer_underflow  = input_data.pdw_encoder_errors[0].sample_buffer_underflow;
+    status_flags.chan0_error_pdw_sample_buffer_busy       = input_data.pdw_encoder_errors[0].sample_buffer_busy;
+    status_flags.chan0_error_pdw_fifo_underflow           = input_data.pdw_encoder_errors[0].pdw_fifo_underflow;
     status_flags.chan0_error_pdw_fifo_overflow            = input_data.pdw_encoder_errors[0].pdw_fifo_overflow;
     status_flags.chan1_error_pdw_reporter_overflow        = input_data.pdw_encoder_errors[1].reporter_overflow;
     status_flags.chan1_error_pdw_reporter_timeout         = input_data.pdw_encoder_errors[1].reporter_timeout;
     status_flags.chan1_error_pdw_sample_buffer_overflow   = input_data.pdw_encoder_errors[1].sample_buffer_overflow;
     status_flags.chan1_error_pdw_sample_buffer_underflow  = input_data.pdw_encoder_errors[1].sample_buffer_underflow;
+    status_flags.chan1_error_pdw_sample_buffer_busy       = input_data.pdw_encoder_errors[1].sample_buffer_busy;
+    status_flags.chan1_error_pdw_fifo_underflow           = input_data.pdw_encoder_errors[1].pdw_fifo_underflow;
     status_flags.chan1_error_pdw_fifo_overflow            = input_data.pdw_encoder_errors[1].pdw_fifo_overflow;
 
     status_flags.error_status_reporter_overflow           = input_data.status_reporter_errors.reporter_overflow;
@@ -423,8 +431,10 @@ module esm_status_reporter_tb;
 
         r[i].pdw_encoder_errors[j].reporter_overflow        = $urandom_range(1);
         r[i].pdw_encoder_errors[j].reporter_timeout         = $urandom_range(1);
+        r[i].pdw_encoder_errors[j].sample_buffer_busy       = $urandom_range(1);
         r[i].pdw_encoder_errors[j].sample_buffer_overflow   = $urandom_range(1);
         r[i].pdw_encoder_errors[j].sample_buffer_underflow  = $urandom_range(1);
+        r[i].pdw_encoder_errors[j].pdw_fifo_underflow       = $urandom_range(1);
         r[i].pdw_encoder_errors[j].pdw_fifo_overflow        = $urandom_range(1);
       end
 

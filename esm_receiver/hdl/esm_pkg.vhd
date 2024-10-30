@@ -206,6 +206,7 @@ package esm_pkg is
   type esm_pdw_sample_buffer_req_t is record
     frame_index   : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
     frame_read    : std_logic;
+    frame_drop    : std_logic;
   end record;
 
   type esm_pdw_sample_buffer_ack_t is record
@@ -270,13 +271,15 @@ package esm_pkg is
 
   type esm_pdw_encoder_errors_t is record
     pdw_fifo_overflow       : std_logic;
+    pdw_fifo_underflow      : std_logic;
+    sample_buffer_busy      : std_logic;
     sample_buffer_underflow : std_logic;
     sample_buffer_overflow  : std_logic;
     reporter_timeout        : std_logic;
     reporter_overflow       : std_logic;
   end record;
 
-  constant ESM_PDW_ENCODER_ERRORS_WIDTH : natural := 5;
+  constant ESM_PDW_ENCODER_ERRORS_WIDTH : natural := 7;
 
   type esm_pdw_encoder_errors_array_t is array (natural range <>) of esm_pdw_encoder_errors_t;
 
@@ -475,10 +478,12 @@ package body esm_pkg is
     variable r : std_logic_vector(ESM_PDW_ENCODER_ERRORS_WIDTH - 1 downto 0);
   begin
     r(0) := v.pdw_fifo_overflow;
-    r(1) := v.sample_buffer_underflow;
-    r(2) := v.sample_buffer_overflow;
-    r(3) := v.reporter_timeout;
-    r(4) := v.reporter_overflow;
+    r(1) := v.pdw_fifo_underflow;
+    r(2) := v.sample_buffer_busy;
+    r(3) := v.sample_buffer_underflow;
+    r(4) := v.sample_buffer_overflow;
+    r(5) := v.reporter_timeout;
+    r(6) := v.reporter_overflow;
     return r;
   end function;
 

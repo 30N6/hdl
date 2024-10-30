@@ -131,7 +131,8 @@ module esm_pdw_encoder_tb;
     bit [31:0]  dwell_sequence_num;
     bit [63:0]  dwell_start_time;
     bit [31:0]  dwell_duration;
-    bit [31:0]  dwell_pulse_count;
+    bit [31:0]  dwell_pulse_total_count;
+    bit [31:0]  dwell_pulse_drop_count;
   } esm_pdw_summary_report_header_t;
 
   typedef bit [$bits(esm_pdw_report_header_t) - 1 : 0]          pdw_report_header_bits_t;
@@ -215,6 +216,8 @@ module esm_pdw_encoder_tb;
     .Axis_last                      (rpt_rx_intf.last),
 
     .Error_pdw_fifo_overflow        (w_error_pdw_fifo_overflow),
+    .Error_pdw_fifo_underflow       (w_error_pdw_fifo_underflow),
+    .Error_sample_buffer_busy       (w_error_sample_buffer_busy),
     .Error_sample_buffer_underflow  (w_error_sample_buffer_underflow),
     .Error_sample_buffer_overflow   (w_error_sample_buffer_overflow),
     .Error_reporter_timeout         (w_error_reporter_timeout),
@@ -226,6 +229,8 @@ module esm_pdw_encoder_tb;
   always_ff @(posedge Clk) begin
     if (!Rst) begin
       if (w_error_pdw_fifo_overflow)        $error("pdw fifo overflow");
+      if (w_error_pdw_fifo_underflow)       $error("pdw fifo underflow");
+      if (w_error_sample_buffer_busy)       $error("sample buffer busy");
       if (w_error_sample_buffer_underflow)  $error("sample buffer underflow");
       if (w_error_sample_buffer_overflow)   $error("sample buffer overflow");
       if (w_error_reporter_timeout)         $error("reporter timeout");
@@ -357,8 +362,13 @@ module esm_pdw_encoder_tb;
         return 0;
       end
 
-      if (report_a.dwell_pulse_count !== report_b.dwell_pulse_count) begin
-        $display("pulse_count mismatch: %X %X", report_a.dwell_pulse_count, report_b.dwell_pulse_count);
+      if (report_a.dwell_pulse_total_count !== report_b.dwell_pulse_total_count) begin
+        $display("dwell_pulse_total_count mismatch: %X %X", report_a.dwell_pulse_total_count, report_b.dwell_pulse_total_count);
+        return 0;
+      end
+
+      if (report_a.dwell_pulse_drop_count !== report_b.dwell_pulse_drop_count) begin
+        $display("dwell_pulse_drop_count mismatch: %X %X", report_a.dwell_pulse_drop_count, report_b.dwell_pulse_drop_count);
         return 0;
       end
 
@@ -462,7 +472,8 @@ module esm_pdw_encoder_tb;
     bit [NUM_CHANNELS - 1 : 0]  pulse_active = '0;
     longint unsigned            pulse_power_accum [NUM_CHANNELS] = {default:0};
     int                         pulse_duration [NUM_CHANNELS] = {default:0};
-    int                         pulse_count = 0;
+    int                         pulse_total_count = 0;
+    int                         pulse_drop_count = 0;
 
     int unsigned new_threshold = (NUM_CHANNELS < 64) ? dwell_data.threshold_wide : dwell_data.threshold_narrow;
     int unsigned continued_threshold = new_threshold / 2;
@@ -503,7 +514,6 @@ module esm_pdw_encoder_tb;
 
           report_header_packed = pdw_pulse_report_header_bits_t'(report_header);
           //$display("report_packed: %X", report_header_packed);
-          $display("pulse_report_header ex: %p", report_header);
 
           for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
             r.data.push_back(report_header_packed[(NUM_PULSE_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
@@ -512,8 +522,15 @@ module esm_pdw_encoder_tb;
           for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
             r.data.push_back(0);
           end
-          expected_data[i_ch].push_back(r);
-          report_seq_num++;
+
+          if (pulse_duration[i_ch] >= dwell_data.min_pulse_duration) begin
+            $display("pulse_report_header expect: %p", report_header);
+            expected_data[i_ch].push_back(r);
+            report_seq_num++;
+          end else begin
+            $display("pulse_report_header expect: %p", report_header);
+            pulse_drop_count++;
+          end
 
           pulse_seq_num[i_ch]++;
           pulse_active[i_ch] = 0;
@@ -524,7 +541,7 @@ module esm_pdw_encoder_tb;
         pulse_active[i_ch] = 1;
         pulse_duration[i_ch] = 1;
         pulse_power_accum[i_ch] = di.power;
-        pulse_count++;
+        pulse_total_count++; //TODO: move above
       end
     end
 
@@ -540,10 +557,11 @@ module esm_pdw_encoder_tb;
       report_header.module_id           = MODULE_ID;
       report_header.message_type        = esm_report_message_type_pdw_summary;
 
-      report_header.dwell_sequence_num  = dwell_seq_num;
-      report_header.dwell_start_time    = 0;
-      report_header.dwell_duration      = 0; //TODO
-      report_header.dwell_pulse_count   = pulse_count;
+      report_header.dwell_sequence_num      = dwell_seq_num;
+      report_header.dwell_start_time        = 0;
+      report_header.dwell_duration          = 0; //TODO
+      report_header.dwell_pulse_total_count = pulse_total_count;
+      report_header.dwell_pulse_drop_count  = pulse_drop_count;
 
       report_header_packed = pdw_summary_report_header_bits_t'(report_header);
       //$display("report_packed: %X", report_header_packed);
@@ -573,6 +591,12 @@ module esm_pdw_encoder_tb;
     r.threshold_wide          = $urandom_range(10e6, 1000);
     r.channel_mask_narrow     = {$urandom, $urandom};
     r.channel_mask_wide       = $urandom;
+
+    if ($urandom_range(99) < 50) begin
+      r.min_pulse_duration = 0;
+    end else begin
+      r.min_pulse_duration = $urandom_range(100);
+    end
     return r;
   endfunction
 

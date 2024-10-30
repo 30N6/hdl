@@ -456,6 +456,7 @@ begin
       Axis_last                     => w_d2h_fifo_in_last(2),
 
       Error_pdw_fifo_overflow       => w_pdw_encoder_errors(0).pdw_fifo_overflow,
+      Error_pdw_fifo_underflow      => w_pdw_encoder_errors(0).pdw_fifo_underflow,
       Error_sample_buffer_underflow => w_pdw_encoder_errors(0).sample_buffer_underflow,
       Error_sample_buffer_overflow  => w_pdw_encoder_errors(0).sample_buffer_overflow,
       Error_reporter_timeout        => w_pdw_encoder_errors(0).reporter_timeout,
@@ -503,6 +504,7 @@ begin
       Axis_last                     => w_d2h_fifo_in_last(3),
 
       Error_pdw_fifo_overflow       => w_pdw_encoder_errors(1).pdw_fifo_overflow,
+      Error_pdw_fifo_underflow      => w_pdw_encoder_errors(1).pdw_fifo_underflow,
       Error_sample_buffer_underflow => w_pdw_encoder_errors(1).sample_buffer_underflow,
       Error_sample_buffer_overflow  => w_pdw_encoder_errors(1).sample_buffer_overflow,
       Error_reporter_timeout        => w_pdw_encoder_errors(1).reporter_timeout,

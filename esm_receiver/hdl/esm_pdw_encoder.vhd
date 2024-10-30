@@ -42,6 +42,8 @@ port (
   Axis_last                     : out std_logic;
 
   Error_pdw_fifo_overflow       : out std_logic;
+  Error_pdw_fifo_underflow      : out std_logic;
+  Error_sample_buffer_busy      : out std_logic;
   Error_sample_buffer_underflow : out std_logic;
   Error_sample_buffer_overflow  : out std_logic;
   Error_reporter_timeout        : out std_logic;
@@ -103,6 +105,8 @@ architecture rtl of esm_pdw_encoder is
   signal w_report_ack               : std_logic;
 
   signal w_pdw_fifo_overflow        : std_logic;
+  signal w_pdw_fifo_underflow       : std_logic;
+  signal w_sample_buffer_busy       : std_logic;
   signal w_sample_buffer_underflow  : std_logic;
   signal w_sample_buffer_overflow   : std_logic;
   signal w_reporter_timeout         : std_logic;
@@ -216,6 +220,8 @@ begin
     Buffered_frame_data     => w_frame_data,
 
     Error_fifo_overflow     => w_pdw_fifo_overflow,
+    Error_fifo_underflow    => w_pdw_fifo_underflow,
+    Error_buffer_busy       => w_sample_buffer_busy,
     Error_buffer_underflow  => w_sample_buffer_overflow,
     Error_buffer_overflow   => w_sample_buffer_underflow
   );
@@ -329,6 +335,8 @@ begin
   begin
     if rising_edge(Clk) then
       Error_pdw_fifo_overflow       <= w_pdw_fifo_overflow;
+      Error_pdw_fifo_underflow      <= w_pdw_fifo_underflow;
+      Error_sample_buffer_busy      <= w_sample_buffer_busy;
       Error_sample_buffer_underflow <= w_sample_buffer_underflow;
       Error_sample_buffer_overflow  <= w_sample_buffer_overflow;
       Error_reporter_timeout        <= w_reporter_timeout;

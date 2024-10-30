@@ -65,6 +65,7 @@ architecture rtl of esm_pdw_reporter is
     S_IDLE,
 
     S_CHECK_START,
+    S_CHECK_PDW_DROP,
 
     S_SUMMARY_HEADER_0,
     S_SUMMARY_HEADER_1,
@@ -74,6 +75,7 @@ architecture rtl of esm_pdw_reporter is
     S_SUMMARY_DWELL_START_TIME_1,
     S_SUMMARY_DWELL_DURATION,
     S_SUMMARY_DWELL_PULSE_COUNT,
+    S_SUMMARY_DWELL_DROP_COUNT,
     S_SUMMARY_PAD,
     S_SUMMARY_DONE,
 
@@ -95,7 +97,9 @@ architecture rtl of esm_pdw_reporter is
     S_PULSE_DONE,
 
     S_BUFFER_READ,
+    S_BUFFER_DROP,
     S_BUFFERED_SAMPLE,
+    S_PDW_DROP,
     S_PDW_READ,
 
     S_REPORT_ACK
@@ -105,6 +109,8 @@ architecture rtl of esm_pdw_reporter is
 
   signal r_packet_seq_num       : unsigned(31 downto 0);
   signal r_words_in_msg         : unsigned(clog2(MAX_WORDS_PER_PACKET) - 1 downto 0);
+
+  signal r_min_duration_valid   : std_logic;
 
   signal w_fifo_almost_full     : std_logic;
   signal w_fifo_ready           : std_logic;
@@ -120,7 +126,8 @@ architecture rtl of esm_pdw_reporter is
   signal r_fifo_partial_0_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   signal r_fifo_partial_1_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
 
-  signal r_pulse_count          : unsigned(15 downto 0);
+  signal r_pulse_count          : unsigned(31 downto 0);
+  signal r_drop_count           : unsigned(31 downto 0);
 
   signal r_timeout              : unsigned(clog2(TIMEOUT_CYCLES) - 1 downto 0);
 
@@ -148,12 +155,24 @@ begin
           if (w_fifo_almost_full = '1') then
             s_state <= S_CHECK_START;
           elsif (Pdw_valid = '1') then
-            s_state <= S_PULSE_HEADER_0;
+            s_state <= S_CHECK_PDW_DROP;
           elsif (Dwell_done = '1') then
             s_state <= S_SUMMARY_HEADER_0;
           else
             s_state <= S_CHECK_START;
           end if;
+
+        when S_CHECK_PDW_DROP =>
+          if (r_min_duration_valid = '1') then
+            s_state <= S_PULSE_HEADER_0;
+          elsif (Pdw_data.buffered_frame_valid = '1') then
+            s_state <= S_BUFFER_DROP;
+          else
+            s_state <= S_PDW_DROP;
+          end if;
+
+        when S_BUFFER_DROP =>
+          s_state <= S_PDW_DROP;
 
         when S_PULSE_HEADER_0 =>
           s_state <= S_PULSE_HEADER_1;
@@ -211,6 +230,8 @@ begin
 
         when S_PDW_READ =>
           s_state <= S_PULSE_DONE;
+        when S_PDW_DROP =>
+          s_state <= S_PULSE_DONE;
 
         when S_PULSE_DONE =>
           s_state <= S_CHECK_START;
@@ -230,6 +251,8 @@ begin
         when S_SUMMARY_DWELL_DURATION =>
           s_state <= S_SUMMARY_DWELL_PULSE_COUNT;
         when S_SUMMARY_DWELL_PULSE_COUNT =>
+          s_state <= S_SUMMARY_DWELL_DROP_COUNT;
+        when S_SUMMARY_DWELL_DROP_COUNT =>
           s_state <= S_SUMMARY_PAD;
         when S_SUMMARY_PAD =>
           if (r_words_in_msg = (MAX_WORDS_PER_PACKET - 1)) then
@@ -251,8 +274,16 @@ begin
 
   Buffered_frame_req.frame_index  <= Pdw_data.buffered_frame_index;
   Buffered_frame_req.frame_read   <= to_stdlogic(s_state = S_BUFFER_READ);
-  Pdw_ready                       <= to_stdlogic(s_state = S_PDW_READ);
+  Buffered_frame_req.frame_drop   <= to_stdlogic(s_state = S_BUFFER_DROP);
+  Pdw_ready                       <= to_stdlogic((s_state = S_PDW_READ) or (s_state = S_PDW_DROP));
   Report_ack                      <= to_stdlogic(s_state = S_REPORT_ACK);
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_min_duration_valid <= to_stdlogic(Pdw_data.duration >= Dwell_data.min_pulse_duration);
+    end if;
+  end process;
 
   process(Clk)
   begin
@@ -260,7 +291,7 @@ begin
       if (Rst = '1') then
         r_packet_seq_num <= (others => '0');
       else
-        if ((s_state = S_PULSE_DONE) or (s_state = S_SUMMARY_DONE)) then
+        if ((s_state = S_PDW_READ) or (s_state = S_SUMMARY_DONE)) then
           r_packet_seq_num <= r_packet_seq_num + 1;
         end if;
       end if;
@@ -273,9 +304,18 @@ begin
       if (s_state = S_IDLE) then
         r_pulse_count <= (others => '0');
       elsif (s_state = S_PULSE_DONE) then
-        if (and_reduce(r_pulse_count) = '0') then
-          r_pulse_count <= r_pulse_count + 1;
-        end if;
+        r_pulse_count <= r_pulse_count + 1;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (s_state = S_IDLE) then
+        r_drop_count <= (others => '0');
+      elsif (s_state = S_PDW_DROP) then
+        r_drop_count <= r_drop_count + 1;
       end if;
     end if;
   end process;
@@ -353,7 +393,7 @@ begin
 
     when S_PULSE_BUFFER_STATUS =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= Pdw_data.buffered_frame_valid  Pdw_data.buffered_frame_index --TODO
+      w_fifo_partial_1_data   <= "0000000" & Pdw_data.buffered_frame_valid & std_logic_vector(resize_up(Pdw_data.buffered_frame_index, 8)) & x"0000";
 
     when S_BUFFERED_SAMPLE =>
       w_fifo_valid            <= Buffered_frame_ack.sample_valid;
@@ -389,7 +429,11 @@ begin
 
     when S_SUMMARY_DWELL_PULSE_COUNT =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= x"0000" & std_logic_vector(r_pulse_count);
+      w_fifo_partial_1_data   <= std_logic_vector(r_pulse_count);
+
+    when S_SUMMARY_DWELL_DROP_COUNT =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(r_drop_count);
 
     when S_PULSE_PAD | S_SUMMARY_PAD =>
       w_fifo_valid            <= '1';
@@ -406,11 +450,14 @@ begin
     case s_state is
     when S_IDLE             =>  w_fifo_valid_opt <= '0';
     when S_CHECK_START      =>  w_fifo_valid_opt <= '0';
+    when S_CHECK_PDW_DROP   =>  w_fifo_valid_opt <= '0';
     when S_SUMMARY_DONE     =>  w_fifo_valid_opt <= '0';
     when S_PULSE_DONE       =>  w_fifo_valid_opt <= '0';
     when S_BUFFER_READ      =>  w_fifo_valid_opt <= '0';
+    when S_BUFFER_DROP      =>  w_fifo_valid_opt <= '0';
     when S_BUFFERED_SAMPLE  =>  w_fifo_valid_opt <= Buffered_frame_ack.sample_valid;
     when S_PDW_READ         =>  w_fifo_valid_opt <= '0';
+    when S_PDW_DROP         =>  w_fifo_valid_opt <= '0';
     when S_REPORT_ACK       =>  w_fifo_valid_opt <= '0';
     when others => null;
     end case;
