@@ -90,6 +90,7 @@ architecture rtl of esm_pdw_reporter is
     S_PULSE_FREQUENCY,
     S_PULSE_START_TIME_0,
     S_PULSE_START_TIME_1,
+    S_PULSE_BUFFER_STATUS,
     S_PULSE_PAD,
     S_PULSE_DONE,
 
@@ -179,6 +180,8 @@ begin
         when S_PULSE_START_TIME_0 =>
           s_state <= S_PULSE_START_TIME_1;
         when S_PULSE_START_TIME_1 =>
+          s_state <= S_PULSE_BUFFER_STATUS;
+        when S_PULSE_BUFFER_STATUS =>
           if (Pdw_data.buffered_frame_valid = '1') then
             s_state <= S_BUFFER_READ;
           else
@@ -348,9 +351,13 @@ begin
       w_fifo_valid            <= '1';
       w_fifo_partial_1_data   <= std_logic_vector(Pdw_data.pulse_start_time(31 downto 0));
 
+    when S_PULSE_BUFFER_STATUS =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= Pdw_data.buffered_frame_valid  Pdw_data.buffered_frame_index --TODO
+
     when S_BUFFERED_SAMPLE =>
       w_fifo_valid            <= Buffered_frame_ack.sample_valid;
-      w_fifo_partial_1_data   <= std_logic_vector(Buffered_frame_data(1)) & std_logic_vector(Buffered_frame_data(1));
+      w_fifo_partial_1_data   <= std_logic_vector(Buffered_frame_data(1)) & std_logic_vector(Buffered_frame_data(0));
 
     when S_SUMMARY_HEADER_0 =>
       w_fifo_valid            <= '1';

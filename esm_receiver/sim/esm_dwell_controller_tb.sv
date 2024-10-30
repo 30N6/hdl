@@ -194,6 +194,7 @@ module esm_dwell_controller_tb;
     packed_entry[223 : 192] = entry.entry_data.threshold_wide;
     packed_entry[287 : 224] = entry.entry_data.channel_mask_narrow;
     packed_entry[295 : 288] = entry.entry_data.channel_mask_wide;
+    packed_entry[319 : 304] = entry.entry_data.min_pulse_duration;
 
     config_data[0] = esm_control_magic_num;
     config_data[1] = config_seq_num++;
@@ -260,7 +261,7 @@ module esm_dwell_controller_tb;
     if(a.threshold_wide       !== b.threshold_wide)         return 0;
     if(a.channel_mask_narrow  !== b.channel_mask_narrow)    return 0;
     if(a.channel_mask_wide    !== b.channel_mask_wide)      return 0;
-
+    if(a.min_pulse_duration   !== b.min_pulse_duration)     return 0;
     return 1;
   endfunction
 
@@ -398,6 +399,7 @@ module esm_dwell_controller_tb;
         entry.entry_data.threshold_wide       = $urandom;
         entry.entry_data.channel_mask_narrow  = $urandom;
         entry.entry_data.channel_mask_wide    = $urandom;
+        entry.entry_data.min_pulse_duration   = $urandom;
 
         send_dwell_entry(entry);
         dwell_entry_mem[i_dwell] = entry.entry_data;

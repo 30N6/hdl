@@ -217,6 +217,7 @@ module esm_receiver_tb;
     packed_entry[223 : 192] = entry.entry_data.threshold_wide;
     packed_entry[287 : 224] = entry.entry_data.channel_mask_narrow;
     packed_entry[295 : 288] = entry.entry_data.channel_mask_wide;
+    packed_entry[319 : 304] = entry.entry_data.min_pulse_duration;
 
     config_data[0] = esm_control_magic_num;
     config_data[1] = config_seq_num++;
@@ -334,6 +335,7 @@ module esm_receiver_tb;
         entry.entry_data.threshold_wide       = $urandom;
         entry.entry_data.channel_mask_narrow  = 64'hFFFFFFFFFFFFFFFF;
         entry.entry_data.channel_mask_wide    = 8'hFF;
+        entry.entry_data.min_pulse_duration   = $urandom;
 
         send_dwell_entry(entry);
         dwell_entry_mem[i_dwell] = entry.entry_data;

@@ -206,7 +206,8 @@ begin
         r3_context.recording_sample_padding <= (others => '0');
         r3_context.ts_start                 <= Timestamp;
 
-        if ((Dwell_active = '1') and (r2_new_detect = '1') and (w_fifo_full = '0')) then
+        if ((Dwell_active = '1') and (r2_new_detect = '1') and (w_fifo_full = '0')) then  --TODO: this full check is wrong -- can have  multiple in flight
+          --TODO: include w_buffer_full in the check above? might be too limited -- probably need to track the fifo count
           r3_context.state                  <= S_ACTIVE;
           r3_context.recording_skipped      <= w_buffer_full;
           r3_context.recording_active       <= not(w_buffer_full);
@@ -336,6 +337,8 @@ begin
   w_buffer_next_start <= to_stdlogic(r2_context.state = S_IDLE) and Dwell_active and r2_input_ctrl.valid and r2_new_detect and not(w_fifo_full) and not(w_buffer_full);
   w_buffer_wr_en      <= r2_input_ctrl.valid and r2_context.recording_active;
 
+  --TODO: need a way to flush this buffer at the end of a dwell?
+
   i_sample_buffer : entity esm_lib.esm_pdw_sample_buffer
   generic map (
     DATA_WIDTH        => DATA_WIDTH,
@@ -354,7 +357,7 @@ begin
     Input_sample_index  => r2_context.recording_sample_index,
     Input_data          => r2_input_iq,
 
-    Output_frame_req    => Buffered_frame_req,
+    Output_frame_req    => Buffered_frame_req,  --TODO: need a frame_drop
     Output_frame_ack    => Buffered_frame_ack,
     Output_sample_data  => Buffered_frame_data,
 

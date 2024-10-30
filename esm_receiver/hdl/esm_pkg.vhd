@@ -50,6 +50,7 @@ package esm_pkg is
   constant ESM_DWELL_SEQUENCE_NUM_WIDTH                 : natural := 32;
   constant ESM_TIMESTAMP_WIDTH                          : natural := 48;
   constant ESM_THRESHOLD_WIDTH                          : natural := 32;
+  constant ESM_MIN_DURATION_WIDTH                       : natural := 16;
   constant ESM_PDW_SEQUENCE_NUM_WIDTH                   : natural := 32;
   constant ESM_PDW_POWER_ACCUM_WIDTH                    : natural := 48;
   constant ESM_PDW_CYCLE_COUNT_WIDTH                    : natural := 32;
@@ -83,6 +84,7 @@ package esm_pkg is
     threshold_wide            : unsigned(ESM_THRESHOLD_WIDTH - 1 downto 0);
     channel_mask_narrow       : std_logic_vector(ESM_NUM_CHANNELS_NARROW - 1 downto 0);
     channel_mask_wide         : std_logic_vector(ESM_NUM_CHANNELS_WIDE - 1 downto 0);
+    min_pulse_duration        : unsigned(ESM_MIN_DURATION_WIDTH - 1 downto 0);
   end record;
 
   type esm_dwell_metadata_array_t is array (natural range <>) of esm_dwell_metadata_t;
@@ -99,7 +101,8 @@ package esm_pkg is
   --  threshold_wide            : unsigned(31 downto 0);
   --  channel_mask_narrow       : std_logic_vector(63 downto 0);
   --  channel_mask_wide         : std_logic_vector(7 downto 0);
-  --  padding1                  : std_logic_vector(23 downto 0);
+  --  padding1                  : std_logic_vector(7 downto 0);
+  --  min_pulse_duration        : unsigned(15 downto 0);
   --end record;
 
   type esm_message_dwell_entry_t is record
@@ -338,6 +341,8 @@ package body esm_pkg is
     r.threshold_wide      := unsigned(vm(159 downto 128));
     r.channel_mask_narrow := vm(223 downto 160);
     r.channel_mask_wide   := vm(231 downto 224);
+    --padding
+    r.min_pulse_duration  := unsigned(vm(255 downto 240));
     return r;
   end function;
 

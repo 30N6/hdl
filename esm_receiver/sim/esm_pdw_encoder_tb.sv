@@ -115,6 +115,9 @@ module esm_pdw_encoder_tb;
     bit [31:0]  pulse_duration;
     bit [31:0]  pulse_frequency;
     bit [63:0]  pulse_start_time;
+    bit [7:0]   buffered_frame_valid;
+    bit [7:0]   buffered_frame_index;
+    bit [15:0]  padding_1;
   } esm_pdw_pulse_report_header_t;
 
   typedef struct packed
@@ -482,19 +485,21 @@ module esm_pdw_encoder_tb;
           esm_pdw_pulse_report_header_t report_header;
           pdw_pulse_report_header_bits_t report_header_packed;
 
-          report_header.magic_num           = esm_report_magic_num;
-          report_header.sequence_num        = report_seq_num;
-          report_header.module_id           = MODULE_ID;
-          report_header.message_type        = esm_report_message_type_pdw_pulse;
+          report_header.magic_num             = esm_report_magic_num;
+          report_header.sequence_num          = report_seq_num;
+          report_header.module_id             = MODULE_ID;
+          report_header.message_type          = esm_report_message_type_pdw_pulse;
 
-          report_header.dwell_sequence_num  = dwell_seq_num;
-          report_header.pulse_sequence_num  = pulse_seq_num[i_ch];
-          report_header.pulse_channel       = i_ch;
-          report_header.pulse_threshold     = new_threshold;
-          report_header.pulse_power_accum   = pulse_power_accum[i_ch];
-          report_header.pulse_duration      = pulse_duration[i_ch];
-          report_header.pulse_frequency     = 0;
-          report_header.pulse_start_time    = 0;
+          report_header.dwell_sequence_num    = dwell_seq_num;
+          report_header.pulse_sequence_num    = pulse_seq_num[i_ch];
+          report_header.pulse_channel         = i_ch;
+          report_header.pulse_threshold       = new_threshold;
+          report_header.pulse_power_accum     = pulse_power_accum[i_ch];
+          report_header.pulse_duration        = pulse_duration[i_ch];
+          report_header.pulse_frequency       = 0;
+          report_header.pulse_start_time      = 0;
+          report_header.buffered_frame_valid  = 0;
+          report_header.buffered_frame_index  = 0;
 
           report_header_packed = pdw_pulse_report_header_bits_t'(report_header);
           //$display("report_packed: %X", report_header_packed);
