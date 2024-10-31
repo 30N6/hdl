@@ -14,6 +14,7 @@ library dsp_lib;
 
 library esm_lib;
   use esm_lib.esm_pkg.all;
+  use esm_lib.esm_debug_pkg.all;
 
 entity esm_pdw_sample_processor is
 generic (
@@ -26,6 +27,8 @@ generic (
 port (
   Clk                     : in  std_logic;
   Rst                     : in  std_logic;
+
+  Debug_out               : out esm_pdw_sample_processor_debug_t;
 
   Timestamp               : in  unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
 
@@ -145,10 +148,44 @@ architecture rtl of esm_pdw_sample_processor is
   signal w_pending_fifo_overflow    : std_logic;
   signal w_pending_fifo_underflow   : std_logic;
   signal w_fifo_overflow            : std_logic;
+  signal w_sample_buffer_busy       : std_logic;
   signal w_sample_buffer_overflow   : std_logic;
   signal w_sample_buffer_underflow  : std_logic;
 
 begin
+
+    Debug_out.w_buffer_empty                      <= w_buffer_empty;
+    Debug_out.w_buffer_full                       <= w_buffer_full;
+    Debug_out.w_buffer_next_index                 <= std_logic_vector(w_buffer_next_index);
+    Debug_out.w_buffer_next_start                 <= w_buffer_next_start;
+    Debug_out.w_buffer_wr_en                      <= w_buffer_wr_en;
+    Debug_out.w_pending_fifo_wr_en                <= w_pending_fifo_wr_en;
+    Debug_out.w_pending_fifo_full                 <= w_pending_fifo_full;
+    Debug_out.w_pending_fifo_rd_en                <= w_pending_fifo_rd_en;
+    Debug_out.w_pending_fifo_empty                <= w_pending_fifo_empty;
+    Debug_out.w_fifo_full                         <= w_fifo_full;
+    Debug_out.r_fifo_wr_en                        <= r_fifo_wr_en;
+    Debug_out.w_fifo_empty                        <= w_fifo_empty;
+    Debug_out.r2_context_state                    <= "00" when (r2_context.state = S_IDLE) else
+                                                     "01" when (r2_context.state = S_ACTIVE) else
+                                                     "10" when (r2_context.state = S_PAD_RECORDING) else
+                                                     "11" when (r2_context.state = S_STORE_REPORT);
+    Debug_out.r2_context_pulse_seq_num            <= std_logic_vector(r2_context.pulse_seq_num);
+    Debug_out.r2_context_power_accum_a            <= std_logic_vector(r2_context.power_accum_a);
+    Debug_out.r2_context_duration                 <= std_logic_vector(r2_context.duration);
+    Debug_out.r2_context_recording_skipped        <= r2_context.recording_skipped;
+    Debug_out.r2_context_recording_active         <= r2_context.recording_active;
+    Debug_out.r2_context_recording_frame_index    <= std_logic_vector(r2_context.recording_frame_index);
+    Debug_out.r2_context_recording_sample_index   <= std_logic_vector(r2_context.recording_sample_index);
+    Debug_out.r2_context_recording_sample_padding <= std_logic_vector(r2_context.recording_sample_padding);
+    Debug_out.r2_input_ctrl_valid                 <= r2_input_ctrl.valid;
+    Debug_out.r2_input_ctrl_last                  <= r2_input_ctrl.last;
+    Debug_out.r2_input_ctrl_index                 <= std_logic_vector(r2_input_ctrl.data_index);
+    Debug_out.r2_input_i                          <= std_logic_vector(r2_input_iq(0));
+    Debug_out.r2_input_q                          <= std_logic_vector(r2_input_iq(1));
+    Debug_out.r2_input_power                      <= std_logic_vector(r2_input_power);
+    Debug_out.r2_new_detect                       <= r2_new_detect;
+    Debug_out.r2_continued_detect                 <= r2_continued_detect;
 
   process(Clk)
   begin
@@ -322,7 +359,7 @@ begin
     end if;
   end process;
 
-  w_pending_fifo_wr_en <= to_stdlogic(r2_context.state = S_IDLE) and Dwell_active and r2_new_detect and not(w_pending_fifo_full);
+  w_pending_fifo_wr_en <= r2_input_ctrl.valid and to_stdlogic(r2_context.state = S_IDLE) and Dwell_active and r2_new_detect and not(w_pending_fifo_full);
   w_pending_fifo_rd_en <= Pdw_ready and not(w_fifo_empty);
 
   i_pdw_pending_fifo : entity mem_lib.xpm_fallthough_fifo
@@ -416,12 +453,14 @@ begin
     end if;
   end process;
 
+  w_sample_buffer_busy <= Dwell_active and not(r_dwell_active) and not(w_buffer_empty);
+
   process(Clk)
   begin
     if rising_edge(Clk) then
       Error_fifo_overflow     <= w_fifo_overflow or w_pending_fifo_overflow;
       Error_fifo_underflow    <= w_pending_fifo_underflow;
-      Error_buffer_busy       <= Dwell_active and not(r_dwell_active) and not(w_buffer_empty);
+      Error_buffer_busy       <= w_sample_buffer_busy;
       Error_buffer_underflow  <= w_sample_buffer_underflow;
       Error_buffer_overflow   <= w_sample_buffer_overflow;
     end if;

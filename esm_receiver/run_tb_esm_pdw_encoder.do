@@ -29,6 +29,7 @@ set library_file_list [list \
     ] \
   esm_lib [list \
     ./hdl/esm_pkg.vhd \
+    ./hdl/esm_debug_pkg.vhd \
     ./hdl/esm_pdw_iq_delay.vhd \
     ./hdl/esm_pdw_sample_buffer.vhd \
     ./hdl/esm_pdw_sample_processor.vhd \

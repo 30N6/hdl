@@ -62,6 +62,7 @@ set library_file_list [list \
     ] \
   esm_lib [list \
     ./hdl/esm_pkg.vhd \
+    ./hdl/esm_debug_pkg.vhd \
     ./hdl/esm_config.vhd \
     ./hdl/esm_dwell_config_decoder.vhd \
     ./hdl/esm_dwell_controller.vhd \
@@ -71,6 +72,7 @@ set library_file_list [list \
     ./hdl/esm_pdw_sample_buffer.vhd \
     ./hdl/esm_pdw_sample_processor.vhd \
     ./hdl/esm_pdw_reporter.vhd \
+    ./hdl/esm_pdw_encoder_debug.vhd \
     ./hdl/esm_pdw_encoder.vhd \
     ./hdl/esm_status_reporter.vhd \
     ./hdl/esm_receiver.vhd \

@@ -12,6 +12,7 @@ library dsp_lib;
 
 library esm_lib;
   use esm_lib.esm_pkg.all;
+  use esm_lib.esm_debug_pkg.all;
 
 entity esm_pdw_encoder is
 generic (
@@ -49,6 +50,8 @@ port (
   Error_reporter_timeout        : out std_logic;
   Error_reporter_overflow       : out std_logic
 );
+begin
+  -- PSL default clock is rising_edge(Clk);
 end entity esm_pdw_encoder;
 
 architecture rtl of esm_pdw_encoder is
@@ -112,16 +115,55 @@ architecture rtl of esm_pdw_encoder is
   signal w_reporter_timeout         : std_logic;
   signal w_reporter_overflow        : std_logic;
 
-  --attribute MARK_DEBUG : string;
-  --attribute DONT_TOUCH : string;
-  --attribute MARK_DEBUG of r_enable : signal is "TRUE";
-  --attribute DONT_TOUCH of r_enable : signal is "TRUE";
-  --attribute MARK_DEBUG of r_dwell_active : signal is "TRUE";
-  --attribute DONT_TOUCH of r_dwell_active : signal is "TRUE";
-  --attribute MARK_DEBUG of s_state : signal is "TRUE";
-  --attribute DONT_TOUCH of s_state : signal is "TRUE";
+  signal w_debug_pdw_encoder        : esm_pdw_encoder_debug_t;
+  signal w_debug_sample_processor   : esm_pdw_sample_processor_debug_t;
 
 begin
+
+  w_debug_pdw_encoder.r_timestamp                      <= std_logic_vector(r_timestamp);
+  w_debug_pdw_encoder.s_state                          <= "000" when (s_state = S_IDLE) else
+                                                          "001" when (s_state = S_DWELL_ACTIVE) else
+                                                          "010" when (s_state = S_DWELL_STOP_WAIT) else
+                                                          "011" when (s_state = S_DWELL_DONE) else
+                                                          "100" when (s_state = S_CLEAR);
+  w_debug_pdw_encoder.r_dwell_active                   <= r_dwell_active;
+  w_debug_pdw_encoder.r_dwell_data_tag                 <= std_logic_vector(r_dwell_data.tag);
+  w_debug_pdw_encoder.w_pdw_ready                      <= w_pdw_ready;
+  w_debug_pdw_encoder.w_pdw_valid                      <= w_pdw_valid;
+  w_debug_pdw_encoder.w_pdw_data_sequence_num          <= std_logic_vector(w_pdw_data.sequence_num);
+  w_debug_pdw_encoder.w_pdw_data_channel               <= std_logic_vector(w_pdw_data.channel);
+  w_debug_pdw_encoder.w_pdw_data_power_accum           <= std_logic_vector(w_pdw_data.power_accum);
+  w_debug_pdw_encoder.w_pdw_data_duration              <= std_logic_vector(w_pdw_data.duration);
+  w_debug_pdw_encoder.w_pdw_data_buffered_frame_index  <= std_logic_vector(w_pdw_data.buffered_frame_index);
+  w_debug_pdw_encoder.w_pdw_data_buffered_frame_valid  <= w_pdw_data.buffered_frame_valid;
+  w_debug_pdw_encoder.w_frame_req_index                <= std_logic_vector(w_frame_req.frame_index);
+  w_debug_pdw_encoder.w_frame_req_read                 <= w_frame_req.frame_read;
+  w_debug_pdw_encoder.w_frame_req_drop                 <= w_frame_req.frame_drop;
+  w_debug_pdw_encoder.w_frame_ack_index                <= std_logic_vector(w_frame_ack.sample_index);
+  w_debug_pdw_encoder.w_frame_ack_valid                <= w_frame_ack.sample_valid;
+  w_debug_pdw_encoder.w_frame_ack_last                 <= w_frame_ack.sample_last;
+  w_debug_pdw_encoder.w_frame_data_i                   <= std_logic_vector(w_frame_data(0));
+  w_debug_pdw_encoder.w_frame_data_q                   <= std_logic_vector(w_frame_data(1));
+  w_debug_pdw_encoder.w_dwell_active                   <= w_dwell_active;
+  w_debug_pdw_encoder.w_dwell_done                     <= w_dwell_done;
+  w_debug_pdw_encoder.w_report_ack                     <= w_report_ack;
+  w_debug_pdw_encoder.w_pdw_fifo_overflow              <= w_pdw_fifo_overflow;
+  w_debug_pdw_encoder.w_pdw_fifo_underflow             <= w_pdw_fifo_underflow;
+  w_debug_pdw_encoder.w_sample_buffer_busy             <= w_sample_buffer_busy;
+  w_debug_pdw_encoder.w_sample_buffer_underflow        <= w_sample_buffer_underflow;
+  w_debug_pdw_encoder.w_sample_buffer_overflow         <= w_sample_buffer_overflow;
+  w_debug_pdw_encoder.w_reporter_timeout               <= w_reporter_timeout;
+  w_debug_pdw_encoder.w_reporter_overflow              <= w_reporter_overflow;
+
+  i_debug : entity esm_lib.esm_pdw_encoder_debug
+  port map (
+    Clk_axi                 => Clk_axi,
+    Clk                     => Clk,
+    Rst                     => r_rst,
+
+    Debug_sample_processor  => w_debug_sample_processor,
+    Debug_pdw_encoder       => w_debug_pdw_encoder
+  );
 
   process(Clk)
   begin
@@ -134,7 +176,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (Rst = '1') then
+      if (r_rst = '1') then
         r_timestamp <= (others => '0');
       else
         r_timestamp <= r_timestamp + 1;
@@ -201,6 +243,8 @@ begin
   port map (
     Clk                     => Clk,
     Rst                     => r_rst,
+
+    Debug_out               => w_debug_sample_processor,
 
     Timestamp               => r_timestamp,
 

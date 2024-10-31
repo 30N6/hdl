@@ -51,8 +51,9 @@ end entity esm_receiver;
 
 architecture rtl of esm_receiver is
 
-  constant ENABLE_NARROW_CHANNEL      : boolean := true;
-  constant ENABLE_WIDE_CHANNEL        : boolean := false;
+  constant ENABLE_NARROW_CHANNEL      : boolean := false;
+  constant ENABLE_WIDE_CHANNEL        : boolean := true;
+  constant ENABLE_DWELL_STATS         : boolean := false;
   constant ENABLE_PDW_ENCODER         : boolean := true;
 
   constant AXI_FIFO_DEPTH             : natural := 64;
@@ -139,40 +140,44 @@ architecture rtl of esm_receiver is
   signal w_M_axis_last     : std_logic;
   signal w_M_axis_valid_ready : std_logic;
 
-  attribute MARK_DEBUG of w_config_rst : signal is "TRUE";
-  attribute DONT_TOUCH of w_config_rst : signal is "TRUE";
-  attribute MARK_DEBUG of r_combined_rst : signal is "TRUE";
-  attribute DONT_TOUCH of r_combined_rst : signal is "TRUE";
-  attribute MARK_DEBUG of w_enable_status : signal is "TRUE";
-  attribute DONT_TOUCH of w_enable_status : signal is "TRUE";
-  attribute MARK_DEBUG of w_enable_chan : signal is "TRUE";
-  attribute DONT_TOUCH of w_enable_chan : signal is "TRUE";
-  attribute MARK_DEBUG of w_enable_pdw : signal is "TRUE";
-  attribute DONT_TOUCH of w_enable_pdw : signal is "TRUE";
-  attribute MARK_DEBUG of w_dwell_active : signal is "TRUE";
-  attribute DONT_TOUCH of w_dwell_active : signal is "TRUE";
-  attribute MARK_DEBUG of w_dwell_sequence_num : signal is "TRUE";
-  attribute DONT_TOUCH of w_dwell_sequence_num : signal is "TRUE";
+  --attribute MARK_DEBUG of w_pdw_encoder_errors : signal is "TRUE";
+  --attribute DONT_TOUCH of w_pdw_encoder_errors : signal is "TRUE";
 
-  attribute MARK_DEBUG of w_d2h_fifo_in_ready : signal is "TRUE";
-  attribute DONT_TOUCH of w_d2h_fifo_in_ready : signal is "TRUE";
-  attribute MARK_DEBUG of w_d2h_fifo_in_valid : signal is "TRUE";
-  attribute DONT_TOUCH of w_d2h_fifo_in_valid : signal is "TRUE";
-  attribute MARK_DEBUG of w_d2h_fifo_in_data : signal is "TRUE";
-  attribute DONT_TOUCH of w_d2h_fifo_in_data : signal is "TRUE";
-  attribute MARK_DEBUG of w_d2h_fifo_in_last : signal is "TRUE";
-  attribute DONT_TOUCH of w_d2h_fifo_in_last : signal is "TRUE";
+  --attribute MARK_DEBUG of w_config_rst : signal is "TRUE";
+  --attribute DONT_TOUCH of w_config_rst : signal is "TRUE";
+  --attribute MARK_DEBUG of r_combined_rst : signal is "TRUE";
+  --attribute DONT_TOUCH of r_combined_rst : signal is "TRUE";
+  --attribute MARK_DEBUG of w_enable_status : signal is "TRUE";
+  --attribute DONT_TOUCH of w_enable_status : signal is "TRUE";
+  --attribute MARK_DEBUG of w_enable_chan : signal is "TRUE";
+  --attribute DONT_TOUCH of w_enable_chan : signal is "TRUE";
+  --attribute MARK_DEBUG of w_enable_pdw : signal is "TRUE";
+  --attribute DONT_TOUCH of w_enable_pdw : signal is "TRUE";
+  --attribute MARK_DEBUG of w_dwell_active : signal is "TRUE";
+  --attribute DONT_TOUCH of w_dwell_active : signal is "TRUE";
+  --attribute MARK_DEBUG of w_dwell_sequence_num : signal is "TRUE";
+  --attribute DONT_TOUCH of w_dwell_sequence_num : signal is "TRUE";
+  --
+  --attribute MARK_DEBUG of w_d2h_fifo_in_ready : signal is "TRUE";
+  --attribute DONT_TOUCH of w_d2h_fifo_in_ready : signal is "TRUE";
+  --attribute MARK_DEBUG of w_d2h_fifo_in_valid : signal is "TRUE";
+  --attribute DONT_TOUCH of w_d2h_fifo_in_valid : signal is "TRUE";
+  --attribute MARK_DEBUG of w_d2h_fifo_in_data : signal is "TRUE";
+  --attribute DONT_TOUCH of w_d2h_fifo_in_data : signal is "TRUE";
+  --attribute MARK_DEBUG of w_d2h_fifo_in_last : signal is "TRUE";
+  --attribute DONT_TOUCH of w_d2h_fifo_in_last : signal is "TRUE";
+  --
+  --attribute MARK_DEBUG of w_M_axis_ready : signal is "TRUE";
+  --attribute DONT_TOUCH of w_M_axis_ready : signal is "TRUE";
+  --attribute MARK_DEBUG of w_M_axis_valid : signal is "TRUE";
+  --attribute DONT_TOUCH of w_M_axis_valid : signal is "TRUE";
+  --attribute MARK_DEBUG of w_M_axis_data : signal is "TRUE";
+  --attribute DONT_TOUCH of w_M_axis_data : signal is "TRUE";
+  --attribute MARK_DEBUG of w_M_axis_last : signal is "TRUE";
+  --attribute DONT_TOUCH of w_M_axis_last : signal is "TRUE";
+  --attribute MARK_DEBUG of w_M_axis_valid_ready : signal is "TRUE";
+  --attribute DONT_TOUCH of w_M_axis_valid_ready : signal is "TRUE";
 
-  attribute MARK_DEBUG of w_M_axis_ready : signal is "TRUE";
-  attribute DONT_TOUCH of w_M_axis_ready : signal is "TRUE";
-  attribute MARK_DEBUG of w_M_axis_valid : signal is "TRUE";
-  attribute DONT_TOUCH of w_M_axis_valid : signal is "TRUE";
-  attribute MARK_DEBUG of w_M_axis_data : signal is "TRUE";
-  attribute DONT_TOUCH of w_M_axis_data : signal is "TRUE";
-  attribute MARK_DEBUG of w_M_axis_last : signal is "TRUE";
-  attribute DONT_TOUCH of w_M_axis_last : signal is "TRUE";
-  attribute MARK_DEBUG of w_M_axis_valid_ready : signal is "TRUE";
-  attribute DONT_TOUCH of w_M_axis_valid_ready : signal is "TRUE";
 begin
 
   w_M_axis_ready  <= M_axis_ready;
@@ -346,7 +351,7 @@ begin
     w_channelizer_errors(1).mux_collision   <= '0';
   end generate g_narrow_channelizer;
 
-  g_wide_dwell_stats : if (ENABLE_WIDE_CHANNEL) generate
+  g_wide_dwell_stats : if (ENABLE_WIDE_CHANNEL and ENABLE_DWELL_STATS) generate
     i_dwell_stats_8 : entity esm_lib.esm_dwell_stats
     generic map (
       AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
@@ -386,7 +391,7 @@ begin
     w_dwell_stats_errors(0).reporter_overflow <= '0';
   end generate g_wide_dwell_stats;
 
-  g_narrow_dwell_stats : if (ENABLE_NARROW_CHANNEL) generate
+  g_narrow_dwell_stats : if (ENABLE_NARROW_CHANNEL and ENABLE_DWELL_STATS) generate
     i_dwell_stats_64 : entity esm_lib.esm_dwell_stats
     generic map (
       AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
@@ -457,6 +462,7 @@ begin
 
       Error_pdw_fifo_overflow       => w_pdw_encoder_errors(0).pdw_fifo_overflow,
       Error_pdw_fifo_underflow      => w_pdw_encoder_errors(0).pdw_fifo_underflow,
+      Error_sample_buffer_busy      => w_pdw_encoder_errors(0).sample_buffer_busy,
       Error_sample_buffer_underflow => w_pdw_encoder_errors(0).sample_buffer_underflow,
       Error_sample_buffer_overflow  => w_pdw_encoder_errors(0).sample_buffer_overflow,
       Error_reporter_timeout        => w_pdw_encoder_errors(0).reporter_timeout,
@@ -468,6 +474,8 @@ begin
     w_d2h_fifo_in_last(2)   <= '0';
 
     w_pdw_encoder_errors(0).pdw_fifo_overflow       <= '0';
+    w_pdw_encoder_errors(0).pdw_fifo_underflow      <= '0';
+    w_pdw_encoder_errors(0).sample_buffer_busy      <= '0';
     w_pdw_encoder_errors(0).sample_buffer_underflow <= '0';
     w_pdw_encoder_errors(0).sample_buffer_overflow  <= '0';
     w_pdw_encoder_errors(0).reporter_timeout        <= '0';
@@ -505,6 +513,7 @@ begin
 
       Error_pdw_fifo_overflow       => w_pdw_encoder_errors(1).pdw_fifo_overflow,
       Error_pdw_fifo_underflow      => w_pdw_encoder_errors(1).pdw_fifo_underflow,
+      Error_sample_buffer_busy      => w_pdw_encoder_errors(1).sample_buffer_busy,
       Error_sample_buffer_underflow => w_pdw_encoder_errors(1).sample_buffer_underflow,
       Error_sample_buffer_overflow  => w_pdw_encoder_errors(1).sample_buffer_overflow,
       Error_reporter_timeout        => w_pdw_encoder_errors(1).reporter_timeout,
@@ -516,6 +525,8 @@ begin
     w_d2h_fifo_in_last(3)   <= '0';
 
     w_pdw_encoder_errors(1).pdw_fifo_overflow       <= '0';
+    w_pdw_encoder_errors(1).pdw_fifo_underflow      <= '0';
+    w_pdw_encoder_errors(1).sample_buffer_busy      <= '0';
     w_pdw_encoder_errors(1).sample_buffer_underflow <= '0';
     w_pdw_encoder_errors(1).sample_buffer_overflow  <= '0';
     w_pdw_encoder_errors(1).reporter_timeout        <= '0';

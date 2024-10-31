@@ -40,6 +40,7 @@ custom_ip_files esm_receiver [list \
   {"../dsp/hdl/channelizer_32.vhd"          "dsp_lib"}      \
   {"../dsp/hdl/channelizer_64.vhd"          "dsp_lib"}      \
   {"./hdl/esm_pkg.vhd"                      "esm_lib"}      \
+  {"./hdl/esm_debug_pkg.vhd"                "esm_lib"}      \
   {"./hdl/esm_config.vhd"                   "esm_lib"}      \
   {"./hdl/esm_dwell_config_decoder.vhd"     "esm_lib"}      \
   {"./hdl/esm_dwell_controller.vhd"         "esm_lib"}      \
@@ -49,6 +50,7 @@ custom_ip_files esm_receiver [list \
   {"./hdl/esm_pdw_sample_buffer.vhd"        "esm_lib"}      \
   {"./hdl/esm_pdw_sample_processor.vhd"     "esm_lib"}      \
   {"./hdl/esm_pdw_reporter.vhd"             "esm_lib"}      \
+  {"./hdl/esm_pdw_encoder_debug.vhd"        "esm_lib"}      \
   {"./hdl/esm_pdw_encoder.vhd"              "esm_lib"}      \
   {"./hdl/esm_status_reporter.vhd"          "esm_lib"}      \
   {"./hdl/esm_receiver.vhd"                 "esm_lib"}      \
