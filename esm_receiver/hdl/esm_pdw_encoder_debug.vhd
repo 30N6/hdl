@@ -88,7 +88,8 @@ begin
                       r_debug_pdw_encoder.w_frame_req_drop or
                       --r_debug_pdw_encoder.w_frame_ack_valid or
                       --r_debug_pdw_encoder.w_dwell_done or
-                      r_debug_pdw_encoder.w_report_ack or
+                      --r_debug_pdw_encoder.r_report_ack or
+                      (to_stdlogic(r_debug_pdw_encoder.s_state = "011") and r_debug_pdw_encoder.r_sample_processor_ack and r_debug_pdw_encoder.r_report_ack) or
                       w_error;
 
       r_fifo_wr_data <= w_debug_pdw_encoder_packed & w_debug_sample_processor_packed;

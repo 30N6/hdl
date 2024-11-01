@@ -106,7 +106,10 @@ architecture rtl of esm_pdw_encoder is
 
   signal w_dwell_active             : std_logic;
   signal w_dwell_done               : std_logic;
+  signal w_sample_processor_ack     : std_logic;
   signal w_report_ack               : std_logic;
+  signal r_sample_processor_ack     : std_logic;
+  signal r_report_ack               : std_logic;
 
   signal w_pdw_fifo_busy            : std_logic;
   signal w_pdw_fifo_overflow        : std_logic;
@@ -148,7 +151,8 @@ begin
   w_debug_pdw_encoder.w_frame_data_q                   <= std_logic_vector(w_frame_data(1));
   w_debug_pdw_encoder.w_dwell_active                   <= w_dwell_active;
   w_debug_pdw_encoder.w_dwell_done                     <= w_dwell_done;
-  w_debug_pdw_encoder.w_report_ack                     <= w_report_ack;
+  w_debug_pdw_encoder.r_sample_processor_ack           <= r_sample_processor_ack;
+  w_debug_pdw_encoder.r_report_ack                     <= r_report_ack;
   w_debug_pdw_encoder.w_pdw_fifo_busy                  <= w_pdw_fifo_busy;
   w_debug_pdw_encoder.w_pdw_fifo_overflow              <= w_pdw_fifo_overflow;
   w_debug_pdw_encoder.w_pdw_fifo_underflow             <= w_pdw_fifo_underflow;
@@ -252,6 +256,8 @@ begin
     Timestamp               => r_timestamp,
 
     Dwell_active            => w_dwell_active,
+    Dwell_done              => w_dwell_done,
+    Dwell_ack               => w_sample_processor_ack,
 
     Input_ctrl              => w_pipelined_ctrl,
     Input_iq_delayed        => w_delayed_iq_data,
@@ -303,7 +309,7 @@ begin
           end if;
 
         when S_DWELL_DONE =>
-          if (w_report_ack = '1') then
+          if ((r_sample_processor_ack = '1') and (r_report_ack = '1')) then
             s_state <= S_CLEAR;
           else
             s_state <= S_DWELL_DONE;
@@ -378,6 +384,19 @@ begin
     Error_timeout       => w_reporter_timeout,
     Error_overflow      => w_reporter_overflow
   );
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (s_state = S_DWELL_ACTIVE) then
+        r_sample_processor_ack <= '0';
+        r_report_ack           <= '0';
+      elsif (s_state = S_DWELL_DONE) then
+        r_sample_processor_ack <= r_sample_processor_ack or w_sample_processor_ack;
+        r_report_ack           <= r_report_ack or w_report_ack;
+      end if;
+    end if;
+  end process;
 
   process(Clk)
   begin

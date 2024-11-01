@@ -33,6 +33,8 @@ port (
   Timestamp               : in  unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
 
   Dwell_active            : in  std_logic;
+  Dwell_done              : in  std_logic;
+  Dwell_ack               : out std_logic;
 
   Input_ctrl              : in  channelizer_control_t;
   Input_iq_delayed        : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
@@ -144,6 +146,7 @@ architecture rtl of esm_pdw_sample_processor is
   signal w_fifo_empty               : std_logic;
   signal w_fifo_rd_data             : std_logic_vector(ESM_PDW_FIFO_DATA_WIDTH - 1 downto 0);
 
+  signal r_dwell_ack_pending        : std_logic;
   signal r_dwell_active             : std_logic;
 
   signal w_pending_fifo_busy        : std_logic;
@@ -446,6 +449,19 @@ begin
     Error_underflow     => w_sample_buffer_underflow,
     Error_overflow      => w_sample_buffer_overflow
   );
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (Dwell_active = '1') then
+        r_dwell_ack_pending <= '0';
+      elsif (Dwell_done = '1') then
+        r_dwell_ack_pending <= '1';
+      end if;
+
+      Dwell_ack <= r_dwell_ack_pending and w_pending_fifo_empty and w_buffer_empty;
+    end if;
+  end process;
 
   process(Clk)
   begin
