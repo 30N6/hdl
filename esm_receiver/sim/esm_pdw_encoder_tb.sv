@@ -614,7 +614,7 @@ module esm_pdw_encoder_tb;
     int pulse_start_time [NUM_CHANNELS][$];
     int pulse_duration [NUM_CHANNELS][$];
     int time_offset [NUM_CHANNELS];
-    int max_dwell_time = $urandom_range(10000, 500);
+    int max_dwell_time = $urandom_range(5000, 500);
     int threshold = (NUM_CHANNELS < 64) ? dwell_data.threshold_wide : dwell_data.threshold_narrow;
     int rnd = 0;
 

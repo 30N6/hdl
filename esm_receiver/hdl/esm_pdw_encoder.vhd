@@ -360,7 +360,7 @@ begin
     Rst                 => r_rst,
 
     Dwell_active        => w_dwell_active,
-    Dwell_done          => w_dwell_done,
+    Dwell_done          => r_sample_processor_ack,
     Dwell_data          => r_dwell_data,
     Dwell_sequence_num  => r_dwell_sequence_num,
     Dwell_timestamp     => r_dwell_timestamp,
