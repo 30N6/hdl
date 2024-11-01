@@ -55,7 +55,7 @@ package esm_pkg is
   constant ESM_PDW_POWER_ACCUM_WIDTH                    : natural := 48;
   constant ESM_PDW_CYCLE_COUNT_WIDTH                    : natural := 32;
   constant ESM_PDW_IFM_WIDTH                            : natural := 16;
-  constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH            : natural := 16;
+  constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH            : natural := 8; --TODO: increase
   constant ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH      : natural := clog2(ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH);
   constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_DEPTH           : natural := 64;
   constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH     : natural := clog2(ESM_PDW_SAMPLE_BUFFER_SAMPLE_DEPTH);

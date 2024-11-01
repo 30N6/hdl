@@ -169,7 +169,7 @@ begin
     Debug_out.r2_context_state                    <= "00" when (r2_context.state = S_IDLE) else
                                                      "01" when (r2_context.state = S_ACTIVE) else
                                                      "10" when (r2_context.state = S_PAD_RECORDING) else
-                                                     "11" when (r2_context.state = S_STORE_REPORT);
+                                                     "11";
     Debug_out.r2_context_pulse_seq_num            <= std_logic_vector(r2_context.pulse_seq_num);
     Debug_out.r2_context_power_accum_a            <= std_logic_vector(r2_context.power_accum_a);
     Debug_out.r2_context_duration                 <= std_logic_vector(r2_context.duration);

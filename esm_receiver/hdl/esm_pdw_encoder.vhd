@@ -125,7 +125,7 @@ begin
                                                           "001" when (s_state = S_DWELL_ACTIVE) else
                                                           "010" when (s_state = S_DWELL_STOP_WAIT) else
                                                           "011" when (s_state = S_DWELL_DONE) else
-                                                          "100" when (s_state = S_CLEAR);
+                                                          "100";
   w_debug_pdw_encoder.r_dwell_active                   <= r_dwell_active;
   w_debug_pdw_encoder.r_dwell_data_tag                 <= std_logic_vector(r_dwell_data.tag);
   w_debug_pdw_encoder.w_pdw_ready                      <= w_pdw_ready;
