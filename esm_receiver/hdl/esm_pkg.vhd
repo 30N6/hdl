@@ -408,8 +408,8 @@ package body esm_pkg is
     r.duration              := unsigned(v(149 downto 118));
     r.frequency             := unsigned(v(165 downto 150));
     r.pulse_start_time      := unsigned(v(213 downto 166));
-    r.buffered_frame_index  := unsigned(v(217 downto 214));
-    r.buffered_frame_valid  := v(218);
+    r.buffered_frame_index  := unsigned(v(216 downto 214));
+    r.buffered_frame_valid  := v(217);
     return r;
   end function;
 
@@ -442,8 +442,8 @@ package body esm_pkg is
     r(149 downto 118) := std_logic_vector(v.duration);
     r(165 downto 150) := std_logic_vector(v.frequency);
     r(213 downto 166) := std_logic_vector(v.pulse_start_time);
-    r(217 downto 214) := std_logic_vector(v.buffered_frame_index);
-    r(218)            := v.buffered_frame_valid;
+    r(216 downto 214) := std_logic_vector(v.buffered_frame_index);
+    r(217)            := v.buffered_frame_valid;
 
     return r;
   end function;

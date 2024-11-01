@@ -34,6 +34,7 @@ set library_file_list [list \
     ./hdl/esm_pdw_sample_buffer.vhd \
     ./hdl/esm_pdw_sample_processor.vhd \
     ./hdl/esm_pdw_reporter.vhd \
+    ./hdl/esm_pdw_encoder_debug.vhd \
     ./hdl/esm_pdw_encoder.vhd \
     ./sim/esm_pdw_encoder_tb.sv \
     ] \
