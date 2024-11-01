@@ -248,7 +248,7 @@ begin
 
     Timestamp               => r_timestamp,
 
-    Dwell_active            => r_dwell_active,
+    Dwell_active            => w_dwell_active,
 
     Input_ctrl              => w_pipelined_ctrl,
     Input_iq_delayed        => w_delayed_iq_data,
