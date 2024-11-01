@@ -47,6 +47,7 @@ port (
   Buffered_frame_ack      : out esm_pdw_sample_buffer_ack_t;
   Buffered_frame_data     : out signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
 
+  Error_fifo_busy         : out std_logic;
   Error_fifo_overflow     : out std_logic;
   Error_fifo_underflow    : out std_logic;
   Error_buffer_busy       : out std_logic;
@@ -145,6 +146,7 @@ architecture rtl of esm_pdw_sample_processor is
 
   signal r_dwell_active             : std_logic;
 
+  signal w_pending_fifo_busy        : std_logic;
   signal w_pending_fifo_overflow    : std_logic;
   signal w_pending_fifo_underflow   : std_logic;
   signal w_fifo_overflow            : std_logic;
@@ -415,8 +417,6 @@ begin
   -- PSL assert always (w_fifo_full = '1') -> (w_pending_fifo_full = '1');
   -- PSL assert always rose(w_pending_fifo_empty) -> rose(w_fifo_empty);
 
-  --TODO: need a way to flush this buffer at the end of a dwell?
-
   w_buffer_wr_en       <= r2_input_ctrl.valid and r2_context.recording_active;
   w_buffer_next_start  <= w_pending_fifo_wr_en and not(w_buffer_full);
 
@@ -454,11 +454,13 @@ begin
     end if;
   end process;
 
+  w_pending_fifo_busy  <= Dwell_active and not(r_dwell_active) and not(w_pending_fifo_empty);
   w_sample_buffer_busy <= Dwell_active and not(r_dwell_active) and not(w_buffer_empty);
 
   process(Clk)
   begin
     if rising_edge(Clk) then
+      Error_fifo_busy         <= w_pending_fifo_busy;
       Error_fifo_overflow     <= w_fifo_overflow or w_pending_fifo_overflow;
       Error_fifo_underflow    <= w_pending_fifo_underflow;
       Error_buffer_busy       <= w_sample_buffer_busy;

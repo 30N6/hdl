@@ -157,6 +157,12 @@ module esm_pdw_encoder_tb;
   int           num_received = 0;
   logic         r_axi_rx_ready;
   logic         w_axi_rx_valid;
+  logic         w_error_pdw_fifo_busy;
+  logic         w_error_pdw_fifo_overflow;
+  logic         w_error_pdw_fifo_underflow;
+  logic         w_error_sample_buffer_busy;
+  logic         w_error_sample_buffer_underflow;
+  logic         w_error_sample_buffer_overflow;
   logic         w_error_reporter_timeout;
   logic         w_error_reporter_overflow;
 
@@ -215,6 +221,7 @@ module esm_pdw_encoder_tb;
     .Axis_data                      (rpt_rx_intf.data),
     .Axis_last                      (rpt_rx_intf.last),
 
+    .Error_pdw_fifo_busy            (w_error_pdw_fifo_busy),
     .Error_pdw_fifo_overflow        (w_error_pdw_fifo_overflow),
     .Error_pdw_fifo_underflow       (w_error_pdw_fifo_underflow),
     .Error_sample_buffer_busy       (w_error_sample_buffer_busy),
@@ -228,6 +235,7 @@ module esm_pdw_encoder_tb;
 
   always_ff @(posedge Clk) begin
     if (!Rst) begin
+      if (w_error_pdw_fifo_busy)            $error("pdw fifo busy");
       if (w_error_pdw_fifo_overflow)        $error("pdw fifo overflow");
       if (w_error_pdw_fifo_underflow)       $error("pdw fifo underflow");
       if (w_error_sample_buffer_busy)       $error("sample buffer busy");

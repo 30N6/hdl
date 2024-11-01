@@ -42,6 +42,7 @@ port (
   Axis_data                     : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   Axis_last                     : out std_logic;
 
+  Error_pdw_fifo_busy           : out std_logic;
   Error_pdw_fifo_overflow       : out std_logic;
   Error_pdw_fifo_underflow      : out std_logic;
   Error_sample_buffer_busy      : out std_logic;
@@ -107,6 +108,7 @@ architecture rtl of esm_pdw_encoder is
   signal w_dwell_done               : std_logic;
   signal w_report_ack               : std_logic;
 
+  signal w_pdw_fifo_busy            : std_logic;
   signal w_pdw_fifo_overflow        : std_logic;
   signal w_pdw_fifo_underflow       : std_logic;
   signal w_sample_buffer_busy       : std_logic;
@@ -147,6 +149,7 @@ begin
   w_debug_pdw_encoder.w_dwell_active                   <= w_dwell_active;
   w_debug_pdw_encoder.w_dwell_done                     <= w_dwell_done;
   w_debug_pdw_encoder.w_report_ack                     <= w_report_ack;
+  w_debug_pdw_encoder.w_pdw_fifo_busy                  <= w_pdw_fifo_busy;
   w_debug_pdw_encoder.w_pdw_fifo_overflow              <= w_pdw_fifo_overflow;
   w_debug_pdw_encoder.w_pdw_fifo_underflow             <= w_pdw_fifo_underflow;
   w_debug_pdw_encoder.w_sample_buffer_busy             <= w_sample_buffer_busy;
@@ -263,6 +266,7 @@ begin
     Buffered_frame_ack      => w_frame_ack,
     Buffered_frame_data     => w_frame_data,
 
+    Error_fifo_busy         => w_pdw_fifo_busy,
     Error_fifo_overflow     => w_pdw_fifo_overflow,
     Error_fifo_underflow    => w_pdw_fifo_underflow,
     Error_buffer_busy       => w_sample_buffer_busy,
@@ -378,6 +382,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      Error_pdw_fifo_busy           <= w_pdw_fifo_busy;
       Error_pdw_fifo_overflow       <= w_pdw_fifo_overflow;
       Error_pdw_fifo_underflow      <= w_pdw_fifo_underflow;
       Error_sample_buffer_busy      <= w_sample_buffer_busy;

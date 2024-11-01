@@ -82,6 +82,7 @@ package esm_debug_pkg is
     w_dwell_active                  : std_logic;
     w_dwell_done                    : std_logic;
     w_report_ack                    : std_logic;
+    w_pdw_fifo_busy                 : std_logic;
     w_pdw_fifo_overflow             : std_logic;
     w_pdw_fifo_underflow            : std_logic;
     w_sample_buffer_busy            : std_logic;
@@ -91,7 +92,7 @@ package esm_debug_pkg is
     w_reporter_overflow             : std_logic;
   end record;
 
-  constant ESM_PDW_ENCODER_DEBUG_WIDTH : natural := 18 + ESM_TIMESTAMP_WIDTH + 3 + 16 +
+  constant ESM_PDW_ENCODER_DEBUG_WIDTH : natural := 19 + ESM_TIMESTAMP_WIDTH + 3 + 16 +
                                                     ESM_PDW_SEQUENCE_NUM_WIDTH + ESM_CHANNEL_INDEX_WIDTH + ESM_PDW_POWER_ACCUM_WIDTH + ESM_PDW_CYCLE_COUNT_WIDTH + ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH +
                                                     ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH + ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH + 16 + 16;
 
@@ -179,6 +180,7 @@ package body esm_debug_pkg is
       r.w_dwell_active                  ,
       r.w_dwell_done                    ,
       r.w_report_ack                    ,
+      r.w_pdw_fifo_busy                 ,
       r.w_pdw_fifo_overflow             ,
       r.w_pdw_fifo_underflow            ,
       r.w_sample_buffer_busy            ,
@@ -258,6 +260,7 @@ package body esm_debug_pkg is
             v.w_dwell_active                  ,
             v.w_dwell_done                    ,
             v.w_report_ack                    ,
+            v.w_pdw_fifo_busy                 ,
             v.w_pdw_fifo_overflow             ,
             v.w_pdw_fifo_underflow            ,
             v.w_sample_buffer_busy            ,

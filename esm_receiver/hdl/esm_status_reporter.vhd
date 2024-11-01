@@ -55,7 +55,9 @@ architecture rtl of esm_status_reporter is
     S_HEADER_2,
 
     S_ENABLES,
-    S_STATUS,
+    S_STATUS_PATH_0,
+    S_STATUS_PATH_1,
+    S_STATUS_REPORTER,
     S_TIMESTAMP_0,
     S_TIMESTAMP_1,
 
@@ -63,43 +65,48 @@ architecture rtl of esm_status_reporter is
     S_DONE
   );
 
-  signal s_state                : state_t;
+  signal s_state                    : state_t;
 
-  signal r_timestamp            : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+  signal r_timestamp                : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
 
-  signal r_enable_status        : std_logic;
-  signal r_enable_channelizer   : std_logic_vector(1 downto 0);
-  signal r_enable_pdw_encoder   : std_logic_vector(1 downto 0);
-  signal r_channelizer_warnings : esm_channelizer_warnings_array_t(1 downto 0);
-  signal r_channelizer_errors   : esm_channelizer_errors_array_t(1 downto 0);
-  signal r_dwell_stats_errors   : esm_dwell_stats_errors_array_t(1 downto 0);
-  signal r_pdw_encoder_errors   : esm_pdw_encoder_errors_array_t(1 downto 0);
+  signal r_enable_status            : std_logic;
+  signal r_enable_channelizer       : std_logic_vector(1 downto 0);
+  signal r_enable_pdw_encoder       : std_logic_vector(1 downto 0);
+  signal r_channelizer_warnings     : esm_channelizer_warnings_array_t(1 downto 0);
+  signal r_channelizer_errors       : esm_channelizer_errors_array_t(1 downto 0);
+  signal r_dwell_stats_errors       : esm_dwell_stats_errors_array_t(1 downto 0);
+  signal r_pdw_encoder_errors       : esm_pdw_encoder_errors_array_t(1 downto 0);
 
-  signal w_status_flags         : esm_status_flags_t;
-  signal w_status_flags_packed  : std_logic_vector(ESM_STATUS_FLAGS_WIDTH - 1 downto 0);
-  signal r_status_flags_latched : std_logic_vector(ESM_STATUS_FLAGS_WIDTH - 1 downto 0);
+  signal w_status_flags             : esm_path_status_flags_array_t(1 downto 0);
+  signal w_status_flags_packed      : std_logic_vector_array_t(1 downto 0)(ESM_PATH_STATUS_FLAGS_WIDTH - 1 downto 0);
+  signal r_status_flags_latched     : std_logic_vector_array_t(1 downto 0)(ESM_PATH_STATUS_FLAGS_WIDTH - 1 downto 0);
+  signal w_status_read              : std_logic_vector(1 downto 0);
 
-  signal r_status_timer         : unsigned(clog2(HEARTBEAT_INTERVAL) - 1 downto 0);
-  signal r_status_trigger       : std_logic;
+  signal w_reporter_errors          : esm_status_reporter_errors_t;
+  signal w_reporter_errors_packed   : std_logic_vector(ESM_STATUS_REPORTER_ERRORS_WIDTH - 1 downto 0);
+  signal r_reporter_errors_latched  : std_logic_vector(ESM_STATUS_REPORTER_ERRORS_WIDTH - 1 downto 0);
 
-  signal r_packet_seq_num       : unsigned(31 downto 0);
-  signal r_trigger_timestamp    : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+  signal r_status_timer             : unsigned(clog2(HEARTBEAT_INTERVAL) - 1 downto 0);
+  signal r_status_trigger           : std_logic;
 
-  signal r_words_in_msg         : unsigned(clog2(MAX_WORDS_PER_PACKET) - 1 downto 0);
+  signal r_packet_seq_num           : unsigned(31 downto 0);
+  signal r_trigger_timestamp        : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
 
-  signal w_fifo_almost_full     : std_logic;
-  signal w_fifo_ready           : std_logic;
-  signal w_fifo_valid           : std_logic;
-  signal w_fifo_last            : std_logic;
-  signal w_fifo_data            : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal r_words_in_msg             : unsigned(clog2(MAX_WORDS_PER_PACKET) - 1 downto 0);
 
-  signal r_fifo_valid           : std_logic;
-  signal r_fifo_last            : std_logic;
-  signal r_fifo_data            : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_fifo_almost_full         : std_logic;
+  signal w_fifo_ready               : std_logic;
+  signal w_fifo_valid               : std_logic;
+  signal w_fifo_last                : std_logic;
+  signal w_fifo_data                : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
 
-  signal r_timeout              : unsigned(clog2(TIMEOUT_CYCLES) - 1 downto 0);
-  signal r_error_timeout        : std_logic;
-  signal r_error_overflow       : std_logic;
+  signal r_fifo_valid               : std_logic;
+  signal r_fifo_last                : std_logic;
+  signal r_fifo_data                : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+
+  signal r_timeout                  : unsigned(clog2(TIMEOUT_CYCLES) - 1 downto 0);
+  signal r_error_timeout            : std_logic;
+  signal r_error_overflow           : std_logic;
 
   --attribute MARK_DEBUG : string;
   --attribute DONT_TOUCH : string;
@@ -172,25 +179,46 @@ begin
     end if;
   end process;
 
-  w_status_flags.channelizer_warnings                     <= r_channelizer_warnings;
-  w_status_flags.channelizer_errors                       <= r_channelizer_errors;
-  w_status_flags.dwell_stats_errors                       <= r_dwell_stats_errors;
-  w_status_flags.pdw_encoder_errors                       <= r_pdw_encoder_errors;
-  w_status_flags.status_reporter_errors.reporter_timeout  <= r_error_timeout;
-  w_status_flags.status_reporter_errors.reporter_overflow <= r_error_overflow;
+  w_status_read(0) <= to_stdlogic(s_state = S_STATUS_PATH_0);
+  w_status_read(1) <= to_stdlogic(s_state = S_STATUS_PATH_1);
 
-  w_status_flags_packed <= pack(w_status_flags);
+  g_path_loop : for i in 0 to 1 generate
+    w_status_flags(i).channelizer_warnings  <= r_channelizer_warnings(i);
+    w_status_flags(i).channelizer_errors    <= r_channelizer_errors(i);
+    w_status_flags(i).dwell_stats_errors    <= r_dwell_stats_errors(i);
+    w_status_flags(i).pdw_encoder_errors    <= r_pdw_encoder_errors(i);
+    w_status_flags_packed(i)                <= pack(w_status_flags(i));
+
+    process(Clk)
+    begin
+      if rising_edge(Clk) then
+        if (Rst = '1') then
+          r_status_flags_latched(i) <= (others => '0');
+        else
+          if (or_reduce(w_status_flags_packed(i)) = '1') then
+            r_status_flags_latched(i) <= r_status_flags_latched(i) or w_status_flags_packed(i);
+          elsif (w_status_read(i) = '1') then
+            r_status_flags_latched(i) <= (others => '0');
+          end if;
+        end if;
+      end if;
+    end process;
+  end generate g_path_loop;
+
+  w_reporter_errors.reporter_timeout  <= r_error_timeout;
+  w_reporter_errors.reporter_overflow <= r_error_overflow;
+  w_reporter_errors_packed            <= pack(w_reporter_errors);
 
   process(Clk)
   begin
     if rising_edge(Clk) then
       if (Rst = '1') then
-        r_status_flags_latched <= (others => '0');
+        r_reporter_errors_latched <= (others => '0');
       else
-        if (or_reduce(w_status_flags_packed) = '1') then
-          r_status_flags_latched <= r_status_flags_latched or w_status_flags_packed;
-        elsif (s_state = S_STATUS) then
-          r_status_flags_latched <= (others => '0');
+        if (or_reduce(w_reporter_errors_packed) = '1') then
+          r_reporter_errors_latched <= r_reporter_errors_latched or w_reporter_errors_packed;
+        elsif (s_state = S_STATUS_REPORTER) then
+          r_reporter_errors_latched <= (others => '0');
         end if;
       end if;
     end if;
@@ -258,8 +286,12 @@ begin
           s_state <= S_ENABLES;
 
         when S_ENABLES =>
-          s_state <= S_STATUS;
-        when S_STATUS =>
+          s_state <= S_STATUS_PATH_0;
+        when S_STATUS_PATH_0 =>
+          s_state <= S_STATUS_PATH_1;
+        when S_STATUS_PATH_1 =>
+          s_state <= S_STATUS_REPORTER;
+        when S_STATUS_REPORTER =>
           s_state <= S_TIMESTAMP_0;
         when S_TIMESTAMP_0 =>
           s_state <= S_TIMESTAMP_1;
@@ -292,7 +324,7 @@ begin
     end if;
   end process;
 
-  process(Clk)
+  process(all)
   begin
     w_fifo_valid  <= '0';
     w_fifo_last   <= '0';
@@ -315,9 +347,17 @@ begin
       w_fifo_valid  <= '1';
       w_fifo_data   <= x"000000" & "000" & r_enable_pdw_encoder & r_enable_channelizer & r_enable_status;
 
-    when S_STATUS =>
+    when S_STATUS_PATH_0 =>
       w_fifo_valid  <= '1';
-      w_fifo_data   <= resize_up(r_status_flags_latched, 32);
+      w_fifo_data   <= resize_up(r_status_flags_latched(0), 32);
+
+    when S_STATUS_PATH_1 =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= resize_up(r_status_flags_latched(1), 32);
+
+    when S_STATUS_REPORTER =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= resize_up(r_reporter_errors_latched, 32);
 
     when S_TIMESTAMP_0 =>
       w_fifo_valid  <= '1';
