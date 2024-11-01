@@ -77,12 +77,19 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_fifo_wr_en <= r_debug_sample_processor.w_pending_fifo_wr_en or r_debug_sample_processor.r_fifo_wr_en or
-                      (r_debug_sample_processor.r2_input_ctrl_valid and to_stdlogic(r_debug_sample_processor.r2_context_state /= "00")) or
-                      r_debug_pdw_encoder.w_pdw_valid       or r_debug_pdw_encoder.w_pdw_ready or
-                      r_debug_pdw_encoder.w_frame_req_read  or r_debug_pdw_encoder.w_frame_req_drop or
-                      r_debug_pdw_encoder.w_frame_ack_valid or r_debug_pdw_encoder.w_dwell_done or
-                      r_debug_pdw_encoder.w_report_ack      or w_error;
+      r_fifo_wr_en <= r_debug_sample_processor.w_pending_fifo_wr_en or
+                      r_debug_sample_processor.w_pending_fifo_rd_en or
+                      r_debug_sample_processor.r_fifo_wr_en or
+                      --(r_debug_sample_processor.r2_input_ctrl_valid and to_stdlogic(r_debug_sample_processor.r2_context_state /= "00")) or
+                      (r_debug_sample_processor.r2_input_ctrl_valid and to_stdlogic(r_debug_sample_processor.r2_context_state = "11")) or
+                      r_debug_pdw_encoder.w_pdw_valid or
+                      r_debug_pdw_encoder.w_pdw_ready or
+                      r_debug_pdw_encoder.w_frame_req_read or
+                      r_debug_pdw_encoder.w_frame_req_drop or
+                      --r_debug_pdw_encoder.w_frame_ack_valid or
+                      --r_debug_pdw_encoder.w_dwell_done or
+                      r_debug_pdw_encoder.w_report_ack or
+                      w_error;
 
       r_fifo_wr_data <= w_debug_pdw_encoder_packed & w_debug_sample_processor_packed;
     end if;
