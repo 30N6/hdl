@@ -25,6 +25,7 @@ package esm_debug_pkg is
     w_pending_fifo_empty                : std_logic;
     w_fifo_full                         : std_logic;
     r_fifo_wr_en                        : std_logic;
+    r_fifo_wr_data_channel              : std_logic_vector(ESM_CHANNEL_INDEX_WIDTH - 1 downto 0);
     w_fifo_empty                        : std_logic;
 
     r2_context_state                    : std_logic_vector(1 downto 0);
@@ -47,7 +48,7 @@ package esm_debug_pkg is
     r2_continued_detect                 : std_logic;
   end record;
 
-  constant ESM_PDW_SAMPLE_PROCESSOR_DEBUG_WIDTH : natural := 17 + ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH + 2 +
+  constant ESM_PDW_SAMPLE_PROCESSOR_DEBUG_WIDTH : natural := 17 + ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH + ESM_CHANNEL_INDEX_WIDTH + 2 +
                                                              ESM_PDW_SEQUENCE_NUM_WIDTH + (ESM_PDW_POWER_ACCUM_WIDTH - 16) +
                                                              ESM_PDW_CYCLE_COUNT_WIDTH + ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH +
                                                              ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH + 4 +
@@ -123,6 +124,7 @@ package body esm_debug_pkg is
       r.w_pending_fifo_empty                ,
       r.w_fifo_full                         ,
       r.r_fifo_wr_en                        ,
+      r.r_fifo_wr_data_channel              ,
       r.w_fifo_empty                        ,
       r.r2_context_state                    ,
       r.r2_context_pulse_seq_num            ,
@@ -205,6 +207,7 @@ package body esm_debug_pkg is
             v.w_pending_fifo_empty                ,
             v.w_fifo_full                         ,
             v.r_fifo_wr_en                        ,
+            v.r_fifo_wr_data_channel              ,
             v.w_fifo_empty                        ,
             v.r2_context_state                    ,
             v.r2_context_pulse_seq_num            ,

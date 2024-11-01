@@ -165,6 +165,7 @@ begin
     Debug_out.w_pending_fifo_empty                <= w_pending_fifo_empty;
     Debug_out.w_fifo_full                         <= w_fifo_full;
     Debug_out.r_fifo_wr_en                        <= r_fifo_wr_en;
+    Debug_out.r_fifo_wr_data_channel              <= std_logic_vector(r_fifo_wr_data.channel);
     Debug_out.w_fifo_empty                        <= w_fifo_empty;
     Debug_out.r2_context_state                    <= "00" when (r2_context.state = S_IDLE) else
                                                      "01" when (r2_context.state = S_ACTIVE) else
