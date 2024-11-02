@@ -51,10 +51,11 @@ end entity esm_receiver;
 
 architecture rtl of esm_receiver is
 
-  constant ENABLE_NARROW_CHANNEL      : boolean := false;
-  constant ENABLE_WIDE_CHANNEL        : boolean := true;
-  constant ENABLE_DWELL_STATS         : boolean := false;
+  constant ENABLE_NARROW_CHANNEL      : boolean := true;
+  constant ENABLE_WIDE_CHANNEL        : boolean := false;
+  constant ENABLE_DWELL_STATS         : boolean := true;
   constant ENABLE_PDW_ENCODER         : boolean := true;
+  constant ENABLE_DEBUG               : boolean := false;
 
   constant AXI_FIFO_DEPTH             : natural := 64;
   constant NUM_D2H_MUX_INPUTS         : natural := 5;
@@ -131,65 +132,7 @@ architecture rtl of esm_receiver is
   attribute ASYNC_REG : string;
   attribute ASYNC_REG of r_ad9361_status : signal is "TRUE";
 
-  attribute MARK_DEBUG : string;
-  attribute DONT_TOUCH : string;
-
-  signal w_M_axis_ready    : std_logic;
-  signal w_M_axis_valid    : std_logic;
-  signal w_M_axis_data     : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal w_M_axis_last     : std_logic;
-  signal w_M_axis_valid_ready : std_logic;
-
-  --attribute MARK_DEBUG of w_pdw_encoder_errors : signal is "TRUE";
-  --attribute DONT_TOUCH of w_pdw_encoder_errors : signal is "TRUE";
-
-  --attribute MARK_DEBUG of w_config_rst : signal is "TRUE";
-  --attribute DONT_TOUCH of w_config_rst : signal is "TRUE";
-  --attribute MARK_DEBUG of r_combined_rst : signal is "TRUE";
-  --attribute DONT_TOUCH of r_combined_rst : signal is "TRUE";
-  --attribute MARK_DEBUG of w_enable_status : signal is "TRUE";
-  --attribute DONT_TOUCH of w_enable_status : signal is "TRUE";
-  --attribute MARK_DEBUG of w_enable_chan : signal is "TRUE";
-  --attribute DONT_TOUCH of w_enable_chan : signal is "TRUE";
-  --attribute MARK_DEBUG of w_enable_pdw : signal is "TRUE";
-  --attribute DONT_TOUCH of w_enable_pdw : signal is "TRUE";
-  --attribute MARK_DEBUG of w_dwell_active : signal is "TRUE";
-  --attribute DONT_TOUCH of w_dwell_active : signal is "TRUE";
-  --attribute MARK_DEBUG of w_dwell_sequence_num : signal is "TRUE";
-  --attribute DONT_TOUCH of w_dwell_sequence_num : signal is "TRUE";
-  --
-  --attribute MARK_DEBUG of w_d2h_fifo_in_ready : signal is "TRUE";
-  --attribute DONT_TOUCH of w_d2h_fifo_in_ready : signal is "TRUE";
-  --attribute MARK_DEBUG of w_d2h_fifo_in_valid : signal is "TRUE";
-  --attribute DONT_TOUCH of w_d2h_fifo_in_valid : signal is "TRUE";
-  --attribute MARK_DEBUG of w_d2h_fifo_in_data : signal is "TRUE";
-  --attribute DONT_TOUCH of w_d2h_fifo_in_data : signal is "TRUE";
-  --attribute MARK_DEBUG of w_d2h_fifo_in_last : signal is "TRUE";
-  --attribute DONT_TOUCH of w_d2h_fifo_in_last : signal is "TRUE";
-  --
-  --attribute MARK_DEBUG of w_M_axis_ready : signal is "TRUE";
-  --attribute DONT_TOUCH of w_M_axis_ready : signal is "TRUE";
-  --attribute MARK_DEBUG of w_M_axis_valid : signal is "TRUE";
-  --attribute DONT_TOUCH of w_M_axis_valid : signal is "TRUE";
-  --attribute MARK_DEBUG of w_M_axis_data : signal is "TRUE";
-  --attribute DONT_TOUCH of w_M_axis_data : signal is "TRUE";
-  --attribute MARK_DEBUG of w_M_axis_last : signal is "TRUE";
-  --attribute DONT_TOUCH of w_M_axis_last : signal is "TRUE";
-  --attribute MARK_DEBUG of w_M_axis_valid_ready : signal is "TRUE";
-  --attribute DONT_TOUCH of w_M_axis_valid_ready : signal is "TRUE";
-
 begin
-
-  w_M_axis_ready  <= M_axis_ready;
-  w_M_axis_valid  <= M_axis_valid;
-  w_M_axis_data   <= M_axis_data;
-  w_M_axis_last   <= M_axis_last;
-  w_M_axis_valid_ready <= M_axis_valid and M_axis_ready;
-
-  --TODO: use axi clock to generate 250 MHz
-  --TODO: cdc fifo for adc data_clk -- limit max rate to 1/4
-
-  --TODO: switch to axi async fifos in each reporter
 
   i_phase_marker : entity common_lib.clk_x4_phase_marker
   port map (
@@ -438,7 +381,8 @@ begin
       DATA_WIDTH      => CHANNELIZER8_DATA_WIDTH,
       NUM_CHANNELS    => 8,
       MODULE_ID       => ESM_MODULE_ID_PDW_WIDE,
-      WIDE_BANDWIDTH  => TRUE
+      WIDE_BANDWIDTH  => TRUE,
+      DEBUG_ENABLE    => ENABLE_DEBUG
     )
     port map (
       Clk_axi                       => M_axis_clk,
@@ -489,7 +433,8 @@ begin
       DATA_WIDTH      => CHANNELIZER64_DATA_WIDTH,
       NUM_CHANNELS    => 64,
       MODULE_ID       => ESM_MODULE_ID_PDW_NARROW,
-      WIDE_BANDWIDTH  => FALSE
+      WIDE_BANDWIDTH  => FALSE,
+      DEBUG_ENABLE    => ENABLE_DEBUG
     )
     port map (
       Clk_axi                       => M_axis_clk,

@@ -22,7 +22,8 @@ generic (
   DATA_WIDTH                  : natural;
   BUFFERED_SAMPLES_PER_FRAME  : natural;
   BUFFERED_SAMPLE_PADDING     : natural;
-  PDW_FIFO_DEPTH              : natural
+  PDW_FIFO_DEPTH              : natural;
+  DEBUG_ENABLE                : boolean
 );
 port (
   Clk                     : in  std_logic;
@@ -159,6 +160,7 @@ architecture rtl of esm_pdw_sample_processor is
 
 begin
 
+  g_debug : if (DEBUG_ENABLE) generate
     Debug_out.w_buffer_empty                      <= w_buffer_empty;
     Debug_out.w_buffer_full                       <= w_buffer_full;
     Debug_out.w_buffer_next_index                 <= std_logic_vector(w_buffer_next_index);
@@ -192,6 +194,7 @@ begin
     Debug_out.r2_input_power                      <= std_logic_vector(r2_input_power);
     Debug_out.r2_new_detect                       <= r2_new_detect;
     Debug_out.r2_continued_detect                 <= r2_continued_detect;
+  end generate g_debug;
 
   process(Clk)
   begin

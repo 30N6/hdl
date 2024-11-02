@@ -84,38 +84,6 @@ architecture rtl of esm_config is
   attribute ASYNC_REG of r_enable_pdw_x4      : signal is "TRUE";
   attribute ASYNC_REG of r_enable_status_x4   : signal is "TRUE";
 
-  --attribute MARK_DEBUG : string;
-  --attribute DONT_TOUCH : string;
-
-  --attribute MARK_DEBUG of r_axis_valid : signal is "TRUE";
-  --attribute DONT_TOUCH of r_axis_valid : signal is "TRUE";
-  --attribute MARK_DEBUG of r_axis_last : signal is "TRUE";
-  --attribute DONT_TOUCH of r_axis_last : signal is "TRUE";
-  --attribute MARK_DEBUG of r_axis_data : signal is "TRUE";
-  --attribute DONT_TOUCH of r_axis_data : signal is "TRUE";
-  --attribute MARK_DEBUG of s_state : signal is "TRUE";
-  --attribute DONT_TOUCH of s_state : signal is "TRUE";
-  --attribute MARK_DEBUG of w_module_id : signal is "TRUE";
-  --attribute DONT_TOUCH of w_module_id : signal is "TRUE";
-  --attribute MARK_DEBUG of w_message_type : signal is "TRUE";
-  --attribute DONT_TOUCH of w_message_type : signal is "TRUE";
-  --attribute MARK_DEBUG of r_module_id : signal is "TRUE";
-  --attribute DONT_TOUCH of r_module_id : signal is "TRUE";
-  --attribute MARK_DEBUG of r_message_type : signal is "TRUE";
-  --attribute DONT_TOUCH of r_message_type : signal is "TRUE";
-  --attribute MARK_DEBUG of r_first : signal is "TRUE";
-  --attribute DONT_TOUCH of r_first : signal is "TRUE";
-  --attribute MARK_DEBUG of r_module_config : signal is "TRUE";
-  --attribute DONT_TOUCH of r_module_config : signal is "TRUE";
-  --attribute MARK_DEBUG of r_rst_out : signal is "TRUE";
-  --attribute DONT_TOUCH of r_rst_out : signal is "TRUE";
-  --attribute MARK_DEBUG of r_enable_status : signal is "TRUE";
-  --attribute DONT_TOUCH of r_enable_status : signal is "TRUE";
-  --attribute MARK_DEBUG of r_enable_chan : signal is "TRUE";
-  --attribute DONT_TOUCH of r_enable_chan : signal is "TRUE";
-  --attribute MARK_DEBUG of r_enable_pdw : signal is "TRUE";
-  --attribute DONT_TOUCH of r_enable_pdw : signal is "TRUE";
-
 begin
 
   assert (AXI_DATA_WIDTH = 32)

@@ -14,13 +14,16 @@ library esm_lib;
   use esm_lib.esm_pkg.all;
   use esm_lib.esm_debug_pkg.all;
 
+--TODO: implement channel masking
+
 entity esm_pdw_encoder is
 generic (
   AXI_DATA_WIDTH  : natural;
   DATA_WIDTH      : natural;
   NUM_CHANNELS    : natural;
   MODULE_ID       : unsigned;
-  WIDE_BANDWIDTH  : boolean
+  WIDE_BANDWIDTH  : boolean;
+  DEBUG_ENABLE    : boolean
 );
 port (
   Clk_axi                       : in  std_logic;
@@ -125,52 +128,54 @@ architecture rtl of esm_pdw_encoder is
 
 begin
 
-  w_debug_pdw_encoder.r_timestamp                      <= std_logic_vector(r_timestamp);
-  w_debug_pdw_encoder.s_state                          <= "000" when (s_state = S_IDLE) else
-                                                          "001" when (s_state = S_DWELL_ACTIVE) else
-                                                          "010" when (s_state = S_DWELL_STOP_WAIT) else
-                                                          "011" when (s_state = S_DWELL_DONE) else
-                                                          "100";
-  w_debug_pdw_encoder.r_dwell_active                   <= r_dwell_active;
-  w_debug_pdw_encoder.r_dwell_data_tag                 <= std_logic_vector(r_dwell_data.tag);
-  w_debug_pdw_encoder.w_pdw_ready                      <= w_pdw_ready;
-  w_debug_pdw_encoder.w_pdw_valid                      <= w_pdw_valid;
-  w_debug_pdw_encoder.w_pdw_data_sequence_num          <= std_logic_vector(w_pdw_data.sequence_num);
-  w_debug_pdw_encoder.w_pdw_data_channel               <= std_logic_vector(w_pdw_data.channel);
-  w_debug_pdw_encoder.w_pdw_data_power_accum           <= std_logic_vector(w_pdw_data.power_accum);
-  w_debug_pdw_encoder.w_pdw_data_duration              <= std_logic_vector(w_pdw_data.duration);
-  w_debug_pdw_encoder.w_pdw_data_buffered_frame_index  <= std_logic_vector(w_pdw_data.buffered_frame_index);
-  w_debug_pdw_encoder.w_pdw_data_buffered_frame_valid  <= w_pdw_data.buffered_frame_valid;
-  w_debug_pdw_encoder.w_frame_req_index                <= std_logic_vector(w_frame_req.frame_index);
-  w_debug_pdw_encoder.w_frame_req_read                 <= w_frame_req.frame_read;
-  w_debug_pdw_encoder.w_frame_req_drop                 <= w_frame_req.frame_drop;
-  w_debug_pdw_encoder.w_frame_ack_index                <= std_logic_vector(w_frame_ack.sample_index);
-  w_debug_pdw_encoder.w_frame_ack_valid                <= w_frame_ack.sample_valid;
-  w_debug_pdw_encoder.w_frame_ack_last                 <= w_frame_ack.sample_last;
-  w_debug_pdw_encoder.w_frame_data_i                   <= std_logic_vector(w_frame_data(0));
-  w_debug_pdw_encoder.w_frame_data_q                   <= std_logic_vector(w_frame_data(1));
-  w_debug_pdw_encoder.w_dwell_active                   <= w_dwell_active;
-  w_debug_pdw_encoder.w_dwell_done                     <= w_dwell_done;
-  w_debug_pdw_encoder.r_sample_processor_ack           <= r_sample_processor_ack;
-  w_debug_pdw_encoder.r_report_ack                     <= r_report_ack;
-  w_debug_pdw_encoder.w_pdw_fifo_busy                  <= w_pdw_fifo_busy;
-  w_debug_pdw_encoder.w_pdw_fifo_overflow              <= w_pdw_fifo_overflow;
-  w_debug_pdw_encoder.w_pdw_fifo_underflow             <= w_pdw_fifo_underflow;
-  w_debug_pdw_encoder.w_sample_buffer_busy             <= w_sample_buffer_busy;
-  w_debug_pdw_encoder.w_sample_buffer_underflow        <= w_sample_buffer_underflow;
-  w_debug_pdw_encoder.w_sample_buffer_overflow         <= w_sample_buffer_overflow;
-  w_debug_pdw_encoder.w_reporter_timeout               <= w_reporter_timeout;
-  w_debug_pdw_encoder.w_reporter_overflow              <= w_reporter_overflow;
+  g_debug : if (DEBUG_ENABLE) generate
+    w_debug_pdw_encoder.r_timestamp                      <= std_logic_vector(r_timestamp);
+    w_debug_pdw_encoder.s_state                          <= "000" when (s_state = S_IDLE) else
+                                                            "001" when (s_state = S_DWELL_ACTIVE) else
+                                                            "010" when (s_state = S_DWELL_STOP_WAIT) else
+                                                            "011" when (s_state = S_DWELL_DONE) else
+                                                            "100";
+    w_debug_pdw_encoder.r_dwell_active                   <= r_dwell_active;
+    w_debug_pdw_encoder.r_dwell_data_tag                 <= std_logic_vector(r_dwell_data.tag);
+    w_debug_pdw_encoder.w_pdw_ready                      <= w_pdw_ready;
+    w_debug_pdw_encoder.w_pdw_valid                      <= w_pdw_valid;
+    w_debug_pdw_encoder.w_pdw_data_sequence_num          <= std_logic_vector(w_pdw_data.sequence_num);
+    w_debug_pdw_encoder.w_pdw_data_channel               <= std_logic_vector(w_pdw_data.channel);
+    w_debug_pdw_encoder.w_pdw_data_power_accum           <= std_logic_vector(w_pdw_data.power_accum);
+    w_debug_pdw_encoder.w_pdw_data_duration              <= std_logic_vector(w_pdw_data.duration);
+    w_debug_pdw_encoder.w_pdw_data_buffered_frame_index  <= std_logic_vector(w_pdw_data.buffered_frame_index);
+    w_debug_pdw_encoder.w_pdw_data_buffered_frame_valid  <= w_pdw_data.buffered_frame_valid;
+    w_debug_pdw_encoder.w_frame_req_index                <= std_logic_vector(w_frame_req.frame_index);
+    w_debug_pdw_encoder.w_frame_req_read                 <= w_frame_req.frame_read;
+    w_debug_pdw_encoder.w_frame_req_drop                 <= w_frame_req.frame_drop;
+    w_debug_pdw_encoder.w_frame_ack_index                <= std_logic_vector(w_frame_ack.sample_index);
+    w_debug_pdw_encoder.w_frame_ack_valid                <= w_frame_ack.sample_valid;
+    w_debug_pdw_encoder.w_frame_ack_last                 <= w_frame_ack.sample_last;
+    w_debug_pdw_encoder.w_frame_data_i                   <= std_logic_vector(w_frame_data(0));
+    w_debug_pdw_encoder.w_frame_data_q                   <= std_logic_vector(w_frame_data(1));
+    w_debug_pdw_encoder.w_dwell_active                   <= w_dwell_active;
+    w_debug_pdw_encoder.w_dwell_done                     <= w_dwell_done;
+    w_debug_pdw_encoder.r_sample_processor_ack           <= r_sample_processor_ack;
+    w_debug_pdw_encoder.r_report_ack                     <= r_report_ack;
+    w_debug_pdw_encoder.w_pdw_fifo_busy                  <= w_pdw_fifo_busy;
+    w_debug_pdw_encoder.w_pdw_fifo_overflow              <= w_pdw_fifo_overflow;
+    w_debug_pdw_encoder.w_pdw_fifo_underflow             <= w_pdw_fifo_underflow;
+    w_debug_pdw_encoder.w_sample_buffer_busy             <= w_sample_buffer_busy;
+    w_debug_pdw_encoder.w_sample_buffer_underflow        <= w_sample_buffer_underflow;
+    w_debug_pdw_encoder.w_sample_buffer_overflow         <= w_sample_buffer_overflow;
+    w_debug_pdw_encoder.w_reporter_timeout               <= w_reporter_timeout;
+    w_debug_pdw_encoder.w_reporter_overflow              <= w_reporter_overflow;
 
-  i_debug : entity esm_lib.esm_pdw_encoder_debug
-  port map (
-    Clk_axi                 => Clk_axi,
-    Clk                     => Clk,
-    Rst                     => r_rst,
+    i_debug : entity esm_lib.esm_pdw_encoder_debug
+    port map (
+      Clk_axi                 => Clk_axi,
+      Clk                     => Clk,
+      Rst                     => r_rst,
 
-    Debug_sample_processor  => w_debug_sample_processor,
-    Debug_pdw_encoder       => w_debug_pdw_encoder
-  );
+      Debug_sample_processor  => w_debug_sample_processor,
+      Debug_pdw_encoder       => w_debug_pdw_encoder
+    );
+  end generate g_debug;
 
   process(Clk)
   begin
@@ -245,7 +250,8 @@ begin
     DATA_WIDTH                  => IQ_WIDTH,
     BUFFERED_SAMPLES_PER_FRAME  => BUFFERED_SAMPLES_PER_FRAME,
     BUFFERED_SAMPLE_PADDING     => BUFFERED_SAMPLE_PADDING,
-    PDW_FIFO_DEPTH              => PDW_FIFO_DEPTH
+    PDW_FIFO_DEPTH              => PDW_FIFO_DEPTH,
+    DEBUG_ENABLE                => DEBUG_ENABLE
   )
   port map (
     Clk                     => Clk,
