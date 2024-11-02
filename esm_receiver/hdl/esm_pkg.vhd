@@ -41,7 +41,7 @@ package esm_pkg is
 
   constant ESM_NUM_FAST_LOCK_PROFILES                   : natural := 8;
   constant ESM_FAST_LOCK_PROFILE_INDEX_WIDTH            : natural := clog2(ESM_NUM_FAST_LOCK_PROFILES);
-  constant ESM_NUM_DWELL_ENTRIES                        : natural := 32;
+  constant ESM_NUM_DWELL_ENTRIES                        : natural := 32; --TODO: increase now that memory is more plentiful without the wideband path?
   constant ESM_DWELL_ENTRY_INDEX_WIDTH                  : natural := clog2(ESM_NUM_DWELL_ENTRIES);
   constant ESM_NUM_DWELL_INSTRUCTIONS                   : natural := 32;
   constant ESM_DWELL_INSTRUCTION_INDEX_WIDTH            : natural := clog2(ESM_NUM_DWELL_INSTRUCTIONS);
@@ -50,11 +50,12 @@ package esm_pkg is
   constant ESM_DWELL_SEQUENCE_NUM_WIDTH                 : natural := 32;
   constant ESM_TIMESTAMP_WIDTH                          : natural := 48;
   constant ESM_THRESHOLD_WIDTH                          : natural := 32;
+  constant ESM_MIN_DURATION_WIDTH                       : natural := 16;
   constant ESM_PDW_SEQUENCE_NUM_WIDTH                   : natural := 32;
   constant ESM_PDW_POWER_ACCUM_WIDTH                    : natural := 48;
   constant ESM_PDW_CYCLE_COUNT_WIDTH                    : natural := 32;
   constant ESM_PDW_IFM_WIDTH                            : natural := 16;
-  constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH            : natural := 16;
+  constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH            : natural := 8; --TODO: increase
   constant ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH      : natural := clog2(ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH);
   constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_DEPTH           : natural := 64;
   constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH     : natural := clog2(ESM_PDW_SAMPLE_BUFFER_SAMPLE_DEPTH);
@@ -83,6 +84,7 @@ package esm_pkg is
     threshold_wide            : unsigned(ESM_THRESHOLD_WIDTH - 1 downto 0);
     channel_mask_narrow       : std_logic_vector(ESM_NUM_CHANNELS_NARROW - 1 downto 0);
     channel_mask_wide         : std_logic_vector(ESM_NUM_CHANNELS_WIDE - 1 downto 0);
+    min_pulse_duration        : unsigned(ESM_MIN_DURATION_WIDTH - 1 downto 0);
   end record;
 
   type esm_dwell_metadata_array_t is array (natural range <>) of esm_dwell_metadata_t;
@@ -99,7 +101,8 @@ package esm_pkg is
   --  threshold_wide            : unsigned(31 downto 0);
   --  channel_mask_narrow       : std_logic_vector(63 downto 0);
   --  channel_mask_wide         : std_logic_vector(7 downto 0);
-  --  padding1                  : std_logic_vector(23 downto 0);
+  --  padding1                  : std_logic_vector(7 downto 0);
+  --  min_pulse_duration        : unsigned(15 downto 0);
   --end record;
 
   type esm_message_dwell_entry_t is record
@@ -107,10 +110,11 @@ package esm_pkg is
     entry_data                : esm_dwell_metadata_t;
   end record;
 
-  constant ESM_MESSAGE_DWELL_ENTRY_PACKED_WIDTH : natural := 32 + ESM_DWELL_METADATA_PACKED_WIDTH;
+  constant ESM_MESSAGE_DWELL_ENTRY_PACKED_WIDTH : natural := 64 + ESM_DWELL_METADATA_PACKED_WIDTH;
   --type esm_message_dwell_entry_packed_t is record
   --  entry_index               : unsigned(7 downto 0);
-  --  padding                   : std_logic_vector(23 downto 0);
+  --  padding0                  : std_logic_vector(23 downto 0);
+  --  padding1                  : std_logic_vector(31 downto 0);
   --  entry_data                : esm_dwell_metadata_packed_t;
   --end record;
 
@@ -118,6 +122,9 @@ package esm_pkg is
     valid                     : std_logic;
     global_counter_check      : std_logic;
     global_counter_dec        : std_logic;
+    skip_pll_prelock_wait     : std_logic;
+    skip_pll_lock_check       : std_logic;
+    skip_pll_postlock_wait    : std_logic;
     repeat_count              : unsigned(3 downto 0);
     entry_index               : unsigned(ESM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
     next_instruction_index    : unsigned(ESM_DWELL_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
@@ -199,6 +206,7 @@ package esm_pkg is
   type esm_pdw_sample_buffer_req_t is record
     frame_index   : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
     frame_read    : std_logic;
+    frame_drop    : std_logic;
   end record;
 
   type esm_pdw_sample_buffer_ack_t is record
@@ -230,6 +238,7 @@ package esm_pkg is
     module_id                 : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0);
     message_type              : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0);
   end record;
+  constant ESM_CONFIG_DATA_WIDTH : natural := 3 + 32 + ESM_MODULE_ID_WIDTH + ESM_MESSAGE_TYPE_WIDTH;
 
   type esm_channelizer_warnings_t is record
     demux_gap       : std_logic;
@@ -251,22 +260,66 @@ package esm_pkg is
 
   type esm_channelizer_errors_array_t is array (natural range <>) of esm_channelizer_errors_t;
 
-  type esm_status_flags_t is record
-    channelizer_warnings  : esm_channelizer_warnings_array_t(1 downto 0);
-    channelizer_errors    : esm_channelizer_errors_array_t(1 downto 0);
+  type esm_dwell_stats_errors_t is record
+    reporter_timeout  : std_logic;
+    reporter_overflow : std_logic;
   end record;
 
-  constant ESM_STATUS_FLAGS_WIDTH : natural := 2*ESM_CHANNELIZER_WARNINGS_WIDTH + 2*ESM_CHANNELIZER_ERRORS_WIDTH;
+  constant ESM_DWELL_STATS_ERRORS_WIDTH : natural := 2;
+
+  type esm_dwell_stats_errors_array_t is array (natural range <>) of esm_dwell_stats_errors_t;
+
+  type esm_pdw_encoder_errors_t is record
+    pdw_fifo_busy           : std_logic;
+    pdw_fifo_overflow       : std_logic;
+    pdw_fifo_underflow      : std_logic;
+    sample_buffer_busy      : std_logic;
+    sample_buffer_underflow : std_logic;
+    sample_buffer_overflow  : std_logic;
+    reporter_timeout        : std_logic;
+    reporter_overflow       : std_logic;
+  end record;
+
+  constant ESM_PDW_ENCODER_ERRORS_WIDTH : natural := 8;
+
+  type esm_pdw_encoder_errors_array_t is array (natural range <>) of esm_pdw_encoder_errors_t;
+
+  type esm_status_reporter_errors_t is record
+    reporter_timeout  : std_logic;
+    reporter_overflow : std_logic;
+  end record;
+
+  constant ESM_STATUS_REPORTER_ERRORS_WIDTH : natural := 2;
+
+  type esm_path_status_flags_t is record
+    channelizer_warnings  : esm_channelizer_warnings_t;
+    channelizer_errors    : esm_channelizer_errors_t;
+    dwell_stats_errors    : esm_dwell_stats_errors_t;
+    pdw_encoder_errors    : esm_pdw_encoder_errors_t;
+  end record;
+
+  constant ESM_PATH_STATUS_FLAGS_WIDTH : natural := ESM_CHANNELIZER_WARNINGS_WIDTH +
+                                                    ESM_CHANNELIZER_ERRORS_WIDTH +
+                                                    ESM_DWELL_STATS_ERRORS_WIDTH +
+                                                    ESM_PDW_ENCODER_ERRORS_WIDTH;
+
+  type esm_path_status_flags_array_t is array (natural range <>) of esm_path_status_flags_t;
 
   function unpack(v : std_logic_vector) return esm_dwell_metadata_t;
   function unpack(v : std_logic_vector) return esm_message_dwell_entry_t;
   function unpack(v : std_logic_vector) return esm_message_dwell_program_header_t;
   function unpack(v : std_logic_vector) return esm_dwell_instruction_t;
   function unpack(v : std_logic_vector) return esm_pdw_fifo_data_t;
+  function unpack(v : std_logic_vector) return esm_config_data_t;
+
   function pack(v : esm_pdw_fifo_data_t) return std_logic_vector;
   function pack(v : esm_channelizer_warnings_t) return std_logic_vector;
   function pack(v : esm_channelizer_errors_t) return std_logic_vector;
-  function pack(v : esm_status_flags_t) return std_logic_vector;
+  function pack(v : esm_dwell_stats_errors_t) return std_logic_vector;
+  function pack(v : esm_pdw_encoder_errors_t) return std_logic_vector;
+  function pack(v : esm_status_reporter_errors_t) return std_logic_vector;
+  function pack(v : esm_path_status_flags_t) return std_logic_vector;
+  function pack(v : esm_config_data_t) return std_logic_vector;
 
 end package esm_pkg;
 
@@ -292,6 +345,8 @@ package body esm_pkg is
     r.threshold_wide      := unsigned(vm(159 downto 128));
     r.channel_mask_narrow := vm(223 downto 160);
     r.channel_mask_wide   := vm(231 downto 224);
+    --padding
+    r.min_pulse_duration  := unsigned(vm(255 downto 240));
     return r;
   end function;
 
@@ -303,7 +358,7 @@ package body esm_pkg is
       severity failure;
 
     r.entry_index   := unsigned(v(ESM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0));
-    r.entry_data    := unpack(v(32 + ESM_DWELL_METADATA_PACKED_WIDTH - 1 downto 32));
+    r.entry_data    := unpack(v(64 + ESM_DWELL_METADATA_PACKED_WIDTH - 1 downto 64));
     return r;
   end function;
 
@@ -331,6 +386,9 @@ package body esm_pkg is
     r.valid                   := v(0);
     r.global_counter_check    := v(1);
     r.global_counter_dec      := v(2);
+    r.skip_pll_prelock_wait   := v(3);
+    r.skip_pll_lock_check     := v(4);
+    r.skip_pll_postlock_wait  := v(5);
     r.repeat_count            := unsigned(v(11 downto 8));
     r.entry_index             := unsigned(v(20 downto 16));
     r.next_instruction_index  := unsigned(v(28 downto 24));
@@ -351,10 +409,28 @@ package body esm_pkg is
     r.duration              := unsigned(v(149 downto 118));
     r.frequency             := unsigned(v(165 downto 150));
     r.pulse_start_time      := unsigned(v(213 downto 166));
-    r.buffered_frame_index  := unsigned(v(217 downto 214));
-    r.buffered_frame_valid  := v(218);
+    r.buffered_frame_index  := unsigned(v(216 downto 214));
+    r.buffered_frame_valid  := v(217);
     return r;
   end function;
+
+  function unpack(v : std_logic_vector) return esm_config_data_t is
+    variable r : esm_config_data_t;
+  begin
+    assert (v'length = ESM_CONFIG_DATA_WIDTH)
+      report "Invalid length."
+      severity failure;
+
+    r.valid         := v(0);
+    r.first         := v(1);
+    r.last          := v(2);
+    r.data          := v(34 downto 3);
+    r.module_id     := unsigned(v(35 + ESM_MODULE_ID_WIDTH - 1 downto 35));
+    r.message_type  := unsigned(v(35 + ESM_MODULE_ID_WIDTH + ESM_MESSAGE_TYPE_WIDTH - 1 downto 35 + ESM_MODULE_ID_WIDTH));
+
+    return r;
+  end function;
+
 
   function pack(v : esm_pdw_fifo_data_t) return std_logic_vector is
     variable r : std_logic_vector(ESM_PDW_FIFO_DATA_WIDTH - 1 downto 0);
@@ -367,8 +443,8 @@ package body esm_pkg is
     r(149 downto 118) := std_logic_vector(v.duration);
     r(165 downto 150) := std_logic_vector(v.frequency);
     r(213 downto 166) := std_logic_vector(v.pulse_start_time);
-    r(217 downto 214) := std_logic_vector(v.buffered_frame_index);
-    r(218)            := v.buffered_frame_valid;
+    r(216 downto 214) := std_logic_vector(v.buffered_frame_index);
+    r(217)            := v.buffered_frame_valid;
 
     return r;
   end function;
@@ -383,22 +459,74 @@ package body esm_pkg is
   function pack(v : esm_channelizer_errors_t) return std_logic_vector is
     variable r : std_logic_vector(ESM_CHANNELIZER_ERRORS_WIDTH - 1 downto 0);
   begin
-    r(0) := v.demux_overflow;
-    r(1) := v.filter_overflow;
-    r(2) := v.mux_overflow;
-    r(3) := v.mux_underflow;
-    r(4) := v.mux_collision;
+    r := (
+          v.mux_collision,
+          v.mux_underflow,
+          v.mux_overflow,
+          v.filter_overflow,
+          v.demux_overflow
+         );
     return r;
   end function;
 
-  function pack(v : esm_status_flags_t) return std_logic_vector is
-    variable r : std_logic_vector(ESM_STATUS_FLAGS_WIDTH - 1 downto 0);
+  function pack(v : esm_dwell_stats_errors_t) return std_logic_vector is
+    variable r : std_logic_vector(ESM_DWELL_STATS_ERRORS_WIDTH - 1 downto 0);
   begin
-      r(ESM_CHANNELIZER_WARNINGS_WIDTH - 1 downto 0)                                := pack(v.channelizer_warnings(0));
-      r(2*ESM_CHANNELIZER_WARNINGS_WIDTH - 1 downto ESM_CHANNELIZER_WARNINGS_WIDTH) := pack(v.channelizer_warnings(1));
+    r := (
+          v.reporter_overflow,
+          v.reporter_timeout
+         );
+    return r;
+  end function;
 
-      r(ESM_CHANNELIZER_ERRORS_WIDTH + 2*ESM_CHANNELIZER_WARNINGS_WIDTH - 1 downto 2*ESM_CHANNELIZER_WARNINGS_WIDTH)                                  := pack(v.channelizer_errors(0));
-      r(2*ESM_CHANNELIZER_ERRORS_WIDTH + 2*ESM_CHANNELIZER_WARNINGS_WIDTH - 1 downto ESM_CHANNELIZER_ERRORS_WIDTH + 2*ESM_CHANNELIZER_WARNINGS_WIDTH) := pack(v.channelizer_errors(1));
+  function pack(v : esm_pdw_encoder_errors_t) return std_logic_vector is
+    variable r : std_logic_vector(ESM_PDW_ENCODER_ERRORS_WIDTH - 1 downto 0);
+  begin
+    r := (
+          v.reporter_overflow,
+          v.reporter_timeout,
+          v.sample_buffer_overflow,
+          v.sample_buffer_underflow,
+          v.sample_buffer_busy,
+          v.pdw_fifo_underflow,
+          v.pdw_fifo_overflow,
+          v.pdw_fifo_busy
+         );
+    return r;
+  end function;
+
+  function pack(v : esm_status_reporter_errors_t) return std_logic_vector is
+    variable r : std_logic_vector(ESM_STATUS_REPORTER_ERRORS_WIDTH - 1 downto 0);
+  begin
+    r := (
+          v.reporter_overflow,
+          v.reporter_timeout
+         );
+    return r;
+  end function;
+
+  function pack(v : esm_path_status_flags_t) return std_logic_vector is
+    variable r : std_logic_vector(ESM_PATH_STATUS_FLAGS_WIDTH - 1 downto 0);
+  begin
+    r := (
+          pack(v.pdw_encoder_errors),
+          pack(v.dwell_stats_errors),
+          pack(v.channelizer_errors),
+          pack(v.channelizer_warnings)
+         );
+    return r;
+  end function;
+
+  function pack(v : esm_config_data_t) return std_logic_vector is
+    variable r : std_logic_vector(ESM_CONFIG_DATA_WIDTH - 1 downto 0);
+  begin
+    r(0)             := v.valid;
+    r(1)             := v.first;
+    r(2)             := v.last;
+    r(34 downto 3)   := v.data;
+    r(35 + ESM_MODULE_ID_WIDTH - 1 downto 35)                                                 := std_logic_vector(v.module_id);
+    r(35 + ESM_MODULE_ID_WIDTH + ESM_MESSAGE_TYPE_WIDTH - 1 downto 35 + ESM_MODULE_ID_WIDTH)  := std_logic_vector(v.message_type);
+
     return r;
   end function;
 

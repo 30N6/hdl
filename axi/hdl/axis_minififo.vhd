@@ -23,9 +23,16 @@ port (
   M_axis_data   : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   M_axis_last   : out std_logic
 );
+begin
+-- PSL default clock is rising_edge(Clk);
+-- PSL assert always (Rst = '1') -> next(M_axis_valid = '0');
+-- PSL assert always ((Rst = '0') and (M_axis_valid = '1') and (M_axis_ready = '0')) -> next(stable(M_axis_data));
+-- PSL assert always ((Rst = '0') and (M_axis_valid = '1') and (M_axis_ready = '0')) -> next(stable(M_axis_last));
+-- PSL assert always ((Rst = '0') and (M_axis_valid = '1') and (M_axis_ready = '0')) -> next(M_axis_valid = '1');
+-- PSL assert always ((Rst = '0') and (S_axis_valid = '1') and (S_axis_ready = '0')) -> next(stable(S_axis_data));
+-- PSL assert always ((Rst = '0') and (S_axis_valid = '1') and (S_axis_ready = '0')) -> next(stable(S_axis_last));
+-- PSL assert always ((Rst = '0') and (S_axis_valid = '1') and (S_axis_ready = '0')) -> next(S_axis_valid = '1');
 end entity axis_minififo;
-
---TODO: PSL assert
 
 architecture rtl of axis_minififo is
 

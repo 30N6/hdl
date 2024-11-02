@@ -4,11 +4,14 @@ import math::*;
 import esm_pkg::*;
 
 typedef struct {
-  bit [1:0]                   enable_channelizer;
-  bit [1:0]                   enable_pdw_encoder;
-  esm_channelizer_warnings_t  channelizer_warnings [1:0];
-  esm_channelizer_errors_t    channelizer_errors [1:0];
-  int                         pre_write_delay;
+  bit [1:0]                     enable_channelizer;
+  bit [1:0]                     enable_pdw_encoder;
+  esm_channelizer_warnings_t    channelizer_warnings [1:0];
+  esm_channelizer_errors_t      channelizer_errors [1:0];
+  esm_dwell_stats_errors_t      dwell_stats_errors [1:0];
+  esm_pdw_encoder_errors_t      pdw_encoder_errors [1:0];
+  esm_status_reporter_errors_t  status_reporter_errors;
+  int                           pre_write_delay;
 } esm_status_data_t;
 
 typedef esm_status_data_t esm_status_data_array_t [];
@@ -18,12 +21,16 @@ interface esm_status_tx_intf (input logic Clk);
   bit [1:0]                   enable_pdw_encoder;
   esm_channelizer_warnings_t  channelizer_warnings [1:0];
   esm_channelizer_errors_t    channelizer_errors [1:0];
+  esm_dwell_stats_errors_t    dwell_stats_errors [1:0];
+  esm_pdw_encoder_errors_t    pdw_encoder_errors [1:0];
 
   task clear();
     enable_channelizer    = 0;
     enable_pdw_encoder    = 0;
     channelizer_warnings  = {default:0};
     channelizer_errors    = {default:0};
+    dwell_stats_errors    = {default:0};
+    pdw_encoder_errors    = {default:0};
   endtask
 
   task write(esm_status_data_t input_data);
@@ -32,9 +39,13 @@ interface esm_status_tx_intf (input logic Clk);
     enable_pdw_encoder    = input_data.enable_pdw_encoder;
     channelizer_warnings  = input_data.channelizer_warnings;
     channelizer_errors    = input_data.channelizer_errors;
+    dwell_stats_errors    = input_data.dwell_stats_errors;
+    pdw_encoder_errors    = input_data.pdw_encoder_errors;
     @(posedge Clk);
     channelizer_warnings  = {default:0};
     channelizer_errors    = {default:0};
+    dwell_stats_errors    = {default:0};
+    pdw_encoder_errors    = {default:0};
   endtask
 endinterface
 
@@ -58,10 +69,11 @@ interface axi_rx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
 endinterface
 
 module esm_status_reporter_tb;
-  parameter time CLK_HALF_PERIOD    = 8ns;
-  parameter AXI_DATA_WIDTH          = 32;
-  parameter logic [7:0] MODULE_ID   = 99;
-  parameter HEARTBEAT_INTERVAL      = 1000;
+  parameter time CLK_HALF_PERIOD      = 2ns;
+  parameter time AXI_CLK_HALF_PERIOD  = 5ns;
+  parameter AXI_DATA_WIDTH            = 32;
+  parameter logic [7:0] MODULE_ID     = 99;
+  parameter HEARTBEAT_INTERVAL        = 1000;
 
   typedef struct
   {
@@ -77,45 +89,68 @@ module esm_status_reporter_tb;
     bit [15:0]  padding_0;
 
     bit [31:0]  enables;
-    bit [31:0]  status;
+    bit [31:0]  status_path_0;
+    bit [31:0]  status_path_1;
+    bit [31:0]  status_reporter;
     bit [63:0]  timestamp;
   } esm_status_report_header_t;
 
   typedef struct packed
   {
-    bit chan1_error_mux_collision;
-    bit chan1_error_mux_underflow;
-    bit chan1_error_mux_overflow;
-    bit chan1_error_filter_overflow;
-    bit chan1_error_demux_overflow;
+    bit error_status_reporter_overflow;
+    bit error_status_reporter_timeout;
+  } esm_status_reporter_errors_packed_t;
 
-    bit chan0_error_mux_collision;
-    bit chan0_error_mux_underflow;
-    bit chan0_error_mux_overflow;
-    bit chan0_error_filter_overflow;
-    bit chan0_error_demux_overflow;
+  typedef struct packed
+  {
+    bit error_pdw_reporter_overflow;
+    bit error_pdw_reporter_timeout;
+    bit error_pdw_sample_buffer_overflow;
+    bit error_pdw_sample_buffer_underflow;
+    bit error_pdw_sample_buffer_busy;
+    bit error_pdw_fifo_underflow;
+    bit error_pdw_fifo_overflow;
+    bit error_pdw_fifo_busy;
 
-    bit chan1_warning_demux_gap;
-    bit chan0_warning_demux_gap;
-  } esm_status_flags_packed_t;
+    bit error_dwell_reporter_overflow;
+    bit error_dwell_reporter_timeout;
 
-  typedef bit [$bits(esm_status_report_header_t) - 1 : 0] esm_status_report_header_bits_t;
-  typedef bit [$bits(esm_status_flags_packed_t) - 1 : 0] esm_status_flags_packed_bits_t;
+    bit error_mux_collision;
+    bit error_mux_underflow;
+    bit error_mux_overflow;
+    bit error_filter_overflow;
+    bit error_demux_overflow;
+
+    bit warning_demux_gap;
+  } esm_path_status_flags_packed_t;
+
+  typedef bit [$bits(esm_status_report_header_t) - 1 : 0]           esm_status_report_header_bits_t;
+  typedef bit [$bits(esm_path_status_flags_packed_t) - 1 : 0]       esm_path_status_flags_packed_bits_t;
+  typedef bit [$bits(esm_status_reporter_errors_packed_t) - 1 : 0]  esm_status_reporter_errors_packed_bits_t;
 
   parameter MAX_WORDS_PER_PACKET = 64;
   parameter NUM_HEADER_WORDS = ($bits(esm_status_report_header_t) / AXI_DATA_WIDTH);
 
+  logic Clk_axi;
   logic Clk;
   logic Rst;
 
   esm_status_tx_intf                              status_tx_intf (.*);
-  axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf    (.*);
+  axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf    (.Clk(Clk_axi));
 
   int unsigned  report_seq_num = 0;
   expect_t      expected_data [$];
   int           num_received = 0;
   logic         r_axi_rx_ready;
   logic         w_axi_rx_valid;
+
+  initial begin
+    Clk_axi = 0;
+    forever begin
+      #(AXI_CLK_HALF_PERIOD);
+      Clk_axi = ~Clk_axi;
+    end
+  end
 
   initial begin
     Clk = 0;
@@ -127,11 +162,11 @@ module esm_status_reporter_tb;
 
   initial begin
     Rst = 1;
-    @(posedge Clk);
+    repeat(10) @(posedge Clk);
     Rst = 0;
   end
 
-  always_ff @(posedge Clk) begin
+  always_ff @(posedge Clk_axi) begin
     r_axi_rx_ready <= $urandom_range(99) < 80;
   end
 
@@ -143,6 +178,7 @@ module esm_status_reporter_tb;
   )
   dut
   (
+    .Clk_axi              (Clk_axi),
     .Clk                  (Clk),
     .Rst                  (Rst),
 
@@ -152,6 +188,8 @@ module esm_status_reporter_tb;
 
     .Channelizer_warnings (status_tx_intf.channelizer_warnings),
     .Channelizer_errors   (status_tx_intf.channelizer_errors),
+    .Dwell_stats_errors   (status_tx_intf.dwell_stats_errors),
+    .Pdw_encoder_errors   (status_tx_intf.pdw_encoder_errors),
 
     .Axis_ready           (r_axi_rx_ready),
     .Axis_valid           (w_axi_rx_valid),
@@ -190,6 +228,9 @@ module esm_status_reporter_tb;
     esm_status_report_header_t report_a = unpack_report_header(a);
     esm_status_report_header_t report_b = unpack_report_header(b);
 
+    $display("data_match: a=%p", report_a);
+    $display("data_match: b=%p", report_b);
+
     if (a.size() != b.size()) begin
       $display("%0t: size mismatch: a=%0d b=%0d", $time, a.size(), b.size());
       return 0;
@@ -222,8 +263,16 @@ module esm_status_reporter_tb;
       return 0;
     end
 
-    if (report_a.status !== report_b.status) begin
-      $display("status mismatch: %X %X", report_a.status, report_b.status);
+    if (report_a.status_path_0 !== report_b.status_path_0) begin
+      $display("status_path_0 mismatch: %X %X", report_a.status_path_0, report_b.status_path_0);
+      return 0;
+    end
+    if (report_a.status_path_1 !== report_b.status_path_1) begin
+      $display("status_path_1 mismatch: %X %X", report_a.status_path_1, report_b.status_path_1);
+      return 0;
+    end
+    if (report_a.status_reporter !== report_b.status_reporter) begin
+      $display("status_reporter mismatch: %X %X", report_a.status_reporter, report_b.status_reporter);
       return 0;
     end
 
@@ -266,35 +315,52 @@ module esm_status_reporter_tb;
   end
 
   function automatic void expect_report(esm_status_data_t input_data);
-    int                               num_padding_words = 0;
-    expect_t                          r;
-    esm_status_report_header_t        report_header;
-    esm_status_report_header_bits_t   report_header_packed;
-    esm_status_flags_packed_t         status_flags;
-    esm_status_flags_packed_bits_t    status_flags_packed;
+    int                                       num_padding_words = 0;
+    expect_t                                  r;
+    esm_status_report_header_t                report_header;
+    esm_status_report_header_bits_t           report_header_packed;
+    esm_status_reporter_errors_packed_t       reporter_errors;
+    esm_status_reporter_errors_packed_bits_t  reporter_errors_packed;
+    esm_path_status_flags_packed_t            status_flags [1 : 0];
+    esm_path_status_flags_packed_bits_t       status_flags_packed [1 : 0];
 
-    status_flags.chan0_warning_demux_gap      = input_data.channelizer_warnings[0].demux_gap;
-    status_flags.chan1_warning_demux_gap      = input_data.channelizer_warnings[1].demux_gap;
-    status_flags.chan0_error_demux_overflow   = input_data.channelizer_errors[0].demux_overflow;
-    status_flags.chan0_error_filter_overflow  = input_data.channelizer_errors[0].filter_overflow;
-    status_flags.chan0_error_mux_overflow     = input_data.channelizer_errors[0].mux_overflow;
-    status_flags.chan0_error_mux_underflow    = input_data.channelizer_errors[0].mux_underflow;
-    status_flags.chan0_error_mux_collision    = input_data.channelizer_errors[0].mux_collision;
-    status_flags.chan1_error_demux_overflow   = input_data.channelizer_errors[1].demux_overflow;
-    status_flags.chan1_error_filter_overflow  = input_data.channelizer_errors[1].filter_overflow;
-    status_flags.chan1_error_mux_overflow     = input_data.channelizer_errors[1].mux_overflow;
-    status_flags.chan1_error_mux_underflow    = input_data.channelizer_errors[1].mux_underflow;
-    status_flags.chan1_error_mux_collision    = input_data.channelizer_errors[1].mux_collision;
+    //$display("%0t: expect_report: input=%p", $time, input_data);
+    reporter_errors.error_status_reporter_overflow = input_data.status_reporter_errors.reporter_overflow;
+    reporter_errors.error_status_reporter_timeout  = input_data.status_reporter_errors.reporter_timeout;
 
-    status_flags_packed = esm_status_flags_packed_bits_t'(status_flags);
+    for (int i = 0; i < 2; i++) begin
+      status_flags[i].warning_demux_gap                  = input_data.channelizer_warnings[i].demux_gap;
 
-    report_header.magic_num     = esm_report_magic_num;
-    report_header.sequence_num  = report_seq_num;
-    report_header.module_id     = MODULE_ID;
-    report_header.message_type  = esm_report_message_type_status;
-    report_header.enables       = {27'h0, input_data.enable_pdw_encoder, input_data.enable_channelizer, 1'b1};
-    report_header.status        = status_flags_packed;
-    report_header.timestamp     = 0;
+      status_flags[i].error_demux_overflow               = input_data.channelizer_errors[i].demux_overflow;
+      status_flags[i].error_filter_overflow              = input_data.channelizer_errors[i].filter_overflow;
+      status_flags[i].error_mux_overflow                 = input_data.channelizer_errors[i].mux_overflow;
+      status_flags[i].error_mux_underflow                = input_data.channelizer_errors[i].mux_underflow;
+      status_flags[i].error_mux_collision                = input_data.channelizer_errors[i].mux_collision;
+
+      status_flags[i].error_dwell_reporter_overflow      = input_data.dwell_stats_errors[i].reporter_overflow;
+      status_flags[i].error_dwell_reporter_timeout       = input_data.dwell_stats_errors[i].reporter_timeout;
+
+      status_flags[i].error_pdw_reporter_overflow        = input_data.pdw_encoder_errors[i].reporter_overflow;
+      status_flags[i].error_pdw_reporter_timeout         = input_data.pdw_encoder_errors[i].reporter_timeout;
+      status_flags[i].error_pdw_sample_buffer_overflow   = input_data.pdw_encoder_errors[i].sample_buffer_overflow;
+      status_flags[i].error_pdw_sample_buffer_underflow  = input_data.pdw_encoder_errors[i].sample_buffer_underflow;
+      status_flags[i].error_pdw_sample_buffer_busy       = input_data.pdw_encoder_errors[i].sample_buffer_busy;
+      status_flags[i].error_pdw_fifo_underflow           = input_data.pdw_encoder_errors[i].pdw_fifo_underflow;
+      status_flags[i].error_pdw_fifo_overflow            = input_data.pdw_encoder_errors[i].pdw_fifo_overflow;
+      status_flags[i].error_pdw_fifo_busy                = input_data.pdw_encoder_errors[i].pdw_fifo_busy;
+
+      status_flags_packed[i] = esm_path_status_flags_packed_bits_t'(status_flags[i]);
+    end
+
+    report_header.magic_num       = esm_report_magic_num;
+    report_header.sequence_num    = report_seq_num;
+    report_header.module_id       = MODULE_ID;
+    report_header.message_type    = esm_report_message_type_status;
+    report_header.enables         = {27'h0, input_data.enable_pdw_encoder, input_data.enable_channelizer, 1'b1};
+    report_header.status_path_0   = status_flags_packed[0];
+    report_header.status_path_1   = status_flags_packed[1];
+    report_header.status_reporter = reporter_errors;
+    report_header.timestamp       = 0;
 
     report_header_packed = esm_status_report_header_bits_t'(report_header);
     //$display("report_packed: %X", report_header_packed);
@@ -337,15 +403,32 @@ module esm_status_reporter_tb;
       end
 
       for (int j = 0; j < 2; j++) begin
-        r[i].enable_channelizer[j]                  = $urandom_range(1);
-        r[i].enable_pdw_encoder[j]                  = $urandom_range(1);
-        r[i].channelizer_warnings[j].demux_gap      = $urandom_range(1);
-        r[i].channelizer_errors[j].demux_overflow   = $urandom_range(1);
-        r[i].channelizer_errors[j].filter_overflow  = $urandom_range(1);
-        r[i].channelizer_errors[j].mux_overflow     = $urandom_range(1);
-        r[i].channelizer_errors[j].mux_underflow    = $urandom_range(1);
-        r[i].channelizer_errors[j].mux_collision    = $urandom_range(1);
+        r[i].enable_channelizer[j]                          = $urandom_range(1);
+        r[i].enable_pdw_encoder[j]                          = $urandom_range(1);
+
+        r[i].channelizer_warnings[j].demux_gap              = $urandom_range(1);
+
+        r[i].channelizer_errors[j].demux_overflow           = $urandom_range(1);
+        r[i].channelizer_errors[j].filter_overflow          = $urandom_range(1);
+        r[i].channelizer_errors[j].mux_overflow             = $urandom_range(1);
+        r[i].channelizer_errors[j].mux_underflow            = $urandom_range(1);
+        r[i].channelizer_errors[j].mux_collision            = $urandom_range(1);
+
+        r[i].dwell_stats_errors[j].reporter_overflow        = $urandom_range(1);
+        r[i].dwell_stats_errors[j].reporter_timeout         = $urandom_range(1);
+
+        r[i].pdw_encoder_errors[j].reporter_overflow        = $urandom_range(1);
+        r[i].pdw_encoder_errors[j].reporter_timeout         = $urandom_range(1);
+        r[i].pdw_encoder_errors[j].sample_buffer_busy       = $urandom_range(1);
+        r[i].pdw_encoder_errors[j].sample_buffer_overflow   = $urandom_range(1);
+        r[i].pdw_encoder_errors[j].sample_buffer_underflow  = $urandom_range(1);
+        r[i].pdw_encoder_errors[j].pdw_fifo_underflow       = $urandom_range(1);
+        r[i].pdw_encoder_errors[j].pdw_fifo_overflow        = $urandom_range(1);
+        r[i].pdw_encoder_errors[j].pdw_fifo_busy            = $urandom_range(1);
       end
+
+      r[i].status_reporter_errors.reporter_overflow = 0;
+      r[i].status_reporter_errors.reporter_timeout  = 0;
     end
 
     return r;

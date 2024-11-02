@@ -68,7 +68,9 @@ architecture rtl of esm_dwell_controller is
   signal r_dwell_program_valid      : std_logic;
 
   signal r_pll_pre_lock_cycles      : unsigned(clog2(PLL_PRE_LOCK_DELAY_CYCLES) - 1 downto 0);
+  signal r_pll_pre_lock_done        : std_logic;
   signal r_pll_post_lock_cycles     : unsigned(clog2(PLL_POST_LOCK_DELAY_CYCLES) - 1 downto 0);
+  signal r_pll_post_lock_done       : std_logic;
 
   signal w_instructions_done        : std_logic;
   signal w_pll_pre_lock_done        : std_logic;
@@ -172,9 +174,9 @@ begin
   end process;
 
   w_instructions_done   <= not(r_instruction_data.valid) or (r_instruction_data.global_counter_check and r_global_counter_is_zero);
-  w_pll_pre_lock_done   <= to_stdlogic(r_pll_pre_lock_cycles = (PLL_PRE_LOCK_DELAY_CYCLES - 1));
-  w_pll_locked          <= r_ad9361_status(6);
-  w_pll_post_lock_done  <= to_stdlogic(r_pll_post_lock_cycles = (PLL_POST_LOCK_DELAY_CYCLES - 1));
+  w_pll_pre_lock_done   <= r_instruction_data.skip_pll_prelock_wait   or r_pll_pre_lock_done;
+  w_pll_locked          <= r_instruction_data.skip_pll_lock_check     or r_ad9361_status(6);
+  w_pll_post_lock_done  <= r_instruction_data.skip_pll_postlock_wait  or r_pll_post_lock_done;
 
   process(Clk)
   begin
@@ -247,7 +249,7 @@ begin
 
         end case;
 
-        if (r_dwell_program_valid = '1') then
+        if (r_dwell_program_valid = '1') then --TODO: check this in s_idle instead?
           s_state <= S_INSTRUCTION_LOOKUP;
         elsif ((w_dwell_entry_valid = '1') or (w_dwell_instruction_valid = '1') or (w_dwell_program_valid = '1')) then
           s_state <= S_IDLE;
@@ -293,8 +295,10 @@ begin
     if rising_edge(Clk) then
       if (s_state = S_ENTRY_LOOKUP) then
         r_pll_pre_lock_cycles <= (others => '0');
-      elsif (r_pll_pre_lock_cycles /= (PLL_PRE_LOCK_DELAY_CYCLES - 1)) then
+        r_pll_pre_lock_done   <= '0';
+      else
         r_pll_pre_lock_cycles <= r_pll_pre_lock_cycles + 1;
+        r_pll_pre_lock_done   <= to_stdlogic(r_pll_pre_lock_cycles = (PLL_PRE_LOCK_DELAY_CYCLES - 2));
       end if;
     end if;
   end process;
@@ -304,8 +308,10 @@ begin
     if rising_edge(Clk) then
       if (s_state = S_PLL_WAIT_PRE_LOCK) then
         r_pll_post_lock_cycles <= (others => '0');
+        r_pll_post_lock_done   <= '0';
       else
         r_pll_post_lock_cycles <= r_pll_post_lock_cycles + 1;
+        r_pll_post_lock_done   <= to_stdlogic(r_pll_post_lock_cycles = (PLL_POST_LOCK_DELAY_CYCLES - 2));
       end if;
     end if;
   end process;

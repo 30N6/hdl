@@ -72,10 +72,11 @@ interface axi_rx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
 endinterface
 
 module esm_dwell_stats_tb;
-  parameter time CLK_HALF_PERIOD  = 8ns;
-  parameter AXI_DATA_WIDTH        = 32;
-  parameter logic [7:0] MODULE_ID = 99;
-  parameter NUM_CHANNELS          = 64;
+  parameter time CLK_HALF_PERIOD      = 2ns;
+  parameter time AXI_CLK_HALF_PERIOD  = 5ns;
+  parameter AXI_DATA_WIDTH            = 32;
+  parameter logic [7:0] MODULE_ID     = 99;
+  parameter NUM_CHANNELS              = 64;
 
   typedef struct
   {
@@ -97,7 +98,8 @@ module esm_dwell_stats_tb;
     bit [31:0]  duration_requested;
     bit [7:0]   gain;
     bit [7:0]   fast_lock_profile;
-    bit [15:0]  padding_1;
+    bit [7:0]   num_channels;
+    bit [7:0]   report_starting_channel;
     bit [31:0]  threshold_narrow;
     bit [31:0]  threshold_wide;
     bit [63:0]  channel_mask_narrow;
@@ -123,17 +125,28 @@ module esm_dwell_stats_tb;
   parameter MAX_WORDS_PER_PACKET = 64;
   parameter NUM_HEADER_WORDS = ($bits(esm_dwell_report_header_t) / AXI_DATA_WIDTH);
 
+  logic Clk_axi;
   logic Clk;
   logic Rst;
 
   dwell_stats_tx_intf                             dwell_tx_intf (.*);
-  axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf   (.*);
+  axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf   (.Clk(Clk_axi));
 
   int unsigned  report_seq_num = 0;
   expect_t      expected_data [$];
   int           num_received = 0;
   logic         r_axi_rx_ready;
   logic         w_axi_rx_valid;
+  logic         w_error_reporter_timeout;
+  logic         w_error_reporter_overflow;
+
+  initial begin
+    Clk_axi = 0;
+    forever begin
+      #(AXI_CLK_HALF_PERIOD);
+      Clk_axi = ~Clk_axi;
+    end
+  end
 
   initial begin
     Clk = 0;
@@ -145,11 +158,11 @@ module esm_dwell_stats_tb;
 
   initial begin
     Rst = 1;
-    @(posedge Clk);
+    repeat(10) @(posedge Clk);
     Rst = 0;
   end
 
-  always_ff @(posedge Clk) begin
+  always_ff @(posedge Clk_axi) begin
     r_axi_rx_ready <= $urandom_range(99) < 80;
   end
 
@@ -162,26 +175,37 @@ module esm_dwell_stats_tb;
   )
   dut
   (
-    .Clk                (Clk),
-    .Rst                (Rst),
+    .Clk_axi                  (Clk_axi),
+    .Clk                      (Clk),
+    .Rst                      (Rst),
 
-    .Enable             (1'b1),
+    .Enable                   (1'b1),
 
-    .Dwell_active       (dwell_tx_intf.dwell_active),
-    .Dwell_data         (dwell_tx_intf.dwell_data),
-    .Dwell_sequence_num (dwell_tx_intf.dwell_sequence_num),
+    .Dwell_active             (dwell_tx_intf.dwell_active),
+    .Dwell_data               (dwell_tx_intf.dwell_data),
+    .Dwell_sequence_num       (dwell_tx_intf.dwell_sequence_num),
 
-    .Input_ctrl         (dwell_tx_intf.input_ctrl),
-    .Input_data         (),
-    .Input_pwr          (dwell_tx_intf.input_pwr),
+    .Input_ctrl               (dwell_tx_intf.input_ctrl),
+    .Input_data               (),
+    .Input_pwr                (dwell_tx_intf.input_pwr),
 
-    .Axis_ready         (r_axi_rx_ready),
-    .Axis_valid         (w_axi_rx_valid),
-    .Axis_data          (rpt_rx_intf.data),
-    .Axis_last          (rpt_rx_intf.last)
+    .Axis_ready               (r_axi_rx_ready),
+    .Axis_valid               (w_axi_rx_valid),
+    .Axis_data                (rpt_rx_intf.data),
+    .Axis_last                (rpt_rx_intf.last),
+
+    .Error_reporter_timeout   (w_error_reporter_timeout),
+    .Error_reporter_overflow  (w_error_reporter_overflow)
   );
 
   assign rpt_rx_intf.valid = w_axi_rx_valid && r_axi_rx_ready;
+
+  always_ff @(posedge Clk) begin
+    if (!Rst) begin
+      if (w_error_reporter_timeout)   $error("reporter timeout");
+      if (w_error_reporter_overflow)  $error("reporter overflow");
+    end
+  end
 
   task automatic wait_for_reset();
     do begin
@@ -264,6 +288,14 @@ module esm_dwell_stats_tb;
       $display("fast_lock_profile mismatch: %X %X", report_a.fast_lock_profile, report_b.fast_lock_profile);
       return 0;
     end
+    if (report_a.num_channels !== report_b.num_channels) begin
+      $display("num_channels mismatch: %X %X", report_a.num_channels, report_b.num_channels);
+      return 0;
+    end
+    if (report_a.report_starting_channel !== report_b.report_starting_channel) begin
+      $display("report_starting_channel mismatch: %X %X", report_a.report_starting_channel, report_b.report_starting_channel);
+      return 0;
+    end
     if (report_a.threshold_narrow !== report_b.threshold_narrow) begin
       $display("threshold_narrow mismatch: %X %X", report_a.threshold_narrow, report_b.threshold_narrow);
       return 0;
@@ -341,7 +373,7 @@ module esm_dwell_stats_tb;
     longint unsigned channel_accum [NUM_CHANNELS] = {default:0};
     int unsigned channel_max [NUM_CHANNELS] = {default:0};
 
-    //$display("%0t: num_header_words=%0d channels_per_packet=%0d num_packets=%0d", $time, NUM_HEADER_WORDS, channels_per_packet, num_packets);
+    $display("%0t: num_header_words=%0d channels_per_packet=%0d num_packets=%0d", $time, NUM_HEADER_WORDS, channels_per_packet, num_packets);
 
     for (int i = 0; i < dwell_input.size(); i++) begin
       channel_accum[dwell_input[i].channel] += dwell_input[i].power;
@@ -363,6 +395,8 @@ module esm_dwell_stats_tb;
       report_header.duration_requested      = dwell_data.duration;
       report_header.gain                    = dwell_data.gain;
       report_header.fast_lock_profile       = dwell_data.fast_lock_profile;
+      report_header.num_channels            = NUM_CHANNELS;
+      report_header.report_starting_channel = channel_index;
       report_header.threshold_narrow        = dwell_data.threshold_narrow;
       report_header.threshold_wide          = dwell_data.threshold_wide;
       report_header.channel_mask_narrow     = 0; //dwell_data.channel_mask_narrow;

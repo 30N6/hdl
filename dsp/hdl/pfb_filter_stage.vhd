@@ -34,6 +34,8 @@ port (
 
   Error_input_overflow  : out std_logic
 );
+begin
+  -- PSL default clock is rising_edge(Clk);
 end entity pfb_filter_stage;
 
 architecture rtl of pfb_filter_stage is
@@ -177,13 +179,10 @@ begin
       r_mult_data       <= w_mult_data;
       r_mult_index      <= w_mult_index;
       r_mult_sub_index  <= w_mult_sub_index;
-
-      --TODO: PSL assert
-      assert ((Output_valid /= '1') or ((r_mult_valid = '1') and (w_mult_index = r_mult_index) and (r_mult_sub_index = 1)))
-        report "Unexpected data from multiplier." & to_hstring(unsigned'("0" & r_mult_valid)) & " " & to_hstring(w_mult_index) & " " & to_hstring(r_mult_index) & " " & to_hstring(r_mult_sub_index)
-        severity failure;
     end if;
   end process;
+
+  -- PSL assert always (Output_valid = '1') -> ((r_mult_valid = '1') and (w_mult_index = r_mult_index) and (r_mult_sub_index = 1));
 
   Output_valid  <= w_mult_valid and to_stdlogic(w_mult_sub_index = 0);
   Output_index  <= w_mult_index;

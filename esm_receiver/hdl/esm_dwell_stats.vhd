@@ -21,23 +21,27 @@ generic (
   MODULE_ID       : unsigned
 );
 port (
-  Clk                 : in  std_logic;
-  Rst                 : in  std_logic;
+  Clk_axi                 : in  std_logic;
+  Clk                     : in  std_logic;
+  Rst                     : in  std_logic;
 
-  Enable              : in  std_logic;
+  Enable                  : in  std_logic;
 
-  Dwell_active        : in  std_logic;
-  Dwell_data          : in  esm_dwell_metadata_t;
-  Dwell_sequence_num  : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  Dwell_active            : in  std_logic;
+  Dwell_data              : in  esm_dwell_metadata_t;
+  Dwell_sequence_num      : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
-  Input_ctrl          : in  channelizer_control_t;
-  Input_data          : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);  --unused
-  Input_pwr           : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  Input_ctrl              : in  channelizer_control_t;
+  Input_data              : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);  --unused
+  Input_pwr               : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  Axis_ready          : in  std_logic;
-  Axis_valid          : out std_logic;
-  Axis_data           : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  Axis_last           : out std_logic
+  Axis_ready              : in  std_logic;
+  Axis_valid              : out std_logic;
+  Axis_data               : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  Axis_last               : out std_logic;
+
+  Error_reporter_timeout  : out std_logic;
+  Error_reporter_overflow : out std_logic
 );
 end entity esm_dwell_stats;
 
@@ -302,6 +306,7 @@ begin
     MODULE_ID             => MODULE_ID
   )
   port map (
+    Clk_axi             => Clk_axi,
     Clk                 => Clk,
     Rst                 => r_rst,
 
@@ -324,7 +329,10 @@ begin
     Axis_ready          => Axis_ready,
     Axis_valid          => Axis_valid,
     Axis_data           => Axis_data,
-    Axis_last           => Axis_last
+    Axis_last           => Axis_last,
+
+    Error_timeout       => Error_reporter_timeout,
+    Error_overflow      => Error_reporter_overflow
   );
 
 end architecture rtl;

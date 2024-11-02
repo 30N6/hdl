@@ -170,8 +170,6 @@ begin
     end if;
   end process;
 
-  --TODO: handle input_valid stops
-
   w_read_cycle_next <= r_read_cycle + 1;
 
   process(Clk)

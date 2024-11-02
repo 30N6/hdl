@@ -12,10 +12,9 @@ custom_ip_files esm_receiver [list \
   {"../axi/hdl/axis_sync_fifo.vhd"          "axi_lib"}      \
   {"../axi/hdl/axis_mux.vhd"                "axi_lib"}      \
   {"../axi/hdl/axis_minififo.vhd"           "axi_lib"}      \
-  {"../clock/hdl/adc_clk_mult_clk_wiz.v"    "clock_lib"}    \
-  {"../clock/hdl/adc_clk_mult.v"            "clock_lib"}    \
   {"../mem/hdl/ram_sdp.vhd"                 "mem_lib"}      \
   {"../mem/hdl/xpm_fallthrough_fifo.vhd"    "mem_lib"}      \
+  {"../mem/hdl/xpm_async_fifo.vhd"          "mem_lib"}      \
   {"../dsp/hdl/dsp_pkg.vhd"                 "dsp_lib"}      \
   {"../dsp/hdl/correlator_simple.vhd"       "dsp_lib"}      \
   {"../dsp/hdl/filter_moving_avg.vhd"       "dsp_lib"}      \
@@ -41,6 +40,7 @@ custom_ip_files esm_receiver [list \
   {"../dsp/hdl/channelizer_32.vhd"          "dsp_lib"}      \
   {"../dsp/hdl/channelizer_64.vhd"          "dsp_lib"}      \
   {"./hdl/esm_pkg.vhd"                      "esm_lib"}      \
+  {"./hdl/esm_debug_pkg.vhd"                "esm_lib"}      \
   {"./hdl/esm_config.vhd"                   "esm_lib"}      \
   {"./hdl/esm_dwell_config_decoder.vhd"     "esm_lib"}      \
   {"./hdl/esm_dwell_controller.vhd"         "esm_lib"}      \
@@ -50,6 +50,7 @@ custom_ip_files esm_receiver [list \
   {"./hdl/esm_pdw_sample_buffer.vhd"        "esm_lib"}      \
   {"./hdl/esm_pdw_sample_processor.vhd"     "esm_lib"}      \
   {"./hdl/esm_pdw_reporter.vhd"             "esm_lib"}      \
+  {"./hdl/esm_pdw_encoder_debug.vhd"        "esm_lib"}      \
   {"./hdl/esm_pdw_encoder.vhd"              "esm_lib"}      \
   {"./hdl/esm_status_reporter.vhd"          "esm_lib"}      \
   {"./hdl/esm_receiver.vhd"                 "esm_lib"}      \

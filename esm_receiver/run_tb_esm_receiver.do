@@ -3,7 +3,7 @@
 # modify the rest of the script.
 
 set tb_lib      esm_lib
-set tb_name     esm_pdw_encoder_tb
+set tb_name     esm_receiver_tb
 set top_level   $tb_lib.$tb_name
 
 set xilinx_dir  C:/Xilinx/Vivado/2022.2/data/verilog/src
@@ -15,28 +15,68 @@ set library_file_list [list \
   common_lib [list \
     ../common/hdl/common_pkg.vhd \
     ../common/hdl/math_pkg.vhd \
+    ../common/hdl/reset_extender.vhd \
+    ../common/hdl/clk_x4_phase_marker.vhd \
     ../common/sim/math_pkg_sv.sv \
     ] \
   axi_lib [list \
     ../axi/hdl/axis_async_fifo.vhd \
+    ../axi/hdl/axis_sync_fifo.vhd \
+    ../axi/hdl/axis_mux.vhd \
+    ../axi/hdl/axis_minififo.vhd \
+    ] \
+  clock_lib [list \
+    ../clock/hdl/adc_clk_mult_clk_wiz.v \
+    ../clock/hdl/adc_clk_mult.v \
     ] \
   mem_lib [list \
     ../mem/hdl/ram_sdp.vhd \
     ../mem/hdl/xpm_fallthrough_fifo.vhd \
+    ../mem/hdl/xpm_async_fifo.vhd \
     ] \
   dsp_lib [list \
     ../dsp/hdl/dsp_pkg.vhd \
+    ../dsp/hdl/correlator_simple.vhd \
+    ../dsp/hdl/filter_moving_avg.vhd \
+    ../dsp/hdl/mag_approximation.vhd \
+    ../dsp/hdl/pipeline_delay.vhd \
+    ../dsp/hdl/fft_sample_fifo.vhd \
+    ../dsp/hdl/fft_mux.vhd \
+    ../dsp/hdl/fft_4.vhd \
+    ../dsp/hdl/fft_4_serializer.vhd \
+    ../dsp/hdl/fft_twiddle_mem.vhd \
+    ../dsp/hdl/fft_radix2_output.vhd \
+    ../dsp/hdl/fft_radix2_stage.vhd \
+    ../dsp/hdl/fft_pipelined.vhd \
+    ../dsp/hdl/pfb_demux_2x.vhd \
+    ../dsp/hdl/pfb_baseband_2x.vhd \
+    ../dsp/hdl/pfb_filter_buffer.vhd \
+    ../dsp/hdl/pfb_filter_mult.vhd \
+    ../dsp/hdl/pfb_filter_stage.vhd \
+    ../dsp/hdl/pfb_filter.vhd \
+    ../dsp/hdl/channelizer_power.vhd \
+    ../dsp/hdl/channelizer_common.vhd \
+    ../dsp/hdl/channelizer_8.vhd \
+    ../dsp/hdl/channelizer_32.vhd \
+    ../dsp/hdl/channelizer_64.vhd \
     ] \
   esm_lib [list \
     ./hdl/esm_pkg.vhd \
     ./hdl/esm_debug_pkg.vhd \
+    ./hdl/esm_config.vhd \
+    ./hdl/esm_dwell_config_decoder.vhd \
+    ./hdl/esm_dwell_controller.vhd \
+    ./hdl/esm_dwell_reporter.vhd \
+    ./hdl/esm_dwell_stats.vhd \
     ./hdl/esm_pdw_iq_delay.vhd \
     ./hdl/esm_pdw_sample_buffer.vhd \
     ./hdl/esm_pdw_sample_processor.vhd \
     ./hdl/esm_pdw_reporter.vhd \
     ./hdl/esm_pdw_encoder_debug.vhd \
     ./hdl/esm_pdw_encoder.vhd \
-    ./sim/esm_pdw_encoder_tb.sv \
+    ./hdl/esm_status_reporter.vhd \
+    ./hdl/esm_receiver.vhd \
+    ./sim/esm_receiver_tb.sv \
     ] \
 ]
 
@@ -45,8 +85,9 @@ set incdir_list [list \
   ./hdl \
   ../common/hdl \
   ../common/sim \
-  ../mem/hdl \
   ../axi/hdl \
+  ../clock/hdl \
+  ../mem/hdl \
   ../dsp/hdl \
   $xilinx_dir \
 ]
@@ -108,16 +149,12 @@ foreach {library file_list} $library_file_list {
 }
 set last_compile_time $time_now
 
-#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=8
-#set NumericStdNoWarnings 1
-#set BreakOnAssertion 2
-#run -all
+#-L unisim -L unisim_ver
 
-vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=64
+vsim -suppress 12110 $top_level glbl.glbl
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all
-
 
 # If waves exists
 if [file exist wave.do] {

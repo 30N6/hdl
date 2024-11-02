@@ -3,17 +3,24 @@
 import math::*;
 import esm_pkg::*;
 
-interface dwell_rx_intf (input logic Clk);
-  esm_dwell_metadata_t  data;
-  logic                 valid;
+typedef struct {
+  int data_i;
+  int data_q;
+} adc_transaction_t;
 
-  task read(output esm_dwell_metadata_t d);
-    logic v;
-    do begin
-      d <= data;
-      v <= valid;
-      @(posedge Clk);
-    end while (v !== 1);
+interface adc_tx_intf #(parameter ADC_WIDTH) (input logic Clk);
+  logic                             valid = 0;
+  logic signed [ADC_WIDTH - 1 : 0]  data_i;
+  logic signed [ADC_WIDTH - 1 : 0]  data_q;
+
+  task write(input adc_transaction_t tx);
+    data_i  <= tx.data_i;
+    data_q  <= tx.data_q;
+    valid   <= 1;
+    @(posedge Clk);
+    data_i  <= 0;
+    data_q  <= 0;
+    valid   <= 0;
   endtask
 endinterface
 
@@ -40,137 +47,153 @@ interface axi_tx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
   endtask
 endinterface
 
-module esm_dwell_controller_tb;
-  parameter time CLK_HALF_PERIOD      = 2ns;
+interface axi_rx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
+  logic                           valid;
+  logic                           last;
+  logic [AXI_DATA_WIDTH - 1 : 0]  data;
+
+  task read(output logic [AXI_DATA_WIDTH - 1 : 0] d [$]);
+    automatic bit done = 0;
+    d.delete();
+
+    do begin
+      if (valid) begin
+        d.push_back(data);
+        done = last;
+      end
+      @(posedge Clk);
+    end while(!done);
+  endtask
+endinterface
+
+module esm_receiver_tb;
+  parameter time ADC_CLK_HALF_PERIOD  = 8ns;
   parameter time AXI_CLK_HALF_PERIOD  = 5ns;
-  parameter AXI_DATA_WIDTH = 32;
+  parameter AXI_DATA_WIDTH            = 32;
+  parameter ADC_WIDTH                 = 16;
+  parameter IQ_WIDTH                  = 12;
 
-  typedef struct
-  {
-    esm_dwell_metadata_t data;
-  } expect_t;
+  logic Adc_clk;
+  logic Adc_clk_x4;
+  logic Adc_rst;
+  logic Axi_clk;
+  logic Axi_rstn;
 
-  logic Clk_axi;
-  logic Clk;
-  logic Rst;
-
-  axi_tx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  cfg_tx_intf (.Clk(Clk_axi));
-  dwell_rx_intf                                   rx_intf (.*);
-
-  logic                                           w_rst_out;
-  logic [1:0]                                     w_enable_chan;
-  logic [1:0]                                     w_enable_pdw;
-  logic                                           w_enable_status;
-  esm_config_data_t                               w_module_config;
-  logic                                           w_dwell_active;
-  logic                                           r_dwell_active;
-  esm_dwell_metadata_t                            w_dwell_data;
-  logic [31:0]                                    w_dwell_seq_num;
+  adc_tx_intf #(.ADC_WIDTH(ADC_WIDTH))            tx_intf     (.Clk(Adc_clk));
+  axi_tx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  cfg_tx_intf (.Clk(Axi_clk));
+  axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf (.Clk(Axi_clk));
 
   logic [3:0]                                     w_ad9361_control;
   logic [3:0]                                     r_ad9361_control;
   logic [7:0]                                     w_ad9361_status;
+  logic                                           r_axi_rx_ready;
+  logic                                           w_axi_rx_valid;
 
   bit [31:0]                                      config_seq_num = 0;
   esm_dwell_metadata_t                            dwell_entry_mem [esm_num_dwell_entries - 1 : 0];
 
-  expect_t                                        expected_data [$];
-  int                                             num_received = 0;
+  initial begin
+    Adc_clk = 0;
+    forever begin
+      #(ADC_CLK_HALF_PERIOD);
+      Adc_clk = ~Adc_clk;
+    end
+  end
 
   initial begin
-    Clk_axi = 0;
+    Adc_clk_x4 = 0;
+    forever begin
+      #(ADC_CLK_HALF_PERIOD/4);
+      Adc_clk_x4 = ~Adc_clk_x4;
+    end
+  end
+
+  initial begin
+    Axi_clk = 0;
     forever begin
       #(AXI_CLK_HALF_PERIOD);
-      Clk_axi = ~Clk_axi;
+      Axi_clk = ~Axi_clk;
     end
   end
 
   initial begin
-    Clk = 0;
-    forever begin
-      #(CLK_HALF_PERIOD);
-      Clk = ~Clk;
-    end
+    Adc_rst = 1;
+    repeat(100) @(posedge Adc_clk);
+    Adc_rst = 0;
   end
 
   initial begin
-    Rst = 1;
-    repeat(100) @(posedge Clk);
-    Rst = 0;
+    Axi_rstn = 0;
+    repeat(10) @(posedge Axi_clk);
+    Axi_rstn = 1;
   end
 
-  esm_config #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH)) cfg
+  esm_receiver #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH), .ADC_WIDTH(ADC_WIDTH), .IQ_WIDTH(IQ_WIDTH)) dut
   (
-    .Clk_x4         (Clk),
+    .Adc_clk        (Adc_clk),
+    .Adc_clk_x4     (Adc_clk_x4),
+    .Adc_rst        (Adc_rst),
 
+    .Ad9361_control (w_ad9361_control),
+    .Ad9361_status  (w_ad9361_status),
 
-    .S_axis_clk     (Clk_axi),
-    .S_axis_resetn  (!Rst),
+    .Adc_valid      (tx_intf.valid),
+    .Adc_data_i     (tx_intf.data_i),
+    .Adc_data_q     (tx_intf.data_q),
+
+    .S_axis_clk     (Axi_clk),
+    .S_axis_resetn  (Axi_rstn),
     .S_axis_ready   (cfg_tx_intf.ready),
     .S_axis_valid   (cfg_tx_intf.valid),
     .S_axis_data    (cfg_tx_intf.data),
     .S_axis_last    (cfg_tx_intf.last),
 
-
-    .Rst_out       (w_rst_out),
-    .Enable_status (w_enable_status),
-    .Enable_chan   (w_enable_chan),
-    .Enable_pdw    (w_enable_pdw),
-
-    .Module_config (w_module_config)
+    .M_axis_clk     (Axi_clk),
+    .M_axis_resetn  (Axi_rstn),
+    .M_axis_ready   (r_axi_rx_ready),
+    .M_axis_valid   (w_axi_rx_valid),
+    .M_axis_data    (rpt_rx_intf.data),
+    .M_axis_last    (rpt_rx_intf.last)
   );
 
-  esm_dwell_controller #(.PLL_PRE_LOCK_DELAY_CYCLES(8), .PLL_POST_LOCK_DELAY_CYCLES(10)) dut
-  (
-    .Clk                (Clk),
-    .Rst                (Rst),
+  always_ff @(posedge Axi_clk) begin
+    r_axi_rx_ready <= $urandom_range(99) < 80;
+  end
 
-    .Module_config      (w_module_config),
+  assign rpt_rx_intf.valid = w_axi_rx_valid && r_axi_rx_ready;
 
-    .Ad9361_control     (w_ad9361_control),
-    .Ad9361_status      (w_ad9361_status),
-
-    .Dwell_active       (w_dwell_active),
-    .Dwell_data         (w_dwell_data),
-    .Dwell_sequence_num (w_dwell_seq_num)
-  );
-
-  always_ff @(posedge Clk) begin
-    r_ad9361_control  <= w_ad9361_control;
-    r_dwell_active    <= w_dwell_active;
+  always_ff @(posedge Adc_clk) begin
+    r_ad9361_control <= w_ad9361_control;
   end
 
   initial begin
-    w_ad9361_status <= 0;
-
+    w_ad9361_status <= '1;
+    /*w_ad9361_status <= 0;
     while (1) begin
       if (w_ad9361_control != r_ad9361_control) begin
         w_ad9361_status <= '0;
-        repeat ($urandom_range(10, 5)) @(posedge Clk);
+        repeat ($urandom_range(10, 5)) @(posedge Adc_clk);
         w_ad9361_status <= '1;
       end
-      @(posedge Clk);
-    end
+      @(posedge Adc_clk);
+    end*/
   end
-
-  assign rx_intf.valid  = w_dwell_active && !r_dwell_active;
-  assign rx_intf.data   = w_dwell_data;
 
   task automatic wait_for_reset();
     do begin
-      @(posedge Clk);
-    end while (Rst);
+      @(posedge Adc_clk);
+    end while (Adc_rst);
   endtask
 
   task automatic write_config(bit [31:0] config_data []);
-    @(posedge Clk_axi)
+    @(posedge Axi_clk)
     cfg_tx_intf.write(config_data);
-    repeat(10) @(posedge Clk_axi);
+    repeat(10) @(posedge Axi_clk);
   endtask
 
   task automatic send_initial_config();
     bit [31:0] config_data [][] = '{{esm_control_magic_num, config_seq_num++, 32'h00000000, 32'hDEADBEEF, 32'h01000000, 32'hDEADBEEF},
-                                    {esm_control_magic_num, config_seq_num++, 32'h00000000, 32'hDEADBEEF, 32'h00030300, 32'hDEADBEEF}};
+                                    {esm_control_magic_num, config_seq_num++, 32'h00000000, 32'hDEADBEEF, 32'h00030301, 32'hDEADBEEF}};
     foreach (config_data[i]) begin
       write_config(config_data[i]);
     end
@@ -214,9 +237,6 @@ module esm_dwell_controller_tb;
     r[0]      = instruction.valid;
     r[1]      = instruction.global_counter_check;
     r[2]      = instruction.global_counter_dec;
-    r[3]      = instruction.skip_pll_prelock_wait;
-    r[4]      = instruction.skip_pll_lock_check;
-    r[5]      = instruction.skip_pll_postlock_wait;
     r[15:8]   = instruction.repeat_count;
     r[23:16]  = instruction.entry_index;
     r[31:24]  = instruction.next_instruction_index;
@@ -251,47 +271,6 @@ module esm_dwell_controller_tb;
     write_config(config_data);
   endtask
 
-  function automatic bit compare_data(esm_dwell_metadata_t a, esm_dwell_metadata_t b);
-    if(a.tag                  !== b.tag)                    return 0;
-    if(a.frequency            !== b.frequency)              return 0;
-    if(a.duration             !== b.duration)               return 0;
-    if(a.gain                 !== b.gain)                   return 0;
-    if(a.fast_lock_profile    !== b.fast_lock_profile)      return 0;
-    if(a.threshold_narrow     !== b.threshold_narrow)       return 0;
-    if(a.threshold_wide       !== b.threshold_wide)         return 0;
-    if(a.channel_mask_narrow  !== b.channel_mask_narrow)    return 0;
-    if(a.channel_mask_wide    !== b.channel_mask_wide)      return 0;
-    if(a.min_pulse_duration   !== b.min_pulse_duration)     return 0;
-    return 1;
-  endfunction
-
-  initial begin
-    automatic esm_dwell_metadata_t read_data;
-
-    wait_for_reset();
-
-    forever begin
-      rx_intf.read(read_data);
-      if (compare_data(read_data, expected_data[0].data)) begin
-        $display("%0t: data match (remaining=%0d) - %p", $time, expected_data.size(), read_data);
-      end else begin
-        $error("%0t: error -- data mismatch: expected = %p  actual = %p", $time, expected_data[0].data, read_data);
-      end
-      num_received++;
-      void'(expected_data.pop_front());
-    end
-  end
-
-  final begin
-    if ( expected_data.size() != 0 ) begin
-      $error("Unexpected data remaining in queue:");
-      while ( expected_data.size() != 0 ) begin
-        $display("%p", expected_data[0].data);
-        void'(expected_data.pop_front());
-      end
-    end
-  end
-
   function automatic void randomize_instructions(inout esm_message_dwell_program_t dwell_program, bit global_counter_enable);
     int random_order = $urandom_range(99) < 50;
     int loop = ($urandom_range(99) < 50) && global_counter_enable;
@@ -316,9 +295,6 @@ module esm_dwell_controller_tb;
       dwell_program.instructions[idx].valid = 1;
       dwell_program.instructions[idx].global_counter_check    = global_counter_enable;
       dwell_program.instructions[idx].global_counter_dec      = global_counter_enable;
-      dwell_program.instructions[idx].skip_pll_prelock_wait   = $urandom_range(1);
-      dwell_program.instructions[idx].skip_pll_lock_check     = $urandom_range(1);
-      dwell_program.instructions[idx].skip_pll_postlock_wait  = $urandom_range(1);
       dwell_program.instructions[idx].repeat_count            = $urandom_range(4);
       dwell_program.instructions[idx].entry_index             = $urandom_range(esm_num_dwell_entries - 1);
 
@@ -339,46 +315,6 @@ module esm_dwell_controller_tb;
     end
   endfunction
 
-  function automatic void expect_dwell_program(esm_message_dwell_program_t dwell_program);
-    int global_counter = dwell_program.global_counter_init;
-    int inst_index = 0;
-    bit done = 0;
-
-    while (1) begin
-      esm_dwell_instruction_t inst = dwell_program.instructions[inst_index];
-      expect_t e;
-
-      //$display("%0t: expect_dwell_program - initial: inst[%0d]=%p", $time, inst_index, inst);
-
-      if (!inst.valid) begin
-        break;
-      end
-
-      for (int i = 0; i < inst.repeat_count + 1; i++) begin
-        if (inst.global_counter_check && (global_counter <= 0)) begin
-          done = 1;
-          break;
-        end
-
-        //$display("%0t: expecting dwell: inst_index=%0d  entry_index=%0d  next_instruction_index=%0d  global_counter=%0d", $time, inst_index, inst.entry_index, inst.next_instruction_index, global_counter);
-        e.data = dwell_entry_mem[inst.entry_index];
-        $display("%0t: expecting dwell: inst_index=%0d  dwell_entry=%p", $time, inst_index, e.data);
-
-        expected_data.push_back(e);
-        if (inst.global_counter_dec) begin
-          global_counter--;
-        end
-      end
-
-      if (done) begin
-        break;
-      end
-
-      inst_index = inst.next_instruction_index;
-      //$display("%0t: expect_dwell_program - final: inst_index=%0d", $time, inst_index);
-    end
-  endfunction
-
   task automatic standard_tests();
     parameter NUM_TESTS = 20;
 
@@ -390,22 +326,45 @@ module esm_dwell_controller_tb;
       for (int i_dwell = 0; i_dwell < esm_num_dwell_entries; i_dwell++) begin
         esm_message_dwell_entry_t entry;
         entry.entry_index                     = i_dwell;
-        entry.entry_data.tag                  = $urandom;
-        entry.entry_data.frequency            = $urandom;
-        entry.entry_data.duration             = $urandom_range(1000);
+        entry.entry_data.tag                  = i_dwell; //$urandom;
+        entry.entry_data.frequency            = i_dwell * 1000; //$urandom;
+        entry.entry_data.duration             = 10000;
         entry.entry_data.gain                 = $urandom;
-        entry.entry_data.fast_lock_profile    = $urandom;
-        entry.entry_data.threshold_narrow     = $urandom;
+        entry.entry_data.fast_lock_profile    = i_dwell;
+        entry.entry_data.threshold_narrow     = 100;
         entry.entry_data.threshold_wide       = $urandom;
-        entry.entry_data.channel_mask_narrow  = $urandom;
-        entry.entry_data.channel_mask_wide    = $urandom;
+        entry.entry_data.channel_mask_narrow  = 64'hFFFFFFFFFFFFFFFF;
+        entry.entry_data.channel_mask_wide    = 8'hFF;
         entry.entry_data.min_pulse_duration   = $urandom;
 
         send_dwell_entry(entry);
         dwell_entry_mem[i_dwell] = entry.entry_data;
       end
 
-      for (int i_rep = 0; i_rep < 10; i_rep++) begin
+      begin
+        esm_message_dwell_program_t dwell_program;
+        dwell_program.enable_program        = 1;
+        dwell_program.enable_delayed_start  = 0;
+        dwell_program.global_counter_init   = 100;
+        dwell_program.delayed_start_time    = 200;
+
+        //for (int i_dwell = 0; i_dwell < esm_num_dwell_entries; i_dwell++) begin
+        for (int i_dwell = 0; i_dwell < 10; i_dwell++) begin
+          dwell_program.instructions[i_dwell].valid                   = 1;
+          dwell_program.instructions[i_dwell].global_counter_check    = 0;
+          dwell_program.instructions[i_dwell].global_counter_dec      = 0;
+          dwell_program.instructions[i_dwell].repeat_count            = 0;
+          dwell_program.instructions[i_dwell].entry_index             = i_dwell;
+          dwell_program.instructions[i_dwell].next_instruction_index  = i_dwell + 1;
+        end
+        dwell_program.instructions[10].valid = 0;
+
+        send_dwell_program(dwell_program);
+      end
+
+      repeat(50000) @(posedge Adc_clk);
+
+      /*for (int i_rep = 0; i_rep < 10; i_rep++) begin
         int global_counter_init   = $urandom_range(500);
         bit global_counter_enable = $urandom;
         int delayed_start_time    = $urandom_range(5000);
@@ -418,34 +377,31 @@ module esm_dwell_controller_tb;
         dwell_program.delayed_start_time    = delayed_start_time;
 
         randomize_instructions(dwell_program, global_counter_enable);
-        /*$display("dwell_program: %p", dwell_program);
-        for (int i = 0; i < esm_num_dwell_instructions; i++) begin
-          $display("  inst[%0d] = %p", i, dwell_program.instructions[i]);
-        end*/
-
-        expect_dwell_program(dwell_program);
-
+        //$display("dwell_program: %p", dwell_program);
+        //for (int i = 0; i < esm_num_dwell_instructions; i++) begin
+        //  $display("  inst[%0d] = %p", i, dwell_program.instructions[i]);
+        //end
         send_dwell_program(dwell_program);
 
         //repeat(300000) @(posedge Clk);
 
         wait_cycles = 0;
-        while ((expected_data.size() != 0) && (wait_cycles < 6e5)) begin
+        while ((expected_data.size() != 0) && (wait_cycles < 3e5)) begin
           @(posedge Clk);
           wait_cycles++;
         end
-        assert (wait_cycles < 6e5) else $error("Timeout while waiting for expected queue to empty during standard test");
+        assert (wait_cycles < 3e5) else $error("Timeout while waiting for expected queue to empty during standard test");
 
         foreach (expected_data[i]) begin
           $display("%0t: end of rep: expected_data[%0d]=%p", $time, i, expected_data[i]);
         end
       end
 
-      $display("%0t: Standard test finished: num_received = %0d", $time, num_received);
+      $display("%0t: Standard test finished: num_received = %0d", $time, num_received);*/
 
-      Rst = 1;
-      repeat(100) @(posedge Clk);
-      Rst = 0;
+      Adc_rst = 1;
+      repeat(100) @(posedge Adc_clk);
+      Adc_rst = 0;
     end
   endtask
 

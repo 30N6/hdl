@@ -12,6 +12,9 @@ library dsp_lib;
 
 library esm_lib;
   use esm_lib.esm_pkg.all;
+  use esm_lib.esm_debug_pkg.all;
+
+--TODO: implement channel masking
 
 entity esm_pdw_encoder is
 generic (
@@ -19,27 +22,40 @@ generic (
   DATA_WIDTH      : natural;
   NUM_CHANNELS    : natural;
   MODULE_ID       : unsigned;
-  WIDE_BANDWIDTH  : boolean
+  WIDE_BANDWIDTH  : boolean;
+  DEBUG_ENABLE    : boolean
 );
 port (
-  Clk                 : in  std_logic;
-  Rst                 : in  std_logic;
+  Clk_axi                       : in  std_logic;
+  Clk                           : in  std_logic;
+  Rst                           : in  std_logic;
 
-  Enable              : in  std_logic;
+  Enable                        : in  std_logic;
 
-  Dwell_active        : in  std_logic;
-  Dwell_data          : in  esm_dwell_metadata_t;
-  Dwell_sequence_num  : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  Dwell_active                  : in  std_logic;
+  Dwell_data                    : in  esm_dwell_metadata_t;
+  Dwell_sequence_num            : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
-  Input_ctrl          : in  channelizer_control_t;
-  Input_data          : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
-  Input_power         : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  Input_ctrl                    : in  channelizer_control_t;
+  Input_data                    : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+  Input_power                   : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  Axis_ready          : in  std_logic;
-  Axis_valid          : out std_logic;
-  Axis_data           : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  Axis_last           : out std_logic
+  Axis_ready                    : in  std_logic;
+  Axis_valid                    : out std_logic;
+  Axis_data                     : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  Axis_last                     : out std_logic;
+
+  Error_pdw_fifo_busy           : out std_logic;
+  Error_pdw_fifo_overflow       : out std_logic;
+  Error_pdw_fifo_underflow      : out std_logic;
+  Error_sample_buffer_busy      : out std_logic;
+  Error_sample_buffer_underflow : out std_logic;
+  Error_sample_buffer_overflow  : out std_logic;
+  Error_reporter_timeout        : out std_logic;
+  Error_reporter_overflow       : out std_logic
 );
+begin
+  -- PSL default clock is rising_edge(Clk);
 end entity esm_pdw_encoder;
 
 architecture rtl of esm_pdw_encoder is
@@ -93,13 +109,73 @@ architecture rtl of esm_pdw_encoder is
 
   signal w_dwell_active             : std_logic;
   signal w_dwell_done               : std_logic;
+  signal w_sample_processor_ack     : std_logic;
   signal w_report_ack               : std_logic;
+  signal r_sample_processor_ack     : std_logic;
+  signal r_report_ack               : std_logic;
 
+  signal w_pdw_fifo_busy            : std_logic;
   signal w_pdw_fifo_overflow        : std_logic;
-  signal w_sample_buffer_underflow  : std_logic;  --TODO: use
-  signal w_sample_buffer_overflow   : std_logic;  --TODO: use
+  signal w_pdw_fifo_underflow       : std_logic;
+  signal w_sample_buffer_busy       : std_logic;
+  signal w_sample_buffer_underflow  : std_logic;
+  signal w_sample_buffer_overflow   : std_logic;
+  signal w_reporter_timeout         : std_logic;
+  signal w_reporter_overflow        : std_logic;
+
+  signal w_debug_pdw_encoder        : esm_pdw_encoder_debug_t;
+  signal w_debug_sample_processor   : esm_pdw_sample_processor_debug_t;
 
 begin
+
+  g_debug : if (DEBUG_ENABLE) generate
+    w_debug_pdw_encoder.r_timestamp                      <= std_logic_vector(r_timestamp);
+    w_debug_pdw_encoder.s_state                          <= "000" when (s_state = S_IDLE) else
+                                                            "001" when (s_state = S_DWELL_ACTIVE) else
+                                                            "010" when (s_state = S_DWELL_STOP_WAIT) else
+                                                            "011" when (s_state = S_DWELL_DONE) else
+                                                            "100";
+    w_debug_pdw_encoder.r_dwell_active                   <= r_dwell_active;
+    w_debug_pdw_encoder.r_dwell_data_tag                 <= std_logic_vector(r_dwell_data.tag);
+    w_debug_pdw_encoder.w_pdw_ready                      <= w_pdw_ready;
+    w_debug_pdw_encoder.w_pdw_valid                      <= w_pdw_valid;
+    w_debug_pdw_encoder.w_pdw_data_sequence_num          <= std_logic_vector(w_pdw_data.sequence_num);
+    w_debug_pdw_encoder.w_pdw_data_channel               <= std_logic_vector(w_pdw_data.channel);
+    w_debug_pdw_encoder.w_pdw_data_power_accum           <= std_logic_vector(w_pdw_data.power_accum);
+    w_debug_pdw_encoder.w_pdw_data_duration              <= std_logic_vector(w_pdw_data.duration);
+    w_debug_pdw_encoder.w_pdw_data_buffered_frame_index  <= std_logic_vector(w_pdw_data.buffered_frame_index);
+    w_debug_pdw_encoder.w_pdw_data_buffered_frame_valid  <= w_pdw_data.buffered_frame_valid;
+    w_debug_pdw_encoder.w_frame_req_index                <= std_logic_vector(w_frame_req.frame_index);
+    w_debug_pdw_encoder.w_frame_req_read                 <= w_frame_req.frame_read;
+    w_debug_pdw_encoder.w_frame_req_drop                 <= w_frame_req.frame_drop;
+    w_debug_pdw_encoder.w_frame_ack_index                <= std_logic_vector(w_frame_ack.sample_index);
+    w_debug_pdw_encoder.w_frame_ack_valid                <= w_frame_ack.sample_valid;
+    w_debug_pdw_encoder.w_frame_ack_last                 <= w_frame_ack.sample_last;
+    w_debug_pdw_encoder.w_frame_data_i                   <= std_logic_vector(w_frame_data(0));
+    w_debug_pdw_encoder.w_frame_data_q                   <= std_logic_vector(w_frame_data(1));
+    w_debug_pdw_encoder.w_dwell_active                   <= w_dwell_active;
+    w_debug_pdw_encoder.w_dwell_done                     <= w_dwell_done;
+    w_debug_pdw_encoder.r_sample_processor_ack           <= r_sample_processor_ack;
+    w_debug_pdw_encoder.r_report_ack                     <= r_report_ack;
+    w_debug_pdw_encoder.w_pdw_fifo_busy                  <= w_pdw_fifo_busy;
+    w_debug_pdw_encoder.w_pdw_fifo_overflow              <= w_pdw_fifo_overflow;
+    w_debug_pdw_encoder.w_pdw_fifo_underflow             <= w_pdw_fifo_underflow;
+    w_debug_pdw_encoder.w_sample_buffer_busy             <= w_sample_buffer_busy;
+    w_debug_pdw_encoder.w_sample_buffer_underflow        <= w_sample_buffer_underflow;
+    w_debug_pdw_encoder.w_sample_buffer_overflow         <= w_sample_buffer_overflow;
+    w_debug_pdw_encoder.w_reporter_timeout               <= w_reporter_timeout;
+    w_debug_pdw_encoder.w_reporter_overflow              <= w_reporter_overflow;
+
+    i_debug : entity esm_lib.esm_pdw_encoder_debug
+    port map (
+      Clk_axi                 => Clk_axi,
+      Clk                     => Clk,
+      Rst                     => r_rst,
+
+      Debug_sample_processor  => w_debug_sample_processor,
+      Debug_pdw_encoder       => w_debug_pdw_encoder
+    );
+  end generate g_debug;
 
   process(Clk)
   begin
@@ -112,7 +188,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (Rst = '1') then
+      if (r_rst = '1') then
         r_timestamp <= (others => '0');
       else
         r_timestamp <= r_timestamp + 1;
@@ -174,15 +250,20 @@ begin
     DATA_WIDTH                  => IQ_WIDTH,
     BUFFERED_SAMPLES_PER_FRAME  => BUFFERED_SAMPLES_PER_FRAME,
     BUFFERED_SAMPLE_PADDING     => BUFFERED_SAMPLE_PADDING,
-    PDW_FIFO_DEPTH              => PDW_FIFO_DEPTH
+    PDW_FIFO_DEPTH              => PDW_FIFO_DEPTH,
+    DEBUG_ENABLE                => DEBUG_ENABLE
   )
   port map (
     Clk                     => Clk,
     Rst                     => r_rst,
 
+    Debug_out               => w_debug_sample_processor,
+
     Timestamp               => r_timestamp,
 
-    Dwell_active            => r_dwell_active,
+    Dwell_active            => w_dwell_active,
+    Dwell_done              => w_dwell_done,
+    Dwell_ack               => w_sample_processor_ack,
 
     Input_ctrl              => w_pipelined_ctrl,
     Input_iq_delayed        => w_delayed_iq_data,
@@ -197,7 +278,10 @@ begin
     Buffered_frame_ack      => w_frame_ack,
     Buffered_frame_data     => w_frame_data,
 
+    Error_fifo_busy         => w_pdw_fifo_busy,
     Error_fifo_overflow     => w_pdw_fifo_overflow,
+    Error_fifo_underflow    => w_pdw_fifo_underflow,
+    Error_buffer_busy       => w_sample_buffer_busy,
     Error_buffer_underflow  => w_sample_buffer_overflow,
     Error_buffer_overflow   => w_sample_buffer_underflow
   );
@@ -231,7 +315,7 @@ begin
           end if;
 
         when S_DWELL_DONE =>
-          if (w_report_ack = '1') then
+          if ((r_sample_processor_ack = '1') and (r_report_ack = '1')) then
             s_state <= S_CLEAR;
           else
             s_state <= S_DWELL_DONE;
@@ -277,11 +361,12 @@ begin
     MODULE_ID           => MODULE_ID
   )
   port map (
+    Clk_axi             => Clk_axi,
     Clk                 => Clk,
     Rst                 => r_rst,
 
     Dwell_active        => w_dwell_active,
-    Dwell_done          => w_dwell_done,
+    Dwell_done          => r_sample_processor_ack,
     Dwell_data          => r_dwell_data,
     Dwell_sequence_num  => r_dwell_sequence_num,
     Dwell_timestamp     => r_dwell_timestamp,
@@ -300,7 +385,37 @@ begin
     Axis_ready          => Axis_ready,
     Axis_valid          => Axis_valid,
     Axis_data           => Axis_data,
-    Axis_last           => Axis_last
+    Axis_last           => Axis_last,
+
+    Error_timeout       => w_reporter_timeout,
+    Error_overflow      => w_reporter_overflow
   );
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (s_state = S_DWELL_ACTIVE) then
+        r_sample_processor_ack <= '0';
+        r_report_ack           <= '0';
+      elsif (s_state = S_DWELL_DONE) then
+        r_sample_processor_ack <= r_sample_processor_ack or w_sample_processor_ack;
+        r_report_ack           <= r_report_ack or w_report_ack;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Error_pdw_fifo_busy           <= w_pdw_fifo_busy;
+      Error_pdw_fifo_overflow       <= w_pdw_fifo_overflow;
+      Error_pdw_fifo_underflow      <= w_pdw_fifo_underflow;
+      Error_sample_buffer_busy      <= w_sample_buffer_busy;
+      Error_sample_buffer_underflow <= w_sample_buffer_underflow;
+      Error_sample_buffer_overflow  <= w_sample_buffer_overflow;
+      Error_reporter_timeout        <= w_reporter_timeout;
+      Error_reporter_overflow       <= w_reporter_overflow;
+    end if;
+  end process;
 
 end architecture rtl;
