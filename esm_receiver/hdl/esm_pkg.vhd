@@ -41,7 +41,7 @@ package esm_pkg is
 
   constant ESM_NUM_FAST_LOCK_PROFILES                   : natural := 8;
   constant ESM_FAST_LOCK_PROFILE_INDEX_WIDTH            : natural := clog2(ESM_NUM_FAST_LOCK_PROFILES);
-  constant ESM_NUM_DWELL_ENTRIES                        : natural := 32; --TODO: increase now that memory is more plentiful without the wideband path?
+  constant ESM_NUM_DWELL_ENTRIES                        : natural := 256;
   constant ESM_DWELL_ENTRY_INDEX_WIDTH                  : natural := clog2(ESM_NUM_DWELL_ENTRIES);
   constant ESM_NUM_DWELL_INSTRUCTIONS                   : natural := 32;
   constant ESM_DWELL_INSTRUCTION_INDEX_WIDTH            : natural := clog2(ESM_NUM_DWELL_INSTRUCTIONS);
@@ -390,7 +390,7 @@ package body esm_pkg is
     r.skip_pll_lock_check     := v(4);
     r.skip_pll_postlock_wait  := v(5);
     r.repeat_count            := unsigned(v(11 downto 8));
-    r.entry_index             := unsigned(v(20 downto 16));
+    r.entry_index             := unsigned(v(23 downto 16));
     r.next_instruction_index  := unsigned(v(28 downto 24));
     return r;
   end function;
