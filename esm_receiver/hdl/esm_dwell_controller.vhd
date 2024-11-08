@@ -366,7 +366,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Ad9361_control <= std_logic_vector('0' & r_dwell_entry_d.fast_lock_profile);
+      Ad9361_control <= std_logic_vector(r_dwell_entry_d.fast_lock_profile & '0');
     end if;
   end process;
 
