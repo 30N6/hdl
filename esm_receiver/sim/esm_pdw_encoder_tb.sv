@@ -133,6 +133,8 @@ module esm_pdw_encoder_tb;
     bit [31:0]  dwell_duration;
     bit [31:0]  dwell_pulse_total_count;
     bit [31:0]  dwell_pulse_drop_count;
+    bit [31:0]  ack_delay_report;
+    bit [31:0]  ack_delay_sample_processor;
   } esm_pdw_summary_report_header_t;
 
   typedef bit [$bits(esm_pdw_report_header_t) - 1 : 0]          pdw_report_header_bits_t;
@@ -198,7 +200,8 @@ module esm_pdw_encoder_tb;
     .DATA_WIDTH     (16),
     .NUM_CHANNELS   (NUM_CHANNELS),
     .MODULE_ID      (MODULE_ID),
-    .WIDE_BANDWIDTH (NUM_CHANNELS < 64)
+    .WIDE_BANDWIDTH (NUM_CHANNELS < 64),
+    .DEBUG_ENABLE   (0)
   )
   dut
   (

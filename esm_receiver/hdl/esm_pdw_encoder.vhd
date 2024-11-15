@@ -93,6 +93,9 @@ architecture rtl of esm_pdw_encoder is
   signal r_dwell_timestamp          : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
   signal r_dwell_duration           : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
 
+  signal r_ack_delay_report         : unsigned(31 downto 0);
+  signal r_ack_delay_sample_proc    : unsigned(31 downto 0);
+
   signal w_iq_scaled                : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
   signal w_threshold                : unsigned(ESM_THRESHOLD_WIDTH - 1 downto 0);
 
@@ -361,45 +364,57 @@ begin
     MODULE_ID           => MODULE_ID
   )
   port map (
-    Clk_axi             => Clk_axi,
-    Clk                 => Clk,
-    Rst                 => r_rst,
+    Clk_axi               => Clk_axi,
+    Clk                   => Clk,
+    Rst                   => r_rst,
 
-    Dwell_active        => w_dwell_active,
-    Dwell_done          => r_sample_processor_ack,
-    Dwell_data          => r_dwell_data,
-    Dwell_sequence_num  => r_dwell_sequence_num,
-    Dwell_timestamp     => r_dwell_timestamp,
-    Dwell_duration      => r_dwell_duration,
+    Dwell_active          => w_dwell_active,
+    Dwell_done            => r_sample_processor_ack,
+    Dwell_data            => r_dwell_data,
+    Dwell_sequence_num    => r_dwell_sequence_num,
+    Dwell_timestamp       => r_dwell_timestamp,
+    Dwell_duration        => r_dwell_duration,
 
-    Pdw_ready           => w_pdw_ready,
-    Pdw_valid           => w_pdw_valid,
-    Pdw_data            => w_pdw_data,
+    Ack_delay_report      => r_ack_delay_report,
+    Ack_delay_sample_proc => r_ack_delay_sample_proc,
 
-    Buffered_frame_req  => w_frame_req,
-    Buffered_frame_ack  => w_frame_ack,
-    Buffered_frame_data => w_frame_data,
+    Pdw_ready             => w_pdw_ready,
+    Pdw_valid             => w_pdw_valid,
+    Pdw_data              => w_pdw_data,
 
-    Report_ack          => w_report_ack,
+    Buffered_frame_req    => w_frame_req,
+    Buffered_frame_ack    => w_frame_ack,
+    Buffered_frame_data   => w_frame_data,
 
-    Axis_ready          => Axis_ready,
-    Axis_valid          => Axis_valid,
-    Axis_data           => Axis_data,
-    Axis_last           => Axis_last,
+    Report_ack            => w_report_ack,
 
-    Error_timeout       => w_reporter_timeout,
-    Error_overflow      => w_reporter_overflow
+    Axis_ready            => Axis_ready,
+    Axis_valid            => Axis_valid,
+    Axis_data             => Axis_data,
+    Axis_last             => Axis_last,
+
+    Error_timeout         => w_reporter_timeout,
+    Error_overflow        => w_reporter_overflow
   );
 
   process(Clk)
   begin
     if rising_edge(Clk) then
       if (s_state = S_DWELL_ACTIVE) then
-        r_sample_processor_ack <= '0';
-        r_report_ack           <= '0';
+        r_sample_processor_ack  <= '0';
+        r_report_ack            <= '0';
+        r_ack_delay_report      <= (others => '0');
+        r_ack_delay_sample_proc <= (others => '0');
       elsif (s_state = S_DWELL_DONE) then
-        r_sample_processor_ack <= r_sample_processor_ack or w_sample_processor_ack;
-        r_report_ack           <= r_report_ack or w_report_ack;
+        r_sample_processor_ack  <= r_sample_processor_ack or w_sample_processor_ack;
+        r_report_ack            <= r_report_ack or w_report_ack;
+
+        if (r_report_ack = '0') then
+          r_ack_delay_report      <= r_ack_delay_report + 1;
+        end if;
+        if (r_sample_processor_ack = '0') then
+          r_ack_delay_sample_proc <= r_ack_delay_sample_proc + 1;
+        end if;
       end if;
     end if;
   end process;
