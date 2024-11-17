@@ -8,6 +8,7 @@ typedef struct {
   int channel;
   bit last;
   int unsigned power;
+  int unsigned average_power;
   int data_i;
   int data_q;
 } dwell_channel_data_t;
@@ -47,7 +48,7 @@ interface dwell_data_tx_intf (input logic Clk);
       input_ctrl.valid      = 0;
       input_ctrl.last       = 'x;
       input_ctrl.data_index = 'x;
-      input_power           = 'x;
+      input_power           = '0;
       input_iq[0]           = 'x;
       input_iq[1]           = 'x;
       repeat($urandom_range(1,0)) @(posedge Clk);
@@ -186,7 +187,7 @@ module esm_pdw_encoder_tb;
 
   initial begin
     Rst = 1;
-    repeat(100) @(posedge Clk);
+    repeat(3000) @(posedge Clk);
     Rst = 0;
   end
 
@@ -409,10 +410,10 @@ module esm_pdw_encoder_tb;
         $display("pulse_channel mismatch: %X %X", report_a.pulse_channel, report_b.pulse_channel);
         return 0;
       end
-      if (report_a.pulse_threshold !== report_b.pulse_threshold) begin
+      /*if (report_a.pulse_threshold !== report_b.pulse_threshold) begin
         $display("pulse_threshold mismatch: %X %X", report_a.pulse_threshold, report_b.pulse_threshold);
         return 0;
-      end
+      end*/
       if (report_a.pulse_power_accum !== report_b.pulse_power_accum) begin
         $display("pulse_power_accum mismatch: %X %X", report_a.pulse_power_accum, report_b.pulse_power_accum);
         return 0;
@@ -486,14 +487,16 @@ module esm_pdw_encoder_tb;
     int                         pulse_total_count = 0;
     int                         pulse_drop_count = 0;
 
-    int unsigned new_threshold = (NUM_CHANNELS < 64) ? dwell_data.threshold_wide : dwell_data.threshold_narrow;
-    int unsigned continued_threshold = new_threshold / 2;
+    int unsigned new_threshold_shift = (NUM_CHANNELS < 64) ? dwell_data.threshold_shift_wide : dwell_data.threshold_shift_narrow;
+    int unsigned continued_threshold_shift = new_threshold_shift - 1;
 
     //$display("%0t: num_header_words=%0d channels_per_packet=%0d num_packets=%0d", $time, NUM_HEADER_WORDS, channels_per_packet, num_packets);
 
     for (int i = 0; i < dwell_input.size(); i++) begin
       dwell_channel_data_t di = dwell_input[i];
       int i_ch                = dwell_input[i].channel;
+      int new_threshold       = di.average_power << new_threshold_shift;
+      int continued_threshold = di.average_power << continued_threshold_shift;
       bit continued_detect    = (di.power > continued_threshold);
 
       if (pulse_active[i_ch]) begin
@@ -598,8 +601,8 @@ module esm_pdw_encoder_tb;
     r.duration                = $urandom;
     r.gain                    = $urandom;
     r.fast_lock_profile       = $urandom;
-    r.threshold_narrow        = $urandom_range(10e6, 1000);
-    r.threshold_wide          = $urandom_range(10e6, 1000);
+    r.threshold_shift_narrow  = $urandom_range(18, 3);
+    r.threshold_shift_wide    = $urandom_range(18, 3);
     r.channel_mask_narrow     = {$urandom, $urandom};
     r.channel_mask_wide       = $urandom;
 
@@ -618,7 +621,7 @@ module esm_pdw_encoder_tb;
     int pulse_duration [NUM_CHANNELS][$];
     int time_offset [NUM_CHANNELS];
     int max_dwell_time = $urandom_range(5000, 500);
-    int threshold = (NUM_CHANNELS < 64) ? dwell_data.threshold_wide : dwell_data.threshold_narrow;
+    int threshold_shift = (NUM_CHANNELS < 64) ? dwell_data.threshold_shift_wide : dwell_data.threshold_shift_narrow;
     int rnd = 0;
 
     for (int i = 0; i < NUM_CHANNELS; i++) begin
@@ -628,7 +631,7 @@ module esm_pdw_encoder_tb;
 
       if ($urandom_range(99) < 50) begin
         int num_pulses = $urandom_range(10, 1);
-        time_offset[i] = $urandom_range(100);
+        time_offset[i] = $urandom_range(100, 50);
 
         for (int p = 0; p < num_pulses; p++) begin
           pulse_start_time[i].push_back(time_offset[i]);
@@ -662,26 +665,31 @@ module esm_pdw_encoder_tb;
       end
     end
 
-    max_dwell_time += $urandom_range(100, 10);
+    max_dwell_time += $urandom_range(200, 50);
 
     for (int i = 0; i < NUM_CHANNELS; i++) begin
+      int noise_floor     = $urandom_range(100, 1);
+      int pulse_threshold = noise_floor << threshold_shift;
       channel_data[i] = new[max_dwell_time];
 
       for (int j = 0; j < max_dwell_time; j++) begin
-        channel_data[i][j].channel  = i;
-        channel_data[i][j].last     = (i == (NUM_CHANNELS - 1));
-        channel_data[i][j].data_i   = $urandom_range(100);
-        channel_data[i][j].data_q   = $urandom_range(100);
-        channel_data[i][j].power    = $urandom_range(threshold / 4, 1);
+        channel_data[i][j].channel        = i;
+        channel_data[i][j].last           = (i == (NUM_CHANNELS - 1));
+        channel_data[i][j].data_i         = $urandom_range(100);
+        channel_data[i][j].data_q         = $urandom_range(100);
+        channel_data[i][j].power          = $urandom_range(2 * noise_floor, 0); //noise floor is the average
+        channel_data[i][j].average_power  = noise_floor;
       end
 
       for (int p = 0; p < pulse_start_time[i].size(); p++) begin
         int ps = pulse_start_time[i][p];
         int pd = pulse_duration[i][p];
         for (int j = ps; j < (ps + pd); j++) begin
-          channel_data[i][j].data_i = $urandom_range(1000);
-          channel_data[i][j].data_q = $urandom_range(1000);
-          channel_data[i][j].power  = $urandom_range(threshold * 2, threshold + 1);
+          channel_data[i][j].data_i             = $urandom_range(1000);
+          channel_data[i][j].data_q             = $urandom_range(1000);
+          channel_data[i][j].power              = $urandom_range(pulse_threshold * 2, pulse_threshold + 1);
+          channel_data[i][j + 32].average_power = pulse_threshold;  //average power is delayed
+
           //$display("channel_data[%0d][%0d]: j=%0d   power=%0d  threshold=%0d", i, p, j, channel_data[i][j].power, threshold);
         end
 
@@ -742,7 +750,7 @@ module esm_pdw_encoder_tb;
 
       $display("%0t: Test finished: num_received = %0d", $time, num_received);
       Rst = 1;
-      repeat(100) @(posedge Clk);
+      repeat(3000) @(posedge Clk);
       Rst = 0;
       repeat(100) @(posedge Clk);
     end

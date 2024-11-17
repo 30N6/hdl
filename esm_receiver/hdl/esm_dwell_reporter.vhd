@@ -334,11 +334,12 @@ begin
 
     when S_META_3 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(Dwell_data.threshold_narrow);
+      w_fifo_partial_0_data   <= std_logic_vector(resize_up(Dwell_data.threshold_shift_narrow, 8)) & std_logic_vector(resize_up(Dwell_data.threshold_shift_wide, 8)) &
+                                 x"0000";
 
     when S_META_4 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(Dwell_data.threshold_wide);
+      w_fifo_partial_0_data   <= (others => '0');
 
     when S_META_5 =>
       w_fifo_valid            <= '1';

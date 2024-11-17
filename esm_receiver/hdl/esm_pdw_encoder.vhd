@@ -64,7 +64,7 @@ architecture rtl of esm_pdw_encoder is
   constant DWELL_STOP_WAIT_CYCLES     : natural := NUM_CHANNELS * 4;
   constant IQ_WIDTH                   : natural := 16;
   constant IQ_DELAY_SAMPLES           : natural := 8;
-  constant IQ_DELAY_LATENCY           : natural := 4;
+  constant THRESHOLD_LATENCY          : natural := 5;
   constant BUFFERED_SAMPLES_PER_FRAME : natural := 40;
   constant BUFFERED_SAMPLE_PADDING    : natural := 16;
   constant PDW_FIFO_DEPTH             : natural := 32;
@@ -97,10 +97,13 @@ architecture rtl of esm_pdw_encoder is
   signal r_ack_delay_sample_proc    : unsigned(31 downto 0);
 
   signal w_iq_scaled                : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
-  signal w_threshold                : unsigned(ESM_THRESHOLD_WIDTH - 1 downto 0);
+  signal w_threshold_shift          : unsigned(ESM_THRESHOLD_SHIFT_WIDTH - 1 downto 0);
+
+  signal w_thresh_ctrl              : channelizer_control_t;
+  signal w_thresh_power             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal w_thresh_threshold         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   signal w_pipelined_ctrl           : channelizer_control_t;
-  signal w_pipelined_power          : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal w_delayed_iq_data          : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
 
   signal w_pdw_ready                : std_logic;
@@ -226,11 +229,35 @@ begin
   w_iq_scaled(0) <= Input_data(0)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
   w_iq_scaled(1) <= Input_data(1)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
 
+  w_threshold_shift <= Dwell_data.threshold_shift_wide when WIDE_BANDWIDTH else Dwell_data.threshold_shift_narrow;
+
+  i_threshold : entity esm_lib.esm_pdw_threshold
+  generic map (
+    DATA_WIDTH          => IQ_WIDTH,
+    CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
+    LATENCY             => THRESHOLD_LATENCY
+  )
+  port map (
+    Clk                   => Clk,
+
+    Dwell_active          => Dwell_active,
+    Dwell_threshold_shift => w_threshold_shift,
+
+    Input_ctrl            => Input_ctrl,
+    Input_data            => (others => (others => '0')), --unused
+    Input_power           => Input_power,
+
+    Output_ctrl           => w_thresh_ctrl,
+    Output_data           => open, --w_piped_data, TODO: IFM?
+    Output_power          => w_thresh_power,
+    Output_threshold      => w_thresh_threshold
+  );
+
   i_iq_delay : entity esm_lib.esm_pdw_iq_delay
   generic map (
     DATA_WIDTH          => IQ_WIDTH,
     CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
-    LATENCY             => IQ_DELAY_LATENCY,
+    LATENCY             => THRESHOLD_LATENCY,
     DELAY_SAMPLES       => IQ_DELAY_SAMPLES
   )
   port map (
@@ -238,14 +265,16 @@ begin
 
     Input_ctrl              => Input_ctrl,
     Input_data              => w_iq_scaled,
-    Input_power             => Input_power,
+    Input_power             => (others => '0'), --unused
 
     Output_pipelined_ctrl   => w_pipelined_ctrl,
-    Output_pipelined_power  => w_pipelined_power,
+    Output_pipelined_power  => open,
     Output_delayed_data     => w_delayed_iq_data
   );
 
-  w_threshold <= r_dwell_data.threshold_wide when WIDE_BANDWIDTH else r_dwell_data.threshold_narrow;
+  assert (w_thresh_ctrl = w_pipelined_ctrl)
+    report "Threshold/IQ delay control mismatch."
+    severity failure;
 
   i_sample_processor : entity esm_lib.esm_pdw_sample_processor
   generic map (
@@ -270,8 +299,8 @@ begin
 
     Input_ctrl              => w_pipelined_ctrl,
     Input_iq_delayed        => w_delayed_iq_data,
-    Input_power             => w_pipelined_power,
-    Input_threshold         => w_threshold,
+    Input_power             => w_thresh_power,
+    Input_threshold         => w_thresh_threshold,
 
     Pdw_ready               => w_pdw_ready,
     Pdw_valid               => w_pdw_valid,

@@ -63,6 +63,9 @@ architecture rtl of esm_pdw_iq_delay is
   signal r3_input_ctrl        : channelizer_control_t;
   signal r3_input_power       : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r3_rd_data           : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
+  signal r4_input_ctrl        : channelizer_control_t;
+  signal r4_input_power       : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r4_rd_data           : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
 
 begin
 
@@ -70,8 +73,8 @@ begin
     report "DELAY_SAMPLES expected to be a power of two."
     severity failure;
 
-  assert (LATENCY = 4)
-    report "LATENCY expected to be 4."
+  assert (LATENCY = 5)
+    report "LATENCY expected to be 5."
     severity failure;
 
   process(Clk)
@@ -130,9 +133,18 @@ begin
     end if;
   end process;
 
-  Output_pipelined_ctrl   <= r3_input_ctrl;
-  Output_pipelined_power  <= r3_input_power;
-  Output_delayed_data(0)  <= signed(r3_rd_data(DATA_WIDTH - 1 downto 0));
-  Output_delayed_data(1)  <= signed(r3_rd_data(2*DATA_WIDTH - 1 downto DATA_WIDTH));
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r4_input_ctrl   <= r3_input_ctrl;
+      r4_input_power  <= r3_input_power;
+      r4_rd_data      <= r3_rd_data;
+    end if;
+  end process;
+
+  Output_pipelined_ctrl   <= r4_input_ctrl;
+  Output_pipelined_power  <= r4_input_power;
+  Output_delayed_data(0)  <= signed(r4_rd_data(DATA_WIDTH - 1 downto 0));
+  Output_delayed_data(1)  <= signed(r4_rd_data(2*DATA_WIDTH - 1 downto DATA_WIDTH));
 
 end architecture rtl;

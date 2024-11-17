@@ -190,11 +190,11 @@ module esm_dwell_controller_tb;
     packed_entry[127 :  96] = entry.entry_data.duration;
     packed_entry[135 : 128] = entry.entry_data.gain;
     packed_entry[143 : 136] = entry.entry_data.fast_lock_profile;
-    packed_entry[191 : 160] = entry.entry_data.threshold_narrow;
-    packed_entry[223 : 192] = entry.entry_data.threshold_wide;
-    packed_entry[287 : 224] = entry.entry_data.channel_mask_narrow;
-    packed_entry[295 : 288] = entry.entry_data.channel_mask_wide;
-    packed_entry[319 : 304] = entry.entry_data.min_pulse_duration;
+    packed_entry[167 : 160] = entry.entry_data.threshold_shift_narrow;
+    packed_entry[175 : 168] = entry.entry_data.threshold_shift_wide;
+    packed_entry[255 : 192] = entry.entry_data.channel_mask_narrow;
+    packed_entry[263 : 256] = entry.entry_data.channel_mask_wide;
+    packed_entry[287 : 272] = entry.entry_data.min_pulse_duration;
 
     config_data[0] = esm_control_magic_num;
     config_data[1] = config_seq_num++;
@@ -252,16 +252,16 @@ module esm_dwell_controller_tb;
   endtask
 
   function automatic bit compare_data(esm_dwell_metadata_t a, esm_dwell_metadata_t b);
-    if(a.tag                  !== b.tag)                    return 0;
-    if(a.frequency            !== b.frequency)              return 0;
-    if(a.duration             !== b.duration)               return 0;
-    if(a.gain                 !== b.gain)                   return 0;
-    if(a.fast_lock_profile    !== b.fast_lock_profile)      return 0;
-    if(a.threshold_narrow     !== b.threshold_narrow)       return 0;
-    if(a.threshold_wide       !== b.threshold_wide)         return 0;
-    if(a.channel_mask_narrow  !== b.channel_mask_narrow)    return 0;
-    if(a.channel_mask_wide    !== b.channel_mask_wide)      return 0;
-    if(a.min_pulse_duration   !== b.min_pulse_duration)     return 0;
+    if(a.tag                    !== b.tag)                    return 0;
+    if(a.frequency              !== b.frequency)              return 0;
+    if(a.duration               !== b.duration)               return 0;
+    if(a.gain                   !== b.gain)                   return 0;
+    if(a.fast_lock_profile      !== b.fast_lock_profile)      return 0;
+    if(a.threshold_shift_narrow !== b.threshold_shift_narrow) return 0;
+    if(a.threshold_shift_wide   !== b.threshold_shift_wide)   return 0;
+    if(a.channel_mask_narrow    !== b.channel_mask_narrow)    return 0;
+    if(a.channel_mask_wide      !== b.channel_mask_wide)      return 0;
+    if(a.min_pulse_duration     !== b.min_pulse_duration)     return 0;
     return 1;
   endfunction
 
@@ -389,17 +389,17 @@ module esm_dwell_controller_tb;
 
       for (int i_dwell = 0; i_dwell < esm_num_dwell_entries; i_dwell++) begin
         esm_message_dwell_entry_t entry;
-        entry.entry_index                     = i_dwell;
-        entry.entry_data.tag                  = $urandom;
-        entry.entry_data.frequency            = $urandom;
-        entry.entry_data.duration             = $urandom_range(1000);
-        entry.entry_data.gain                 = $urandom;
-        entry.entry_data.fast_lock_profile    = $urandom;
-        entry.entry_data.threshold_narrow     = $urandom;
-        entry.entry_data.threshold_wide       = $urandom;
-        entry.entry_data.channel_mask_narrow  = $urandom;
-        entry.entry_data.channel_mask_wide    = $urandom;
-        entry.entry_data.min_pulse_duration   = $urandom;
+        entry.entry_index                       = i_dwell;
+        entry.entry_data.tag                    = $urandom;
+        entry.entry_data.frequency              = $urandom;
+        entry.entry_data.duration               = $urandom_range(1000);
+        entry.entry_data.gain                   = $urandom;
+        entry.entry_data.fast_lock_profile      = $urandom;
+        entry.entry_data.threshold_shift_narrow = $urandom;
+        entry.entry_data.threshold_shift_wide   = $urandom;
+        entry.entry_data.channel_mask_narrow    = $urandom;
+        entry.entry_data.channel_mask_wide      = $urandom;
+        entry.entry_data.min_pulse_duration     = $urandom;
 
         send_dwell_entry(entry);
         dwell_entry_mem[i_dwell] = entry.entry_data;
