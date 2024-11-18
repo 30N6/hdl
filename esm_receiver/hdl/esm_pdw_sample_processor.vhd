@@ -40,7 +40,8 @@ port (
   Input_ctrl              : in  channelizer_control_t;
   Input_iq_delayed        : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
   Input_power             : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-  Input_threshold         : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  Input_threshold_value   : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  Input_threshold_valid   : in  std_logic;
 
   Pdw_ready               : in  std_logic;
   Pdw_valid               : out std_logic;
@@ -98,19 +99,21 @@ architecture rtl of esm_pdw_sample_processor is
   signal r0_input_ctrl              : channelizer_control_t;
   signal r0_input_iq                : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
   signal r0_input_power             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-  signal r0_input_threshold         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r0_input_threshold_value   : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r0_input_threshold_valid   : std_logic;
   signal r0_context                 : channel_context_t;
 
   signal r1_input_ctrl              : channelizer_control_t;
   signal r1_input_iq                : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
   signal r1_input_power             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-  signal r1_input_threshold         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r1_input_threshold_value   : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r1_input_threshold_valid   : std_logic;
   signal r1_context                 : channel_context_t;
 
   signal r2_input_ctrl              : channelizer_control_t;
   signal r2_input_iq                : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
   signal r2_input_power             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-  signal r2_input_threshold         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r2_input_threshold_value   : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r2_context                 : channel_context_t;
   signal r2_new_detect              : std_logic;
   signal r2_continued_detect        : std_logic;
@@ -208,36 +211,38 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r0_input_ctrl       <= Input_ctrl;
-      r0_input_iq         <= Input_iq_delayed;
-      r0_input_power      <= Input_power;
-      r0_input_threshold  <= Input_threshold;
-      r0_context          <= m_channel_context(to_integer(Input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0)));
+      r0_input_ctrl             <= Input_ctrl;
+      r0_input_iq               <= Input_iq_delayed;
+      r0_input_power            <= Input_power;
+      r0_input_threshold_value  <= Input_threshold_value;
+      r0_input_threshold_valid  <= Input_threshold_valid;
+      r0_context                <= m_channel_context(to_integer(Input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0)));
     end if;
   end process;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r1_input_ctrl       <= r0_input_ctrl;
-      r1_input_iq         <= r0_input_iq;
-      r1_input_power      <= r0_input_power;
-      r1_input_threshold  <= r0_input_threshold;
-      r1_context          <= r0_context;
+      r1_input_ctrl             <= r0_input_ctrl;
+      r1_input_iq               <= r0_input_iq;
+      r1_input_power            <= r0_input_power;
+      r1_input_threshold_value  <= r0_input_threshold_value;
+      r1_input_threshold_valid  <= r0_input_threshold_valid;
+      r1_context                <= r0_context;
     end if;
   end process;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r2_input_ctrl       <= r1_input_ctrl;
-      r2_input_iq         <= r1_input_iq;
-      r2_input_power      <= r1_input_power;
-      r2_input_threshold  <= r1_input_threshold;
-      r2_context          <= r1_context;
-      r2_new_detect       <= to_stdlogic(r1_input_power > r1_input_threshold);
-      r2_continued_detect <= to_stdlogic(r1_input_power > shift_right(r1_context.threshold, 1)); -- reduce threshold by 3 dB after pulse has started
-      r2_seq_num_next     <= r1_context.pulse_seq_num + 1;
+      r2_input_ctrl             <= r1_input_ctrl;
+      r2_input_iq               <= r1_input_iq;
+      r2_input_power            <= r1_input_power;
+      r2_input_threshold_value  <= r1_input_threshold_value;
+      r2_context                <= r1_context;
+      r2_new_detect             <= to_stdlogic(r1_input_power > r1_input_threshold_value) and r1_input_threshold_valid;
+      r2_continued_detect       <= to_stdlogic(r1_input_power > shift_right(r1_context.threshold, 1)); -- reduce threshold by 3 dB after pulse has started
+      r2_seq_num_next           <= r1_context.pulse_seq_num + 1;
     end if;
   end process;
 
@@ -254,7 +259,7 @@ begin
 
       case r2_context.state is
       when S_IDLE =>
-        r3_context.threshold                <= r2_input_threshold;
+        r3_context.threshold                <= r2_input_threshold_value;
         r3_context.power_accum_a            <= resize_up(r2_input_power, ESM_PDW_POWER_ACCUM_WIDTH - 16);
         r3_context.power_accum_ac           <= '0';
         r3_context.power_accum_b            <= (others => '0');

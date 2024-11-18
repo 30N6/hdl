@@ -102,6 +102,7 @@ architecture rtl of esm_pdw_encoder is
   signal w_thresh_ctrl              : channelizer_control_t;
   signal w_thresh_power             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal w_thresh_threshold         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal w_thresh_valid             : std_logic;
 
   signal w_pipelined_ctrl           : channelizer_control_t;
   signal w_delayed_iq_data          : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
@@ -238,19 +239,20 @@ begin
     LATENCY             => THRESHOLD_LATENCY
   )
   port map (
-    Clk                   => Clk,
+    Clk                     => Clk,
 
-    Dwell_active          => Dwell_active,
-    Dwell_threshold_shift => w_threshold_shift,
+    Dwell_active            => Dwell_active,
+    Dwell_threshold_shift   => w_threshold_shift,
 
-    Input_ctrl            => Input_ctrl,
-    Input_data            => (others => (others => '0')), --unused
-    Input_power           => Input_power,
+    Input_ctrl              => Input_ctrl,
+    Input_data              => (others => (others => '0')), --unused
+    Input_power             => Input_power,
 
-    Output_ctrl           => w_thresh_ctrl,
-    Output_data           => open, --w_piped_data, TODO: IFM?
-    Output_power          => w_thresh_power,
-    Output_threshold      => w_thresh_threshold
+    Output_ctrl             => w_thresh_ctrl,
+    Output_data             => open, --w_piped_data, TODO: IFM?
+    Output_power            => w_thresh_power,
+    Output_threshold_value  => w_thresh_threshold,
+    Output_threshold_valid  => w_thresh_valid
   );
 
   i_iq_delay : entity esm_lib.esm_pdw_iq_delay
@@ -300,7 +302,8 @@ begin
     Input_ctrl              => w_pipelined_ctrl,
     Input_iq_delayed        => w_delayed_iq_data,
     Input_power             => w_thresh_power,
-    Input_threshold         => w_thresh_threshold,
+    Input_threshold_value   => w_thresh_threshold,
+    Input_threshold_valid   => w_thresh_valid,
 
     Pdw_ready               => w_pdw_ready,
     Pdw_valid               => w_pdw_valid,

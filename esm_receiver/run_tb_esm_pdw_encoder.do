@@ -23,6 +23,7 @@ set library_file_list [list \
   mem_lib [list \
     ../mem/hdl/ram_sdp.vhd \
     ../mem/hdl/xpm_fallthrough_fifo.vhd \
+    ../mem/hdl/xpm_async_fifo.vhd \
     ] \
   dsp_lib [list \
     ../dsp/hdl/dsp_pkg.vhd \
