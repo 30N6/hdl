@@ -164,7 +164,7 @@ begin
       r3_input_ctrl     <= r2_input_ctrl;
       r3_input_data     <= r2_input_data;
       r3_input_pwr_sat  <= r2_input_pwr_sat;
-      r3_comb_diff      <= r2_integrator_sum - r2_comb_pwr;
+      r3_comb_diff      <= r2_integrator_sum - r2_comb_pwr - r2_input_pwr_sat;
       r3_comb_rd_valid  <= r2_comb_rd_valid;
     end if;
   end process;

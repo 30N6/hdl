@@ -633,7 +633,7 @@ module esm_pdw_encoder_tb;
       time_offset[i] = 0;
 
       if ($urandom_range(99) < 50) begin
-        int num_pulses = 1; //TODO: $urandom_range(10, 1);
+        int num_pulses = $urandom_range(10, 1);
         time_offset[i] = $urandom_range(100, 50);
 
         for (int p = 0; p < num_pulses; p++) begin
@@ -654,11 +654,11 @@ module esm_pdw_encoder_tb;
 
           rnd = $urandom_range(99);
           if (rnd < 30) begin
-            time_offset[i] += $urandom_range(50, 20);
+            time_offset[i] += $urandom_range(64, 32);
           end else if (rnd < 70) begin
-            time_offset[i] += $urandom_range(200, 50);
+            time_offset[i] += $urandom_range(256, 64);
           end else begin
-            time_offset[i] += $urandom_range(1000, 200);
+            time_offset[i] += $urandom_range(1024, 256);
           end
         end
 
@@ -671,7 +671,7 @@ module esm_pdw_encoder_tb;
     max_dwell_time += $urandom_range(200, 50);
 
     for (int i = 0; i < NUM_CHANNELS; i++) begin
-      int noise_floor     = 10; //TODO: $urandom_range(100, 1);
+      int noise_floor     = $urandom_range(100, 1);
       int pulse_threshold = noise_floor << threshold_shift;
       channel_data[i] = new[max_dwell_time];
 
@@ -680,7 +680,7 @@ module esm_pdw_encoder_tb;
         channel_data[i][j].last           = (i == (NUM_CHANNELS - 1));
         channel_data[i][j].data_i         = $urandom_range(100);
         channel_data[i][j].data_q         = $urandom_range(100);
-        channel_data[i][j].power          = noise_floor; //$urandom_range(2 * noise_floor, 0); //noise floor is the average
+        channel_data[i][j].power          = $urandom_range(1.5 * noise_floor, 0.5 * noise_floor); //noise floor is the average
         channel_data[i][j].pulse_valid    = 0;
       end
 
@@ -692,7 +692,7 @@ module esm_pdw_encoder_tb;
           channel_data[i][j].data_q       = $urandom_range(1000);
           channel_data[i][j].power        = $urandom_range(pulse_threshold * 2, pulse_threshold + 1);
           channel_data[i][j].pulse_valid  = 1;
-          //$display("channel_data[%0d][%0d]: j=%0d   power=%0d  threshold=%0d", i, p, j, channel_data[i][j].power, threshold);
+          //$display("channel_data[%0d][%0d]: j=%0d   power=%0d  noise_floor=%0d", i, p, j, channel_data[i][j].power, noise_floor);
         end
 
         $display("channel[%0d] pulse[%0d]: start=%0d  duration=%0d", i, p, ps, pd);
