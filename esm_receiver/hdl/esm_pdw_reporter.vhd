@@ -372,6 +372,8 @@ begin
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= std_logic_vector(resize_up(Pdw_data.channel, 32));
 
+    --TODO: report noise floor
+
     when S_PULSE_THRESHOLD =>
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= std_logic_vector(Pdw_data.power_threshold);

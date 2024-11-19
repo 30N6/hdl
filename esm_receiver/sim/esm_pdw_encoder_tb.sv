@@ -335,8 +335,21 @@ module esm_pdw_encoder_tb;
     esm_pdw_report_header_t header_a = unpack_report_header(a);
     esm_pdw_report_header_t header_b = unpack_report_header(b);
 
-    $display("%0t: data_match: header_a=%p", $time, header_a);
-    $display("%0t: data_match: header_b=%p", $time, header_b);
+    $display("%0t: data_match h: header_a=%p", $time, header_a);
+    $display("%0t: data_match h: header_b=%p", $time, header_b);
+    if (header_a.message_type == esm_report_message_type_pdw_summary) begin
+      esm_pdw_summary_report_header_t report_a = unpack_summary_report_header(a);
+      esm_pdw_summary_report_header_t report_b = unpack_summary_report_header(b);
+      $display("%0t: data_match 0: report_a=%p", $time, report_a);
+      $display("%0t: data_match 0: report_b=%p", $time, report_b);
+    end
+    if (header_a.message_type == esm_report_message_type_pdw_pulse) begin
+      esm_pdw_pulse_report_header_t report_a = unpack_pulse_report_header(a);
+      esm_pdw_pulse_report_header_t report_b = unpack_pulse_report_header(b);
+
+      $display("%0t: data_match 0: report_a=%p", $time, report_a);
+      $display("%0t: data_match 0: report_b=%p", $time, report_b);
+    end
 
     if (a.size() != b.size()) begin
       $display("%0t: size mismatch: a=%0d b=%0d", $time, a.size(), b.size());
@@ -368,8 +381,8 @@ module esm_pdw_encoder_tb;
       esm_pdw_summary_report_header_t report_a = unpack_summary_report_header(a);
       esm_pdw_summary_report_header_t report_b = unpack_summary_report_header(b);
 
-      $display("%0t: data_match: report_a=%p", $time, report_a);
-      $display("%0t: data_match: report_b=%p", $time, report_b);
+      $display("%0t: data_match 1: report_a=%p", $time, report_a);
+      $display("%0t: data_match 1: report_b=%p", $time, report_b);
 
       //TODO: check dwell_duration
 

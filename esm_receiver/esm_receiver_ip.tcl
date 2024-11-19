@@ -47,6 +47,7 @@ custom_ip_files esm_receiver [list \
   {"./hdl/esm_dwell_reporter.vhd"           "esm_lib"}      \
   {"./hdl/esm_dwell_stats.vhd"              "esm_lib"}      \
   {"./hdl/esm_pdw_iq_delay.vhd"             "esm_lib"}      \
+  {"./hdl/esm_pdw_threshold.vhd"            "esm_lib"}      \
   {"./hdl/esm_pdw_sample_buffer.vhd"        "esm_lib"}      \
   {"./hdl/esm_pdw_sample_processor.vhd"     "esm_lib"}      \
   {"./hdl/esm_pdw_reporter.vhd"             "esm_lib"}      \
