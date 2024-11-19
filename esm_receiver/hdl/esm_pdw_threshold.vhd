@@ -25,10 +25,6 @@ port (
   Dwell_active            : in  std_logic;
   Dwell_threshold_shift   : in  unsigned(ESM_THRESHOLD_SHIFT_WIDTH - 1 downto 0);
 
-  Override_channel        : in  unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  Override_valid          : in  std_logic;
-  Override_wr_en          : in  std_logic;
-
   Input_ctrl              : in  channelizer_control_t;
   Input_data              : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
   Input_power             : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
@@ -54,7 +50,6 @@ architecture rtl of esm_pdw_threshold is
   signal m_channel_comb_data      : unsigned_array_t(2**COMB_INDEX_WIDTH - 1 downto 0)(INTEGRATOR_WIDTH - 1 downto 0);
   signal m_channel_comb_index     : unsigned_array_t(2**CHANNEL_INDEX_WIDTH - 1 downto 0)(clog2(FILTER_LENGTH) - 1 downto 0);
   signal m_channel_comb_valid     : std_logic_array_t(2**CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal m_channel_override_valid : std_logic_array_t(2**CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal m_channel_average_power  : unsigned_array_t(2**CHANNEL_INDEX_WIDTH - 1 downto 0)(INTEGRATOR_WIDTH - 1 downto 0);
   signal m_channel_average_valid  : std_logic_array_t(2**CHANNEL_INDEX_WIDTH - 1 downto 0);
 
@@ -73,11 +68,6 @@ architecture rtl of esm_pdw_threshold is
   signal r_clear_channel_index    : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
   signal r_clear_comb_index       : unsigned(COMB_INDEX_WIDTH - 1 downto 0) := (others => '0');
 
-  signal r_override_wr_en         : std_logic;
-  signal r_override_wr_channel    : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal r_override_wr_valid      : std_logic;
-  signal r_override_wr_power      : unsigned(SAT_POWER_WIDTH - 1 downto 0);
-
   signal r_dwell_active           : std_logic;
   signal r_dwell_thresh_shift     : unsigned(ESM_THRESHOLD_SHIFT_WIDTH - 1 downto 0);
 
@@ -89,7 +79,6 @@ architecture rtl of esm_pdw_threshold is
   signal r0_average_valid         : std_logic;
   signal r0_comb_rd_index         : unsigned(clog2(FILTER_LENGTH) - 1 downto 0);
   signal r0_comb_rd_valid         : std_logic;
-  signal r0_override_valid        : std_logic;
 
   signal r1_input_ctrl            : channelizer_control_t;
   signal r1_input_data            : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
@@ -100,7 +89,6 @@ architecture rtl of esm_pdw_threshold is
   signal r1_comb_power            : unsigned(INTEGRATOR_WIDTH - 1 downto 0);
   signal r1_comb_rd_index         : unsigned(clog2(FILTER_LENGTH) - 1 downto 0);
   signal r1_comb_rd_valid         : std_logic;
-  signal r1_override_valid        : std_logic;
 
   signal r2_input_ctrl            : channelizer_control_t;
   signal r2_input_data            : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
@@ -111,7 +99,6 @@ architecture rtl of esm_pdw_threshold is
   signal r2_comb_power            : unsigned(INTEGRATOR_WIDTH - 1 downto 0);
   signal r2_comb_rd_index         : unsigned(clog2(FILTER_LENGTH) - 1 downto 0);
   signal r2_comb_rd_valid         : std_logic;
-  signal r2_override_valid        : std_logic;
 
   signal r3_input_ctrl            : channelizer_control_t;
   signal r3_input_data            : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
@@ -120,13 +107,16 @@ architecture rtl of esm_pdw_threshold is
   signal r3_average_valid         : std_logic;
   signal r3_comb_diff             : unsigned(INTEGRATOR_WIDTH - 1 downto 0);
   signal r3_comb_rd_valid         : std_logic;
-  signal r3_override_valid        : std_logic;
 
   signal w3_threshold_scaled      : unsigned(INTEGRATOR_WIDTH - 1 downto 0);
+  signal w3_threshold_value       : unsigned(SAT_POWER_WIDTH - 1 downto 0);
 
   signal r4_input_ctrl            : channelizer_control_t;
   signal r4_input_data            : signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
   signal r4_input_power_sat       : unsigned(SAT_POWER_WIDTH - 1 downto 0);
+  signal r4_comb_diff             : unsigned(INTEGRATOR_WIDTH - 1 downto 0);
+  signal r4_comb_diff_accepted    : std_logic;
+  signal r4_comb_rd_valid         : std_logic;
   signal r4_threshold_value       : unsigned(SAT_POWER_WIDTH - 1 downto 0);
   signal r4_threshold_valid       : std_logic;
 
@@ -159,7 +149,6 @@ begin
       r0_integrated_power   <= m_channel_integrator(to_integer(Input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0)));
       r0_comb_rd_index      <= m_channel_comb_index(to_integer(Input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0)));
       r0_comb_rd_valid      <= m_channel_comb_valid(to_integer(Input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0)));
-      r0_override_valid     <= m_channel_override_valid(to_integer(Input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0)));
       r0_average_power      <= m_channel_average_power(to_integer(Input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0)));
       r0_average_valid      <= m_channel_average_valid(to_integer(Input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0)));
     end if;
@@ -175,7 +164,6 @@ begin
       r1_comb_power       <= m_channel_comb_data(to_integer(r0_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0) & r0_comb_rd_index));
       r1_comb_rd_index    <= r0_comb_rd_index;
       r1_comb_rd_valid    <= r0_comb_rd_valid;
-      r1_override_valid   <= r0_override_valid;
       r1_average_power    <= r0_average_power;
       r1_average_valid    <= r0_average_valid;
     end if;
@@ -190,7 +178,6 @@ begin
       r2_comb_power       <= r1_comb_power;
       r2_comb_rd_index    <= r1_comb_rd_index;
       r2_comb_rd_valid    <= r1_comb_rd_valid;
-      r2_override_valid   <= r1_override_valid;
       r2_integrator_sum   <= r1_integrated_power + r1_input_power_sat;
       r2_average_power    <= r1_average_power;
       r2_average_valid    <= r1_average_valid;
@@ -207,20 +194,23 @@ begin
       r3_comb_diff        <= r2_integrator_sum - r2_comb_power;
       r3_average_power    <= r2_average_power;
       r3_average_valid    <= r2_average_valid;
-      r3_override_valid   <= r2_override_valid;
     end if;
   end process;
 
   w3_threshold_scaled <= shift_left(r3_average_power, to_integer(r_dwell_thresh_shift));
+  w3_threshold_value  <= w3_threshold_scaled(INTEGRATOR_WIDTH - 1 downto clog2(FILTER_LENGTH));
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r4_input_ctrl       <= r3_input_ctrl;
-      r4_input_data       <= r3_input_data;
-      r4_input_power_sat  <= r3_input_power_sat;
-      r4_threshold_valid  <= r3_average_valid;
-      r4_threshold_value  <= w3_threshold_scaled(INTEGRATOR_WIDTH - 1 downto clog2(FILTER_LENGTH));
+      r4_input_ctrl         <= r3_input_ctrl;
+      r4_input_data         <= r3_input_data;
+      r4_input_power_sat    <= r3_input_power_sat;
+      r4_comb_rd_valid      <= r3_comb_rd_valid;
+      r4_comb_diff          <= r3_comb_diff;
+      r4_comb_diff_accepted <= to_stdlogic(r3_comb_diff < w3_threshold_value) or not(r3_average_valid);
+      r4_threshold_valid    <= r3_average_valid;
+      r4_threshold_value    <= w3_threshold_value;
     end if;
   end process;
 
@@ -248,7 +238,7 @@ begin
       w_comb_index_wr_data  <= (others => '0');
       w_comb_valid_wr_data  <= '0';
     else
-      w_integrator_wr_en    <= r2_input_ctrl.valid and not(r2_override_valid);
+      w_integrator_wr_en    <= r2_input_ctrl.valid;
       w_integrator_wr_index <= r2_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
       w_integrator_wr_data  <= r2_integrator_sum;
       w_comb_wr_index       <= r2_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0) & r2_comb_rd_index;
@@ -277,10 +267,10 @@ begin
       w_average_power_wr_data  <= (others => '-');
       w_average_power_wr_valid <= '0';
     else
-      w_average_power_wr_en    <= r3_input_ctrl.valid and not(r3_override_valid);
-      w_average_power_wr_index <= r3_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
-      w_average_power_wr_data  <= r3_comb_diff;
-      w_average_power_wr_valid <= r3_comb_rd_valid;
+      w_average_power_wr_en    <= r4_input_ctrl.valid and r4_comb_diff_accepted;
+      w_average_power_wr_index <= r4_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
+      w_average_power_wr_data  <= r4_comb_diff;
+      w_average_power_wr_valid <= r4_comb_rd_valid;
     end if;
   end process;
 
@@ -290,25 +280,6 @@ begin
       if (w_average_power_wr_en = '1') then
         m_channel_average_power(to_integer(w_average_power_wr_index)) <= w_average_power_wr_data;
         m_channel_average_valid(to_integer(w_average_power_wr_index)) <= w_average_power_wr_valid;
-      end if;
-    end if;
-  end process;
-
-
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      r_override_wr_en      <= Override_wr_en;
-      r_override_wr_valid   <= Override_valid;
-      r_override_wr_channel <= Override_channel;
-    end if;
-  end process;
-
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      if (r_override_wr_en = '1') then
-        m_channel_override_valid(to_integer(r_override_wr_channel)) <= r_override_wr_valid;
       end if;
     end if;
   end process;

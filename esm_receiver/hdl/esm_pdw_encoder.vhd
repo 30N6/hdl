@@ -99,10 +99,6 @@ architecture rtl of esm_pdw_encoder is
   signal w_iq_scaled                : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
   signal w_threshold_shift          : unsigned(ESM_THRESHOLD_SHIFT_WIDTH - 1 downto 0);
 
-  signal w_thresh_override_channel  : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_thresh_override_valid    : std_logic;
-  signal w_thresh_override_wr_en    : std_logic;
-
   signal w_thresh_ctrl              : channelizer_control_t;
   signal w_thresh_power             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal w_thresh_threshold         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
@@ -248,10 +244,6 @@ begin
     Dwell_active            => Dwell_active,
     Dwell_threshold_shift   => w_threshold_shift,
 
-    Override_channel        => w_thresh_override_channel,
-    Override_valid          => w_thresh_override_valid,
-    Override_wr_en          => w_thresh_override_wr_en,
-
     Input_ctrl              => Input_ctrl,
     Input_data              => (others => (others => '0')), --unused
     Input_power             => Input_power,
@@ -306,10 +298,6 @@ begin
     Dwell_active            => w_dwell_active,
     Dwell_done              => w_dwell_done,
     Dwell_ack               => w_sample_processor_ack,
-
-    Thresh_override_channel => w_thresh_override_channel,
-    Thresh_override_valid   => w_thresh_override_valid,
-    Thresh_override_wr_en   => w_thresh_override_wr_en,
 
     Input_ctrl              => w_pipelined_ctrl,
     Input_iq_delayed        => w_delayed_iq_data,

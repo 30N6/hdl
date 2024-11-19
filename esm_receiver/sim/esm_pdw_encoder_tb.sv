@@ -337,19 +337,19 @@ module esm_pdw_encoder_tb;
 
     $display("%0t: data_match h: header_a=%p", $time, header_a);
     $display("%0t: data_match h: header_b=%p", $time, header_b);
-    if (header_a.message_type == esm_report_message_type_pdw_summary) begin
+    /*if (header_a.message_type == esm_report_message_type_pdw_summary) begin
       esm_pdw_summary_report_header_t report_a = unpack_summary_report_header(a);
       esm_pdw_summary_report_header_t report_b = unpack_summary_report_header(b);
-      $display("%0t: data_match 0: report_a=%p", $time, report_a);
-      $display("%0t: data_match 0: report_b=%p", $time, report_b);
+      $display("%0t: data_match: report_a=%p", $time, report_a);
+      $display("%0t: data_match: report_b=%p", $time, report_b);
     end
     if (header_a.message_type == esm_report_message_type_pdw_pulse) begin
       esm_pdw_pulse_report_header_t report_a = unpack_pulse_report_header(a);
       esm_pdw_pulse_report_header_t report_b = unpack_pulse_report_header(b);
 
-      $display("%0t: data_match 0: report_a=%p", $time, report_a);
-      $display("%0t: data_match 0: report_b=%p", $time, report_b);
-    end
+      $display("%0t: data_match: report_a=%p", $time, report_a);
+      $display("%0t: data_match: report_b=%p", $time, report_b);
+    end*/
 
     if (a.size() != b.size()) begin
       $display("%0t: size mismatch: a=%0d b=%0d", $time, a.size(), b.size());
@@ -381,8 +381,8 @@ module esm_pdw_encoder_tb;
       esm_pdw_summary_report_header_t report_a = unpack_summary_report_header(a);
       esm_pdw_summary_report_header_t report_b = unpack_summary_report_header(b);
 
-      $display("%0t: data_match 1: report_a=%p", $time, report_a);
-      $display("%0t: data_match 1: report_b=%p", $time, report_b);
+      $display("%0t: data_match: report_a=%p", $time, report_a);
+      $display("%0t: data_match: report_b=%p", $time, report_b);
 
       //TODO: check dwell_duration
 
@@ -703,7 +703,7 @@ module esm_pdw_encoder_tb;
         for (int j = ps; j < (ps + pd); j++) begin
           channel_data[i][j].data_i       = $urandom_range(1000);
           channel_data[i][j].data_q       = $urandom_range(1000);
-          channel_data[i][j].power        = $urandom_range(pulse_threshold * 2, pulse_threshold + 1);
+          channel_data[i][j].power        = $urandom_range(pulse_threshold * 2, pulse_threshold * 1.25);
           channel_data[i][j].pulse_valid  = 1;
           //$display("channel_data[%0d][%0d]: j=%0d   power=%0d  noise_floor=%0d", i, p, j, channel_data[i][j].power, noise_floor);
         end

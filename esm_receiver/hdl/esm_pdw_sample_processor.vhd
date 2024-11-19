@@ -37,10 +37,6 @@ port (
   Dwell_done              : in  std_logic;
   Dwell_ack               : out std_logic;
 
-  Thresh_override_channel : out unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  Thresh_override_valid   : out std_logic;
-  Thresh_override_wr_en   : out std_logic;
-
   Input_ctrl              : in  channelizer_control_t;
   Input_iq_delayed        : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
   Input_power             : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
@@ -360,10 +356,6 @@ begin
       end if;
     end if;
   end process;
-
-  Thresh_override_channel <= r3_context_wr_index;
-  Thresh_override_valid   <= to_stdlogic(w3_context.state = S_ACTIVE);
-  Thresh_override_wr_en   <= r3_context_wr_valid;
 
   process(Clk)
   begin
