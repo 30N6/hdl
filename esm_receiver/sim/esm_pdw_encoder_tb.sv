@@ -335,8 +335,8 @@ module esm_pdw_encoder_tb;
     esm_pdw_report_header_t header_a = unpack_report_header(a);
     esm_pdw_report_header_t header_b = unpack_report_header(b);
 
-    $display("%0t: data_match h: header_a=%p", $time, header_a);
-    $display("%0t: data_match h: header_b=%p", $time, header_b);
+    $display("%0t: data_match: header_a=%p", $time, header_a);
+    $display("%0t: data_match: header_b=%p", $time, header_b);
     /*if (header_a.message_type == esm_report_message_type_pdw_summary) begin
       esm_pdw_summary_report_header_t report_a = unpack_summary_report_header(a);
       esm_pdw_summary_report_header_t report_b = unpack_summary_report_header(b);
@@ -647,15 +647,15 @@ module esm_pdw_encoder_tb;
 
       if ($urandom_range(99) < 50) begin
         int num_pulses = $urandom_range(10, 1);
-        time_offset[i] = $urandom_range(100, 50);
+        time_offset[i] = $urandom_range(200, 100);
 
         for (int p = 0; p < num_pulses; p++) begin
           pulse_start_time[i].push_back(time_offset[i]);
 
           rnd = $urandom_range(99);
-          if (rnd < 25) begin
+          if (rnd < 10) begin
             pulse_duration[i].push_back($urandom_range(5,1));
-          end else if (rnd < 50) begin
+          end else if (rnd < 25) begin
             pulse_duration[i].push_back($urandom_range(50,10));
           end else if (rnd < 75) begin
             pulse_duration[i].push_back($urandom_range(500,100));
