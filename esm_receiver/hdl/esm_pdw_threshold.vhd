@@ -266,15 +266,21 @@ begin
   begin
     if rising_edge(Clk) then
       if (r_dwell_active = '0') then
-        r_average_power_wr_en    <= '1';
-        r_average_power_wr_index <= r_clear_channel_index;
-        r_average_power_wr_data  <= (others => '-');
-        r_average_power_wr_valid <= '0';
+        r_average_power_wr_en     <= '1';
+        r_average_power_wr_index  <= r_clear_channel_index;
+        r_average_power_wr_data   <= (others => '-');
+        r_average_power_wr_valid  <= '0';
       else
-        r_average_power_wr_en    <= r4_input_ctrl.valid and w4_comb_diff_accepted;
-        r_average_power_wr_index <= r4_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
-        r_average_power_wr_data  <= r4_comb_diff;
-        r_average_power_wr_valid <= r4_comb_rd_valid;
+        r_average_power_wr_en     <= r4_input_ctrl.valid and w4_comb_diff_accepted;
+        r_average_power_wr_index  <= r4_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
+        r_average_power_wr_valid  <= r4_comb_rd_valid;
+        r_average_power_wr_data   <= r4_comb_diff;
+
+        -- average power floor of 1 to avoid bad thresholds
+        if (or_reduce(r4_comb_diff(INTEGRATOR_WIDTH - 1 downto clog2(FILTER_LENGTH))) = '0') then
+          r_average_power_wr_data(clog2(FILTER_LENGTH))               <= '1';
+          r_average_power_wr_data(clog2(FILTER_LENGTH) - 1 downto 0)  <= (others => '0');
+        end if;
       end if;
     end if;
   end process;

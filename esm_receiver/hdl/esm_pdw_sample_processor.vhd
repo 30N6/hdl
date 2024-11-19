@@ -33,6 +33,7 @@ port (
 
   Timestamp               : in  unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
 
+  Dwell_channel_mask      : in  std_logic_vector(2**CHANNEL_INDEX_WIDTH - 1 downto 0);
   Dwell_active            : in  std_logic;
   Dwell_done              : in  std_logic;
   Dwell_ack               : out std_logic;
@@ -118,6 +119,7 @@ architecture rtl of esm_pdw_sample_processor is
   signal r2_new_detect              : std_logic;
   signal r2_continued_detect        : std_logic;
   signal r2_seq_num_next            : unsigned(ESM_PDW_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal r2_channel_enabled         : std_logic;
 
   signal r3_input_ctrl              : channelizer_control_t;
   signal r3_context                 : channel_context_t;
@@ -152,6 +154,7 @@ architecture rtl of esm_pdw_sample_processor is
 
   signal r_dwell_ack_pending        : std_logic;
   signal r_dwell_active             : std_logic;
+
 
   signal w_pending_fifo_busy        : std_logic;
   signal w_pending_fifo_overflow    : std_logic;
@@ -243,6 +246,7 @@ begin
       r2_new_detect             <= to_stdlogic(r1_input_power > r1_input_threshold_value) and r1_input_threshold_valid;
       r2_continued_detect       <= to_stdlogic(r1_input_power > shift_right(r1_context.threshold, 1)); -- reduce threshold by 3 dB after pulse has started
       r2_seq_num_next           <= r1_context.pulse_seq_num + 1;
+      r2_channel_enabled        <= Dwell_channel_mask(to_integer(r1_input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0)));
     end if;
   end process;
 
@@ -271,7 +275,7 @@ begin
         r3_context.recording_sample_padding <= (others => '0');
         r3_context.ts_start                 <= Timestamp;
 
-        if ((Dwell_active = '1') and (r2_new_detect = '1') and (w_pending_fifo_full = '0')) then
+        if ((Dwell_active = '1') and (r2_new_detect = '1') and (r2_channel_enabled = '1') and (w_pending_fifo_full = '0')) then
           r3_context.state                  <= S_ACTIVE;
           r3_context.recording_skipped      <= w_buffer_full;
           r3_context.recording_active       <= not(w_buffer_full);
@@ -373,7 +377,7 @@ begin
     end if;
   end process;
 
-  w_pending_fifo_wr_en <= r2_input_ctrl.valid and to_stdlogic(r2_context.state = S_IDLE) and Dwell_active and r2_new_detect and not(w_pending_fifo_full);
+  w_pending_fifo_wr_en <= r2_input_ctrl.valid and to_stdlogic(r2_context.state = S_IDLE) and Dwell_active and r2_new_detect and r2_channel_enabled and not(w_pending_fifo_full);
   w_pending_fifo_rd_en <= Pdw_ready and not(w_fifo_empty);
 
   i_pdw_pending_fifo : entity mem_lib.xpm_fallthough_fifo

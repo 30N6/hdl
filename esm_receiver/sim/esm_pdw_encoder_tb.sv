@@ -508,6 +508,7 @@ module esm_pdw_encoder_tb;
     int                         pulse_duration [NUM_CHANNELS] = {default:0};
     int                         pulse_total_count = 0;
     int                         pulse_drop_count = 0;
+    bit [NUM_CHANNELS - 1 : 0]  channel_mask = (NUM_CHANNELS < 64) ? dwell_data.channel_mask_wide : dwell_data.channel_mask_narrow;
 
     //$display("%0t: num_header_words=%0d channels_per_packet=%0d num_packets=%0d", $time, NUM_HEADER_WORDS, channels_per_packet, num_packets);
 
@@ -567,7 +568,7 @@ module esm_pdw_encoder_tb;
           pulse_duration[i_ch] = 0;
           pulse_power_accum[i_ch] = 0;
         end
-      end else if (!pulse_active[i_ch] && di.pulse_valid) begin
+      end else if (!pulse_active[i_ch] && di.pulse_valid && channel_mask[i_ch]) begin
         pulse_active[i_ch] = 1;
         pulse_duration[i_ch] = 1;
         pulse_power_accum[i_ch] = di.power;
@@ -619,8 +620,13 @@ module esm_pdw_encoder_tb;
     r.fast_lock_profile       = $urandom;
     r.threshold_shift_narrow  = $urandom_range(18, 3);
     r.threshold_shift_wide    = $urandom_range(18, 3);
-    r.channel_mask_narrow     = {$urandom, $urandom};
-    r.channel_mask_wide       = $urandom;
+
+    for (int i = 0; i < esm_num_channels_narrow; i++) begin
+      r.channel_mask_narrow[i] = ($urandom_range(99) < 75);
+    end
+    for (int i = 0; i < esm_num_channels_wide; i++) begin
+      r.channel_mask_wide[i] = ($urandom_range(99) < 75);
+    end
 
     if ($urandom_range(99) < 50) begin
       r.min_pulse_duration = 0;

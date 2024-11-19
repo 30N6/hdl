@@ -67,7 +67,7 @@ architecture rtl of esm_pdw_encoder is
   constant THRESHOLD_LATENCY          : natural := 5;
   constant BUFFERED_SAMPLES_PER_FRAME : natural := 40;
   constant BUFFERED_SAMPLE_PADDING    : natural := 16;
-  constant PDW_FIFO_DEPTH             : natural := 32;
+  constant PDW_FIFO_DEPTH             : natural := 512;
 
   type state_t is
   (
@@ -92,6 +92,7 @@ architecture rtl of esm_pdw_encoder is
   signal r_dwell_sequence_num       : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal r_dwell_timestamp          : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
   signal r_dwell_duration           : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
+  signal r_dwell_channel_mask       : std_logic_vector(NUM_CHANNELS - 1 downto 0);
 
   signal r_ack_delay_report         : unsigned(31 downto 0);
   signal r_ack_delay_sample_proc    : unsigned(31 downto 0);
@@ -278,6 +279,17 @@ begin
     report "Threshold/IQ delay control mismatch."
     severity failure;
 
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (WIDE_BANDWIDTH) then
+        r_dwell_channel_mask <= r_dwell_data.channel_mask_wide;
+      else
+        r_dwell_channel_mask <= r_dwell_data.channel_mask_narrow;
+      end if;
+    end if;
+  end process;
+
   i_sample_processor : entity esm_lib.esm_pdw_sample_processor
   generic map (
     CHANNEL_INDEX_WIDTH         => CHANNEL_INDEX_WIDTH,
@@ -295,6 +307,7 @@ begin
 
     Timestamp               => r_timestamp,
 
+    Dwell_channel_mask      => r_dwell_channel_mask,
     Dwell_active            => w_dwell_active,
     Dwell_done              => w_dwell_done,
     Dwell_ack               => w_sample_processor_ack,
