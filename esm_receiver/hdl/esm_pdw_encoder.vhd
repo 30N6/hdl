@@ -65,8 +65,8 @@ architecture rtl of esm_pdw_encoder is
   constant IQ_WIDTH                   : natural := 16;
   constant IQ_DELAY_SAMPLES           : natural := 8;
   constant THRESHOLD_LATENCY          : natural := 5;
-  constant BUFFERED_SAMPLES_PER_FRAME : natural := 40;
-  constant BUFFERED_SAMPLE_PADDING    : natural := 16;
+  constant BUFFERED_SAMPLES_PER_FRAME : natural := 48;
+  constant BUFFERED_SAMPLE_PADDING    : natural := 8;
   constant PDW_FIFO_DEPTH             : natural := 512;
 
   type state_t is

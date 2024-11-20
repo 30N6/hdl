@@ -155,7 +155,6 @@ architecture rtl of esm_pdw_sample_processor is
   signal r_dwell_ack_pending        : std_logic;
   signal r_dwell_active             : std_logic;
 
-
   signal w_pending_fifo_busy        : std_logic;
   signal w_pending_fifo_overflow    : std_logic;
   signal w_pending_fifo_underflow   : std_logic;

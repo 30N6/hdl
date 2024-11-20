@@ -39,6 +39,8 @@ port (
   Error_underflow     : out std_logic;
   Error_overflow      : out std_logic
 );
+begin
+  -- PSL default clock is rising_edge(Clk);
 end entity esm_pdw_sample_buffer;
 
 architecture rtl of esm_pdw_sample_buffer is
@@ -56,6 +58,9 @@ architecture rtl of esm_pdw_sample_buffer is
   signal r_buffer_pending         : std_logic_vector(2**ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
   signal w_buffer_full            : std_logic;
   signal w_buffer_next_index      : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
+
+  signal r_buffer_next_index      : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
+  signal r_buffer_update_pending  : std_logic;
 
   signal r_output_valid           : std_logic;
   signal r_output_frame_index     : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
@@ -100,7 +105,7 @@ begin
         r_buffer_pending <= (others => '0');
       else
         if (Buffer_next_start = '1') then
-          r_buffer_pending(to_integer(w_buffer_next_index)) <= '1';
+          r_buffer_pending(to_integer(r_buffer_next_index)) <= '1';
         end if;
         if ((r_output_valid = '1') and (r_output_sample_last = '1')) then
           r_buffer_pending(to_integer(r_output_frame_index)) <= '0';
@@ -112,10 +117,21 @@ begin
     end if;
   end process;
 
-  w_buffer_full     <= and_reduce(r_buffer_pending);
+   -- break the difficult paths from r_buffer_pending through w_buffer_next_index to r_buffer_pending
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_buffer_next_index     <= w_buffer_next_index;
+      r_buffer_update_pending <= Buffer_next_start or (r_output_valid and r_output_sample_last) or Output_frame_req.frame_drop;
+    end if;
+  end process;
+
+  -- PSL buffer_update : assert always ((Rst = '0') and (r_buffer_pending /= prev(r_buffer_pending))) -> (w_buffer_full = '1');
+
+  w_buffer_full     <= and_reduce(r_buffer_pending) or r_buffer_update_pending;
   Buffer_empty      <= not(or_reduce(r_buffer_pending));
   Buffer_full       <= w_buffer_full;
-  Buffer_next_index <= w_buffer_next_index;
+  Buffer_next_index <= r_buffer_next_index;
 
   process(Clk)
   begin
