@@ -64,7 +64,7 @@ architecture rtl of esm_pdw_encoder is
   constant DWELL_STOP_WAIT_CYCLES     : natural := NUM_CHANNELS * 4;
   constant IQ_WIDTH                   : natural := 16;
   constant IQ_DELAY_SAMPLES           : natural := 8;
-  constant THRESHOLD_LATENCY          : natural := 5;
+  constant THRESHOLD_LATENCY          : natural := 4;
   constant BUFFERED_SAMPLES_PER_FRAME : natural := 48;
   constant BUFFERED_SAMPLE_PADDING    : natural := 8;
   constant PDW_FIFO_DEPTH             : natural := 512;

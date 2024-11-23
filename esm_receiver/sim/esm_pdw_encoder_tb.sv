@@ -618,8 +618,8 @@ module esm_pdw_encoder_tb;
     r.duration                = $urandom;
     r.gain                    = $urandom;
     r.fast_lock_profile       = $urandom;
-    r.threshold_shift_narrow  = $urandom_range(18, 3);
-    r.threshold_shift_wide    = $urandom_range(18, 3);
+    r.threshold_shift_narrow  = $urandom_range(4, 2);
+    r.threshold_shift_wide    = $urandom_range(4, 2);
 
     for (int i = 0; i < esm_num_channels_narrow; i++) begin
       r.channel_mask_narrow[i] = ($urandom_range(99) < 75);
@@ -631,7 +631,7 @@ module esm_pdw_encoder_tb;
     if ($urandom_range(99) < 50) begin
       r.min_pulse_duration = 0;
     end else begin
-      r.min_pulse_duration = $urandom_range(100);
+      r.min_pulse_duration = $urandom_range(10);
     end
     return r;
   endfunction
@@ -653,32 +653,33 @@ module esm_pdw_encoder_tb;
 
       if ($urandom_range(99) < 50) begin
         int num_pulses = $urandom_range(10, 1);
-        time_offset[i] = $urandom_range(200, 100);
+        time_offset[i] = $urandom_range(400, 200);
 
         for (int p = 0; p < num_pulses; p++) begin
           pulse_start_time[i].push_back(time_offset[i]);
 
-          rnd = $urandom_range(99);
-          if (rnd < 10) begin
+          //TODO: bring back a wider range of durations and PRIs
+          pulse_duration[i].push_back($urandom_range(10,1));
+          /*rnd = $urandom_range(99);
+          if (rnd < 25) begin
             pulse_duration[i].push_back($urandom_range(5,1));
-          end else if (rnd < 25) begin
-            pulse_duration[i].push_back($urandom_range(50,10));
           end else if (rnd < 75) begin
-            pulse_duration[i].push_back($urandom_range(500,100));
+            pulse_duration[i].push_back($urandom_range(20,10));
           end else begin
-            pulse_duration[i].push_back($urandom_range(5000,1000));
-          end
+            pulse_duration[i].push_back($urandom_range(200, 50));
+          end*/
 
           time_offset[i] += pulse_duration[i][p];
 
           rnd = $urandom_range(99);
-          if (rnd < 30) begin
+          time_offset[i] += pulse_duration[i][pulse_duration[i].size() - 1] * $urandom_range(50, 20) + $urandom_range(500, 200);
+          /*if (rnd < 10) begin
             time_offset[i] += $urandom_range(64, 32);
           end else if (rnd < 70) begin
             time_offset[i] += $urandom_range(256, 64);
           end else begin
             time_offset[i] += $urandom_range(1024, 256);
-          end
+          end*/
         end
 
         if (time_offset[i] > max_dwell_time) begin
@@ -709,7 +710,7 @@ module esm_pdw_encoder_tb;
         for (int j = ps; j < (ps + pd); j++) begin
           channel_data[i][j].data_i       = $urandom_range(1000);
           channel_data[i][j].data_q       = $urandom_range(1000);
-          channel_data[i][j].power        = $urandom_range(pulse_threshold * 2, pulse_threshold * 1.25);
+          channel_data[i][j].power        = $urandom_range(pulse_threshold * 4, pulse_threshold * 2);
           channel_data[i][j].pulse_valid  = 1;
           //$display("channel_data[%0d][%0d]: j=%0d   power=%0d  noise_floor=%0d", i, p, j, channel_data[i][j].power, noise_floor);
         end
