@@ -213,11 +213,11 @@ module esm_receiver_tb;
     packed_entry[127 :  96] = entry.entry_data.duration;
     packed_entry[135 : 128] = entry.entry_data.gain;
     packed_entry[143 : 136] = entry.entry_data.fast_lock_profile;
-    packed_entry[191 : 160] = entry.entry_data.threshold_narrow;
-    packed_entry[223 : 192] = entry.entry_data.threshold_wide;
-    packed_entry[287 : 224] = entry.entry_data.channel_mask_narrow;
-    packed_entry[295 : 288] = entry.entry_data.channel_mask_wide;
-    packed_entry[319 : 304] = entry.entry_data.min_pulse_duration;
+    packed_entry[167 : 160] = entry.entry_data.threshold_shift_narrow;
+    packed_entry[175 : 168] = entry.entry_data.threshold_shift_wide;
+    packed_entry[255 : 192] = entry.entry_data.channel_mask_narrow;
+    packed_entry[263 : 256] = entry.entry_data.channel_mask_wide;
+    packed_entry[287 : 272] = entry.entry_data.min_pulse_duration;
 
     config_data[0] = esm_control_magic_num;
     config_data[1] = config_seq_num++;
@@ -325,17 +325,17 @@ module esm_receiver_tb;
 
       for (int i_dwell = 0; i_dwell < esm_num_dwell_entries; i_dwell++) begin
         esm_message_dwell_entry_t entry;
-        entry.entry_index                     = i_dwell;
-        entry.entry_data.tag                  = i_dwell; //$urandom;
-        entry.entry_data.frequency            = i_dwell * 1000; //$urandom;
-        entry.entry_data.duration             = 10000;
-        entry.entry_data.gain                 = $urandom;
-        entry.entry_data.fast_lock_profile    = i_dwell;
-        entry.entry_data.threshold_narrow     = 100;
-        entry.entry_data.threshold_wide       = $urandom;
-        entry.entry_data.channel_mask_narrow  = 64'hFFFFFFFFFFFFFFFF;
-        entry.entry_data.channel_mask_wide    = 8'hFF;
-        entry.entry_data.min_pulse_duration   = $urandom;
+        entry.entry_index                       = i_dwell;
+        entry.entry_data.tag                    = i_dwell; //$urandom;
+        entry.entry_data.frequency              = i_dwell * 1000; //$urandom;
+        entry.entry_data.duration               = 10000;
+        entry.entry_data.gain                   = $urandom;
+        entry.entry_data.fast_lock_profile      = i_dwell;
+        entry.entry_data.threshold_shift_narrow = 3;
+        entry.entry_data.threshold_shift_wide   = $urandom;
+        entry.entry_data.channel_mask_narrow    = 64'h0FFFFFFFFFFFFFF0;
+        entry.entry_data.channel_mask_wide      = 8'hFF;
+        entry.entry_data.min_pulse_duration     = $urandom;
 
         send_dwell_entry(entry);
         dwell_entry_mem[i_dwell] = entry.entry_data;

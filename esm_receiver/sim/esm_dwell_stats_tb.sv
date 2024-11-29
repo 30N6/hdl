@@ -100,11 +100,15 @@ module esm_dwell_stats_tb;
     bit [7:0]   fast_lock_profile;
     bit [7:0]   num_channels;
     bit [7:0]   report_starting_channel;
-    bit [31:0]  threshold_narrow;
-    bit [31:0]  threshold_wide;
+    bit [2:0]   padding_t0;
+    bit [4:0]   threshold_shift_narrow;
+    bit [2:0]   padding_t1;
+    bit [4:0]   threshold_shift_wide;
+    bit [15:0]  padding_1;
+    bit [31:0]  padding_2;
     bit [63:0]  channel_mask_narrow;
     bit [7:0]   channel_mask_wide;
-    bit [23:0]  padding_2;
+    bit [23:0]  padding_3;
 
     bit [31:0]  duration_actual;
     bit [31:0]  num_samples;
@@ -296,12 +300,12 @@ module esm_dwell_stats_tb;
       $display("report_starting_channel mismatch: %X %X", report_a.report_starting_channel, report_b.report_starting_channel);
       return 0;
     end
-    if (report_a.threshold_narrow !== report_b.threshold_narrow) begin
-      $display("threshold_narrow mismatch: %X %X", report_a.threshold_narrow, report_b.threshold_narrow);
+    if (report_a.threshold_shift_narrow !== report_b.threshold_shift_narrow) begin
+      $display("threshold_shift_narrow mismatch: %X %X", report_a.threshold_shift_narrow, report_b.threshold_shift_narrow);
       return 0;
     end
-    if (report_a.threshold_wide !== report_b.threshold_wide) begin
-      $display("threshold_wide mismatch: %X %X", report_a.threshold_wide, report_b.threshold_wide);
+    if (report_a.threshold_shift_wide !== report_b.threshold_shift_wide) begin
+      $display("threshold_shift_wide mismatch: %X %X", report_a.threshold_shift_wide, report_b.threshold_shift_wide);
       return 0;
     end
     if (report_a.channel_mask_narrow !== report_b.channel_mask_narrow) begin
@@ -397,8 +401,8 @@ module esm_dwell_stats_tb;
       report_header.fast_lock_profile       = dwell_data.fast_lock_profile;
       report_header.num_channels            = NUM_CHANNELS;
       report_header.report_starting_channel = channel_index;
-      report_header.threshold_narrow        = dwell_data.threshold_narrow;
-      report_header.threshold_wide          = dwell_data.threshold_wide;
+      report_header.threshold_shift_narrow  = dwell_data.threshold_shift_narrow;
+      report_header.threshold_shift_wide    = dwell_data.threshold_shift_wide;
       report_header.channel_mask_narrow     = 0; //dwell_data.channel_mask_narrow;
       report_header.channel_mask_wide       = 0; //dwell_data.channel_mask_wide;
       report_header.duration_actual         = 0;
@@ -456,8 +460,8 @@ module esm_dwell_stats_tb;
     r.duration                = $urandom;
     r.gain                    = $urandom;
     r.fast_lock_profile       = $urandom;
-    r.threshold_narrow        = $urandom;
-    r.threshold_wide          = $urandom;
+    r.threshold_shift_narrow  = $urandom;
+    r.threshold_shift_wide    = $urandom;
     r.channel_mask_narrow     = {$urandom, $urandom};
     r.channel_mask_wide       = $urandom;
     return r;

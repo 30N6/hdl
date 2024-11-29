@@ -7,6 +7,7 @@ package common_pkg is
   type signed_array_t           is array (natural range <>) of signed;
   type unsigned_array_t         is array (natural range <>) of unsigned;
   type std_logic_vector_array_t is array (natural range <>) of std_logic_vector;
+  type std_logic_array_t        is array (natural range <>) of std_logic;
   type natural_array_t          is array (natural range <>) of natural;
   type integer_array_t          is array (natural range <>) of integer;
 

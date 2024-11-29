@@ -10,6 +10,7 @@ typedef struct {
   int unsigned power;
   int data_i;
   int data_q;
+  bit pulse_valid;
 } dwell_channel_data_t;
 
 typedef dwell_channel_data_t dwell_channel_array_t [];
@@ -47,7 +48,7 @@ interface dwell_data_tx_intf (input logic Clk);
       input_ctrl.valid      = 0;
       input_ctrl.last       = 'x;
       input_ctrl.data_index = 'x;
-      input_power           = 'x;
+      input_power           = '0;
       input_iq[0]           = 'x;
       input_iq[1]           = 'x;
       repeat($urandom_range(1,0)) @(posedge Clk);
@@ -56,6 +57,15 @@ interface dwell_data_tx_intf (input logic Clk);
     dwell_active        = 0;
     dwell_data          = '{default: 'x};
     dwell_sequence_num  = 'x;
+  endtask
+
+  task clear();
+    input_ctrl.valid      = 0;
+    input_ctrl.last       = 'x;
+    input_ctrl.data_index = 'x;
+    input_power           = '0;
+    input_iq[0]           = 'x;
+    input_iq[1]           = 'x;
   endtask
 endinterface
 
@@ -133,6 +143,8 @@ module esm_pdw_encoder_tb;
     bit [31:0]  dwell_duration;
     bit [31:0]  dwell_pulse_total_count;
     bit [31:0]  dwell_pulse_drop_count;
+    bit [31:0]  ack_delay_report;
+    bit [31:0]  ack_delay_sample_processor;
   } esm_pdw_summary_report_header_t;
 
   typedef bit [$bits(esm_pdw_report_header_t) - 1 : 0]          pdw_report_header_bits_t;
@@ -184,7 +196,7 @@ module esm_pdw_encoder_tb;
 
   initial begin
     Rst = 1;
-    repeat(100) @(posedge Clk);
+    repeat(3000) @(posedge Clk);
     Rst = 0;
   end
 
@@ -198,7 +210,8 @@ module esm_pdw_encoder_tb;
     .DATA_WIDTH     (16),
     .NUM_CHANNELS   (NUM_CHANNELS),
     .MODULE_ID      (MODULE_ID),
-    .WIDE_BANDWIDTH (NUM_CHANNELS < 64)
+    .WIDE_BANDWIDTH (NUM_CHANNELS < 64),
+    .DEBUG_ENABLE   (0)
   )
   dut
   (
@@ -324,6 +337,19 @@ module esm_pdw_encoder_tb;
 
     $display("%0t: data_match: header_a=%p", $time, header_a);
     $display("%0t: data_match: header_b=%p", $time, header_b);
+    /*if (header_a.message_type == esm_report_message_type_pdw_summary) begin
+      esm_pdw_summary_report_header_t report_a = unpack_summary_report_header(a);
+      esm_pdw_summary_report_header_t report_b = unpack_summary_report_header(b);
+      $display("%0t: data_match: report_a=%p", $time, report_a);
+      $display("%0t: data_match: report_b=%p", $time, report_b);
+    end
+    if (header_a.message_type == esm_report_message_type_pdw_pulse) begin
+      esm_pdw_pulse_report_header_t report_a = unpack_pulse_report_header(a);
+      esm_pdw_pulse_report_header_t report_b = unpack_pulse_report_header(b);
+
+      $display("%0t: data_match: report_a=%p", $time, report_a);
+      $display("%0t: data_match: report_b=%p", $time, report_b);
+    end*/
 
     if (a.size() != b.size()) begin
       $display("%0t: size mismatch: a=%0d b=%0d", $time, a.size(), b.size());
@@ -406,10 +432,10 @@ module esm_pdw_encoder_tb;
         $display("pulse_channel mismatch: %X %X", report_a.pulse_channel, report_b.pulse_channel);
         return 0;
       end
-      if (report_a.pulse_threshold !== report_b.pulse_threshold) begin
+      /*if (report_a.pulse_threshold !== report_b.pulse_threshold) begin
         $display("pulse_threshold mismatch: %X %X", report_a.pulse_threshold, report_b.pulse_threshold);
         return 0;
-      end
+      end*/
       if (report_a.pulse_power_accum !== report_b.pulse_power_accum) begin
         $display("pulse_power_accum mismatch: %X %X", report_a.pulse_power_accum, report_b.pulse_power_accum);
         return 0;
@@ -482,24 +508,21 @@ module esm_pdw_encoder_tb;
     int                         pulse_duration [NUM_CHANNELS] = {default:0};
     int                         pulse_total_count = 0;
     int                         pulse_drop_count = 0;
-
-    int unsigned new_threshold = (NUM_CHANNELS < 64) ? dwell_data.threshold_wide : dwell_data.threshold_narrow;
-    int unsigned continued_threshold = new_threshold / 2;
+    bit [NUM_CHANNELS - 1 : 0]  channel_mask = (NUM_CHANNELS < 64) ? dwell_data.channel_mask_wide : dwell_data.channel_mask_narrow;
 
     //$display("%0t: num_header_words=%0d channels_per_packet=%0d num_packets=%0d", $time, NUM_HEADER_WORDS, channels_per_packet, num_packets);
 
     for (int i = 0; i < dwell_input.size(); i++) begin
       dwell_channel_data_t di = dwell_input[i];
       int i_ch                = dwell_input[i].channel;
-      bit continued_detect    = (di.power > continued_threshold);
 
       if (pulse_active[i_ch]) begin
-        if (continued_detect) begin
+        if (di.pulse_valid) begin
           pulse_duration[i_ch]++;
           pulse_power_accum[i_ch] += di.power;
         end
 
-        if (!continued_detect || (i == (dwell_input.size() - 1))) begin
+        if (!di.pulse_valid || (i == (dwell_input.size() - 1))) begin
           expect_t r;
           esm_pdw_pulse_report_header_t report_header;
           pdw_pulse_report_header_bits_t report_header_packed;
@@ -512,7 +535,7 @@ module esm_pdw_encoder_tb;
           report_header.dwell_sequence_num    = dwell_seq_num;
           report_header.pulse_sequence_num    = pulse_seq_num[i_ch];
           report_header.pulse_channel         = i_ch;
-          report_header.pulse_threshold       = new_threshold;
+          report_header.pulse_threshold       = 0;
           report_header.pulse_power_accum     = pulse_power_accum[i_ch];
           report_header.pulse_duration        = pulse_duration[i_ch];
           report_header.pulse_frequency       = 0;
@@ -536,7 +559,7 @@ module esm_pdw_encoder_tb;
             expected_data[i_ch].push_back(r);
             report_seq_num++;
           end else begin
-            $display("pulse_report_header expect: %p", report_header);
+            $display("pulse_report_header drop: %p", report_header);
             pulse_drop_count++;
           end
 
@@ -545,7 +568,7 @@ module esm_pdw_encoder_tb;
           pulse_duration[i_ch] = 0;
           pulse_power_accum[i_ch] = 0;
         end
-      end else if (!pulse_active[i_ch] && (di.power > new_threshold)) begin
+      end else if (!pulse_active[i_ch] && di.pulse_valid && channel_mask[i_ch]) begin
         pulse_active[i_ch] = 1;
         pulse_duration[i_ch] = 1;
         pulse_power_accum[i_ch] = di.power;
@@ -595,27 +618,32 @@ module esm_pdw_encoder_tb;
     r.duration                = $urandom;
     r.gain                    = $urandom;
     r.fast_lock_profile       = $urandom;
-    r.threshold_narrow        = $urandom_range(10e6, 1000);
-    r.threshold_wide          = $urandom_range(10e6, 1000);
-    r.channel_mask_narrow     = {$urandom, $urandom};
-    r.channel_mask_wide       = $urandom;
+    r.threshold_shift_narrow  = $urandom_range(4, 2);
+    r.threshold_shift_wide    = $urandom_range(4, 2);
+
+    for (int i = 0; i < esm_num_channels_narrow; i++) begin
+      r.channel_mask_narrow[i] = ($urandom_range(99) < 75);
+    end
+    for (int i = 0; i < esm_num_channels_wide; i++) begin
+      r.channel_mask_wide[i] = ($urandom_range(99) < 75);
+    end
 
     if ($urandom_range(99) < 50) begin
       r.min_pulse_duration = 0;
     end else begin
-      r.min_pulse_duration = $urandom_range(100);
+      r.min_pulse_duration = $urandom_range(10);
     end
     return r;
   endfunction
 
   function automatic dwell_channel_array_t randomize_dwell_input(esm_dwell_metadata_t dwell_data);
-    dwell_channel_array_t r; // = new [$urandom_range(10000, 500)];
+    dwell_channel_array_t r;
     dwell_channel_array_t channel_data [NUM_CHANNELS];
     int pulse_start_time [NUM_CHANNELS][$];
     int pulse_duration [NUM_CHANNELS][$];
     int time_offset [NUM_CHANNELS];
     int max_dwell_time = $urandom_range(5000, 500);
-    int threshold = (NUM_CHANNELS < 64) ? dwell_data.threshold_wide : dwell_data.threshold_narrow;
+    int threshold_shift = (NUM_CHANNELS < 64) ? dwell_data.threshold_shift_wide : dwell_data.threshold_shift_narrow;
     int rnd = 0;
 
     for (int i = 0; i < NUM_CHANNELS; i++) begin
@@ -625,32 +653,33 @@ module esm_pdw_encoder_tb;
 
       if ($urandom_range(99) < 50) begin
         int num_pulses = $urandom_range(10, 1);
-        time_offset[i] = $urandom_range(100);
+        time_offset[i] = $urandom_range(400, 200);
 
         for (int p = 0; p < num_pulses; p++) begin
           pulse_start_time[i].push_back(time_offset[i]);
 
-          rnd = $urandom_range(99);
+          //TODO: bring back a wider range of durations and PRIs
+          pulse_duration[i].push_back($urandom_range(10,1));
+          /*rnd = $urandom_range(99);
           if (rnd < 25) begin
             pulse_duration[i].push_back($urandom_range(5,1));
-          end else if (rnd < 50) begin
-            pulse_duration[i].push_back($urandom_range(50,10));
           end else if (rnd < 75) begin
-            pulse_duration[i].push_back($urandom_range(500,100));
+            pulse_duration[i].push_back($urandom_range(20,10));
           end else begin
-            pulse_duration[i].push_back($urandom_range(5000,1000));
-          end
+            pulse_duration[i].push_back($urandom_range(200, 50));
+          end*/
 
           time_offset[i] += pulse_duration[i][p];
 
           rnd = $urandom_range(99);
-          if (rnd < 30) begin
-            time_offset[i] += $urandom_range(50, 20);
+          time_offset[i] += pulse_duration[i][pulse_duration[i].size() - 1] * $urandom_range(50, 20) + $urandom_range(500, 200);
+          /*if (rnd < 10) begin
+            time_offset[i] += $urandom_range(64, 32);
           end else if (rnd < 70) begin
-            time_offset[i] += $urandom_range(200, 50);
+            time_offset[i] += $urandom_range(256, 64);
           end else begin
-            time_offset[i] += $urandom_range(1000, 200);
-          end
+            time_offset[i] += $urandom_range(1024, 256);
+          end*/
         end
 
         if (time_offset[i] > max_dwell_time) begin
@@ -659,27 +688,31 @@ module esm_pdw_encoder_tb;
       end
     end
 
-    max_dwell_time += $urandom_range(100, 10);
+    max_dwell_time += $urandom_range(200, 50);
 
     for (int i = 0; i < NUM_CHANNELS; i++) begin
+      int noise_floor     = $urandom_range(100, 1);
+      int pulse_threshold = noise_floor << threshold_shift;
       channel_data[i] = new[max_dwell_time];
 
       for (int j = 0; j < max_dwell_time; j++) begin
-        channel_data[i][j].channel  = i;
-        channel_data[i][j].last     = (i == (NUM_CHANNELS - 1));
-        channel_data[i][j].data_i   = $urandom_range(100);
-        channel_data[i][j].data_q   = $urandom_range(100);
-        channel_data[i][j].power    = $urandom_range(threshold / 4, 1);
+        channel_data[i][j].channel        = i;
+        channel_data[i][j].last           = (i == (NUM_CHANNELS - 1));
+        channel_data[i][j].data_i         = $urandom_range(100);
+        channel_data[i][j].data_q         = $urandom_range(100);
+        channel_data[i][j].power          = $urandom_range(1.5 * noise_floor, 0.5 * noise_floor); //noise floor is the average
+        channel_data[i][j].pulse_valid    = 0;
       end
 
       for (int p = 0; p < pulse_start_time[i].size(); p++) begin
         int ps = pulse_start_time[i][p];
         int pd = pulse_duration[i][p];
         for (int j = ps; j < (ps + pd); j++) begin
-          channel_data[i][j].data_i = $urandom_range(1000);
-          channel_data[i][j].data_q = $urandom_range(1000);
-          channel_data[i][j].power  = $urandom_range(threshold * 2, threshold + 1);
-          //$display("channel_data[%0d][%0d]: j=%0d   power=%0d  threshold=%0d", i, p, j, channel_data[i][j].power, threshold);
+          channel_data[i][j].data_i       = $urandom_range(1000);
+          channel_data[i][j].data_q       = $urandom_range(1000);
+          channel_data[i][j].power        = $urandom_range(pulse_threshold * 4, pulse_threshold * 2);
+          channel_data[i][j].pulse_valid  = 1;
+          //$display("channel_data[%0d][%0d]: j=%0d   power=%0d  noise_floor=%0d", i, p, j, channel_data[i][j].power, noise_floor);
         end
 
         $display("channel[%0d] pulse[%0d]: start=%0d  duration=%0d", i, p, ps, pd);
@@ -739,7 +772,7 @@ module esm_pdw_encoder_tb;
 
       $display("%0t: Test finished: num_received = %0d", $time, num_received);
       Rst = 1;
-      repeat(100) @(posedge Clk);
+      repeat(3000) @(posedge Clk);
       Rst = 0;
       repeat(100) @(posedge Clk);
     end
@@ -747,6 +780,7 @@ module esm_pdw_encoder_tb;
 
   initial
   begin
+    dwell_tx_intf.clear();
     wait_for_reset();
     standard_test();
     repeat(100) @(posedge Clk);

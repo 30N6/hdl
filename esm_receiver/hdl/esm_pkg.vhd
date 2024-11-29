@@ -41,7 +41,7 @@ package esm_pkg is
 
   constant ESM_NUM_FAST_LOCK_PROFILES                   : natural := 8;
   constant ESM_FAST_LOCK_PROFILE_INDEX_WIDTH            : natural := clog2(ESM_NUM_FAST_LOCK_PROFILES);
-  constant ESM_NUM_DWELL_ENTRIES                        : natural := 32; --TODO: increase now that memory is more plentiful without the wideband path?
+  constant ESM_NUM_DWELL_ENTRIES                        : natural := 256;
   constant ESM_DWELL_ENTRY_INDEX_WIDTH                  : natural := clog2(ESM_NUM_DWELL_ENTRIES);
   constant ESM_NUM_DWELL_INSTRUCTIONS                   : natural := 32;
   constant ESM_DWELL_INSTRUCTION_INDEX_WIDTH            : natural := clog2(ESM_NUM_DWELL_INSTRUCTIONS);
@@ -49,16 +49,17 @@ package esm_pkg is
   constant ESM_DWELL_DURATION_WIDTH                     : natural := 32;
   constant ESM_DWELL_SEQUENCE_NUM_WIDTH                 : natural := 32;
   constant ESM_TIMESTAMP_WIDTH                          : natural := 48;
-  constant ESM_THRESHOLD_WIDTH                          : natural := 32;
+  constant ESM_THRESHOLD_SHIFT_WIDTH                    : natural := 5;
   constant ESM_MIN_DURATION_WIDTH                       : natural := 16;
   constant ESM_PDW_SEQUENCE_NUM_WIDTH                   : natural := 32;
   constant ESM_PDW_POWER_ACCUM_WIDTH                    : natural := 48;
   constant ESM_PDW_CYCLE_COUNT_WIDTH                    : natural := 32;
   constant ESM_PDW_IFM_WIDTH                            : natural := 16;
-  constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH            : natural := 8; --TODO: increase
+  constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH            : natural := 32;
   constant ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH      : natural := clog2(ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH);
   constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_DEPTH           : natural := 64;
   constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH     : natural := clog2(ESM_PDW_SAMPLE_BUFFER_SAMPLE_DEPTH);
+  constant ESM_PDW_BUFFERED_SAMPLES_PER_FRAME           : natural := 48;
 
   --type esm_common_header_t is record
   --  magic_num                 : std_logic_vector(31 downto 0);
@@ -80,8 +81,8 @@ package esm_pkg is
     duration                  : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
     gain                      : unsigned(6 downto 0);
     fast_lock_profile         : unsigned(ESM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 0);
-    threshold_narrow          : unsigned(ESM_THRESHOLD_WIDTH - 1 downto 0);
-    threshold_wide            : unsigned(ESM_THRESHOLD_WIDTH - 1 downto 0);
+    threshold_shift_narrow    : unsigned(ESM_THRESHOLD_SHIFT_WIDTH - 1 downto 0);
+    threshold_shift_wide      : unsigned(ESM_THRESHOLD_SHIFT_WIDTH - 1 downto 0);
     channel_mask_narrow       : std_logic_vector(ESM_NUM_CHANNELS_NARROW - 1 downto 0);
     channel_mask_wide         : std_logic_vector(ESM_NUM_CHANNELS_WIDE - 1 downto 0);
     min_pulse_duration        : unsigned(ESM_MIN_DURATION_WIDTH - 1 downto 0);
@@ -89,7 +90,7 @@ package esm_pkg is
 
   type esm_dwell_metadata_array_t is array (natural range <>) of esm_dwell_metadata_t;
 
-  constant ESM_DWELL_METADATA_PACKED_WIDTH : natural := 256;
+  constant ESM_DWELL_METADATA_PACKED_WIDTH : natural := 224;
   --type esm_dwell_metadata_packed_t is record
   --  tag                       : unsigned(15 downto 0);
   --  frequency                 : unsigned(15 downto 0);
@@ -97,8 +98,11 @@ package esm_pkg is
   --  gain                      : unsigned(7 downto 0);
   --  fast_lock_profile         : unsigned(7 downto 0);
   --  padding0                  : std_logic_vector(15 downto 0);
-  --  threshold_narrow          : unsigned(31 downto 0);
-  --  threshold_wide            : unsigned(31 downto 0);
+  --  threshold_shift_narrow    : unsigned(4 downto 0);
+  --  padding_t0                : std_logic_vector(2 downto 0);
+  --  threshold_shift_wide      : unsigned(4 downto 0);
+  --  padding_t1                : std_logic_vector(2 downto 0);
+  --  padding1                  : std_logic_vector(15 downto 0);
   --  channel_mask_narrow       : std_logic_vector(63 downto 0);
   --  channel_mask_wide         : std_logic_vector(7 downto 0);
   --  padding1                  : std_logic_vector(7 downto 0);
@@ -335,18 +339,19 @@ package body esm_pkg is
 
     vm := v;
 
-    r.tag                 := unsigned(vm(15 downto 0));
-    r.frequency           := unsigned(vm(31 downto 16));
-    r.duration            := unsigned(vm(63 downto 32));
-    r.gain                := unsigned(vm(70 downto 64));
-    r.fast_lock_profile   := unsigned(vm(74 downto 72));
+    r.tag                     := unsigned(vm(15 downto 0));
+    r.frequency               := unsigned(vm(31 downto 16));
+    r.duration                := unsigned(vm(63 downto 32));
+    r.gain                    := unsigned(vm(70 downto 64));
+    r.fast_lock_profile       := unsigned(vm(74 downto 72));
     --padding
-    r.threshold_narrow    := unsigned(vm(127 downto 96));
-    r.threshold_wide      := unsigned(vm(159 downto 128));
-    r.channel_mask_narrow := vm(223 downto 160);
-    r.channel_mask_wide   := vm(231 downto 224);
+    r.threshold_shift_narrow  := unsigned(vm(100 downto 96));
+    r.threshold_shift_wide    := unsigned(vm(108 downto 104));
     --padding
-    r.min_pulse_duration  := unsigned(vm(255 downto 240));
+    r.channel_mask_narrow     := vm(191 downto 128);
+    r.channel_mask_wide       := vm(199 downto 192);
+    --padding
+    r.min_pulse_duration      := unsigned(vm(223 downto 208));
     return r;
   end function;
 
@@ -390,7 +395,7 @@ package body esm_pkg is
     r.skip_pll_lock_check     := v(4);
     r.skip_pll_postlock_wait  := v(5);
     r.repeat_count            := unsigned(v(11 downto 8));
-    r.entry_index             := unsigned(v(20 downto 16));
+    r.entry_index             := unsigned(v(23 downto 16));
     r.next_instruction_index  := unsigned(v(28 downto 24));
     return r;
   end function;
@@ -409,8 +414,8 @@ package body esm_pkg is
     r.duration              := unsigned(v(149 downto 118));
     r.frequency             := unsigned(v(165 downto 150));
     r.pulse_start_time      := unsigned(v(213 downto 166));
-    r.buffered_frame_index  := unsigned(v(216 downto 214));
-    r.buffered_frame_valid  := v(217);
+    r.buffered_frame_index  := unsigned(v(218 downto 214));
+    r.buffered_frame_valid  := v(219);
     return r;
   end function;
 
@@ -443,8 +448,8 @@ package body esm_pkg is
     r(149 downto 118) := std_logic_vector(v.duration);
     r(165 downto 150) := std_logic_vector(v.frequency);
     r(213 downto 166) := std_logic_vector(v.pulse_start_time);
-    r(216 downto 214) := std_logic_vector(v.buffered_frame_index);
-    r(217)            := v.buffered_frame_valid;
+    r(218 downto 214) := std_logic_vector(v.buffered_frame_index);
+    r(219)            := v.buffered_frame_valid;
 
     return r;
   end function;

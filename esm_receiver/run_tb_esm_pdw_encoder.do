@@ -23,6 +23,7 @@ set library_file_list [list \
   mem_lib [list \
     ../mem/hdl/ram_sdp.vhd \
     ../mem/hdl/xpm_fallthrough_fifo.vhd \
+    ../mem/hdl/xpm_async_fifo.vhd \
     ] \
   dsp_lib [list \
     ../dsp/hdl/dsp_pkg.vhd \
@@ -30,6 +31,7 @@ set library_file_list [list \
   esm_lib [list \
     ./hdl/esm_pkg.vhd \
     ./hdl/esm_debug_pkg.vhd \
+    ./hdl/esm_pdw_threshold.vhd \
     ./hdl/esm_pdw_iq_delay.vhd \
     ./hdl/esm_pdw_sample_buffer.vhd \
     ./hdl/esm_pdw_sample_processor.vhd \

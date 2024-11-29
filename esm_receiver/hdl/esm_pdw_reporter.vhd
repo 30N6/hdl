@@ -21,40 +21,43 @@ generic (
   MODULE_ID           : unsigned
 );
 port (
-  Clk_axi             : in  std_logic;
-  Clk                 : in  std_logic;
-  Rst                 : in  std_logic;
+  Clk_axi               : in  std_logic;
+  Clk                   : in  std_logic;
+  Rst                   : in  std_logic;
 
-  Dwell_active        : in  std_logic;
-  Dwell_done          : in  std_logic;
-  Dwell_data          : in  esm_dwell_metadata_t;
-  Dwell_sequence_num  : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
-  Dwell_timestamp     : in  unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
-  Dwell_duration      : in  unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
+  Dwell_active          : in  std_logic;
+  Dwell_done            : in  std_logic;
+  Dwell_data            : in  esm_dwell_metadata_t;
+  Dwell_sequence_num    : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  Dwell_timestamp       : in  unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
+  Dwell_duration        : in  unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
 
-  Pdw_ready           : out std_logic;
-  Pdw_valid           : in  std_logic;
-  Pdw_data            : in  esm_pdw_fifo_data_t;
+  Ack_delay_report      : in  unsigned(31 downto 0);
+  Ack_delay_sample_proc : in  unsigned(31 downto 0);
 
-  Buffered_frame_req  : out esm_pdw_sample_buffer_req_t;
-  Buffered_frame_ack  : in  esm_pdw_sample_buffer_ack_t;
-  Buffered_frame_data : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+  Pdw_ready             : out std_logic;
+  Pdw_valid             : in  std_logic;
+  Pdw_data              : in  esm_pdw_fifo_data_t;
 
-  Report_ack          : out std_logic;
+  Buffered_frame_req    : out esm_pdw_sample_buffer_req_t;
+  Buffered_frame_ack    : in  esm_pdw_sample_buffer_ack_t;
+  Buffered_frame_data   : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
 
-  Axis_ready          : in  std_logic;
-  Axis_valid          : out std_logic;
-  Axis_data           : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  Axis_last           : out std_logic;
+  Report_ack            : out std_logic;
 
-  Error_timeout       : out std_logic;
-  Error_overflow      : out std_logic
+  Axis_ready            : in  std_logic;
+  Axis_valid            : out std_logic;
+  Axis_data             : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  Axis_last             : out std_logic;
+
+  Error_timeout         : out std_logic;
+  Error_overflow        : out std_logic
 );
 end entity esm_pdw_reporter;
 
 architecture rtl of esm_pdw_reporter is
 
-  constant FIFO_DEPTH             : natural := 1024;
+  constant FIFO_DEPTH             : natural := 4096;
   constant MAX_WORDS_PER_PACKET   : natural := 64;
   constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - MAX_WORDS_PER_PACKET - 10;
 
@@ -76,6 +79,8 @@ architecture rtl of esm_pdw_reporter is
     S_SUMMARY_DWELL_DURATION,
     S_SUMMARY_DWELL_PULSE_COUNT,
     S_SUMMARY_DWELL_DROP_COUNT,
+    S_SUMMARY_ACK_DELAY_RPT,
+    S_SUMMARY_ACK_DELAY_SAMPLE_PROC,
     S_SUMMARY_PAD,
     S_SUMMARY_DONE,
 
@@ -253,6 +258,10 @@ begin
         when S_SUMMARY_DWELL_PULSE_COUNT =>
           s_state <= S_SUMMARY_DWELL_DROP_COUNT;
         when S_SUMMARY_DWELL_DROP_COUNT =>
+          s_state <= S_SUMMARY_ACK_DELAY_RPT;
+        when S_SUMMARY_ACK_DELAY_RPT =>
+          s_state <= S_SUMMARY_ACK_DELAY_SAMPLE_PROC;
+        when S_SUMMARY_ACK_DELAY_SAMPLE_PROC =>
           s_state <= S_SUMMARY_PAD;
         when S_SUMMARY_PAD =>
           if (r_words_in_msg = (MAX_WORDS_PER_PACKET - 1)) then
@@ -363,6 +372,8 @@ begin
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= std_logic_vector(resize_up(Pdw_data.channel, 32));
 
+    --TODO: report noise floor
+
     when S_PULSE_THRESHOLD =>
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= std_logic_vector(Pdw_data.power_threshold);
@@ -434,6 +445,14 @@ begin
     when S_SUMMARY_DWELL_DROP_COUNT =>
       w_fifo_valid            <= '1';
       w_fifo_partial_1_data   <= std_logic_vector(r_drop_count);
+
+    when S_SUMMARY_ACK_DELAY_RPT  =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(Ack_delay_report);
+
+    when S_SUMMARY_ACK_DELAY_SAMPLE_PROC =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(Ack_delay_sample_proc);
 
     when S_PULSE_PAD | S_SUMMARY_PAD =>
       w_fifo_valid            <= '1';

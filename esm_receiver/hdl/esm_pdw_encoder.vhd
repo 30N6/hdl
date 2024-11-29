@@ -64,10 +64,9 @@ architecture rtl of esm_pdw_encoder is
   constant DWELL_STOP_WAIT_CYCLES     : natural := NUM_CHANNELS * 4;
   constant IQ_WIDTH                   : natural := 16;
   constant IQ_DELAY_SAMPLES           : natural := 8;
-  constant IQ_DELAY_LATENCY           : natural := 4;
-  constant BUFFERED_SAMPLES_PER_FRAME : natural := 40;
-  constant BUFFERED_SAMPLE_PADDING    : natural := 16;
-  constant PDW_FIFO_DEPTH             : natural := 32;
+  constant THRESHOLD_LATENCY          : natural := 4;
+  constant BUFFERED_SAMPLE_PADDING    : natural := 8;
+  constant PDW_FIFO_DEPTH             : natural := 512;
 
   type state_t is
   (
@@ -92,12 +91,20 @@ architecture rtl of esm_pdw_encoder is
   signal r_dwell_sequence_num       : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal r_dwell_timestamp          : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
   signal r_dwell_duration           : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
+  signal r_dwell_channel_mask       : std_logic_vector(NUM_CHANNELS - 1 downto 0);
+
+  signal r_ack_delay_report         : unsigned(31 downto 0);
+  signal r_ack_delay_sample_proc    : unsigned(31 downto 0);
 
   signal w_iq_scaled                : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
-  signal w_threshold                : unsigned(ESM_THRESHOLD_WIDTH - 1 downto 0);
+  signal w_threshold_shift          : unsigned(ESM_THRESHOLD_SHIFT_WIDTH - 1 downto 0);
+
+  signal w_thresh_ctrl              : channelizer_control_t;
+  signal w_thresh_power             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal w_thresh_threshold         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal w_thresh_valid             : std_logic;
 
   signal w_pipelined_ctrl           : channelizer_control_t;
-  signal w_pipelined_power          : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal w_delayed_iq_data          : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
 
   signal w_pdw_ready                : std_logic;
@@ -223,11 +230,36 @@ begin
   w_iq_scaled(0) <= Input_data(0)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
   w_iq_scaled(1) <= Input_data(1)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
 
+  w_threshold_shift <= Dwell_data.threshold_shift_wide when WIDE_BANDWIDTH else Dwell_data.threshold_shift_narrow;
+
+  i_threshold : entity esm_lib.esm_pdw_threshold
+  generic map (
+    DATA_WIDTH          => IQ_WIDTH,
+    CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
+    LATENCY             => THRESHOLD_LATENCY
+  )
+  port map (
+    Clk                     => Clk,
+
+    Dwell_active            => Dwell_active,
+    Dwell_threshold_shift   => w_threshold_shift,
+
+    Input_ctrl              => Input_ctrl,
+    Input_data              => (others => (others => '0')), --unused
+    Input_power             => Input_power,
+
+    Output_ctrl             => w_thresh_ctrl,
+    Output_data             => open, --w_piped_data, TODO: IFM?
+    Output_power            => w_thresh_power,
+    Output_threshold_value  => w_thresh_threshold,
+    Output_threshold_valid  => w_thresh_valid
+  );
+
   i_iq_delay : entity esm_lib.esm_pdw_iq_delay
   generic map (
     DATA_WIDTH          => IQ_WIDTH,
     CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
-    LATENCY             => IQ_DELAY_LATENCY,
+    LATENCY             => THRESHOLD_LATENCY,
     DELAY_SAMPLES       => IQ_DELAY_SAMPLES
   )
   port map (
@@ -235,20 +267,33 @@ begin
 
     Input_ctrl              => Input_ctrl,
     Input_data              => w_iq_scaled,
-    Input_power             => Input_power,
+    Input_power             => (others => '0'), --unused
 
     Output_pipelined_ctrl   => w_pipelined_ctrl,
-    Output_pipelined_power  => w_pipelined_power,
+    Output_pipelined_power  => open,
     Output_delayed_data     => w_delayed_iq_data
   );
 
-  w_threshold <= r_dwell_data.threshold_wide when WIDE_BANDWIDTH else r_dwell_data.threshold_narrow;
+  assert (w_thresh_ctrl = w_pipelined_ctrl)
+    report "Threshold/IQ delay control mismatch."
+    severity failure;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (WIDE_BANDWIDTH) then
+        r_dwell_channel_mask <= r_dwell_data.channel_mask_wide;
+      else
+        r_dwell_channel_mask <= r_dwell_data.channel_mask_narrow;
+      end if;
+    end if;
+  end process;
 
   i_sample_processor : entity esm_lib.esm_pdw_sample_processor
   generic map (
     CHANNEL_INDEX_WIDTH         => CHANNEL_INDEX_WIDTH,
     DATA_WIDTH                  => IQ_WIDTH,
-    BUFFERED_SAMPLES_PER_FRAME  => BUFFERED_SAMPLES_PER_FRAME,
+    BUFFERED_SAMPLES_PER_FRAME  => ESM_PDW_BUFFERED_SAMPLES_PER_FRAME,
     BUFFERED_SAMPLE_PADDING     => BUFFERED_SAMPLE_PADDING,
     PDW_FIFO_DEPTH              => PDW_FIFO_DEPTH,
     DEBUG_ENABLE                => DEBUG_ENABLE
@@ -261,14 +306,16 @@ begin
 
     Timestamp               => r_timestamp,
 
+    Dwell_channel_mask      => r_dwell_channel_mask,
     Dwell_active            => w_dwell_active,
     Dwell_done              => w_dwell_done,
     Dwell_ack               => w_sample_processor_ack,
 
     Input_ctrl              => w_pipelined_ctrl,
     Input_iq_delayed        => w_delayed_iq_data,
-    Input_power             => w_pipelined_power,
-    Input_threshold         => w_threshold,
+    Input_power             => w_thresh_power,
+    Input_threshold_value   => w_thresh_threshold,
+    Input_threshold_valid   => w_thresh_valid,
 
     Pdw_ready               => w_pdw_ready,
     Pdw_valid               => w_pdw_valid,
@@ -361,45 +408,57 @@ begin
     MODULE_ID           => MODULE_ID
   )
   port map (
-    Clk_axi             => Clk_axi,
-    Clk                 => Clk,
-    Rst                 => r_rst,
+    Clk_axi               => Clk_axi,
+    Clk                   => Clk,
+    Rst                   => r_rst,
 
-    Dwell_active        => w_dwell_active,
-    Dwell_done          => r_sample_processor_ack,
-    Dwell_data          => r_dwell_data,
-    Dwell_sequence_num  => r_dwell_sequence_num,
-    Dwell_timestamp     => r_dwell_timestamp,
-    Dwell_duration      => r_dwell_duration,
+    Dwell_active          => w_dwell_active,
+    Dwell_done            => r_sample_processor_ack,
+    Dwell_data            => r_dwell_data,
+    Dwell_sequence_num    => r_dwell_sequence_num,
+    Dwell_timestamp       => r_dwell_timestamp,
+    Dwell_duration        => r_dwell_duration,
 
-    Pdw_ready           => w_pdw_ready,
-    Pdw_valid           => w_pdw_valid,
-    Pdw_data            => w_pdw_data,
+    Ack_delay_report      => r_ack_delay_report,
+    Ack_delay_sample_proc => r_ack_delay_sample_proc,
 
-    Buffered_frame_req  => w_frame_req,
-    Buffered_frame_ack  => w_frame_ack,
-    Buffered_frame_data => w_frame_data,
+    Pdw_ready             => w_pdw_ready,
+    Pdw_valid             => w_pdw_valid,
+    Pdw_data              => w_pdw_data,
 
-    Report_ack          => w_report_ack,
+    Buffered_frame_req    => w_frame_req,
+    Buffered_frame_ack    => w_frame_ack,
+    Buffered_frame_data   => w_frame_data,
 
-    Axis_ready          => Axis_ready,
-    Axis_valid          => Axis_valid,
-    Axis_data           => Axis_data,
-    Axis_last           => Axis_last,
+    Report_ack            => w_report_ack,
 
-    Error_timeout       => w_reporter_timeout,
-    Error_overflow      => w_reporter_overflow
+    Axis_ready            => Axis_ready,
+    Axis_valid            => Axis_valid,
+    Axis_data             => Axis_data,
+    Axis_last             => Axis_last,
+
+    Error_timeout         => w_reporter_timeout,
+    Error_overflow        => w_reporter_overflow
   );
 
   process(Clk)
   begin
     if rising_edge(Clk) then
       if (s_state = S_DWELL_ACTIVE) then
-        r_sample_processor_ack <= '0';
-        r_report_ack           <= '0';
+        r_sample_processor_ack  <= '0';
+        r_report_ack            <= '0';
+        r_ack_delay_report      <= (others => '0');
+        r_ack_delay_sample_proc <= (others => '0');
       elsif (s_state = S_DWELL_DONE) then
-        r_sample_processor_ack <= r_sample_processor_ack or w_sample_processor_ack;
-        r_report_ack           <= r_report_ack or w_report_ack;
+        r_sample_processor_ack  <= r_sample_processor_ack or w_sample_processor_ack;
+        r_report_ack            <= r_report_ack or w_report_ack;
+
+        if (r_report_ack = '0') then
+          r_ack_delay_report      <= r_ack_delay_report + 1;
+        end if;
+        if (r_sample_processor_ack = '0') then
+          r_ack_delay_sample_proc <= r_ack_delay_sample_proc + 1;
+        end if;
       end if;
     end if;
   end process;
