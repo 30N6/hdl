@@ -63,7 +63,6 @@ architecture rtl of esm_pdw_encoder is
   constant CHANNEL_INDEX_WIDTH        : natural := clog2(NUM_CHANNELS);
   constant DWELL_STOP_WAIT_CYCLES     : natural := NUM_CHANNELS * 4;
   constant IQ_WIDTH                   : natural := 16;
-  constant IQ_DELAY_SAMPLES           : natural := 8;
   constant THRESHOLD_LATENCY          : natural := 4;
   constant BUFFERED_SAMPLE_PADDING    : natural := 8;
   constant PDW_FIFO_DEPTH             : natural := 512;
@@ -260,7 +259,7 @@ begin
     DATA_WIDTH          => IQ_WIDTH,
     CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
     LATENCY             => THRESHOLD_LATENCY,
-    DELAY_SAMPLES       => IQ_DELAY_SAMPLES
+    DELAY_SAMPLES       => ESM_PDW_BUFFERED_IQ_DELAY_SAMPLES
   )
   port map (
     Clk                     => Clk,
