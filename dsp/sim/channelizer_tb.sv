@@ -139,6 +139,29 @@ module channelizer_tb;
         .Error_mux_underflow    (w_error_mux_underflow),
         .Error_mux_collision    (w_error_mux_collision)
       );
+    end else if (NUM_CHANNELS == 16) begin
+      channelizer_16 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH)) dut16
+      (
+        .Clk                    (Clk),
+        .Rst                    (Rst),
+
+        .Input_valid            (tx_intf.valid),
+        .Input_data             (tx_intf.data),
+
+        .Output_chan_ctrl       (w_chan_output_control),
+        .Output_chan_data       (w_chan_output_iq),
+        .Output_chan_pwr        (w_chan_power),
+
+        .Output_fft_ctrl        (w_fft_output_control),
+        .Output_fft_data        (w_fft_output_iq),
+
+        .Warning_demux_gap      (w_warning_demux_gap),
+        .Error_demux_overflow   (w_error_demux_overflow),
+        .Error_filter_overflow  (w_error_filter_overflow),
+        .Error_mux_overflow     (w_error_mux_overflow),
+        .Error_mux_underflow    (w_error_mux_underflow),
+        .Error_mux_collision    (w_error_mux_collision)
+      );
     end else if (NUM_CHANNELS == 8) begin
       channelizer_8 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH)) dut8
       (
@@ -259,6 +282,8 @@ module channelizer_tb;
       standard_tests("./test_data/channelizer_test_data_2024_01_25_64.txt");
     end else if (NUM_CHANNELS == 32) begin
       standard_tests("./test_data/channelizer_test_data_2024_01_25_32.txt");
+    end else if (NUM_CHANNELS == 16) begin
+      standard_tests("./test_data/channelizer_test_data_2025_01_08_16.txt");
     end else if (NUM_CHANNELS == 8) begin
       standard_tests("./test_data/channelizer_test_data_2024_01_25_8.txt");
     end
