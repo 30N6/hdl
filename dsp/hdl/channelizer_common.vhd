@@ -11,13 +11,14 @@ library dsp_lib;
 
 entity channelizer_common is
 generic (
-  INPUT_DATA_WIDTH  : natural;
-  OUTPUT_DATA_WIDTH : natural;
-  NUM_CHANNELS      : natural;
-  NUM_COEFS         : natural;
-  COEF_WIDTH        : natural;
-  COEF_DATA         : signed_array_t(NUM_COEFS - 1 downto 0)(COEF_WIDTH - 1 downto 0);
-  FFT_PATH_ENABLE   : boolean
+  INPUT_DATA_WIDTH    : natural;
+  OUTPUT_DATA_WIDTH   : natural;
+  NUM_CHANNELS        : natural;
+  NUM_COEFS           : natural;
+  COEF_WIDTH          : natural;
+  COEF_DATA           : signed_array_t(NUM_COEFS - 1 downto 0)(COEF_WIDTH - 1 downto 0);
+  FFT_PATH_ENABLE     : boolean;
+  BASEBANDING_ENABLE  : boolean
 );
 port (
   Clk                   : in  std_logic;
@@ -247,7 +248,8 @@ begin
   i_baseband : entity dsp_lib.pfb_baseband_2x
   generic map (
     CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
-    DATA_WIDTH          => FFT_DATA_WIDTH
+    DATA_WIDTH          => FFT_DATA_WIDTH,
+    BASEBANDING_ENABLE  => BASEBANDING_ENABLE
   )
   port map (
     Clk           => Clk,

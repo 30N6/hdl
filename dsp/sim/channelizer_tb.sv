@@ -44,6 +44,7 @@ module channelizer_tb;
   parameter NUM_COEFS_PER_CHANNEL = (NUM_CHANNELS > 8) ? 12 : 8;
   parameter INPUT_DATA_WIDTH      = 12;
   parameter OUTPUT_DATA_WIDTH     = 12 + $clog2(NUM_COEFS_PER_CHANNEL) + $clog2(NUM_CHANNELS);
+  parameter BASEBANDING_ENABLE    = 0;
 
   typedef struct
   {
@@ -94,7 +95,7 @@ module channelizer_tb;
 
   generate
     if (NUM_CHANNELS == 64) begin
-      channelizer_64 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH)) dut64
+      channelizer_64 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut64
       (
         .Clk                    (Clk),
         .Rst                    (Rst),
@@ -117,7 +118,7 @@ module channelizer_tb;
         .Error_mux_collision    (w_error_mux_collision)
       );
     end else if (NUM_CHANNELS == 32) begin
-      channelizer_32 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH)) dut32
+      channelizer_32 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut32
       (
         .Clk                    (Clk),
         .Rst                    (Rst),
@@ -140,7 +141,7 @@ module channelizer_tb;
         .Error_mux_collision    (w_error_mux_collision)
       );
     end else if (NUM_CHANNELS == 16) begin
-      channelizer_16 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH)) dut16
+      channelizer_16 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut16
       (
         .Clk                    (Clk),
         .Rst                    (Rst),
@@ -163,7 +164,7 @@ module channelizer_tb;
         .Error_mux_collision    (w_error_mux_collision)
       );
     end else if (NUM_CHANNELS == 8) begin
-      channelizer_8 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH)) dut8
+      channelizer_8 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut8
       (
         .Clk                    (Clk),
         .Rst                    (Rst),
