@@ -14,8 +14,7 @@ library dsp_lib;
 entity pfb_baseband_2x is
 generic (
   CHANNEL_INDEX_WIDTH : natural;
-  DATA_WIDTH          : natural;
-  BASEBANDING_ENABLE  : boolean
+  DATA_WIDTH          : natural
 );
 port (
   Clk           : in  std_logic;
@@ -92,7 +91,7 @@ begin
       Output_index  <= to_unsigned(CHANNEL_MAP(to_integer(r_input_index)), CHANNEL_INDEX_WIDTH);
       Output_last   <= r_input_last;
 
-      if (BASEBANDING_ENABLE and (r_input_index(0) = '1') and (r_mod_state = '1')) then
+      if ((r_input_index(0) = '1') and (r_mod_state = '1')) then
         Output_data <= r_input_data_inv;
       else
         Output_data <= r_input_data;

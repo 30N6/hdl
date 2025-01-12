@@ -245,25 +245,31 @@ begin
   w_chan_output_valid <= w_fft_output_control.valid and w_fft_output_control.reverse;
   w_raw_output_valid  <= w_fft_output_control.valid and not(w_fft_output_control.reverse);
 
-  i_baseband : entity dsp_lib.pfb_baseband_2x
-  generic map (
-    CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
-    DATA_WIDTH          => FFT_DATA_WIDTH,
-    BASEBANDING_ENABLE  => BASEBANDING_ENABLE
-  )
-  port map (
-    Clk           => Clk,
+  g_baseband : if (BASEBANDING_ENABLE) generate
+    i_baseband : entity dsp_lib.pfb_baseband_2x
+    generic map (
+      CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
+      DATA_WIDTH          => FFT_DATA_WIDTH
+    )
+    port map (
+      Clk           => Clk,
 
-    Input_valid   => w_chan_output_valid,
-    Input_index   => w_fft_output_control.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0),
-    Input_last    => w_fft_output_control.last,
-    Input_data    => w_fft_data,
+      Input_valid   => w_chan_output_valid,
+      Input_index   => w_fft_output_control.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0),
+      Input_last    => w_fft_output_control.last,
+      Input_data    => w_fft_data,
 
-    Output_valid  => w_baseband_valid,
-    Output_index  => w_baseband_index,
-    Output_last   => w_baseband_last,
-    Output_data   => w_baseband_data
-  );
+      Output_valid  => w_baseband_valid,
+      Output_index  => w_baseband_index,
+      Output_last   => w_baseband_last,
+      Output_data   => w_baseband_data
+    );
+  else generate
+    w_baseband_valid  <= w_chan_output_valid;
+    w_baseband_index  <= w_fft_output_control.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
+    w_baseband_last   <= w_fft_output_control.last;
+    w_baseband_data   <= w_fft_data;
+  end generate g_baseband;
 
   i_power : entity dsp_lib.channelizer_power
   generic map (

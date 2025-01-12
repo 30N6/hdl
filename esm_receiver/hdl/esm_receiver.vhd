@@ -225,8 +225,9 @@ begin
   g_wide_channelizer : if (ENABLE_WIDE_CHANNEL) generate
     i_channelizer_8 : entity dsp_lib.channelizer_8
     generic map (
-      INPUT_DATA_WIDTH  => IQ_WIDTH,
-      OUTPUT_DATA_WIDTH => CHANNELIZER8_DATA_WIDTH
+      INPUT_DATA_WIDTH    => IQ_WIDTH,
+      OUTPUT_DATA_WIDTH   => CHANNELIZER8_DATA_WIDTH,
+      BASEBANDING_ENABLE  => true
     )
     port map (
       Clk                   => Adc_clk_x4,
@@ -261,8 +262,9 @@ begin
   g_narrow_channelizer : if (ENABLE_NARROW_CHANNEL) generate
     i_channelizer_64 : entity dsp_lib.channelizer_64
     generic map (
-      INPUT_DATA_WIDTH  => IQ_WIDTH,
-      OUTPUT_DATA_WIDTH => CHANNELIZER64_DATA_WIDTH
+      INPUT_DATA_WIDTH    => IQ_WIDTH,
+      OUTPUT_DATA_WIDTH   => CHANNELIZER64_DATA_WIDTH,
+      BASEBANDING_ENABLE  => true
     )
     port map (
       Clk                   => Adc_clk_x4,
