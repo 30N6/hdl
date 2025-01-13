@@ -55,7 +55,7 @@ architecture rtl of pfb_filter is
       else
         idx := stage * NUM_CHANNELS - channel;
         if (idx < 0) then
-          idx := 0;
+          r(channel) := (others => '0');
         else
           r(channel) := COEF_DATA(idx);
         end if;

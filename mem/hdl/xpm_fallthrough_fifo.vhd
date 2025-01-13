@@ -8,7 +8,7 @@ library common_lib;
 library xpm;
   use xpm.vcomponents.all;
 
-entity xpm_fallthough_fifo is
+entity xpm_fallthrough_fifo is
 generic (
   FIFO_DEPTH        : natural;
   FIFO_WIDTH        : natural;
@@ -30,9 +30,9 @@ port (
   Overflow      : out std_logic;
   Underflow     : out std_logic
 );
-end entity xpm_fallthough_fifo;
+end entity xpm_fallthrough_fifo;
 
-architecture rtl of xpm_fallthough_fifo is
+architecture rtl of xpm_fallthrough_fifo is
 begin
 
   xpm_fifo_sync_inst : xpm_fifo_sync
