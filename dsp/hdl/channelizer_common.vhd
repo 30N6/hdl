@@ -139,7 +139,8 @@ begin
     OUTPUT_DATA_WIDTH   => FILTER_DATA_WIDTH,
     COEF_WIDTH          => COEF_WIDTH,
     NUM_COEFS           => NUM_COEFS,
-    COEF_DATA           => COEF_DATA
+    COEF_DATA           => COEF_DATA,
+    ANALYSIS_MODE       => true
   )
   port map (
     Clk                   => Clk,

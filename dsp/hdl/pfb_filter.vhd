@@ -17,7 +17,8 @@ generic (
   OUTPUT_DATA_WIDTH   : natural;
   COEF_WIDTH          : natural;
   NUM_COEFS           : natural;
-  COEF_DATA           : signed_array_t(NUM_COEFS - 1 downto 0)(COEF_WIDTH - 1 downto 0)
+  COEF_DATA           : signed_array_t(NUM_COEFS - 1 downto 0)(COEF_WIDTH - 1 downto 0);
+  ANALYSIS_MODE       : boolean
 );
 port (
   Clk                   : in  std_logic;
@@ -44,10 +45,21 @@ architecture rtl of pfb_filter is
   constant NUM_COEFS_PER_CHANNEL : natural := NUM_COEFS / NUM_CHANNELS;
 
   function get_coefs_for_stage(stage : natural) return signed_array_t is
+    variable idx : integer;
     variable r : signed_array_t(NUM_CHANNELS - 1 downto 0)(COEF_WIDTH - 1 downto 0);
   begin
     for channel in 0 to (NUM_CHANNELS - 1) loop
-      r(channel) := COEF_DATA(stage * NUM_CHANNELS + channel);
+      if (ANALYSIS_MODE) then
+        idx := stage * NUM_CHANNELS + channel;
+        r(channel) := COEF_DATA(idx);
+      else
+        idx := stage * NUM_CHANNELS - channel;
+        if (idx < 0) then
+          idx := 0;
+        else
+          r(channel) := COEF_DATA(idx);
+        end if;
+      end if;
     end loop;
     return r;
   end function;

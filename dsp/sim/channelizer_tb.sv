@@ -44,7 +44,7 @@ module channelizer_tb;
   parameter NUM_COEFS_PER_CHANNEL = (NUM_CHANNELS > 8) ? 12 : 8;
   parameter INPUT_DATA_WIDTH      = 12;
   parameter OUTPUT_DATA_WIDTH     = 12 + $clog2(NUM_COEFS_PER_CHANNEL) + $clog2(NUM_CHANNELS);
-  parameter BASEBANDING_ENABLE    = 0;
+  parameter BASEBANDING_ENABLE    = 1;
 
   typedef struct
   {
