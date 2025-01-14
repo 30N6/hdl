@@ -44,10 +44,10 @@ architecture rtl of pfb_mux_2x is
   type input_array_t is array (natural range <>) of signed(INPUT_WIDTH - 1 downto 0);
   type output_array_t is array (natural range <>) of signed(OUTPUT_WIDTH - 1 downto 0);
 
-  signal m_delayed_i            : input_array_t(NUM_CHANNELS/2 - 1 downto 0);
-  signal m_delayed_q            : input_array_t(NUM_CHANNELS/2 - 1 downto 0);
-  signal m_buffer_i             : input_array_t(NUM_CHANNELS - 1 downto 0);
-  signal m_buffer_q             : input_array_t(NUM_CHANNELS - 1 downto 0);
+  signal m_buffer_0_i           : input_array_t(NUM_CHANNELS/2 - 1 downto 0);
+  signal m_buffer_0_q           : input_array_t(NUM_CHANNELS/2 - 1 downto 0);
+  signal m_buffer_1_i           : input_array_t(NUM_CHANNELS/2 - 1 downto 0);
+  signal m_buffer_1_q           : input_array_t(NUM_CHANNELS/2 - 1 downto 0);
   signal m_summed_i             : output_array_t(NUM_CHANNELS/2 - 1 downto 0);
   signal m_summed_q             : output_array_t(NUM_CHANNELS/2 - 1 downto 0);
 
@@ -56,10 +56,11 @@ architecture rtl of pfb_mux_2x is
   signal r0_input_channel       : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r0_input_i             : signed(INPUT_WIDTH - 1 downto 0);
   signal r0_input_q             : signed(INPUT_WIDTH - 1 downto 0);
-  signal r0_buffered_i          : signed(INPUT_WIDTH - 1 downto 0);
-  signal r0_buffered_q          : signed(INPUT_WIDTH - 1 downto 0);
-  signal r0_delayed_i           : signed(INPUT_WIDTH - 1 downto 0);
-  signal r0_delayed_q           : signed(INPUT_WIDTH - 1 downto 0);
+  signal r0_buffer_valid        : std_logic;
+  signal r0_buffer_0_i          : signed(INPUT_WIDTH - 1 downto 0);
+  signal r0_buffer_0_q          : signed(INPUT_WIDTH - 1 downto 0);
+  signal r0_buffer_1_i          : signed(INPUT_WIDTH - 1 downto 0);
+  signal r0_buffer_1_q          : signed(INPUT_WIDTH - 1 downto 0);
 
   signal r1_summed_valid        : std_logic;
   signal r1_summed_last         : std_logic;
@@ -96,29 +97,23 @@ begin
       r0_input_channel  <= Input_channel;
       r0_input_i        <= Input_i;
       r0_input_q        <= Input_q;
-      r0_buffered_i     <= m_buffer_i(to_integer(Input_channel));
-      r0_buffered_q     <= m_buffer_q(to_integer(Input_channel));
-      r0_delayed_i      <= m_delayed_i(to_integer(Input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0)));
-      r0_delayed_q      <= m_delayed_q(to_integer(Input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0)));
+
+      r0_buffer_valid   <= Input_valid and to_stdlogic(Input_channel < (NUM_CHANNELS/2));
+      r0_buffer_0_i     <= m_buffer_0_i(to_integer(Input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0)));
+      r0_buffer_0_q     <= m_buffer_0_q(to_integer(Input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0)));
+      r0_buffer_1_i     <= m_buffer_1_i(to_integer(Input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0)));
+      r0_buffer_1_q     <= m_buffer_1_q(to_integer(Input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0)));
     end if;
   end process;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (Input_valid = '1') then
-        m_buffer_i(to_integer(Input_channel)) <= Input_i;
-        m_buffer_q(to_integer(Input_channel)) <= Input_q;
-      end if;
-    end if;
-  end process;
-
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      if ((r0_input_valid = '1') and (r0_input_channel < (NUM_CHANNELS/2))) then
-        m_delayed_i(to_integer(r0_input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0))) <= r0_buffered_i;
-        m_delayed_q(to_integer(r0_input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0))) <= r0_buffered_q;
+      if (r0_buffer_valid = '1') then
+        m_buffer_0_i(to_integer(r0_input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0))) <= r0_input_i;
+        m_buffer_0_q(to_integer(r0_input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0))) <= r0_input_q;
+        m_buffer_1_i(to_integer(r0_input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0))) <= r0_buffer_0_i;
+        m_buffer_1_q(to_integer(r0_input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0))) <= r0_buffer_0_q;
       end if;
     end if;
   end process;
@@ -129,8 +124,8 @@ begin
       r1_summed_valid   <= r0_input_valid and to_stdlogic(r0_input_channel >= (NUM_CHANNELS/2));
       r1_summed_last    <= r0_input_last;
       r1_summed_channel <= r0_input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0);
-      r1_summed_i       <= resize_up(r0_buffered_i, OUTPUT_WIDTH) + resize_up(r0_delayed_i, OUTPUT_WIDTH);
-      r1_summed_q       <= resize_up(r0_buffered_q, OUTPUT_WIDTH) + resize_up(r0_delayed_q, OUTPUT_WIDTH);
+      r1_summed_i       <= resize_up(r0_input_i, OUTPUT_WIDTH) + resize_up(r0_buffer_1_i, OUTPUT_WIDTH);
+      r1_summed_q       <= resize_up(r0_input_q, OUTPUT_WIDTH) + resize_up(r0_buffer_1_q, OUTPUT_WIDTH);
     end if;
   end process;
 

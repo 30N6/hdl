@@ -37,7 +37,7 @@ interface channelizer_intf #(parameter DATA_WIDTH, parameter INDEX_WIDTH) (input
   endtask
 endinterface
 
-module channelizer_tb;
+module synthesizer_tb;
   parameter time CLK_HALF_PERIOD    = 4ns;
   parameter NUM_CHANNELS            = 32;
   parameter CHANNEL_INDEX_WIDTH     = $clog2(NUM_CHANNELS);
@@ -96,7 +96,7 @@ module channelizer_tb;
   end
 
   generate
-    if (NUM_CHANNELS == 16) begin
+    if (NUM_CHANNELS == 16) begin : gen_dut
       channelizer_16 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(CHAN_OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(0)) chan_16
       (
         .Clk                    (Clk),
@@ -146,6 +146,10 @@ module channelizer_tb;
       r_chan_output_i[w_chan_output_control.data_index] <= w_chan_output_iq[0];
       r_chan_output_q[w_chan_output_control.data_index] <= w_chan_output_iq[1];
     end
+
+    /*if (synthesizer_tb.gen_dut.synth_16.i_synthesizer.i_mux.Input_valid) begin
+      $display("%0d %07X", synthesizer_tb.gen_dut.synth_16.i_synthesizer.i_mux.Input_channel, synthesizer_tb.gen_dut.synth_16.i_synthesizer.i_mux.Input_i);
+    end*/
 
     if (w_synth_output_valid) begin
       r_synth_output_i <= w_synth_output_iq[0];

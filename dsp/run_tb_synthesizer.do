@@ -3,7 +3,7 @@
 # modify the rest of the script.
 
 set tb_lib      dsp_lib
-set tb_name     channelizer_tb
+set tb_name     synthesizer_tb
 set top_level   $tb_lib.$tb_name
 
 set xilinx_dir  C:/Xilinx/Vivado/2022.2/data/verilog/src
