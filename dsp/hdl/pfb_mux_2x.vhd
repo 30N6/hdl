@@ -44,12 +44,12 @@ architecture rtl of pfb_mux_2x is
   type input_array_t is array (natural range <>) of signed(INPUT_WIDTH - 1 downto 0);
   type output_array_t is array (natural range <>) of signed(OUTPUT_WIDTH - 1 downto 0);
 
-  signal m_buffer_0_i           : input_array_t(NUM_CHANNELS/2 - 1 downto 0);
-  signal m_buffer_0_q           : input_array_t(NUM_CHANNELS/2 - 1 downto 0);
-  signal m_buffer_1_i           : input_array_t(NUM_CHANNELS/2 - 1 downto 0);
-  signal m_buffer_1_q           : input_array_t(NUM_CHANNELS/2 - 1 downto 0);
-  signal m_summed_i             : output_array_t(NUM_CHANNELS/2 - 1 downto 0);
-  signal m_summed_q             : output_array_t(NUM_CHANNELS/2 - 1 downto 0);
+  signal m_buffer_0_i           : input_array_t(NUM_CHANNELS/2 - 1 downto 0) := (others => (others => '0'));
+  signal m_buffer_0_q           : input_array_t(NUM_CHANNELS/2 - 1 downto 0) := (others => (others => '0'));
+  signal m_buffer_1_i           : input_array_t(NUM_CHANNELS/2 - 1 downto 0) := (others => (others => '0'));
+  signal m_buffer_1_q           : input_array_t(NUM_CHANNELS/2 - 1 downto 0) := (others => (others => '0'));
+  signal m_summed_i             : output_array_t(NUM_CHANNELS/2 - 1 downto 0) := (others => (others => '0'));
+  signal m_summed_q             : output_array_t(NUM_CHANNELS/2 - 1 downto 0) := (others => (others => '0'));
 
   signal r0_input_valid         : std_logic;
   signal r0_input_last          : std_logic;
@@ -142,7 +142,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r2_last_valid <= r1_summed_valid and r1_summed_last;
+      r2_last_valid <= (r1_summed_valid and r1_summed_last) or (r0_input_valid and Input_valid);
     end if;
   end process;
 
