@@ -14,10 +14,11 @@ package dsp_pkg is
 
   constant CHAN_POWER_WIDTH           : natural := 32;
 
-  constant DDS_LFSR_REG_WIDTH         : natural := 32;
+  constant DDS_LFSR_REG_WIDTH         : natural := 10;
   constant DDS_LFSR_PHASE_ACCUM_WIDTH : natural := 16;
   constant DDS_SIN_PHASE_ACCUM_WIDTH  : natural := 16;
   constant DDS_SIN_STEP_PERIOD_WIDTH  : natural := 16;
+  constant DDS_SIN_LOOKUP_INDEX_WIDTH : natural := 10;
 
   constant DDS_CONTROL_TYPE_WIDTH     : natural := 2;
   constant DDS_CONTROL_TYPE_LFSR      : natural := 1;
@@ -88,6 +89,9 @@ package dsp_pkg is
   function unpack(v : std_logic_vector) return dds_control_lfsr_entry_t;
   function unpack(v : std_logic_vector) return dds_control_sin_sweep_entry_t;
   function unpack(v : std_logic_vector) return dds_control_sin_step_entry_t;
+
+  function lfsr_output(x : std_logic_vector, poly : std_logic_vector) return std_logic;
+  function update_lfsr(x : std_logic_vector, poly : std_logic_vector) return std_logic_vector;
 
 end package dsp_pkg;
 
@@ -178,5 +182,29 @@ package body dsp_pkg is
 
     return r;
   end function;
+
+  function lfsr_output(x : std_logic_vector, poly : std_logic_vector) return std_logic is
+    variable r : std_logic;
+  begin
+    r := '0';
+
+    for i in 0 to (x'length - 1) loop
+      if (poly(i) = '1') then
+        r := r xor x(i);
+      end if;
+    end loop;
+
+    return r;
+  end function;
+
+  function update_lfsr(x : std_logic_vector, poly : std_logic_vector) return std_logic_vector is
+    variable r : std_logic_vector(x'length downto 0);
+  begin
+
+    r := shift_left(x, 1) & lfsr_output(x, poly);
+    return r(x'length - 1 downto 0);
+  end function;
+
+
 
 end package body dsp_pkg;
