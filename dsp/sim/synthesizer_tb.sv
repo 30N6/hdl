@@ -24,17 +24,6 @@ interface channelizer_intf #(parameter DATA_WIDTH, parameter INDEX_WIDTH) (input
     valid   <= 0;
     repeat(3) @(posedge Clk);
   endtask
-
-  task read(output channelizer_transaction_t rx);
-    logic v;
-    do begin
-      rx.data_i <= data[0];
-      rx.data_q <= data[1];
-      rx.index  <= index;
-      v         <= valid;
-      @(posedge Clk);
-    end while (v !== 1);
-  endtask
 endinterface
 
 module synthesizer_tb;

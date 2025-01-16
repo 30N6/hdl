@@ -20,7 +20,7 @@ port (
   Read_half     : in  std_logic;
   Read_index    : in  unsigned(DDS_SIN_LOOKUP_INDEX_WIDTH - 1 downto 0);
 
-  Read_data     : out signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);
+  Read_data     : out signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0)
 );
 begin
   -- PSL default clock is rising_edge(Clk);
@@ -29,7 +29,7 @@ end entity channelized_dds_lut;
 architecture rtl of channelized_dds_lut is
 
   constant LUT_WIDTH  : natural := 32;
-  constant LUT_INIT   : unsigned_array_t(2 ** DDS_SIN_LOOKUP_INDEX_WIDTH - 1 downto 0) :=
+  constant LUT_INIT   : std_logic_vector_array_t(2 ** DDS_SIN_LOOKUP_INDEX_WIDTH - 1 downto 0) :=
   (
        0 => "01111111111111110000000000000000",    1 => "01111111111111110000000001100101",    2 => "01111111111111100000000011001001",    3 => "01111111111111100000000100101110",    4 => "01111111111111010000000110010010",    5 => "01111111111110110000000111110111",    6 => "01111111111110010000001001011011",    7 => "01111111111101110000001011000000",
        8 => "01111111111101010000001100100100",    9 => "01111111111100110000001110001001",   10 => "01111111111100000000001111101101",   11 => "01111111111011000000010001010010",   12 => "01111111111010010000010010110110",   13 => "01111111111001010000010100011011",   14 => "01111111111000010000010101111111",   15 => "01111111110111000000010111100011",
@@ -161,12 +161,12 @@ architecture rtl of channelized_dds_lut is
     1016 => "10000000000010110000001100100100", 1017 => "10000000000010010000001011000000", 1018 => "10000000000001110000001001011011", 1019 => "10000000000001010000000111110111", 1020 => "10000000000000110000000110010010", 1021 => "10000000000000100000000100101110", 1022 => "10000000000000100000000011001001", 1023 => "10000000000000010000000001100101"
   );
 
-  signal m_lut          : unsigned_array_t(2 ** DDS_SIN_LOOKUP_INDEX_WIDTH - 1 downto 0) := LUT_INIT;
+  signal m_lut          : std_logic_vector_array_t(2 ** DDS_SIN_LOOKUP_INDEX_WIDTH - 1 downto 0)(LUT_WIDTH - 1 downto 0) := LUT_INIT;
 
   signal r0_read_half   : std_logic;
   signal r0_read_data   : std_logic_vector(LUT_WIDTH - 1 downto 0);
 
-  signal r1_read_half = '0') then   : std_logic;
+  signal r1_read_half   : std_logic;
   signal r1_read_data   : std_logic_vector(LUT_WIDTH - 1 downto 0);
   signal w1_data_i      : signed(LUT_WIDTH/2 - 1 downto 0);
   signal w1_data_q      : signed(LUT_WIDTH/2 - 1 downto 0);

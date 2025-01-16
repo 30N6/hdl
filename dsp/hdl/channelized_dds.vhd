@@ -25,7 +25,7 @@ port (
   Sync_data     : in  channelizer_control_t;
 
   Output_ctrl   : out channelizer_control_t;
-  Output_data   : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  Output_data   : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0)
 );
 end entity channelized_dds;
 
@@ -34,10 +34,10 @@ architecture rtl of channelized_dds is
   constant SIN_LUT_LATENCY            : natural := 3;
   constant DDS_LATENCY                : natural := 7;
 
-  constant POLY_G1                    : std_logic_vector(DDS_LFSR_REG_WIDTH - 1 downto 0) := "1000000100";
-  constant POLY_G2                    : std_logic_vector(DDS_LFSR_REG_WIDTH - 1 downto 0) := "1110100110";
-  constant OUTPUT_TAPS_G1             : std_logic_vector(DDS_LFSR_REG_WIDTH - 1 downto 0) := "1000000000";
-  constant OUTPUT_TAPS_G2             : std_logic_vector(DDS_LFSR_REG_WIDTH - 1 downto 0) := "0000100010";
+  constant POLY_G1                    : unsigned(DDS_LFSR_REG_WIDTH - 1 downto 0) := "1000000100";
+  constant POLY_G2                    : unsigned(DDS_LFSR_REG_WIDTH - 1 downto 0) := "1110100110";
+  constant OUTPUT_TAPS_G1             : unsigned(DDS_LFSR_REG_WIDTH - 1 downto 0) := "1000000000";
+  constant OUTPUT_TAPS_G2             : unsigned(DDS_LFSR_REG_WIDTH - 1 downto 0) := "0000100010";
 
   type dds_channel_control_t is record
     setup                             : dds_control_setup_entry_t;
@@ -51,14 +51,18 @@ architecture rtl of channelized_dds is
     lfsr_reg_state_g2                 : unsigned(DDS_LFSR_REG_WIDTH - 1 downto 0);
     lfsr_phase_accum                  : unsigned(DDS_LFSR_PHASE_ACCUM_WIDTH - 1 downto 0);
 
-    sin_phase_accum                   : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
-    --sin_phase_inc                     : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
-
-    sin_sweep_phase_inc               : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
-
+    sin_phase_accum                   : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+    sin_sweep_phase_inc               : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+    sin_step_phase_inc                : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
     sin_step_cycle                    : unsigned(DDS_SIN_STEP_PERIOD_WIDTH - 1 downto 0);
-    sin_step_phase_inc                : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
   end record;
+
+  constant CHANNEL_CONTROL_INIT       : dds_channel_control_t := (setup => (dds_sin_phase_inc_select => '0', dds_output_select => "00"),
+                                                                  lfsr_control => (others => (others => '0')),
+                                                                  sin_sweep_control => (others => (others => '0')),
+                                                                  sin_step_control => (sin_step_phase_inc_min => (others => '0'), others => (others => '0')));
+  constant CHANNEL_STATE_INIT         : dds_channel_state_t := (lfsr_reg_state_g1 => (others => '1'), lfsr_reg_state_g2 => (others => '1'), lfsr_phase_accum => (others => '0'),
+                                                                sin_phase_accum => (others => '0'), sin_sweep_phase_inc => (others => '0'), sin_step_phase_inc => (others => '0'), sin_step_cycle => (others => '0'));
 
   type dds_channel_control_array_t    is array (natural range <>) of dds_channel_control_t;
   type dds_channel_state_array_t      is array (natural range <>) of dds_channel_state_t;
@@ -71,8 +75,8 @@ architecture rtl of channelized_dds is
   signal w_control_sin_sweep          : dds_control_sin_sweep_entry_t;
   signal w_control_sin_step           : dds_control_sin_step_entry_t;
 
-  signal m_channel_control            : dds_channel_control_array_t(NUM_CHANNELS - 1 downto 0);
-  signal m_channel_state              : dds_channel_state_array_t(NUM_CHANNELS - 1 downto 0);
+  signal m_channel_control            : dds_channel_control_array_t(NUM_CHANNELS - 1 downto 0) := (others => CHANNEL_CONTROL_INIT);
+  signal m_channel_state              : dds_channel_state_array_t(NUM_CHANNELS - 1 downto 0) := (others => CHANNEL_STATE_INIT);
 
   signal r0_sync_data                 : channelizer_control_t;
 
@@ -80,13 +84,14 @@ architecture rtl of channelized_dds is
   signal r1_channel_control           : dds_channel_control_t;
   signal r1_channel_state             : dds_channel_state_t;
   signal w1_lfsr_phase_accum_sum      : unsigned(DDS_LFSR_PHASE_ACCUM_WIDTH downto 0);
+  signal w1_sin_step_rand_offset      : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 2 downto 0);
 
   signal r2_sync_data                 : channelizer_control_t;
   signal r2_channel_state             : dds_channel_state_t;
   signal r2_channel_setup             : dds_control_setup_entry_t;
-  signal r2_sin_phase_inc             : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+  signal r2_sin_phase_inc             : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
   signal r2_lfsr_toggle               : std_logic;
-  signal r2_sin_phase_accum_dithered  : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+  signal r2_sin_phase_accum_dithered  : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
   signal w2_sin_lookup_half           : std_logic;
   signal w2_sin_lookup_index          : unsigned(DDS_SIN_LOOKUP_INDEX_WIDTH - 1 downto 0);
 
@@ -172,6 +177,7 @@ begin
   end process;
 
   w1_lfsr_phase_accum_sum <= ('0' & r1_channel_state.lfsr_phase_accum) + ('0' & r1_channel_control.lfsr_control.lfsr_phase_inc);
+  w1_sin_step_rand_offset <= r1_channel_control.sin_step_control.sin_step_phase_inc_rand_offset_mask and w_rand(DDS_SIN_PHASE_ACCUM_WIDTH - 2 downto 0);
 
   process(Clk)
   begin
@@ -183,26 +189,25 @@ begin
       r2_channel_state.lfsr_phase_accum <= w1_lfsr_phase_accum_sum(DDS_LFSR_PHASE_ACCUM_WIDTH - 1 downto 0);
       r2_lfsr_toggle                    <= w1_lfsr_phase_accum_sum(DDS_LFSR_PHASE_ACCUM_WIDTH);
 
-      r2_channel_state.sin_phase_accum  <= r1_channel_state.sin_phase_accum + r1_channel_state.sin_phase_inc;
       r2_sin_phase_accum_dithered       <= r1_channel_state.sin_phase_accum + ('0' & w_rand(31));
 
-      if (r1_channel_state.sin_sweep_phase_inc >= r1_channel_control.sin_sweep_phase_inc_stop) then
-        r2_channel_state.sin_sweep_phase_inc <= r1_channel_control.sin_sweep_phase_inc_start;
-      elsif (r1_channel_state.sin_sweep_phase_inc < r1_channel_control.sin_sweep_phase_inc_start) then
-        r2_channel_state.sin_sweep_phase_inc <= r1_channel_control.sin_sweep_phase_inc_start;
+      --TODO:
+      if (r1_channel_state.sin_sweep_phase_inc > r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_stop) then
+        r2_channel_state.sin_sweep_phase_inc <= r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_start;
+      elsif (r1_channel_state.sin_sweep_phase_inc < r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_start) then
+        r2_channel_state.sin_sweep_phase_inc <= r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_stop;
       else
-        r2_channel_state.sin_sweep_phase_inc <= r1_channel_state.sin_sweep_phase_inc + r1_channel_control.sin_sweep_phase_inc_step;
+        r2_channel_state.sin_sweep_phase_inc <= r1_channel_state.sin_sweep_phase_inc + r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_step;
       end if;
 
       if (r1_channel_state.sin_step_cycle = r1_channel_control.sin_step_control.sin_step_period_minus_one) then
         r2_channel_state.sin_step_cycle     <= (others => '0');
-        r2_channel_state.sin_step_phase_inc <= r1_channel_control.sin_step_phase_inc_min +
-                                               (r1_channel_control.sin_step_phase_inc_rand_offset_mask and w_rand(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0));
+        r2_channel_state.sin_step_phase_inc <= r1_channel_control.sin_step_control.sin_step_phase_inc_min + signed('0' & w1_sin_step_rand_offset);
       else
         r2_channel_state.sin_step_cycle     <= r1_channel_state.sin_step_cycle + 1;
       end if;
 
-      if (r1_channel_control.dds_sin_phase_inc_select = '0') then
+      if (r1_channel_control.setup.dds_sin_phase_inc_select = '0') then
         r2_sin_phase_inc <= r1_channel_state.sin_sweep_phase_inc;
       else
         r2_sin_phase_inc <= r1_channel_state.sin_step_phase_inc;
@@ -210,17 +215,19 @@ begin
     end if;
   end process;
 
-  w2_sin_lookup_half  <= r2_sin_phase_accum_dithered(DDS_SIN_PHASE_ACCUM_WIDTH - 1)
-  w2_sin_lookup_index <= r2_sin_phase_accum_dithered(DDS_SIN_PHASE_ACCUM_WIDTH - 2 downto (DDS_SIN_PHASE_ACCUM_WIDTH - 1 - DDS_SIN_LOOKUP_INDEX_WIDTH));
+  w2_sin_lookup_half  <= r2_sin_phase_accum_dithered(DDS_SIN_PHASE_ACCUM_WIDTH - 1);
+  w2_sin_lookup_index <= unsigned(r2_sin_phase_accum_dithered(DDS_SIN_PHASE_ACCUM_WIDTH - 2 downto (DDS_SIN_PHASE_ACCUM_WIDTH - 1 - DDS_SIN_LOOKUP_INDEX_WIDTH)));
 
   process(Clk)
   begin
     if rising_edge(Clk) then
       r3_sync_data      <= r2_sync_data;
       r3_channel_state  <= r2_channel_state;
-      r3_channel_setup  <= r2_channel_control.setup;
+      r3_channel_setup  <= r2_channel_setup;
 
-      r3_lfsr_output    <= lfsr_output(r2_channel_state.lfsr_reg_state_g1 & r2_channel_state.lfsr_reg_state_g2, OUTPUT_TAPS_G1 & OUTPUT_TAPS_G2);
+      r3_lfsr_output <= lfsr_output(r2_channel_state.lfsr_reg_state_g1 & r2_channel_state.lfsr_reg_state_g2, OUTPUT_TAPS_G1 & OUTPUT_TAPS_G2);
+
+      r3_channel_state.sin_phase_accum <= r2_channel_state.sin_phase_accum + r2_sin_phase_inc;
 
       if (r_rst = '1') then
         r3_channel_state.lfsr_reg_state_g1 <= (others => '1');
@@ -282,9 +289,9 @@ begin
 
       if (r5_channel_setup.dds_output_select = "01") then
         if (r5_lfsr_output = '1') then
-          r6_output_data(0) <= signed(to_integer(2**(OUTPUT_DATA_WIDTH-1) - 1), OUTPUT_DATA_WIDTH);
+          r6_output_data(0) <= to_signed(2**(OUTPUT_DATA_WIDTH-1) - 1, OUTPUT_DATA_WIDTH);
         else
-          r6_output_data(0) <= -signed(to_integer(2**(OUTPUT_DATA_WIDTH-1) - 1), OUTPUT_DATA_WIDTH);
+          r6_output_data(0) <= -to_signed(2**(OUTPUT_DATA_WIDTH-1) - 1, OUTPUT_DATA_WIDTH);
         end if;
         r6_output_data(1) <= (others => '0');
 

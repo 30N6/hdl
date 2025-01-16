@@ -21,6 +21,7 @@ package dsp_pkg is
   constant DDS_SIN_LOOKUP_INDEX_WIDTH : natural := 10;
 
   constant DDS_CONTROL_TYPE_WIDTH     : natural := 2;
+  constant DDS_CONTROL_TYPE_NONE      : natural := 0;
   constant DDS_CONTROL_TYPE_LFSR      : natural := 1;
   constant DDS_CONTROL_TYPE_SIN_SWEEP : natural := 2;
   constant DDS_CONTROL_TYPE_SIN_STEP  : natural := 3;
@@ -55,22 +56,20 @@ package dsp_pkg is
   constant DDS_CONTROL_LFSR_ENTRY_PACKED_WIDTH : natural := 16;
 
   type dds_control_sin_sweep_entry_t is record
-    sin_sweep_phase_inc_start           : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
-    sin_sweep_phase_inc_stop            : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
-    sin_sweep_phase_inc_step            : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+    sin_sweep_phase_inc_start           : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+    sin_sweep_phase_inc_stop            : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+    sin_sweep_phase_inc_step            : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
   end record;
   constant DDS_CONTROL_SIN_SWEEP_ENTRY_PACKED_WIDTH : natural := 48;
 
   type dds_control_sin_step_entry_t is record
-    sin_step_phase_inc_min              : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
-    sin_step_phase_inc_rand_offset_mask : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+    sin_step_phase_inc_min              : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+    sin_step_phase_inc_rand_offset_mask : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 2 downto 0);
     sin_step_period_minus_one           : unsigned(DDS_SIN_STEP_PERIOD_WIDTH - 1 downto 0);
   end record;
   constant DDS_CONTROL_SIN_STEP_ENTRY_PACKED_WIDTH : natural := 48;
 
-  constant DDS_CONTROL_ENTRY_PACKED_WIDTH : natural := maximum(DDS_CONTROL_LFSR_ENTRY_PACKED_WIDTH,
-                                                               DDS_CONTROL_SIN_SWEEP_ENTRY_PACKED_WIDTH,
-                                                               DDS_CONTROL_SIN_STEP_ENTRY_PACKED_WIDTH);
+  constant DDS_CONTROL_ENTRY_PACKED_WIDTH : natural := 48;
 
   type dds_control_t is record
     valid         : std_logic;
@@ -90,8 +89,8 @@ package dsp_pkg is
   function unpack(v : std_logic_vector) return dds_control_sin_sweep_entry_t;
   function unpack(v : std_logic_vector) return dds_control_sin_step_entry_t;
 
-  function lfsr_output(x : std_logic_vector, poly : std_logic_vector) return std_logic;
-  function update_lfsr(x : std_logic_vector, poly : std_logic_vector) return std_logic_vector;
+  function lfsr_output(x : unsigned; poly : unsigned) return std_logic;
+  function update_lfsr(x : unsigned; poly : unsigned) return unsigned;
 
 end package dsp_pkg;
 
@@ -147,6 +146,7 @@ package body dsp_pkg is
     assert (v'length = DDS_CONTROL_LFSR_ENTRY_PACKED_WIDTH)
       report "Unexpected length"
       severity failure;
+    vm := v;
 
     r.lfsr_phase_inc := unsigned(vm(15 downto 0));
 
@@ -160,10 +160,11 @@ package body dsp_pkg is
     assert (v'length = DDS_CONTROL_SIN_SWEEP_ENTRY_PACKED_WIDTH)
       report "Unexpected length"
       severity failure;
+    vm := v;
 
-    r.sin_sweep_phase_inc_start := unsigned(vm(15 downto 0));
-    r.sin_sweep_phase_inc_stop  := unsigned(vm(31 downto 16));
-    r.sin_sweep_phase_inc_step  := unsigned(vm(47 downto 32));
+    r.sin_sweep_phase_inc_start := signed(vm(15 downto 0));
+    r.sin_sweep_phase_inc_stop  := signed(vm(31 downto 16));
+    r.sin_sweep_phase_inc_step  := signed(vm(47 downto 32));
 
     return r;
   end function;
@@ -175,15 +176,16 @@ package body dsp_pkg is
     assert (v'length = DDS_CONTROL_SIN_STEP_ENTRY_PACKED_WIDTH)
       report "Unexpected length"
       severity failure;
+    vm := v;
 
-    r.sin_step_phase_inc_min              := unsigned(vm(15 downto 0));
-    r.sin_step_phase_inc_rand_offset_max  := unsigned(vm(31 downto 16));
-    r.sin_step_period                     := unsigned(vm(47 downto 32));
+    r.sin_step_phase_inc_min              := signed(vm(15 downto 0));
+    r.sin_step_phase_inc_rand_offset_mask := unsigned(vm(30 downto 16));
+    r.sin_step_period_minus_one           := unsigned(vm(47 downto 32));
 
     return r;
   end function;
 
-  function lfsr_output(x : std_logic_vector, poly : std_logic_vector) return std_logic is
+  function lfsr_output(x : unsigned; poly : unsigned) return std_logic is
     variable r : std_logic;
   begin
     r := '0';
@@ -197,8 +199,8 @@ package body dsp_pkg is
     return r;
   end function;
 
-  function update_lfsr(x : std_logic_vector, poly : std_logic_vector) return std_logic_vector is
-    variable r : std_logic_vector(x'length downto 0);
+  function update_lfsr(x : unsigned; poly : unsigned) return unsigned is
+    variable r : unsigned(x'length downto 0);
   begin
 
     r := shift_left(x, 1) & lfsr_output(x, poly);

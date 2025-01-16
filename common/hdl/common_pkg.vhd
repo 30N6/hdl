@@ -17,6 +17,7 @@ package common_pkg is
   function and_reduce(v : unsigned) return std_logic;
   function and_reduce(v : std_logic_vector) return std_logic;
   function or_reduce(v : unsigned) return std_logic;
+  function or_reduce(v : signed) return std_logic;
   function or_reduce(v : std_logic_vector) return std_logic;
   function resize_up(v : signed; n : natural) return signed;
   function resize_up(v : unsigned; n : natural) return unsigned;
@@ -77,6 +78,11 @@ package body common_pkg is
   end function;
 
   function or_reduce(v : unsigned) return std_logic is
+  begin
+    return to_stdlogic(v /= 0);
+  end function;
+
+  function or_reduce(v : signed) return std_logic is
   begin
     return to_stdlogic(v /= 0);
   end function;
