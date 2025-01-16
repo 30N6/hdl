@@ -94,8 +94,8 @@ module channelized_dds_tb;
       r_output_q[w_output_ctrl.data_index] <= w_output_data[1];
     end
 
-    /*if (synthesizer_tb.gen_dut.synth_16.i_synthesizer.i_mux.Input_valid) begin
-      $display("%0d %07X", synthesizer_tb.gen_dut.synth_16.i_synthesizer.i_mux.Input_channel, synthesizer_tb.gen_dut.synth_16.i_synthesizer.i_mux.Input_i);
+    /*if (channelized_dds_tb.dut.r5_sync_data.valid && (channelized_dds_tb.dut.r5_sync_data.data_index == 15)) begin
+      $display("%0d", channelized_dds_tb.dut.r5_lfsr_output);
     end*/
   end
 
@@ -158,6 +158,7 @@ module channelized_dds_tb;
 
     transactions.push_back({channel_index: 15, setup_data:{0, 3}, control_type:dds_control_type_sin_sweep,  control_data:pack_dds_control_sin_sweep_entry(-8000, 8000, 1), default:'0});
     transactions.push_back({channel_index: 15, setup_data:{0, 3}, control_type:dds_control_type_lfsr,       control_data:pack_dds_control_lfsr_entry(1000), default:'0});
+    //transactions.push_back({channel_index: 15, setup_data:{0, 3}, control_type:dds_control_type_lfsr,       control_data:pack_dds_control_lfsr_entry(8192), default:'0});
 
     for (int i = 0; i < transactions.size(); i++) begin
       ctrl = transactions[i];
