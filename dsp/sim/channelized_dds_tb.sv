@@ -137,26 +137,64 @@ module channelized_dds_tb;
       transactions.push_back({channel_index: i, setup_data:{0, 0}, control_type:dds_control_type_none, default:'0});
     end
 
-    transactions.push_back({channel_index: 0, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(-32767, 32767, 10), default:'0});
-    transactions.push_back({channel_index: 1, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(-32767, 32767, 100), default:'0});
-    transactions.push_back({channel_index: 2, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(-32767, 32767, 1000), default:'0});
+    transactions.push_back({channel_index: 0, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(-32767, 32767,  10), default:'0});
+    transactions.push_back({channel_index: 1, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(-32767, 32767,  100), default:'0});
+    transactions.push_back({channel_index: 2, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(-1000,  1000,   10), default:'0});
+    transactions.push_back({channel_index: 3, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(-32767, 32767,  -10), default:'0});
+    transactions.push_back({channel_index: 4, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(-32767, 32767,  -100), default:'0});
+    transactions.push_back({channel_index: 5, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(-1000,  1000,   -1), default:'0});
+    transactions.push_back({channel_index: 6, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(-18000, 18000,  -100), default:'0});
 
-    transactions.push_back({channel_index: 1, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(-32767, 32767, 100), default:'0});
+    transactions.push_back({channel_index: 7, setup_data:{1, 2}, control_type:dds_control_type_sin_step, control_data:pack_dds_control_sin_step_entry(-16384, 32767,  100), default:'0});
+    transactions.push_back({channel_index: 8, setup_data:{1, 2}, control_type:dds_control_type_sin_step, control_data:pack_dds_control_sin_step_entry(2000, 16383,  100), default:'0});
+    transactions.push_back({channel_index: 9, setup_data:{1, 2}, control_type:dds_control_type_sin_step, control_data:pack_dds_control_sin_step_entry(-4000, 16383,  100), default:'0});
 
+    transactions.push_back({channel_index: 10, setup_data:{0, 1}, control_type:dds_control_type_lfsr, control_data:pack_dds_control_lfsr_entry(18000), default:'0});
+    transactions.push_back({channel_index: 11, setup_data:{0, 1}, control_type:dds_control_type_lfsr, control_data:pack_dds_control_lfsr_entry(1000), default:'0});
+    transactions.push_back({channel_index: 12, setup_data:{0, 1}, control_type:dds_control_type_lfsr, control_data:pack_dds_control_lfsr_entry(100), default:'0});
+
+    transactions.push_back({channel_index: 13, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(-5000, -5000,  0), default:'0});
+    transactions.push_back({channel_index: 14, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(2000, 2000,  0), default:'0});
+
+    transactions.push_back({channel_index: 15, setup_data:{0, 3}, control_type:dds_control_type_sin_sweep,  control_data:pack_dds_control_sin_sweep_entry(-8000, 8000, 1), default:'0});
+    transactions.push_back({channel_index: 15, setup_data:{0, 3}, control_type:dds_control_type_lfsr,       control_data:pack_dds_control_lfsr_entry(1000), default:'0});
 
     for (int i = 0; i < transactions.size(); i++) begin
       ctrl = transactions[i];
       ctrl_intf.write(ctrl);
       //repeat($urandom_range(1)) @(posedge Clk);
     end
+    transactions.delete();
+    repeat(500000) @(posedge Clk);
+
+    for (int i = 0; i < NUM_CHANNELS; i++) begin
+      transactions.push_back({channel_index: i, setup_data:{0, 0}, control_type:dds_control_type_none, default:'0});
+    end
+    for (int i = 0; i < transactions.size(); i++) begin
+      ctrl = transactions[i];
+      ctrl_intf.write(ctrl);
+      //repeat($urandom_range(1)) @(posedge Clk);
+    end
+    transactions.delete();
+    repeat(1000) @(posedge Clk);
+
+    for (int i = 0; i < NUM_CHANNELS; i++) begin
+      int freq = $urandom_range(-8000, 8000);
+      transactions.push_back({channel_index: i, setup_data:{0, 2}, control_type:dds_control_type_sin_sweep, control_data:pack_dds_control_sin_sweep_entry(freq, freq,  0), default:'0});
+    end
+    for (int i = 0; i < transactions.size(); i++) begin
+      ctrl = transactions[i];
+      ctrl_intf.write(ctrl);
+      //repeat($urandom_range(1)) @(posedge Clk);
+    end
+    transactions.delete();
+    repeat(100000) @(posedge Clk);
 
     /*while (tx_queue.size() > 0) begin
       tx = tx_queue.pop_front();
       tx_intf.write(tx);
       //repeat () @(posedge Clk);
     end*/
-
-    repeat(500000) @(posedge Clk);
 
     $display("%0t: Standard test finished", $time);
 

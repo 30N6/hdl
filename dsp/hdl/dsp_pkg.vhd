@@ -203,7 +203,7 @@ package body dsp_pkg is
     variable r : unsigned(x'length downto 0);
   begin
 
-    r := shift_left(x, 1) & lfsr_output(x, poly);
+    r := x & lfsr_output(x, poly);
     return r(x'length - 1 downto 0);
   end function;
 

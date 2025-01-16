@@ -191,7 +191,6 @@ begin
 
       r2_sin_phase_accum_dithered       <= r1_channel_state.sin_phase_accum + ('0' & w_rand(31));
 
-      --TODO:
       if (r1_channel_state.sin_sweep_phase_inc > r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_stop) then
         r2_channel_state.sin_sweep_phase_inc <= r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_start;
       elsif (r1_channel_state.sin_sweep_phase_inc < r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_start) then
