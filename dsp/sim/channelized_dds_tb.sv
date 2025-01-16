@@ -97,6 +97,9 @@ module channelized_dds_tb;
     /*if (channelized_dds_tb.dut.r5_sync_data.valid && (channelized_dds_tb.dut.r5_sync_data.data_index == 15)) begin
       $display("%0d", channelized_dds_tb.dut.r5_lfsr_output);
     end*/
+    /*if (w_output_ctrl.valid) begin
+      $display("%0d %0d %0d", w_output_ctrl.data_index, w_output_data[0], w_output_data[1]);
+    end*/
   end
 
   function automatic bit [dds_control_lfsr_entry_packed_width - 1 : 0] pack_dds_control_lfsr_entry(int lfsr_phase_inc);
