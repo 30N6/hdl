@@ -10,7 +10,6 @@ library dsp_lib;
 
 package ecm_pkg is
 
-
   constant ECM_CONTROL_MAGIC_NUM                      : std_logic_vector(31 downto 0) := x"45434D43";
   constant ECM_REPORT_MAGIC_NUM                       : std_logic_vector(31 downto 0) := x"45434D52";
 
@@ -83,6 +82,8 @@ package ecm_pkg is
   constant ECM_DWELL_TAG_WIDTH                        : natural := 16;
   constant ECM_DWELL_FREQUENCY_WIDTH                  : natural := 16;
   constant ECM_DWELL_GLOBAL_COUNTER_WIDTH             : natural := 16;
+
+  constant ECM_TIMESTAMP_WIDTH                        : natural := 48;
 
   type ecm_tx_instruction_header_t is record
     valid               : std_logic;
@@ -195,10 +196,10 @@ package ecm_pkg is
   --type ecm_report_dwell_stats_t is record
   --  dwell_entry               : ecm_dwell_entry_t;
   --  dwell_sequence_num        : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
-  --  measurement_duration      : unsigned(31 downto 0);
-  --  full_duration             : unsigned(31 downto 0);
-  --  ts_dwell_start            : unsigned(63 downto 0);
-  --  ts_dwell_end              : unsigned(63 downto 0);
+  --  measurement_duration      : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+  --  full_duration             : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+  --  ts_dwell_start            : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
+  --  ts_dwell_end              : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
   --
   --  -- array of 128? bit entries: num_samples, accum, max, padding? --TODO: update
   --end record;
@@ -207,7 +208,7 @@ package ecm_pkg is
   --  dwell_sequence_num        : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   --  segment_sequence_num      : unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
   --  channel_index             : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  --  segment_timestamp         : unsigned(63 downto 0);
+  --  segment_timestamp         : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
   --  segment_duration          : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   --  slice_start               : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   --  slice_length              : unsigned(ECM_DRFM_SEGMENT_SLICE_LENGTH_WIDTH - 1 downto 0);
@@ -222,6 +223,65 @@ package ecm_pkg is
   --end record;
 
 
+  type ecm_channelizer_warnings_t is record
+    demux_gap       : std_logic;
+  end record;
+  constant ECM_CHANNELIZER_WARNINGS_WIDTH : natural := 1;
+  type ecm_channelizer_warnings_array_t is array (natural range <>) of ecm_channelizer_warnings_t; --TODO: remove array types?
+
+  type ecm_channelizer_errors_t is record
+    demux_overflow  : std_logic;
+    filter_overflow : std_logic;
+    mux_overflow    : std_logic;
+    mux_underflow   : std_logic;
+    mux_collision   : std_logic;
+  end record;
+  constant ECM_CHANNELIZER_ERRORS_WIDTH : natural := 5;
+  type ecm_channelizer_errors_array_t is array (natural range <>) of ecm_channelizer_errors_t;
+
+  type ecm_synthesizer_errors_t is record
+    stretcher_overflow  : std_logic;
+    stretcher_underflow : std_logic;
+    filter_overflow     : std_logic;
+    mux_input_overflow  : std_logic;
+    mux_fifo_overflow   : std_logic;
+    mux_fifo_underflow  : std_logic;
+  end record;
+  constant ECM_SYNTHESIZER_ERRORS_WIDTH : natural := 6;
+  type ecm_synthesizer_errors_array_t is array (natural range <>) of ecm_synthesizer_errors_t;
+
+  type ecm_dwell_stats_errors_t is record
+    reporter_timeout  : std_logic;
+    reporter_overflow : std_logic;
+  end record;
+  constant ECM_DWELL_STATS_ERRORS_WIDTH : natural := 2;
+  type ecm_dwell_stats_errors_array_t is array (natural range <>) of ecm_dwell_stats_errors_t;
+
+  type ecm_drfm_errors_t is record
+    todo                    : std_logic;
+  end record;
+  constant ECM_DRFM_ERRORS_WIDTH : natural := 1;
+  type ecm_drfm_errors_array_t is array (natural range <>) of ecm_drfm_errors_t;
+
+  type ecm_status_reporter_errors_t is record
+    reporter_timeout  : std_logic;
+    reporter_overflow : std_logic;
+  end record;
+  constant ECM_STATUS_REPORTER_ERRORS_WIDTH : natural := 2;
+
+  type ecm_status_flags_t is record
+    channelizer_warnings  : ecm_channelizer_warnings_t;
+    channelizer_errors    : ecm_channelizer_errors_t;
+    synthesizer_errors    : ecm_synthesizer_errors_t;
+    dwell_stats_errors    : ecm_dwell_stats_errors_t;
+    drfm_errors           : ecm_drfm_errors_t;
+  end record;
+  constant ECM_STATUS_FLAGS_WIDTH : natural := ECM_CHANNELIZER_WARNINGS_WIDTH +
+                                               ECM_CHANNELIZER_ERRORS_WIDTH +
+                                               ECM_SYNTHESIZER_ERRORS_WIDTH +
+                                               ECM_DWELL_STATS_ERRORS_WIDTH +
+                                               ECM_DRFM_ERRORS_WIDTH;
+
   function unpack(v : std_logic_vector) return ecm_tx_instruction_header_t;
   function unpack(v : std_logic_vector) return ecm_tx_instruction_dds_setup_bpsk_t;
   function unpack(v : std_logic_vector) return ecm_tx_instruction_dds_setup_cw_sweep_t;
@@ -231,6 +291,13 @@ package ecm_pkg is
   function unpack(v : std_logic_vector) return ecm_tx_instruction_jump_t;
   function unpack(v : std_logic_vector) return ecm_config_data_t;
 
+  function pack(v : ecm_channelizer_warnings_t) return std_logic_vector;
+  function pack(v : ecm_channelizer_errors_t) return std_logic_vector;
+  function pack(v : ecm_synthesizer_errors_t) return std_logic_vector;
+  function pack(v : ecm_dwell_stats_errors_t) return std_logic_vector;
+  function pack(v : ecm_drfm_errors_t) return std_logic_vector;
+  function pack(v : ecm_status_reporter_errors_t) return std_logic_vector;
+  function pack(v : ecm_status_flags_t) return std_logic_vector;
   function pack(v : ecm_config_data_t) return std_logic_vector;
 
 end package ecm_pkg;
@@ -272,6 +339,81 @@ package body ecm_pkg is
     return r;
   end function;
 
+  function pack(v : ecm_channelizer_warnings_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_CHANNELIZER_WARNINGS_WIDTH - 1 downto 0);
+  begin
+    r(0) := v.demux_gap;
+    return r;
+  end function;
+
+  function pack(v : ecm_channelizer_errors_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_CHANNELIZER_ERRORS_WIDTH - 1 downto 0);
+  begin
+    r := (
+          v.mux_collision,
+          v.mux_underflow,
+          v.mux_overflow,
+          v.filter_overflow,
+          v.demux_overflow
+         );
+    return r;
+  end function;
+
+  function pack(v : ecm_synthesizer_errors_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_SYNTHESIZER_ERRORS_WIDTH - 1 downto 0);
+  begin
+    r := (
+          v.stretcher_overflow,
+          v.stretcher_underflow,
+          v.filter_overflow,
+          v.mux_input_overflow,
+          v.mux_fifo_overflow,
+          v.mux_fifo_underflow
+         );
+    return r;
+  end function;
+
+  function pack(v : ecm_dwell_stats_errors_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_DWELL_STATS_ERRORS_WIDTH - 1 downto 0);
+  begin
+    r := (
+          v.reporter_overflow,
+          v.reporter_timeout
+         );
+    return r;
+  end function;
+
+  function pack(v : ecm_drfm_errors_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_DRFM_ERRORS_WIDTH - 1 downto 0);
+  begin
+    r := (
+          v.todo,
+         );
+    return r;
+  end function;
+
+  function pack(v : ecm_status_reporter_errors_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_STATUS_REPORTER_ERRORS_WIDTH - 1 downto 0);
+  begin
+    r := (
+          v.reporter_overflow,
+          v.reporter_timeout
+         );
+    return r;
+  end function;
+
+  function pack(v : ecm_status_flags_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_STATUS_FLAGS_WIDTH - 1 downto 0);
+  begin
+    r := (
+          pack(v.drfm_errors),
+          pack(v.dwell_stats_errors),
+          pack(v.synthesizer_errors),
+          pack(v.channelizer_errors),
+          pack(v.channelizer_warnings)
+         );
+    return r;
+  end function;
 
   function pack(v : ecm_config_data_t) return std_logic_vector is
     variable r : std_logic_vector(ECM_CONFIG_DATA_WIDTH - 1 downto 0);
