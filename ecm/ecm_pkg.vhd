@@ -11,26 +11,28 @@ library dsp_lib;
 package ecm_pkg is
 
 
-  constant ECM_CONTROL_MAGIC_NUM                        : std_logic_vector(31 downto 0) := x"45434D43";
-  constant ECM_REPORT_MAGIC_NUM                         : std_logic_vector(31 downto 0) := x"45434D52";
+  constant ECM_CONTROL_MAGIC_NUM                      : std_logic_vector(31 downto 0) := x"45434D43";
+  constant ECM_REPORT_MAGIC_NUM                       : std_logic_vector(31 downto 0) := x"45434D52";
 
-  constant ECM_MODULE_ID_WIDTH                          : natural := 8;
-  constant ECM_MODULE_ID_CONTROL                        : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"00";
-  constant ECM_MODULE_ID_DWELL_CONTROLLER               : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"01";
-  constant ECM_MODULE_ID_DWELL_STATS                    : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"02";
-  constant ECM_MODULE_ID_DRFM                           : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"05";
-  constant ECM_MODULE_ID_STATUS                         : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"06";
+  constant ECM_MODULE_ID_WIDTH                        : natural := 8;
+  constant ECM_MODULE_ID_CONTROL                      : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"00";
+  constant ECM_MODULE_ID_DWELL_CONTROLLER             : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"01";
+  constant ECM_MODULE_ID_DWELL_STATS                  : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"02";
+  constant ECM_MODULE_ID_DRFM                         : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"05";
+  constant ECM_MODULE_ID_STATUS                       : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"06";
 
-  constant ECM_MESSAGE_TYPE_WIDTH                       : natural := 8;
-  constant ECM_CONTROL_MESSAGE_TYPE_ENABLE              : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"00";
-  constant ECM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY         : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"01";
-  constant ECM_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM       : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"02";
-  constant ECM_CONTROL_MESSAGE_TYPE_CHANNEL_CONTROL     : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"03";
-  constant ECM_CONTROL_MESSAGE_TYPE_TX_INSTRUCTION      : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"03";
-  constant ECM_REPORT_MESSAGE_TYPE_DWELL_STATS          : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"10";
-  constant ECM_REPORT_MESSAGE_TYPE_DRFM_CHANNEL_DATA    : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"20";
-  constant ECM_REPORT_MESSAGE_TYPE_DRFM_SUMMARY         : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"21";
-  constant ECM_REPORT_MESSAGE_TYPE_STATUS               : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"30";
+  constant ECM_MESSAGE_TYPE_WIDTH                     : natural := 8;
+  constant ECM_CONTROL_MESSAGE_TYPE_ENABLE            : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"00";
+  constant ECM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY       : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"01";
+  constant ECM_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM     : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"02";
+  constant ECM_CONTROL_MESSAGE_TYPE_CHANNEL_CONTROL   : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"03";
+  constant ECM_CONTROL_MESSAGE_TYPE_TX_INSTRUCTION    : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"03";
+  constant ECM_REPORT_MESSAGE_TYPE_DWELL_STATS        : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"10";
+  constant ECM_REPORT_MESSAGE_TYPE_DRFM_CHANNEL_DATA  : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"20";
+  constant ECM_REPORT_MESSAGE_TYPE_DRFM_SUMMARY       : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"21";
+  constant ECM_REPORT_MESSAGE_TYPE_STATUS             : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"30";
+
+  constant ECM_CONFIG_ADDRESS_WIDTH                   : natural := 16;
 
   constant ECM_NUM_CHANNELS                           : natural := 16;
   constant ECM_CHANNEL_INDEX_WIDTH                    : natural := clog2(ECM_NUM_CHANNELS);
@@ -171,12 +173,23 @@ package ecm_pkg is
     enable_synthesizer        : std_logic;
   end record;
 
+  type ecm_config_data_t is record
+    valid                     : std_logic;
+    first                     : std_logic;
+    last                      : std_logic;
+    data                      : std_logic_vector(31 downto 0);
+    module_id                 : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0);
+    message_type              : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0);
+    address                   : unsigned(ECM_CONFIG_ADDRESS_WIDTH - 1 downto 0);
+  end record;
+  constant ECM_CONFIG_DATA_WIDTH : natural := 3 + 32 + ECM_MODULE_ID_WIDTH + ECM_MESSAGE_TYPE_WIDTH + ECM_CONFIG_ADDRESS_WIDTH;
+
   --type ecm_common_header_t is record
   --  magic_num                 : std_logic_vector(31 downto 0);
   --  sequence_num              : unsigned(31 downto 0);
   --  module_id                 : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0);
   --  message_type              : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0);
-  --  address                   : unsigned(15 downto 0);
+  --  address                   : unsigned(ECM_CONFIG_ADDRESS_WIDTH - 1 downto 0);
   --end record;
 
   --type ecm_report_dwell_stats_t is record
@@ -216,7 +229,9 @@ package ecm_pkg is
   function unpack(v : std_logic_vector) return ecm_tx_instruction_playback_t;
   function unpack(v : std_logic_vector) return ecm_tx_instruction_wait_t;
   function unpack(v : std_logic_vector) return ecm_tx_instruction_jump_t;
+  function unpack(v : std_logic_vector) return ecm_config_data_t;
 
+  function pack(v : ecm_config_data_t) return std_logic_vector;
 
 end package ecm_pkg;
 
@@ -239,5 +254,34 @@ package body ecm_pkg is
   --  return r;
   --end function;
 
+  function unpack(v : std_logic_vector) return ecm_config_data_t is
+    variable r : ecm_config_data_t;
+  begin
+    assert (v'length = ECM_CONFIG_DATA_WIDTH)
+      report "Invalid length."
+      severity failure;
+
+    r.valid         := v(0);
+    r.first         := v(1);
+    r.last          := v(2);
+    r.data          := v(34 downto 3);
+    r.module_id     := unsigned(v(35 + ECM_MODULE_ID_WIDTH - 1 downto 35));
+    r.message_type  := unsigned(v(35 + ECM_MODULE_ID_WIDTH + ECM_MESSAGE_TYPE_WIDTH - 1 downto 35 + ECM_MODULE_ID_WIDTH));
+    r.address       := unsigned(v(35 + ECM_MODULE_ID_WIDTH + ECM_MESSAGE_TYPE_WIDTH + ECM_CONFIG_ADDRESS_WIDTH - 1 downto 35 + ECM_MODULE_ID_WIDTH + ECM_MESSAGE_TYPE_WIDTH));
+
+    return r;
+  end function;
+
+
+  function pack(v : ecm_config_data_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_CONFIG_DATA_WIDTH - 1 downto 0);
+  begin
+    r := (std_logic_vector(v.address),
+          std_logic_vector(v.message_type),
+          std_logic_vector(v.module_id),
+          v.data, v.last, v.first, v.valid);
+
+    return r;
+  end function;
 
 end package body ecm_pkg;
