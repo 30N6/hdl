@@ -112,6 +112,11 @@ architecture rtl of ecm_top is
   signal w_synthesizer16_control      : channelizer_control_t;
   signal w_synthesizer16_data         : signed_array_t(1 downto 0)(SYNTHESIZER16_DATA_WIDTH - 1 downto 0);
 
+  signal w_dds_command                : dds_control_t;
+  signal w_dds_sync                   : channelizer_control_t;
+  signal w_dds_control                : channelizer_control_t;
+  signal w_dds_data                   : signed_array_t(1 downto 0)(ECM_DDS_OUTPUT_WIDTH - 1 downto 0)
+
   signal w_channelizer_warnings       : ecm_channelizer_warnings_t;
   signal w_channelizer_errors         : ecm_channelizer_errors_t;
   signal w_synthesizer_errors         : ecm_synthesizer_errors_t;
@@ -194,7 +199,11 @@ begin
 
     Dwell_active        => w_dwell_active,
     Dwell_data          => w_dwell_data,
-    Dwell_sequence_num  => w_dwell_sequence_num
+    Dwell_sequence_num  => w_dwell_sequence_num,
+
+    Dds_control         => w_dds_command,
+    Drfm_control        => w_drfm_command
+
   );
 
   process(Adc_clk)
@@ -319,7 +328,7 @@ begin
       AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
       DATA_WIDTH      => CHANNELIZER16_DATA_WIDTH,
       NUM_CHANNELS    => 16,
-      MODULE_ID       => ESM_MODULE_ID_DWELL_STATS
+      MODULE_ID       => ECM_MODULE_ID_DWELL_STATS
     )
     port map (
       Clk_axi                 => M_axis_clk,
@@ -328,7 +337,7 @@ begin
 
       Enable                  => w_enable_chan,
 
-      Dwell_active            => w_dwell_active,
+      Dwell_active            => w_dwell_active,    --TODO: measurement active
       Dwell_data              => w_dwell_data,
       Dwell_sequence_num      => w_dwell_sequence_num,
 
@@ -399,10 +408,29 @@ begin
     w_drfm_errors.todo       <= '0';
   end generate g_drfm;
 
-  i_status_reporter : entity esm_lib.esm_status_reporter
+  i_dds : entity dsp_lib.channelized_dds
+  generic map (
+    OUTPUT_DATA_WIDTH   => ECM_DDS_OUTPUT_WIDTH,
+    NUM_CHANNELS        => ECM_NUM_CHANNELS,
+    CHANNEL_INDEX_WIDTH => ECM_CHANNEL_INDEX_WIDTH,
+    LATENCY             => 7 --TODO
+  )
+  port map (
+    Clk           => Adc_clk_x4,
+    Rst           => r_combined_rst,
+
+    Dwell_active  => w_dwell_active,  --TODO: right signal?
+    Control_data  => w_dds_command,
+    Sync_data     => w_dds_sync,
+
+    Output_ctrl   => w_dds_control,
+    Output_data   => w_dds_data
+  );
+
+  i_status_reporter : entity ecm_lib.ecm_status_reporter
   generic map (
     AXI_DATA_WIDTH        => AXI_DATA_WIDTH,
-    MODULE_ID             => ESM_MODULE_ID_STATUS,
+    MODULE_ID             => ECM_MODULE_ID_STATUS,
     HEARTBEAT_INTERVAL    => HEARTBEAT_INTERVAL
   )
   port map (

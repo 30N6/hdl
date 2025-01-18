@@ -20,8 +20,8 @@ port (
   Clk           : in  std_logic;
   Rst           : in  std_logic;
 
+  Dwell_active  : in  std_logic;
   Control_data  : in  dds_control_t;
-
   Sync_data     : in  channelizer_control_t;
 
   Output_ctrl   : out channelizer_control_t;
@@ -70,6 +70,7 @@ architecture rtl of channelized_dds is
   signal w_rand                       : unsigned(31 downto 0);
 
   signal r_rst                        : std_logic;
+  signal r_dwell_active               : std_logic;
   signal r_control                    : dds_control_t;
   signal w_control_lfsr               : dds_control_lfsr_entry_t;
   signal w_control_sin_sweep          : dds_control_sin_sweep_entry_t;
@@ -125,8 +126,9 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_rst     <= Rst;
-      r_control <= Control_data;
+      r_rst           <= Rst;
+      r_control       <= Control_data;
+      r_dwell_active  <= Dwell_active;
     end if;
   end process;
 
@@ -308,6 +310,10 @@ begin
         end if;
 
       else
+        r6_output_data <= (others => (others => '0'));
+      end if;
+
+      if (r_dwell_active = '0') then
         r6_output_data <= (others => (others => '0'));
       end if;
     end if;

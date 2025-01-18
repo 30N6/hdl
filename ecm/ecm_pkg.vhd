@@ -71,10 +71,13 @@ package ecm_pkg is
   constant ECM_CHANNEL_TX_MODE_WIDTH                  : natural := 2;
   constant ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES         : natural := 4;
 
+  constant ECM_DRFM_DATA_WIDTH                        : natural := 16;
+  constant ECM_DRFM_MEM_DEPTH                         : natural := 1024 * 24;
+  constant ECM_DRFM_ADDR_WIDTH                        : natural := clog2(ECM_DRFM_MEM_DEPTH);
   constant ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH        : natural := 32;
   constant ECM_DRFM_SEGMENT_LENGTH_WIDTH              : natural := 16;  --TODO: shrink?
   constant ECM_DRFM_SEGMENT_SLICE_LENGTH_WIDTH        : natural := 8;
-  constant ECM_CHANNEL_TRIGGER_PARAMETER_WIDTH        : natural := maximum(ECM_DRFM_SEGMENT_LENGTH_WIDTH, CHAN_POWER_WIDTH);
+  constant ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH          : natural := 2;
 
   constant ECM_DWELL_DURATION_WIDTH                   : natural := 32;
   constant ECM_DWELL_SEQUENCE_NUM_WIDTH               : natural := 32;
@@ -84,6 +87,7 @@ package ecm_pkg is
   constant ECM_DWELL_GLOBAL_COUNTER_WIDTH             : natural := 16;
 
   constant ECM_TIMESTAMP_WIDTH                        : natural := 48;
+  constant ECM_DDS_OUTPUT_WIDTH                       : natural := 12;
 
   type ecm_tx_instruction_header_t is record
     valid               : std_logic;
@@ -131,8 +135,8 @@ package ecm_pkg is
   type ecm_channel_tx_program_entry_t is record
     valid                 : std_logic;
     tx_program_index      : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
-    trigger_duration_min  : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-    trigger_duration_max  : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+    duration_gate_min     : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+    duration_gate_max     : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   end record;
 
   type ecm_channel_tx_program_entry_array_t is array (natural range <>) of ecm_channel_tx_program_entry_t;
@@ -140,7 +144,9 @@ package ecm_pkg is
   type ecm_channel_control_entry_t is record
     enable                : std_logic;
     tx_mode               : unsigned(ECM_CHANNEL_TX_MODE_WIDTH - 1 downto 0);
-    trigger_parameter     : unsigned(ECM_CHANNEL_TRIGGER_PARAMETER_WIDTH - 1 downto 0); -- force trigger duration, or power threshold (rising + falling)
+    trigger_duration_max  : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+    trigger_threshold     : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+    trigger_hyst_shift    : unsigned(ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH - 1 downto 0);
     program_entries       : ecm_channel_tx_program_entry_array_t(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1 downto 0);
   end record;
 
@@ -219,7 +225,28 @@ package ecm_pkg is
   --type ecm_report_drfm_summary_t record
   --  dwell_sequence_num        : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   --
-  --  channel entry array: triggered flag, recorded flag, tx program index
+  --  channel entry array: readout flag, recorded flag, tx program index
+  --end record;
+
+  type ecm_drfm_write_req_t is record
+    valid               : std_logic;
+    first               : std_logic;
+    last                : std_logic;
+    channel_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+    address             : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+    data                : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  end record;
+
+  type ecm_drfm_read_req_t is record
+    valid               : std_logic;
+    address             : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+    channel_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+    channel_last        : std_logic;
+  end record;
+
+  --type ecm_drfm_control_t is record
+  --  write_req           : ecm_drfm_write_req_t;
+  --  read_req            : ecm_drfm_read_req_t;
   --end record;
 
 

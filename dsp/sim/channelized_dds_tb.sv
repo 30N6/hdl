@@ -80,8 +80,8 @@ module channelized_dds_tb;
     .Clk          (Clk),
     .Rst          (Rst),
 
+    .Dwell_active (1'b1),
     .Control_data (ctrl_intf.data),
-
     .Sync_data    (r_sync_input),
 
     .Output_ctrl  (w_output_ctrl),
