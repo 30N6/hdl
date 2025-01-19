@@ -10,6 +10,8 @@ library dsp_lib;
 
 package ecm_pkg is
 
+  constant ECM_WORDS_PER_DMA_PACKET                   : natural := 128;
+
   constant ECM_CONTROL_MAGIC_NUM                      : std_logic_vector(31 downto 0) := x"45434D43";
   constant ECM_REPORT_MAGIC_NUM                       : std_logic_vector(31 downto 0) := x"45434D52";
 
@@ -72,6 +74,7 @@ package ecm_pkg is
   constant ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES         : natural := 4;
 
   constant ECM_DRFM_DATA_WIDTH                        : natural := 16;
+  constant ECM_DRFM_DATA_WIDTH_WIDTH                  : natural := clog2(ECM_DRFM_DATA_WIDTH);
   constant ECM_DRFM_MEM_DEPTH                         : natural := 1024 * 24;
   constant ECM_DRFM_ADDR_WIDTH                        : natural := clog2(ECM_DRFM_MEM_DEPTH);
   constant ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH        : natural := 32;
@@ -212,12 +215,14 @@ package ecm_pkg is
 
   --type ecm_report_drfm_channel_data_t record
   --  dwell_sequence_num        : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
-  --  segment_sequence_num      : unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
   --  channel_index             : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  --  max_iq_bits               : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  --  segment_sequence_num      : unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
   --  segment_timestamp         : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
-  --  segment_duration          : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  --  slice_start               : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  --  slice_length              : unsigned(ECM_DRFM_SEGMENT_SLICE_LENGTH_WIDTH - 1 downto 0);
+  --  segment_first_addr        : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  --  segment_last_addr         : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  --  slice_start               : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  --  slice_length              : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   --
   --  iq_data : array of N 32-bit entries
   --end record;
@@ -225,7 +230,7 @@ package ecm_pkg is
   --type ecm_report_drfm_summary_t record
   --  dwell_sequence_num        : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   --
-  --  channel entry array: readout flag, recorded flag, tx program index
+  --  channel entry array: readout flag, recorded flag
   --end record;
 
   type ecm_drfm_write_req_t is record

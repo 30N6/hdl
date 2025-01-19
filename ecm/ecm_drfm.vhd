@@ -13,8 +13,8 @@ library mem_lib;
 
 entity ecm_drfm is
 generic (
-  OUTPUT_DATA_WIDTH   : natural;
-  LATENCY             : natural
+  OUTPUT_DATA_WIDTH : natural;
+  READ_LATENCY      : natural
 );
 port (
   Clk_axi                 : in  std_logic;
@@ -50,61 +50,86 @@ architecture rtl of ecm_drfm is
   constant MEM_WIDTH                    : natural := ECM_DRFM_DATA_WIDTH * 2;
   constant MEM_LATENCY                  : natural := 2;
 
-  signal r_rst                          : std_logic;
-  signal r_dwell_active                 : std_logic;
-  signal r_dwell_done                   : std_logic;
-  signal r_dwell_tx_enabled             : std_logic;
-  signal r_dwell_sequence_num           : std_logic;
+  function get_iq_bit_count(v : signed(ECM_DRFM_DATA_WIDTH - 1 downto 0)) return unsigned is
+    variable r : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  begin
+    r := to_unsigned(1, ECM_DRFM_DATA_WIDTH_WIDTH);
 
-  signal r_timestamp                    : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
+    for i in (ECM_DRFM_DATA_WIDTH - 2) downto 0 loop
+      if (((v < 0) and (v(i) = '0')) or ((v >= 0) and (v(i) = '1'))) then
+        r := to_unsigned(i + 1, ECM_DRFM_DATA_WIDTH_WIDTH);
+        exit;
+      end if;
+    end loop;
 
-  signal r0_write_req                   : ecm_drfm_write_req_t;
-  signal r0_read_req                    : ecm_drfm_read_req_t;
-  signal w0_mem_wr_data                 : std_logic_vector(MEM_WIDTH - 1 downto 0);
-  signal w0_mem_rd_addr                 : std_logic_vector(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+    return r;
+  end function;
 
-  signal r1_write_req                   : ecm_drfm_write_req_t;
-  signal r1_read_req                    : ecm_drfm_read_req_t;
-  signal r1_read_valid                  : std_logic;
-  signal r1_write_abs_data              : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
-  signal r1_prev_max_iq                 : signed(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  signal r_rst                            : std_logic;
+  signal r_dwell_active                   : std_logic;
+  signal r_dwell_done                     : std_logic;
+  signal r_dwell_tx_enabled               : std_logic;
+  signal r_dwell_sequence_num             : std_logic;
 
-  signal w2_mem_rd_data                 : std_logic_vector(MEM_WIDTH - 1 downto 0);
-  signal r2_write_req                   : ecm_drfm_write_req_t;
-  signal r2_read_req                    : ecm_drfm_read_req_t;
-  signal r2_read_valid                  : std_logic;
-  signal r2_max_iq_wr_valid             : std_logic;
-  signal r2_max_iq_wr_data              : signed_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  signal r_timestamp                      : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
 
-  signal r_channel_written              : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
-  signal r_channel_read                 : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
-  signal r_channel_report_pending       : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
+  signal r0_write_req                     : ecm_drfm_write_req_t;
+  signal r0_read_req                      : ecm_drfm_read_req_t;
+  signal r0_write_prev_seq_num            : unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal w0_mem_wr_data                   : std_logic_vector(MEM_WIDTH - 1 downto 0);
+  signal w0_mem_rd_addr                   : std_logic_vector(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
 
-  signal m_timestamp                    : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_TIMESTAMP_WIDTH - 1 downto 0);
-  signal m_address_first                : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  signal m_address_last                 : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  signal m_max_iq                       : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  signal r1_write_req                     : ecm_drfm_write_req_t;
+  signal r1_read_req                      : ecm_drfm_read_req_t;
+  signal r1_read_valid                    : std_logic;
+  signal r1_read_max_iq_bits              : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal r1_write_max_iq_bits             : unsigned_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal r1_prev_max_iq_bits              : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal r1_write_next_seq_num            : unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal w1_write_max_iq_bits_sel         : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
 
-  signal w_reporter_channel_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal r_reporter_channel_timestamp   : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
-  signal r_reporter_channel_addr_first  : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  signal r_reporter_channel_addr_last   : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal w2_mem_rd_data                   : std_logic_vector(MEM_WIDTH - 1 downto 0);
+  signal w2_read_data                     : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  signal r2_write_req                     : ecm_drfm_write_req_t;
+  signal r2_read_req                      : ecm_drfm_read_req_t;
+  signal r2_read_valid                    : std_logic;
+  signal r2_read_max_iq_bits              : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal r2_max_iq_wr_valid               : std_logic;
+  signal r2_max_iq_wr_data                : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal w2_iq_shift                      : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
 
-  signal w_reporter_mem_read_valid      : std_logic;
-  signal w_reporter_mem_read_addr       : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  signal r_reporter_mem_read_valid      : std_logic;
-  signal r_reporter_mem_read_addr       : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  signal r_reporter_mem_result_valid    : std_logic;
-  signal r_reporter_mem_result_data     : std_logic_vector(MEM_WIDTH - 1 downto 0);
+  signal r3_read_data_scaled              : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  signal r3_read_req                      : ecm_drfm_read_req_t;
 
+  signal r_channel_was_written            : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
+  signal r_channel_was_read               : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
+  signal r_channel_report_pending         : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
 
-  signal r6_sync_data                 : channelizer_control_t;
-  signal r6_output_data               : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  signal m_timestamp                      : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_TIMESTAMP_WIDTH - 1 downto 0);
+  signal m_seq_num                        : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0) := (others => (others => '1'));
+  signal m_address_first                  : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal m_address_last                   : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal m_max_iq_bits                    : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+
+  signal w_channel_reports_done           : std_logic;
+  signal w_reporter_channel_index         : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r_reporter_channel_timestamp     : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
+  signal r_reporter_channel_seq_num       : unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal r_reporter_channel_addr_first    : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_reporter_channel_addr_last     : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_reporter_channel_max_iq_bits   : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+
+  signal w_reporter_mem_read_valid        : std_logic;
+  signal w_reporter_mem_read_addr         : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_reporter_mem_read_valid        : std_logic;
+  signal r_reporter_mem_read_addr         : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_reporter_mem_result_valid      : std_logic;
+  signal r_reporter_mem_result_data       : std_logic_vector(MEM_WIDTH - 1 downto 0);
 
 begin
 
-  assert (LATENCY = 8)
-    report "Unexpected LATENCY value."
+  assert (READ_LATENCY = 4)
+    report "Unexpected READ_LATENCY value."
     severity failure;
 
   process(Clk)
@@ -117,6 +142,7 @@ begin
       r_dwell_sequence_num  <= Dwell_sequence_num;
       r0_write_req          <= Write_req;
       r0_read_req           <= Read_req;
+      r0_write_prev_seq_num <= m_seq_num(to_integer(Write_req.channel_index));
     end if;
   end process;
 
@@ -178,14 +204,29 @@ begin
     Rd_data   => w2_mem_rd_data
   );
 
+  w2_read_data(0) <= w2_mem_rd_data(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  w2_read_data(1) <= w2_mem_rd_data(ECM_DRFM_DATA_WIDTH * 2 - 1 downto ECM_DRFM_DATA_WIDTH);
+
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r1_write_req      <= r0_write_req;
-      r1_read_req       <= r0_read_req;
-      r1_read_valid     <= w0_read_valid;
-      r1_write_abs_data <= (abs(r1_write_req.data(1)), abs(r1_write_req.data(0)));
-      r1_prev_max_iq    <= m_max_iq(to_integer(r0_write_req.channel_index));
+      r1_read_req           <= r0_read_req;
+      r1_read_valid         <= w0_read_valid;
+      r1_read_max_iq_bits   <= m_max_iq_bits(to_integer(r0_read_req.channel_index));
+
+      r1_write_req          <= r0_write_req;
+      r1_write_max_iq_bits  <= (get_iq_bit_count(r1_write_req.data(1)), get_iq_bit_count(r1_write_req.data(0)));
+      r1_prev_max_iq_bits   <= m_max_iq_bits(to_integer(r0_write_req.channel_index));
+      r1_write_next_seq_num <= r0_write_prev_seq_num + 1;
+    end if;
+  end process;
+
+  process(all)
+  begin
+    if (r1_write_max_iq_bits(0) > r1_write_max_iq_bits(1)) then
+      w1_write_max_iq_bits_sel <= r1_write_max_iq_bits(0);
+    else
+      w1_write_max_iq_bits_sel <= r1_write_max_iq_bits(1);
     end if;
   end process;
 
@@ -195,20 +236,14 @@ begin
       r2_write_req        <= r1_write_req;
       r2_read_req         <= r1_read_req;
       r2_read_valid       <= r1_read_valid;
+      r2_read_max_iq_bits <= r1_read_max_iq_bits;
 
       if ((r1_write_req.valid = '1') and (r1_write_req.first = '1')) then
         r2_max_iq_wr_valid  <= '1';
-        if (r1_write_abs_data(0) > r1_write_abs_data(1)) then
-          r2_max_iq_wr_data <= r1_write_abs_data(0);
-        else
-          r2_max_iq_wr_data <= r1_write_abs_data(1);
-        end if;
-      elsif ((r1_write_req.valid = '1') and (r1_write_abs_data(0) > r1_prev_max_iq))
+        r2_max_iq_wr_data   <= w1_write_max_iq_bits_sel;
+      elsif ((r1_write_req.valid = '1') and (w1_write_max_iq_bits_sel > r1_prev_max_iq_bits))
         r2_max_iq_wr_valid  <= '1';
-        r2_max_iq_wr_data   <= r1_write_abs_data(0);
-      elsif ((r1_write_req.valid = '1') and (r1_write_abs_data(1) > r1_prev_max_iq))
-        r2_max_iq_wr_valid  <= '1';
-        r2_max_iq_wr_data   <= r1_write_abs_data(1);
+        r2_max_iq_wr_data   <= w1_write_max_iq_bits_sel;
       else
         r2_max_iq_wr_valid  <= '0';
         r2_max_iq_wr_data   <= (others => '-');
@@ -220,30 +255,46 @@ begin
   begin
     if rising_edge(Clk) then
       if (r2_max_iq_wr_valid = '1') then
-        m_max_iq(to_integer(r2_write_req.channel_index)) <= r2_max_iq_wr_data;
+        m_max_iq_bits(to_integer(r2_write_req.channel_index)) <= r2_max_iq_wr_data;
       end if;
     end if;
   end process;
+
+  w2_iq_shift <= (ECM_DRFM_DATA_WIDTH - 1) - r2_read_max_iq_bits;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r3_read_req             <= r2_read_req;
+      r3_read_data_scaled(0)  <= shift_left(w2_read_data(0), to_integer(w2_iq_shift));
+      r3_read_data_scaled(1)  <= shift_left(w2_read_data(1), to_integer(w2_iq_shift));
+    end if;
+  end process;
+
+  Output_ctrl <= r3_read_req;
+  Output_data <= r3_read_data_scaled;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
       if (r_dwell_active = '0') then
-        r_channel_written         <= (others => '0');
-        r_channel_read            <= (others => '0');
+        r_channel_was_written     <= (others => '0');
+        r_channel_was_read        <= (others => '0');
         r_channel_report_pending  <= (others => '0');
       else
-        if (r_write_req.valid = '1') then
-          r_channel_written(to_integer(r_write_req.channel_index)) <= '1';
+        if (r1_write_req.valid = '1') then
+          r_channel_was_written(to_integer(r1_write_req.channel_index)) <= '1';
         end if;
 
-        if (r0_read_req.valid = '1') then
-          r_channel_read(to_integer(r0_read_req.channel_index)) <= '1';
+        if (r1_read_req.valid = '1') then
+          r_channel_was_read(to_integer(r1_read_req.channel_index)) <= '1';
         end if;
 
-        --TODO: clear when reported
-        if ((r_write_req.valid = '1') and (r_write_req.last = '1')) then
-          r_channel_report_pending(to_integer(r_write_req.channel_index)) <= '1';
+        if ((r1_write_req.valid = '1') and (r1_write_req.last = '1')) then
+          r_channel_report_pending(to_integer(r1_write_req.channel_index)) <= '1';
+        end if;
+        if (w_channel_reports_done = '1') then
+          r_channel_report_pending(to_integer(w_reporter_channel_index)) <= '0';
         end if;
       end if;
     end if;
@@ -252,12 +303,13 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if ((r_write_req.valid = '1') and (r_write_req.first = '1')) then
-        m_timestamp(to_integer(r_write_req.channel_index))      <= r_timestamp;
-        m_address_first(to_integer(r_write_req.channel_index))  <= r_write_req.address;
+      if ((r1_write_req.valid = '1') and (r1_write_req.first = '1')) then
+        m_timestamp(to_integer(r1_write_req.channel_index))      <= r_timestamp;
+        m_address_first(to_integer(r1_write_req.channel_index))  <= r1_write_req.address;
+        m_seq_num(to_integer(r1_write_req.channel_index))        <= r1_write_next_seq_num;
       end if;
-      if ((r_write_req.valid = '1') and (r_write_req.last = '1')) then
-        m_address_last(to_integer(r_write_req.channel_index))  <= r_write_req.address;
+      if ((r1_write_req.valid = '1') and (r1_write_req.last = '1')) then
+        m_address_last(to_integer(r1_write_req.channel_index))  <= r1_write_req.address;
       end if;
     end if;
   end process;
@@ -265,9 +317,11 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_reporter_channel_timestamp  <= m_timestamp(to_integer(w_reporter_channel_index));
-      r_reporter_channel_addr_first <= m_address_first(to_integer(w_reporter_channel_index));
-      r_reporter_channel_addr_last  <= m_address_last(to_integer(w_reporter_channel_index));
+      r_reporter_channel_timestamp    <= m_timestamp(to_integer(w_reporter_channel_index));
+      r_reporter_channel_seq_num      <= m_seq_num(to_integer(w_reporter_channel_index));
+      r_reporter_channel_addr_first   <= m_address_first(to_integer(w_reporter_channel_index));
+      r_reporter_channel_addr_last    <= m_address_last(to_integer(w_reporter_channel_index));
+      r_reporter_channel_max_iq_bits  <= m_max_iq_bits(to_integer(w_reporter_channel_index));
     end if;
   end process;
 
@@ -285,33 +339,43 @@ begin
     MEM_WIDTH       => MEM_WIDTH
   )
   port map (
-    Clk_axi             => Clk_axi,
-    Clk                 => Clk,
-    Rst                 => r_rst,
+    Clk_axi                 => Clk_axi,
+    Clk                     => Clk,
+    Rst                     => r_rst,
 
-    Dwell_active        => r_dwell_active,
-    Dwell_done          => r_dwell_done,
-    Dwell_tx_enabled    => r_dwell_tx_enabled,
-    Dwell_sequence_num  => r_dwell_sequence_num,
-    Dwell_reports_done  => Dwell_reports_done,
+    Dwell_active            => r_dwell_active,
+    Dwell_done              => r_dwell_done,
+    Dwell_tx_enabled        => r_dwell_tx_enabled,
+    Dwell_sequence_num      => r_dwell_sequence_num,
+    Dwell_reports_done      => Dwell_reports_done,
 
-    Channel_read_index  => w_reporter_channel_index,
-    Channel_timestamp   => r_reporter_channel_timestamp,
-    Channel_addr_first  => r_reporter_channel_addr_first,
-    Channel addr_last   => r_reporter_channel_addr_last,
+    Channel_report_pending  => r_channel_report_pending,
+    Channel_was_read        => r_channel_was_read,
+    Channel_was_written     => r_channel_was_written,
 
-    Read_valid          => w_reporter_mem_read_valid,
-    Read_addr           => w_reporter_mem_read_addr,
-    Read_result_valid   => r_reporter_mem_result_valid,
-    Read_result_data    => r_reporter_mem_result_data,
+    Channel_index           => w_reporter_channel_index,
+    Channel_timestamp       => r_reporter_channel_timestamp,
+    Channel_seq_num         => r_reporter_channel_seq_num,
+    Channel_addr_first      => r_reporter_channel_addr_first,
+    Channel_addr_last       => r_reporter_channel_addr_last,
+    Channel_max_iq_bits     => r_reporter_channel_max_iq_bits,
 
-    Axis_ready          => Axis_ready,
-    Axis_valid          => Axis_valid,
-    Axis_data           => Axis_data,
-    Axis_last           => Axis_last,
+    Read_valid              => w_reporter_mem_read_valid,
+    Read_addr               => w_reporter_mem_read_addr,
+    Read_result_valid       => r_reporter_mem_result_valid,
+    Read_result_data        => r_reporter_mem_result_data,
 
-    Error_timeout       => Error_reporter_timeout,
-    Error_overflow      => Error_reporter_overflow
+    Channel_reports_done    => w_channel_reports_done,
+    Dwell_reports_done      => Dwell_reports_done,
+
+
+    Axis_ready              => Axis_ready,
+    Axis_valid              => Axis_valid,
+    Axis_data               => Axis_data,
+    Axis_last               => Axis_last,
+
+    Error_timeout           => Error_reporter_timeout,
+    Error_overflow          => Error_reporter_overflow
   );
 
   process(Clk)
