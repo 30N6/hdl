@@ -60,7 +60,7 @@ architecture rtl of ecm_drfm_reporter is
 
   constant FIFO_DEPTH             : natural := 2048;
   constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - ECM_WORDS_PER_DMA_PACKET - 10;
-  constant MAX_PACKET_IQ_SAMPLES  : natural := 112;
+  constant MAX_PACKET_IQ_SAMPLES  : natural := 116;
 
   constant TIMEOUT_CYCLES         : natural := 1024;
 
@@ -69,6 +69,7 @@ architecture rtl of ecm_drfm_reporter is
     S_IDLE,
 
     S_START_WAIT,
+    S_READ_CHANNEL,
     S_START_CHANNEL,
     S_CONTINUE_CHANNEL,
     S_START_SUMMARY,
@@ -83,7 +84,7 @@ architecture rtl of ecm_drfm_reporter is
     S_CHANNEL_SEGMENT_TIMESTAMP_1,
     S_CHANNEL_SEGMENT_INFO,
     S_CHANNEL_SLICE_INFO,
-    S_CHANNEL_IQ_READ,
+    S_CHANNEL_IQ_READ_START,
     S_CHANNEL_IQ_RESULT,
     S_CHANNEL_PAD,
     S_CHANNEL_DONE,
@@ -99,9 +100,7 @@ architecture rtl of ecm_drfm_reporter is
 
   signal s_state                      : state_t;
 
-  signal r_next_channel               : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r_packet_seq_num             : unsigned(31 downto 0);
-
   signal r_channel_index              : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r_words_in_msg               : unsigned(clog2(ECM_WORDS_PER_DMA_PACKET) - 1 downto 0);
 
@@ -110,6 +109,11 @@ architecture rtl of ecm_drfm_reporter is
   signal r_segment_addr               : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal r_slice_samples_remaining    : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   signal r_segment_samples_remaining  : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+
+  signal r_read_samples_remaining     : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_read_delay                 : std_logic;
+  signal r_read_addr                  : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal r_read_valid                 : std_logic;
 
   signal w_fifo_almost_full           : std_logic;
   signal w_fifo_ready                 : std_logic;
@@ -149,12 +153,15 @@ begin
 
         when S_START_WAIT =>
           if (or_reduce(Channel_report_pending) = '1') then
-            s_state <= S_START_CHANNEL;
+            s_state <= S_READ_CHANNEL;
           elsif (Dwell_done = '1') then
             s_state <= S_START_SUMMARY;
           else
             s_state <= S_START_WAIT;
           end if;
+
+        when S_READ_CHANNEL =>
+          s_state <= S_START_CHANNEL;
 
         when S_START_CHANNEL =>
           if (w_fifo_almost_full = '0') then
@@ -190,23 +197,18 @@ begin
           s_state <= S_CHANNEL_SLICE_INFO;
         when S_CHANNEL_SLICE_INFO =>
           if (r_slice_samples_remaining > 0) then
-            s_state <= S_CHANNEL_IQ_READ;
+            s_state <= S_CHANNEL_IQ_READ_START;
           else
             s_state <= S_CHANNEL_PAD;
           end if;
 
-        when S_CHANNEL_IQ_READ =>
+        when S_CHANNEL_IQ_READ_START =>
           s_state <= S_CHANNEL_IQ_RESULT;
 
         when S_CHANNEL_IQ_RESULT =>
-          if (Read_result_valid = '1') then
-            if (r_slice_samples_remaining > 0) then
-              s_state <= S_CHANNEL_IQ_READ;
-            else
-              s_state <= S_CHANNEL_PAD;
-            end if;
-          else
-            s_state <= S_CHANNEL_IQ_RESULT;
+          s_state <= S_CHANNEL_IQ_RESULT;
+          if ((Read_result_valid = '1') and (r_slice_samples_remaining = 1)) then
+            s_state <= S_CHANNEL_PAD;
           end if;
 
         when S_CHANNEL_PAD =>
@@ -287,13 +289,13 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_next_channel <= first_bit_index(Channel_report_pending);
-
       if (s_state = S_START_WAIT) then
-        r_channel_index <= r_next_channel;
+        r_channel_index <= first_bit_index(Channel_report_pending);
       end if;
     end if;
   end process;
+
+  Channel_index <= r_channel_index;
 
   process(Clk)
   begin
@@ -303,23 +305,56 @@ begin
         r_segment_last_addr         <= Channel_addr_last;
         r_segment_addr              <= Channel_addr_first;
         r_segment_samples_remaining <= resize(Channel_addr_last - Channel_addr_first + 1, ECM_DRFM_SEGMENT_LENGTH_WIDTH);
-      elsif (s_state = S_CHANNEL_IQ_READ) then
+      elsif ((s_state = S_CHANNEL_IQ_RESULT) and (Read_result_valid = '1')) then
         r_segment_addr              <= r_segment_addr + 1;
         r_segment_samples_remaining <= r_segment_samples_remaining - 1;
       end if;
 
       if (s_state = S_CHANNEL_HEADER_0) then
         r_slice_samples_remaining   <= minimum(r_segment_samples_remaining, MAX_PACKET_IQ_SAMPLES);
-      elsif (s_state = S_CHANNEL_IQ_READ) then
+      elsif ((s_state = S_CHANNEL_IQ_RESULT) and (Read_result_valid = '1')) then
         r_slice_samples_remaining   <= r_slice_samples_remaining - 1;
       end if;
     end if;
   end process;
 
-  Read_valid  <= to_stdlogic(s_state = S_CHANNEL_IQ_READ);
-  Read_addr   <= r_segment_addr;
 
   process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (Rst = '1') then
+        r_read_valid              <= '0';
+        r_read_delay              <= '0';
+        r_read_samples_remaining  <= (others => '-');
+        r_read_addr               <= (others => '-');
+      else
+        if (s_state = S_CHANNEL_HEADER_0) then
+          r_read_delay <= '0';
+        else
+          r_read_delay <= not(r_read_delay);
+        end if;
+
+        if (s_state = S_CHANNEL_HEADER_0) then
+          r_read_samples_remaining  <= minimum(r_segment_samples_remaining, MAX_PACKET_IQ_SAMPLES);
+          r_read_addr               <= r_segment_addr;
+        elsif ((r_read_valid = '1') and (r_read_delay = '1')) then
+          r_read_samples_remaining  <= r_read_samples_remaining - 1;
+          r_read_addr               <= r_read_addr + 1;
+        end if;
+
+        if (s_state = S_CHANNEL_IQ_READ_START) then
+          r_read_valid <= '1';
+        elsif ((r_read_samples_remaining <= 1) and (r_read_delay = '1')) then
+          r_read_valid <= '0';
+        end if;
+      end if;
+    end if;
+  end process;
+
+  Read_valid  <= r_read_valid and r_read_delay;
+  Read_addr   <= r_read_addr;
+
+  process(all)
   begin
     w_fifo_valid          <= '0';
     w_fifo_last           <= '0';
@@ -404,15 +439,16 @@ begin
   begin
     w_fifo_valid_opt <= '1';
     case s_state is
-    when S_IDLE               =>  w_fifo_valid_opt <= '0';
-    when S_START_WAIT         =>  w_fifo_valid_opt <= '0';
-    when S_START_CHANNEL      =>  w_fifo_valid_opt <= '0';
-    when S_CONTINUE_CHANNEL   =>  w_fifo_valid_opt <= '0';
-    when S_START_SUMMARY      =>  w_fifo_valid_opt <= '0';
-    when S_CHANNEL_IQ_READ    =>  w_fifo_valid_opt <= '0';
-    when S_CHANNEL_IQ_RESULT  =>  w_fifo_valid_opt <= Read_result_valid;
-    when S_CHANNEL_DONE       =>  w_fifo_valid_opt <= '0';
-    when S_SUMMARY_DONE       =>  w_fifo_valid_opt <= '0';
+    when S_IDLE                   =>  w_fifo_valid_opt <= '0';
+    when S_START_WAIT             =>  w_fifo_valid_opt <= '0';
+    when S_READ_CHANNEL           =>  w_fifo_valid_opt <= '0';
+    when S_START_CHANNEL          =>  w_fifo_valid_opt <= '0';
+    when S_CONTINUE_CHANNEL       =>  w_fifo_valid_opt <= '0';
+    when S_START_SUMMARY          =>  w_fifo_valid_opt <= '0';
+    when S_CHANNEL_IQ_READ_START  =>  w_fifo_valid_opt <= '0';
+    when S_CHANNEL_IQ_RESULT      =>  w_fifo_valid_opt <= Read_result_valid;
+    when S_CHANNEL_DONE           =>  w_fifo_valid_opt <= '0';
+    when S_SUMMARY_DONE           =>  w_fifo_valid_opt <= '0';
     when others => null;
     end case;
   end process;
@@ -460,7 +496,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if ((s_state = S_IDLE) or (s_state = S_START_CHANNEL) or (s_state = S_CONTINUE_CHANNEL) or (s_state = S_START_SUMMARY))  then
+      if ((s_state = S_IDLE) or (s_state = S_START_WAIT) or (s_state = S_START_CHANNEL) or (s_state = S_CONTINUE_CHANNEL) or (s_state = S_START_SUMMARY))  then
         r_timeout <= (others => '0');
       else
         r_timeout <= r_timeout + 1;

@@ -6,6 +6,28 @@ import dsp_pkg::*;
 
 typedef ecm_drfm_write_req_t ecm_drfm_write_req_queue_t[$];
 typedef ecm_drfm_read_req_t ecm_drfm_read_req_queue_t[$];
+typedef logic signed [ecm_drfm_data_width - 1 : 0] iq_data_t [1:0];
+
+function automatic iq_data_t get_iq_data_from_write_req(ecm_drfm_write_req_t d);
+  iq_data_t r;
+  for (int i = 0; i < 2; i++) begin
+    r[i] = {>>{d.data[i]}};
+    /*for (int j = 0; j < ecm_drfm_data_width; j++) begin
+      r[i][j] = d.data[i][j];
+    end*/
+  end
+  return r;
+endfunction
+
+function automatic ecm_drfm_write_req_t set_iq_data_in_write_req(ecm_drfm_write_req_t d, iq_data_t iq);
+  for (int i = 0; i < 2; i++) begin
+    for (int j = 0; j < ecm_drfm_data_width; j++) begin
+      d.data[i][j] = iq[i][j];
+    end
+  end
+  return d;
+endfunction
+
 
 interface dwell_tx_intf (input logic Clk);
   logic                                         dwell_active = 0;
@@ -16,6 +38,15 @@ interface dwell_tx_intf (input logic Clk);
   ecm_drfm_write_req_t                          write_req;
   ecm_drfm_read_req_t                           read_req;
 
+  task clear();
+    dwell_active        = 0;
+    dwell_done          = 0;
+    dwell_sequence_num  = 'x;
+    read_req.valid      = 0;
+    write_req.valid     = 0;
+    @(posedge Clk);
+  endtask
+
   task write(int unsigned seq_num, ecm_drfm_write_req_queue_t write_req_data, ecm_drfm_read_req_queue_t read_req_data);
     automatic int burst_length = 0;
     automatic int gap_length = 0;
@@ -23,6 +54,8 @@ interface dwell_tx_intf (input logic Clk);
     dwell_active        = 1;
     dwell_done          = 0;
     dwell_sequence_num  = seq_num;
+    read_req.valid      = 0;
+    write_req.valid     = 0;
 
     repeat ($urandom_range(200, 20)) @(posedge Clk);
 
@@ -45,13 +78,14 @@ interface dwell_tx_intf (input logic Clk);
       end*/
 
       write_req = write_req_data.pop_front();
-      repeat ($urandom_range(2, 1)) @(posedge Clk);
+      @(posedge Clk);
       write_req.valid         = 0;
       write_req.first         = 'x;
       write_req.last          = 'x;
       write_req.channel_index = 'x;
       write_req.address       = 'x;
       write_req.data          = {default: 'x};
+      repeat ($urandom_range(1, 0)) @(posedge Clk);
     end
 
     repeat($urandom_range(100)) @(posedge Clk);
@@ -75,11 +109,12 @@ interface dwell_tx_intf (input logic Clk);
       end
 
       read_req = read_req_data.pop_front();
-      repeat(2) @(posedge Clk);
+      @(posedge Clk);
       read_req.valid         = 0;
       read_req.address       = 'x;
       read_req.channel_index = 'x;
       read_req.channel_last  = 'x;
+      repeat(1) @(posedge Clk);
     end
 
     dwell_active = 0;
@@ -638,7 +673,7 @@ module ecm_drfm_tb;
     return r;
   endfunction
 */
-  function automatic ecm_drfm_write_req_queue_t randomize_drfm_writes();
+  function automatic ecm_drfm_write_req_queue_t randomize_drfm_writes(int max_bits);
     bit [ecm_num_channels - 1 : 0]  channel_valid = '0;
     int                             channel_duration    [ecm_num_channels - 1 : 0];
     int                             channel_addr_start  [ecm_num_channels - 1 : 0];
@@ -648,6 +683,8 @@ module ecm_drfm_tb;
     int                             num_frames;
     ecm_drfm_write_req_queue_t      r;
     ecm_drfm_write_req_t            empty_req = {valid:0, default:'x};
+    int                             current_bits = 1;
+    bit                             channel_active = 0;
 
     num_frames = $urandom_range(20 * ecm_drfm_mem_depth / ecm_num_channels, 2 * ecm_drfm_mem_depth / ecm_num_channels);
 
@@ -668,19 +705,35 @@ module ecm_drfm_tb;
     end
 
     for (int f = 0; f < num_frames; f++) begin
+      logic [ecm_drfm_data_width - 1 : 0] iq_bit_mask = 2**current_bits - 1;
+      if (channel_active && (current_bits < max_bits) && (f % 5 == 1)) begin
+        current_bits++;
+        $display("%0t: frame=%0d current_bits=%0d max_bits=%0d -- iq_bit_mask=%0X, r.size=%0d", $time, f, current_bits, max_bits, iq_bit_mask, r.size());
+      end
+
       for (int i = 0; i < ecm_num_channels; i++) begin
         ecm_drfm_write_req_t d = {valid:0, default:'x};
+        iq_data_t iq;
 
         if(channel_valid[i] && (f >= channel_frame_start[i]) && (channel_data_index[i] < channel_duration[i])) begin
+          channel_active  = 1;
+
           d.valid         = 1;
           d.first         = (channel_data_index[i] == 0);
           d.last          = (channel_data_index[i] == (channel_duration[i] - 1));
           d.channel_index = i;
           d.address       = channel_addr_start[i] + channel_data_index[i];
-          //d.data[0]       = 0; //$urandom;
-          //d.data[1]       = 0; //$urandom;
 
-          channel_duration[i]++;
+          for (int j = 0; j < 2; j++) begin
+            iq[j] = ($urandom & iq_bit_mask);
+            if ($urandom_range(1)) begin
+              iq[j] |= (~iq_bit_mask);
+            end
+          end
+
+          d = set_iq_data_in_write_req(d, iq);
+
+          channel_data_index[i]++;
         end
 
         r.push_back(d);
@@ -703,9 +756,12 @@ module ecm_drfm_tb;
       report_seq_num = 0;
 
       for (int i_dwell = 0; i_dwell < 100; i_dwell++) begin
-        int unsigned          dwell_seq_num   = $urandom;
-        ecm_drfm_write_req_t  write_req_data [$]  = randomize_drfm_writes();
+        int unsigned          dwell_seq_num       = $urandom;
+        int                   max_bits            = $urandom_range(ecm_drfm_data_width - 1, 4);
+        ecm_drfm_write_req_t  write_req_data [$]  = randomize_drfm_writes(max_bits);
         ecm_drfm_read_req_t   read_req_data [$]   = randomize_drfm_reads(write_req_data);
+
+        $display("dwell %0d started: seq=%0X max_bits=%0d", i_dwell, dwell_seq_num, max_bits);
 
         //expect_reports(dwell_data, dwell_seq_num, dwell_input);
         tx_intf.write(dwell_seq_num, write_req_data, read_req_data);
@@ -733,6 +789,7 @@ module ecm_drfm_tb;
 
   initial
   begin
+    tx_intf.clear();
     wait_for_reset();
     standard_test();
     repeat(100) @(posedge Clk);

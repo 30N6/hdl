@@ -217,7 +217,7 @@ begin
       r1_read_max_iq_bits   <= m_max_iq_bits(to_integer(r0_read_req.channel_index));
 
       r1_write_req          <= r0_write_req;
-      r1_write_max_iq_bits  <= (get_iq_bit_count(r1_write_req.data(1)), get_iq_bit_count(r1_write_req.data(0)));
+      r1_write_max_iq_bits  <= (get_iq_bit_count(r0_write_req.data(1)), get_iq_bit_count(r0_write_req.data(0)));
       r1_prev_max_iq_bits   <= m_max_iq_bits(to_integer(r0_write_req.channel_index));
       r1_write_next_seq_num <= r0_write_prev_seq_num + 1;
     end if;
