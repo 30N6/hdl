@@ -251,11 +251,6 @@ package ecm_pkg is
     channel_last        : std_logic;
   end record;
 
-  --type ecm_drfm_control_t is record
-  --  write_req           : ecm_drfm_write_req_t;
-  --  read_req            : ecm_drfm_read_req_t;
-  --end record;
-
 
   type ecm_channelizer_warnings_t is record
     demux_gap       : std_logic;

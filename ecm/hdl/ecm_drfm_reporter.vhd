@@ -34,12 +34,12 @@ port (
   Channel_index           : out unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   Channel_timestamp       : in  unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
   Channel_seq_num         : in  unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
-  Channel_addr_first      : in  unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  Channel_addr_last       : in  unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  Channel_addr_first      : in  unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  Channel_addr_last       : in  unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   Channel_max_iq_bits     : in  unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
 
   Read_valid              : out std_logic;
-  Read_addr               : out unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  Read_addr               : out unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   Read_result_valid       : in  std_logic;
   Read_result_data        : in  std_logic_vector(MEM_WIDTH - 1 downto 0);
 

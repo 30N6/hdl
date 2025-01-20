@@ -4,16 +4,19 @@ import math::*;
 import ecm_pkg::*;
 import dsp_pkg::*;
 
+typedef ecm_drfm_write_req_t ecm_drfm_write_req_queue_t[$];
+typedef ecm_drfm_read_req_t ecm_drfm_read_req_queue_t[$];
+
 interface dwell_tx_intf (input logic Clk);
   logic                                         dwell_active = 0;
   logic                                         dwell_done;
   logic [ecm_dwell_sequence_num_width - 1 : 0]  dwell_sequence_num;
-  logic dwell_reports_done                      dwell_reports_done;
+  logic                                         dwell_reports_done;
 
   ecm_drfm_write_req_t                          write_req;
   ecm_drfm_read_req_t                           read_req;
 
-  task write(int unsigned seq_num, ecm_drfm_write_req_t write_req_data [$], ecm_drfm_read_req_t read_req_data [$]);
+  task write(int unsigned seq_num, ecm_drfm_write_req_queue_t write_req_data, ecm_drfm_read_req_queue_t read_req_data);
     automatic int burst_length = 0;
     automatic int gap_length = 0;
 
@@ -24,7 +27,7 @@ interface dwell_tx_intf (input logic Clk);
     repeat ($urandom_range(200, 20)) @(posedge Clk);
 
     while (write_req_data.size() > 0) begin
-      if (burst_length > 0) begin
+      /*if (burst_length > 0) begin
         burst_length--;
         repeat ($urandom_range(1)) @(posedge Clk);
       end else if (gap_length > 0) begin
@@ -39,16 +42,16 @@ interface dwell_tx_intf (input logic Clk);
           gap_length = $urandom_range(20, 10);
         end
         repeat ($urandom_range(10)) @(posedge Clk);
-      end
+      end*/
 
       write_req = write_req_data.pop_front();
-      @(posedge Clk);
+      repeat ($urandom_range(2, 1)) @(posedge Clk);
       write_req.valid         = 0;
       write_req.first         = 'x;
       write_req.last          = 'x;
       write_req.channel_index = 'x;
       write_req.address       = 'x;
-      write_req.data          = 'x;
+      write_req.data          = {default: 'x};
     end
 
     repeat($urandom_range(100)) @(posedge Clk);
@@ -71,14 +74,12 @@ interface dwell_tx_intf (input logic Clk);
         repeat ($urandom_range(10)) @(posedge Clk);
       end
 
-      read_req_data = read_req_data.pop_front();
+      read_req = read_req_data.pop_front();
       repeat(2) @(posedge Clk);
-      read_req_data.valid         = 0;
-      read_req_data.first         = 'x;
-      read_req_data.last          = 'x;
-      read_req_data.channel_index = 'x;
-      read_req_data.address       = 'x;
-      read_req_data.data          = 'x;
+      read_req.valid         = 0;
+      read_req.address       = 'x;
+      read_req.channel_index = 'x;
+      read_req.channel_last  = 'x;
     end
 
     dwell_active = 0;
@@ -98,7 +99,7 @@ typedef struct {
   int index;
 } drfm_output_t;
 
-interface drfm_rx_intf (input logic CLk);
+interface drfm_rx_intf (input logic Clk);
   channelizer_control_t                       ctrl;
   logic signed [ecm_drfm_data_width - 1 : 0]  data [1:0];
 
@@ -108,7 +109,7 @@ interface drfm_rx_intf (input logic CLk);
       rx.data_i <= data[0];
       rx.data_q <= data[1];
       rx.index  <= ctrl.data_index;
-      v         <= valid;
+      v         <= ctrl.valid;
       @(posedge Clk);
     end while (v !== 1);
   endtask
@@ -141,7 +142,17 @@ module ecm_drfm_tb;
   typedef struct
   {
     logic [AXI_DATA_WIDTH - 1 : 0] data [$];
-  } expect_t;
+  } expect_report_t;
+
+  typedef struct packed
+  {
+    bit [31:0]  magic_num;
+    bit [31:0]  sequence_num;
+    bit [7:0]   module_id;
+    bit [7:0]   message_type;
+    bit [15:0]  padding_0;
+    bit [31:0]  dwell_sequence_num;
+  } ecm_common_report_header_t;
 
   typedef struct packed
   {
@@ -155,7 +166,7 @@ module ecm_drfm_tb;
 
     bit [7:0]   channel_index;
     bit [7:0]   max_iq_bits;
-    bit [15:]   padding;
+    bit [15:0]  padding;
 
     bit [31:0]  segment_seq_num;
     bit [63:0]  segment_timestamp;
@@ -181,10 +192,13 @@ module ecm_drfm_tb;
     bit [15:0]  channel_was_read;
   } ecm_drfm_summary_report_header_t;
 
+  typedef bit [$bits(ecm_common_report_header_t) - 1 : 0]       ecm_common_report_header_bits_t;
   typedef bit [$bits(ecm_drfm_channel_report_header_t) - 1 : 0] ecm_drfm_channel_report_header_bits_t;
   typedef bit [$bits(ecm_drfm_summary_report_header_t) - 1 : 0] ecm_drfm_summary_report_header_bits_t;
 
-  parameter NUM_CHANNEL_HEADER_WORDS = ($bits(ecm_drfm_channel_report_header_t) / AXI_DATA_WIDTH);
+  parameter NUM_COMMON_HEADER_WORDS   = ($bits(ecm_common_report_header_t) / AXI_DATA_WIDTH);
+  parameter NUM_CHANNEL_HEADER_WORDS  = ($bits(ecm_drfm_channel_report_header_t) / AXI_DATA_WIDTH);
+  parameter NUM_SUMMARY_HEADER_WORDS  = ($bits(ecm_drfm_summary_report_header_t) / AXI_DATA_WIDTH);
 
   logic Clk_axi;
   logic Clk;
@@ -192,18 +206,20 @@ module ecm_drfm_tb;
 
   dwell_tx_intf                                   tx_intf         (.*);
   drfm_rx_intf                                    output_rx_intf  (.*);
-  axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rpt_rx_intf     (.Clk(Clk_axi));
+  axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  report_rx_intf  (.Clk(Clk_axi));
 
-  int unsigned  report_seq_num = 0;
-  expect_t      expected_data [$];
-  int           num_received = 0;
-  logic         r_axi_rx_ready;
-  logic         w_axi_rx_valid;
-  logic         w_error_ext_read_overflow;
-  logic         w_error_int_read_overflow;
-  logic         w_error_invalid_read;
-  logic         w_error_reporter_timeout;
-  logic         w_error_reporter_overflow;
+  int unsigned    report_seq_num = 0;
+  expect_report_t expected_report_data [$];
+  drfm_output_t   expected_output_data [$];
+
+  int             num_received = 0;
+  logic           r_axi_rx_ready;
+  logic           w_axi_rx_valid;
+  logic           w_error_ext_read_overflow;
+  logic           w_error_int_read_overflow;
+  logic           w_error_invalid_read;
+  logic           w_error_reporter_timeout;
+  logic           w_error_reporter_overflow;
 
   initial begin
     Clk_axi = 0;
@@ -250,13 +266,13 @@ module ecm_drfm_tb;
     .Write_req                (tx_intf.write_req),
     .Read_req                 (tx_intf.read_req),
 
-    .Output_ctrl              (drfm_rx_intf.ctrl),
-    .Output_data              (drfm_rx_intf.data),
+    .Output_ctrl              (output_rx_intf.ctrl),
+    .Output_data              (output_rx_intf.data),
 
     .Axis_ready               (r_axi_rx_ready),
     .Axis_valid               (w_axi_rx_valid),
-    .Axis_data                (rpt_rx_intf.data),
-    .Axis_last                (rpt_rx_intf.last),
+    .Axis_data                (report_rx_intf.data),
+    .Axis_last                (report_rx_intf.last),
 
     .Error_ext_read_overflow  (w_error_ext_read_overflow),
     .Error_int_read_overflow  (w_error_int_read_overflow),
@@ -265,7 +281,7 @@ module ecm_drfm_tb;
     .Error_reporter_overflow  (w_error_reporter_overflow)
   );
 
-  assign rpt_rx_intf.valid = w_axi_rx_valid && r_axi_rx_ready;
+  assign report_rx_intf.valid = w_axi_rx_valid && r_axi_rx_ready;
 
   always_ff @(posedge Clk) begin
     if (!Rst) begin
@@ -283,119 +299,171 @@ module ecm_drfm_tb;
     end while (Rst);
     repeat(100) @(posedge Clk);
   endtask
-/*
-  function automatic esm_dwell_report_header_t unpack_report_header(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
-    esm_dwell_report_header_t   report_header;
-    dwell_report_header_bits_t  packed_report_header;
+
+  function automatic ecm_common_report_header_t unpack_common_report_header(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
+    ecm_common_report_header_t      report_header;
+    ecm_common_report_header_bits_t packed_report_header;
+
+    for (int i = 0; i < $size(packed_report_header)/AXI_DATA_WIDTH; i++) begin
+      packed_report_header[(NUM_COMMON_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH] = data.pop_front();
+    end
+
+    report_header = ecm_common_report_header_t'(packed_report_header);
+    return report_header;
+  endfunction
+
+  function automatic ecm_drfm_channel_report_header_t unpack_channel_report_header(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
+    ecm_drfm_channel_report_header_t      report_header;
+    ecm_drfm_channel_report_header_bits_t packed_report_header;
 
     //$display("unpack_report: data=%p", data);
 
     for (int i = 0; i < $size(packed_report_header)/AXI_DATA_WIDTH; i++) begin
       //$display("unpack_report_header [%0d] = %X", i, data[0]);
-      packed_report_header[(NUM_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH] = data.pop_front();
+      packed_report_header[(NUM_CHANNEL_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH] = data.pop_front();
     end
 
     //$display("unpack_report: packed=%X", packed_report_header);
 
-    report_header = esm_dwell_report_header_t'(packed_report_header);
+    report_header = ecm_drfm_channel_report_header_t'(packed_report_header);
     return report_header;
   endfunction
 
+  function automatic ecm_drfm_summary_report_header_t unpack_summary_report_header(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
+    ecm_drfm_summary_report_header_t      report_header;
+    ecm_drfm_summary_report_header_bits_t packed_report_header;
 
-  function automatic bit data_match(logic [AXI_DATA_WIDTH - 1 : 0] a [$], logic [AXI_DATA_WIDTH - 1 : 0] b []);
-    esm_dwell_report_header_t report_a = unpack_report_header(a);
-    esm_dwell_report_header_t report_b = unpack_report_header(b);
+    //$display("unpack_report: data=%p", data);
+
+    for (int i = 0; i < $size(packed_report_header)/AXI_DATA_WIDTH; i++) begin
+      //$display("unpack_report_header [%0d] = %X", i, data[0]);
+      packed_report_header[(NUM_SUMMARY_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH] = data.pop_front();
+    end
+
+    //$display("unpack_report: packed=%X", packed_report_header);
+
+    report_header = ecm_drfm_summary_report_header_t'(packed_report_header);
+    return report_header;
+  endfunction
+
+  function automatic bit report_data_match(logic [AXI_DATA_WIDTH - 1 : 0] a [$], logic [AXI_DATA_WIDTH - 1 : 0] b []);
+    ecm_common_report_header_t header_a = unpack_common_report_header(a);
+    ecm_common_report_header_t header_b = unpack_common_report_header(a);
 
     if (a.size() != b.size()) begin
       $display("%0t: size mismatch: a=%0d b=%0d", $time, a.size(), b.size());
       return 0;
     end
 
-    //$display("a[0]=%X b[0]=%X  size: %0d %0d", a[0], b[0], a.size(), b.size());
-
-    if (report_a.magic_num !== report_b.magic_num) begin
-      $display("magic_num mismatch: %X %X", report_a.magic_num, report_b.magic_num);
+    if (header_a.magic_num !== header_b.magic_num) begin
+      $display("magic_num mismatch: %X %X", header_a.magic_num, header_b.magic_num);
       return 0;
     end
 
-    if (report_a.sequence_num !== report_b.sequence_num) begin
-      $display("sequence_num mismatch: %X %X", report_a.sequence_num, report_b.sequence_num);
+    if (header_a.sequence_num !== header_b.sequence_num) begin
+      $display("sequence_num mismatch: %X %X", header_a.sequence_num, header_b.sequence_num);
       return 0;
     end
 
-    if (report_a.module_id !== report_b.module_id) begin
-      $display("module_id mismatch: %X %X", report_a.module_id, report_b.module_id);
+    if (header_a.module_id !== header_b.module_id) begin
+      $display("module_id mismatch: %X %X", header_a.module_id, header_b.module_id);
       return 0;
     end
 
-    if (report_a.message_type !== report_b.message_type) begin
-      $display("message_type mismatch: %X %X", report_a.message_type, report_b.message_type);
+    if (header_a.message_type !== header_b.message_type) begin
+      $display("message_type mismatch: %X %X", header_a.message_type, header_b.message_type);
       return 0;
     end
 
-    if (report_a.dwell_sequence_num !== report_b.dwell_sequence_num) begin
-      $display("dwell_sequence_num mismatch: %X %X", report_a.dwell_sequence_num, report_b.dwell_sequence_num);
+    if (header_a.dwell_sequence_num !== header_b.dwell_sequence_num) begin
+      $display("dwell_sequence_num mismatch: %X %X", header_a.dwell_sequence_num, header_b.dwell_sequence_num);
       return 0;
     end
 
-    if (report_a.tag !== report_b.tag) begin
-      $display("tag mismatch: %X %X", report_a.tag, report_b.tag);
-      return 0;
-    end
-    if (report_a.frequency !== report_b.frequency) begin
-      $display("frequency mismatch: %X %X", report_a.frequency, report_b.frequency);
-      return 0;
-    end
-    if (report_a.duration_requested !== report_b.duration_requested) begin
-      $display("duration_requested mismatch: %X %X", report_a.duration_requested, report_b.duration_requested);
-      return 0;
-    end
-    if (report_a.gain !== report_b.gain) begin
-      $display("gain mismatch: %X %X", report_a.gain, report_b.gain);
-      return 0;
-    end
-    if (report_a.fast_lock_profile !== report_b.fast_lock_profile) begin
-      $display("fast_lock_profile mismatch: %X %X", report_a.fast_lock_profile, report_b.fast_lock_profile);
-      return 0;
-    end
-    if (report_a.num_channels !== report_b.num_channels) begin
-      $display("num_channels mismatch: %X %X", report_a.num_channels, report_b.num_channels);
-      return 0;
-    end
-    if (report_a.report_starting_channel !== report_b.report_starting_channel) begin
-      $display("report_starting_channel mismatch: %X %X", report_a.report_starting_channel, report_b.report_starting_channel);
-      return 0;
-    end
-    if (report_a.threshold_shift_narrow !== report_b.threshold_shift_narrow) begin
-      $display("threshold_shift_narrow mismatch: %X %X", report_a.threshold_shift_narrow, report_b.threshold_shift_narrow);
-      return 0;
-    end
-    if (report_a.threshold_shift_wide !== report_b.threshold_shift_wide) begin
-      $display("threshold_shift_wide mismatch: %X %X", report_a.threshold_shift_wide, report_b.threshold_shift_wide);
-      return 0;
-    end
-    if (report_a.channel_mask_narrow !== report_b.channel_mask_narrow) begin
-      $display("channel_mask_narrow mismatch: %X %X", report_a.channel_mask_narrow, report_b.channel_mask_narrow);
-      return 0;
-    end
-    if (report_a.channel_mask_wide !== report_b.channel_mask_wide) begin
-      $display("channel_mask_wide mismatch: %X %X", report_a.channel_mask_wide, report_b.channel_mask_wide);
-      return 0;
-    end
+    if (header_a.message_type == ecm_report_message_type_drfm_channel_data) begin
+      ecm_drfm_channel_report_header_t report_a = unpack_channel_report_header(a);
+      ecm_drfm_channel_report_header_t report_b = unpack_channel_report_header(b);
 
-    if (report_a.num_samples !== report_b.num_samples) begin
-      $display("num_samples mismatch: %X %X", report_a.num_samples, report_b.num_samples);
-      return 0;
-    end
-
-    for (int i = NUM_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
-      if (a[i] !== b[i]) begin
-        $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
+      if (report_a.channel_index !== report_b.channel_index) begin
+        $display("channel_index mismatch: %X %X", report_a.channel_index, report_b.channel_index);
         return 0;
       end
+      if (report_a.max_iq_bits !== report_b.max_iq_bits) begin
+        $display("max_iq_bits mismatch: %X %X", report_a.max_iq_bits, report_b.max_iq_bits);
+        return 0;
+      end
+      if (report_a.segment_seq_num !== report_b.segment_seq_num) begin
+        $display("segment_seq_num mismatch: %X %X", report_a.segment_seq_num, report_b.segment_seq_num);
+        return 0;
+      end
+      if (report_a.segment_timestamp !== report_b.segment_timestamp) begin
+        $display("segment_timestamp mismatch: %X %X", report_a.segment_timestamp, report_b.segment_timestamp);
+        return 0;
+      end
+      if (report_a.segment_addr_first !== report_b.segment_addr_first) begin
+        $display("segment_addr_first mismatch: %X %X", report_a.segment_addr_first, report_b.segment_addr_first);
+        return 0;
+      end
+      if (report_a.segment_addr_last !== report_b.segment_addr_last) begin
+        $display("segment_addr_last mismatch: %X %X", report_a.segment_addr_last, report_b.segment_addr_last);
+        return 0;
+      end
+      if (report_a.slice_addr !== report_b.slice_addr) begin
+        $display("slice_addr mismatch: %X %X", report_a.slice_addr, report_b.slice_addr);
+        return 0;
+      end
+      if (report_a.slice_length !== report_b.slice_length) begin
+        $display("slice_length mismatch: %X %X", report_a.slice_length, report_b.slice_length);
+        return 0;
+      end
+
+      for (int i = NUM_CHANNEL_HEADER_WORDS; i < ecm_words_per_dma_packet; i++) begin
+        if (a[i] !== b[i]) begin
+          $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
+          return 0;
+        end
+      end
+
+    end else if (header_a.message_type == ecm_report_message_type_drfm_summary) begin
+      ecm_drfm_summary_report_header_t report_a = unpack_summary_report_header(a);
+      ecm_drfm_summary_report_header_t report_b = unpack_summary_report_header(b);
+
+      if (report_a.channel_was_written !== report_b.channel_was_written) begin
+        $display("channel_was_written mismatch: %X %X", report_a.channel_was_written, report_b.channel_was_written);
+        return 0;
+      end
+      if (report_a.channel_was_read !== report_b.channel_was_read) begin
+        $display("channel_was_read mismatch: %X %X", report_a.channel_was_read, report_b.channel_was_read);
+        return 0;
+      end
+
+      for (int i = NUM_SUMMARY_HEADER_WORDS; i < ecm_words_per_dma_packet; i++) begin
+        if (a[i] !== b[i]) begin
+          $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
+          return 0;
+        end
+      end
+    end else begin
+      $error("invalid message type");
+      return 0;
     end
 
-    //TODO: check channel data
+    return 1;
+  endfunction
+
+  function automatic bit output_data_match(drfm_output_t a, drfm_output_t b);
+    if (a.data_i !== b.data_i) begin
+      $display("data_i mismatch: %X %X", a.data_i, b.data_i);
+      return 0;
+    end
+    if (a.data_q !== b.data_q) begin
+      $display("data_q mismatch: %X %X", a.data_q, b.data_q);
+      return 0;
+    end
+    if (a.index !== b.index) begin
+      $display("index mismatch: %X %X", a.index, b.index);
+      return 0;
+    end
 
     return 1;
   endfunction
@@ -406,28 +474,56 @@ module ecm_drfm_tb;
     wait_for_reset();
 
     forever begin
-      rpt_rx_intf.read(read_data);
+      report_rx_intf.read(read_data);
 
-      if (data_match(read_data, expected_data[0].data)) begin
+      if (report_data_match(read_data, expected_report_data[0].data)) begin
         $display("%0t: data match - %p", $time, read_data);
       end else begin
-        $error("%0t: error -- data mismatch: expected = %p  actual = %p", $time, expected_data[0].data, read_data);
+        $error("%0t: error -- data mismatch: expected = %p  actual = %p", $time, expected_report_data[0].data, read_data);
       end
       num_received++;
-      void'(expected_data.pop_front());
+      void'(expected_report_data.pop_front());
     end
   end
 
   final begin
-    if ( expected_data.size() != 0 ) begin
+    if ( expected_report_data.size() != 0 ) begin
       $error("Unexpected data remaining in queue:");
-      while ( expected_data.size() != 0 ) begin
-        $display("%p", expected_data[0].data);
-        void'(expected_data.pop_front());
+      while ( expected_report_data.size() != 0 ) begin
+        $display("%p", expected_report_data[0].data);
+        void'(expected_report_data.pop_front());
       end
     end
   end
-*/
+
+  initial begin
+    automatic drfm_output_t read_data;
+
+    wait_for_reset();
+
+    forever begin
+      output_rx_intf.read(read_data);
+
+      if (output_data_match(read_data, expected_output_data[0])) begin
+        $display("%0t: data match - %p", $time, read_data);
+      end else begin
+        $error("%0t: error -- data mismatch: expected = %p  actual = %p", $time, expected_output_data[0], read_data);
+      end
+      num_received++;
+      void'(expected_output_data.pop_front());
+    end
+  end
+
+  final begin
+    if ( expected_output_data.size() != 0 ) begin
+      $error("Unexpected data remaining in queue:");
+      while ( expected_output_data.size() != 0 ) begin
+        $display("%p", expected_output_data[0]);
+        void'(expected_output_data.pop_front());
+      end
+    end
+  end
+
 /*
   function automatic void expect_reports(esm_dwell_metadata_t dwell_data, int unsigned dwell_seq_num, dwell_channel_data_t  dwell_input []);
     int channels_per_packet = (MAX_WORDS_PER_PACKET - NUM_HEADER_WORDS) / 4;
@@ -542,6 +638,62 @@ module ecm_drfm_tb;
     return r;
   endfunction
 */
+  function automatic ecm_drfm_write_req_queue_t randomize_drfm_writes();
+    bit [ecm_num_channels - 1 : 0]  channel_valid = '0;
+    int                             channel_duration    [ecm_num_channels - 1 : 0];
+    int                             channel_addr_start  [ecm_num_channels - 1 : 0];
+    int                             channel_addr_end    [ecm_num_channels - 1 : 0];
+    int                             channel_frame_start [ecm_num_channels - 1 : 0];
+    int                             channel_data_index  [ecm_num_channels - 1 : 0];
+    int                             num_frames;
+    ecm_drfm_write_req_queue_t      r;
+    ecm_drfm_write_req_t            empty_req = {valid:0, default:'x};
+
+    num_frames = $urandom_range(20 * ecm_drfm_mem_depth / ecm_num_channels, 2 * ecm_drfm_mem_depth / ecm_num_channels);
+
+    for (int i = 0; i < ecm_num_channels; i++) begin
+      channel_valid[i]    = ($urandom_range(99) < 75);
+
+      if ($urandom_range(99) < 50) begin
+        channel_duration[i] = $urandom_range(ecm_drfm_mem_depth / ecm_num_channels, 500);
+      end else begin
+        channel_duration[i] = $urandom_range(100, 5);
+      end
+
+      channel_addr_start[i] = i * ecm_drfm_mem_depth / ecm_num_channels;
+      //channel_addr_end[i]   = channel_addr_start[i] + channel_duration[i] - 1;  TODO: remove
+
+      channel_frame_start[i] = $urandom_range(num_frames - ecm_drfm_mem_depth / ecm_num_channels, 0);
+      channel_data_index[i] = 0;
+    end
+
+    for (int f = 0; f < num_frames; f++) begin
+      for (int i = 0; i < ecm_num_channels; i++) begin
+        ecm_drfm_write_req_t d = {valid:0, default:'x};
+
+        if(channel_valid[i] && (f >= channel_frame_start[i]) && (channel_data_index[i] < channel_duration[i])) begin
+          d.valid         = 1;
+          d.first         = (channel_data_index[i] == 0);
+          d.last          = (channel_data_index[i] == (channel_duration[i] - 1));
+          d.channel_index = i;
+          d.address       = channel_addr_start[i] + channel_data_index[i];
+          //d.data[0]       = 0; //$urandom;
+          //d.data[1]       = 0; //$urandom;
+
+          channel_duration[i]++;
+        end
+
+        r.push_back(d);
+      end
+    end
+
+    return r;
+  endfunction
+
+  function automatic ecm_drfm_read_req_queue_t randomize_drfm_reads(ecm_drfm_write_req_queue_t writes);
+    ecm_drfm_read_req_queue_t r;
+    return r;
+  endfunction
 
   task automatic standard_test();
     parameter NUM_TESTS = 20;
@@ -550,26 +702,26 @@ module ecm_drfm_tb;
       $display("%0t: Test started - %0d", $time, i_test);
       report_seq_num = 0;
 
-      /*for (int i_dwell = 0; i_dwell < 100; i_dwell++) begin
+      for (int i_dwell = 0; i_dwell < 100; i_dwell++) begin
         int unsigned          dwell_seq_num   = $urandom;
-        esm_dwell_metadata_t  dwell_data      = randomize_dwell_metadata();
-        dwell_channel_data_t  dwell_input []  = randomize_dwell_input();
+        ecm_drfm_write_req_t  write_req_data [$]  = randomize_drfm_writes();
+        ecm_drfm_read_req_t   read_req_data [$]   = randomize_drfm_reads(write_req_data);
 
-        expect_reports(dwell_data, dwell_seq_num, dwell_input);
-        dwell_tx_intf.write(dwell_data, dwell_seq_num, dwell_input);
+        //expect_reports(dwell_data, dwell_seq_num, dwell_input);
+        tx_intf.write(dwell_seq_num, write_req_data, read_req_data);
 
         repeat(1000) @(posedge Clk);
 
         begin
           int wait_cycles = 0;
-          while ((expected_data.size() != 0) && (wait_cycles < 1e5)) begin
+          while ((expected_report_data.size() != 0) && (expected_output_data.size() != 0) && (wait_cycles < 1e5)) begin
             @(posedge Clk);
             wait_cycles++;
           end
           assert (wait_cycles < 1e5) else $error("Timeout while waiting for expected queue to empty during test.");
         end
 
-      end*/
+      end
 
       $display("%0t: Test finished: num_received = %0d", $time, num_received);
       Rst = 1;

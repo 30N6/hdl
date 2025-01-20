@@ -17,7 +17,6 @@ library mem_lib;
 entity ecm_drfm is
 generic (
   AXI_DATA_WIDTH    : natural;
-  OUTPUT_DATA_WIDTH : natural;
   READ_LATENCY      : natural
 );
 port (
@@ -119,14 +118,14 @@ architecture rtl of ecm_drfm is
   signal w_reporter_channel_index         : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r_reporter_channel_timestamp     : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
   signal r_reporter_channel_seq_num       : unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
-  signal r_reporter_channel_addr_first    : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  signal r_reporter_channel_addr_last     : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_reporter_channel_addr_first    : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal r_reporter_channel_addr_last     : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal r_reporter_channel_max_iq_bits   : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
 
   signal w_reporter_mem_read_valid        : std_logic;
-  signal w_reporter_mem_read_addr         : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal w_reporter_mem_read_addr         : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal r_reporter_mem_read_valid        : std_logic;
-  signal r_reporter_mem_read_addr         : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_reporter_mem_read_addr         : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal r_reporter_mem_result_valid      : std_logic;
   signal r_reporter_mem_result_data       : std_logic_vector(MEM_WIDTH - 1 downto 0);
 
