@@ -13,6 +13,7 @@ library mem_lib;
 
 entity ecm_drfm is
 generic (
+  AXI_DATA_WIDTH    : natural;
   OUTPUT_DATA_WIDTH : natural;
   READ_LATENCY      : natural
 );
@@ -23,7 +24,6 @@ port (
 
   Dwell_active            : in  std_logic;
   Dwell_done              : in  std_logic;
-  Dwell_tx_enabled        : in  std_logic;
   Dwell_sequence_num      : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   Dwell_reports_done      : out std_logic;
 
@@ -40,6 +40,7 @@ port (
 
   Error_ext_read_overflow : out std_logic;
   Error_int_read_overflow : out std_logic;
+  Error_invalid_read      : out std_logic;
   Error_reporter_timeout  : out std_logic;
   Error_reporter_overflow : out std_logic
 );
@@ -68,7 +69,6 @@ architecture rtl of ecm_drfm is
   signal r_rst                            : std_logic;
   signal r_dwell_active                   : std_logic;
   signal r_dwell_done                     : std_logic;
-  signal r_dwell_tx_enabled               : std_logic;
   signal r_dwell_sequence_num             : std_logic;
 
   signal r_timestamp                      : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
@@ -138,7 +138,6 @@ begin
       r_rst                 <= Rst;
       r_dwell_active        <= Dwell_active;
       r_dwell_done          <= Dwell_done;
-      r_dwell_tx_enabled    <= Dwell_tx_enabled;
       r_dwell_sequence_num  <= Dwell_sequence_num;
       r0_write_req          <= Write_req;
       r0_read_req           <= Read_req;
@@ -345,7 +344,6 @@ begin
 
     Dwell_active            => r_dwell_active,
     Dwell_done              => r_dwell_done,
-    Dwell_tx_enabled        => r_dwell_tx_enabled,
     Dwell_sequence_num      => r_dwell_sequence_num,
     Dwell_reports_done      => Dwell_reports_done,
 
@@ -383,6 +381,7 @@ begin
     if rising_edge(Clk) then
       Error_ext_read_overflow <= r_read_req.valid and Read_req.valid;
       Error_int_read_overflow <= w_reporter_mem_read_valid and r_reporter_mem_read_valid and r0_read_req.valid;
+      Error_invalid_read      <= r_read_req.valid and not(r_channel_was_written(to_integer(r_read_req.channel_index)));
     end if;
   end process;
 

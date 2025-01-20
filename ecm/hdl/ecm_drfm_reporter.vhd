@@ -324,14 +324,6 @@ begin
     w_fifo_partial_0_data <= (others => '0');
     w_fifo_partial_1_data <= (others => '0');
 
-    S_SUMMARY_HEADER_0,
-    S_SUMMARY_HEADER_1,
-    S_SUMMARY_HEADER_2,
-    S_SUMMARY_DWELL_SEQ_NUM,
-    S_SUMMARY_CHANNEL_STATE,
-    S_SUMMARY_PAD,
-    S_SUMMARY_DONE
-
     case s_state is
     when S_CHANNEL_HEADER_0 =>
       w_fifo_valid            <= '1';
@@ -387,7 +379,7 @@ begin
 
     when S_SUMMARY_HEADER_2 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= std_logic_vector(ECM_MODULE_ID_DRFM) & std_logic_vector(ECM_REPORT_MESSAGE_TYPE_DRFM_CHANNEL_DATA) & x"0000";
+      w_fifo_partial_1_data   <= std_logic_vector(ECM_MODULE_ID_DRFM) & std_logic_vector(ECM_REPORT_MESSAGE_TYPE_DRFM_SUMMARY) & x"0000";
 
     when S_SUMMARY_DWELL_SEQ_NUM =>
       w_fifo_valid            <= '1';
