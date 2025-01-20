@@ -92,8 +92,26 @@ interface dwell_tx_intf (input logic Clk);
   endtask
 endinterface
 
+typedef struct {
+  int data_i;
+  int data_q;
+  int index;
+} drfm_output_t;
+
 interface drfm_rx_intf (input logic CLk);
-  
+  channelizer_control_t                       ctrl;
+  logic signed [ecm_drfm_data_width - 1 : 0]  data [1:0];
+
+  task read(output drfm_output_t rx);
+    logic v;
+    do begin
+      rx.data_i <= data[0];
+      rx.data_q <= data[1];
+      rx.index  <= ctrl.data_index;
+      v         <= valid;
+      @(posedge Clk);
+    end while (v !== 1);
+  endtask
 endinterface
 
 interface axi_rx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
@@ -265,7 +283,7 @@ module ecm_drfm_tb;
     end while (Rst);
     repeat(100) @(posedge Clk);
   endtask
-
+/*
   function automatic esm_dwell_report_header_t unpack_report_header(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
     esm_dwell_report_header_t   report_header;
     dwell_report_header_bits_t  packed_report_header;
@@ -365,12 +383,6 @@ module ecm_drfm_tb;
       return 0;
     end
 
-    /*
-    if (report_a.duration_actual !== report_b.duration_actual) begin
-      $display("duration_actual mismatch: %X %X", report_a.duration_actual, report_b.duration_actual);
-      return 0;
-    end
-    */
     if (report_a.num_samples !== report_b.num_samples) begin
       $display("num_samples mismatch: %X %X", report_a.num_samples, report_b.num_samples);
       return 0;
@@ -415,7 +427,8 @@ module ecm_drfm_tb;
       end
     end
   end
-
+*/
+/*
   function automatic void expect_reports(esm_dwell_metadata_t dwell_data, int unsigned dwell_seq_num, dwell_channel_data_t  dwell_input []);
     int channels_per_packet = (MAX_WORDS_PER_PACKET - NUM_HEADER_WORDS) / 4;
     int num_packets = (NUM_CHANNELS + channels_per_packet - 1) / channels_per_packet;
@@ -487,15 +500,15 @@ module ecm_drfm_tb;
         r.data.push_back(0);
       end
 
-      /*for (int i = 0; i < r.data.size(); i++) begin
-        $display("r.data[%02d]=%X", i, r.data[i]);
-      end*/
+      //for (int i = 0; i < r.data.size(); i++) begin
+      //  $display("r.data[%02d]=%X", i, r.data[i]);
+      //end
 
       expected_data.push_back(r);
 
-      /*$display("report_header: %p", report_header);
-      $display("report_header_packed: %p", report_header_packed);
-      $display("axi report: %p [0]", r.data, r.data[0]);*/
+      //$display("report_header: %p", report_header);
+      //$display("report_header_packed: %p", report_header_packed);
+      //$display("axi report: %p [0]", r.data, r.data[0]);
 
       report_seq_num++;
     end
@@ -528,16 +541,16 @@ module ecm_drfm_tb;
 
     return r;
   endfunction
+*/
 
   task automatic standard_test();
     parameter NUM_TESTS = 20;
-    int max_write_delay = 5;
 
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
-      $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
+      $display("%0t: Test started - %0d", $time, i_test);
       report_seq_num = 0;
 
-      for (int i_dwell = 0; i_dwell < 100; i_dwell++) begin
+      /*for (int i_dwell = 0; i_dwell < 100; i_dwell++) begin
         int unsigned          dwell_seq_num   = $urandom;
         esm_dwell_metadata_t  dwell_data      = randomize_dwell_metadata();
         dwell_channel_data_t  dwell_input []  = randomize_dwell_input();
@@ -556,7 +569,7 @@ module ecm_drfm_tb;
           assert (wait_cycles < 1e5) else $error("Timeout while waiting for expected queue to empty during test.");
         end
 
-      end
+      end*/
 
       $display("%0t: Test finished: num_received = %0d", $time, num_received);
       Rst = 1;

@@ -136,10 +136,11 @@ package ecm_pkg is
   end record;
 
   type ecm_channel_tx_program_entry_t is record
-    valid                 : std_logic;
-    tx_program_index      : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
-    duration_gate_min     : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-    duration_gate_max     : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+    valid                       : std_logic;
+    trigger_immediate_after_min : std_logic;
+    tx_program_index            : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
+    duration_gate_min           : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+    duration_gate_max           : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   end record;
 
   type ecm_channel_tx_program_entry_array_t is array (natural range <>) of ecm_channel_tx_program_entry_t;
@@ -166,6 +167,7 @@ package ecm_pkg is
     frequency                 : unsigned(ECM_DWELL_FREQUENCY_WIDTH - 1 downto 0);
     measurement_duration      : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
     total_duration_max        : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+    force_full_duration       : std_logic;
     fast_lock_profile         : unsigned(ECM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 0);
 
     next_dwell_index          : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
@@ -314,13 +316,13 @@ package ecm_pkg is
                                                ECM_DWELL_STATS_ERRORS_WIDTH +
                                                ECM_DRFM_ERRORS_WIDTH;
 
-  function unpack(v : std_logic_vector) return ecm_tx_instruction_header_t;
-  function unpack(v : std_logic_vector) return ecm_tx_instruction_dds_setup_bpsk_t;
-  function unpack(v : std_logic_vector) return ecm_tx_instruction_dds_setup_cw_sweep_t;
-  function unpack(v : std_logic_vector) return ecm_tx_instruction_dds_setup_cw_step_t;
-  function unpack(v : std_logic_vector) return ecm_tx_instruction_playback_t;
-  function unpack(v : std_logic_vector) return ecm_tx_instruction_wait_t;
-  function unpack(v : std_logic_vector) return ecm_tx_instruction_jump_t;
+  --function unpack(v : std_logic_vector) return ecm_tx_instruction_header_t;
+  --function unpack(v : std_logic_vector) return ecm_tx_instruction_dds_setup_bpsk_t;
+  --function unpack(v : std_logic_vector) return ecm_tx_instruction_dds_setup_cw_sweep_t;
+  --function unpack(v : std_logic_vector) return ecm_tx_instruction_dds_setup_cw_step_t;
+  --function unpack(v : std_logic_vector) return ecm_tx_instruction_playback_t;
+  --function unpack(v : std_logic_vector) return ecm_tx_instruction_wait_t;
+  --function unpack(v : std_logic_vector) return ecm_tx_instruction_jump_t;
   function unpack(v : std_logic_vector) return ecm_config_data_t;
 
   function pack(v : ecm_channelizer_warnings_t) return std_logic_vector;
@@ -335,23 +337,6 @@ package ecm_pkg is
 end package ecm_pkg;
 
 package body ecm_pkg is
-
-
-  --function unpack(v : std_logic_vector) return dds_control_sin_step_entry_t is
-  --  variable vm : std_logic_vector(v'length - 1 downto 0);
-  --  variable r  : dds_control_sin_step_entry_t;
-  --begin
-  --  assert (v'length = DDS_CONTROL_SIN_STEP_ENTRY_PACKED_WIDTH)
-  --    report "Unexpected length"
-  --    severity failure;
-  --  vm := v;
-  --
-  --  r.sin_step_phase_inc_min              := signed(vm(15 downto 0));
-  --  r.sin_step_phase_inc_rand_offset_mask := unsigned(vm(30 downto 16));
-  --  r.sin_step_period_minus_one           := unsigned(vm(47 downto 32));
-  --
-  --  return r;
-  --end function;
 
   function unpack(v : std_logic_vector) return ecm_config_data_t is
     variable r : ecm_config_data_t;
@@ -418,9 +403,9 @@ package body ecm_pkg is
   function pack(v : ecm_drfm_errors_t) return std_logic_vector is
     variable r : std_logic_vector(ECM_DRFM_ERRORS_WIDTH - 1 downto 0);
   begin
-    r := (
-          v.todo,
-         );
+    --r := (
+    --      v.todo
+    --     );
     return r;
   end function;
 

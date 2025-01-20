@@ -9,6 +9,9 @@ library common_lib;
 library ecm_lib;
   use ecm_lib.ecm_pkg.all;
 
+library dsp_lib;
+  use dsp_lib.dsp_pkg.all;
+
 library mem_lib;
 
 entity ecm_drfm is
@@ -69,7 +72,7 @@ architecture rtl of ecm_drfm is
   signal r_rst                            : std_logic;
   signal r_dwell_active                   : std_logic;
   signal r_dwell_done                     : std_logic;
-  signal r_dwell_sequence_num             : std_logic;
+  signal r_dwell_sequence_num             : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   signal r_timestamp                      : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
 
@@ -77,26 +80,27 @@ architecture rtl of ecm_drfm is
   signal r0_read_req                      : ecm_drfm_read_req_t;
   signal r0_write_prev_seq_num            : unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal w0_mem_wr_data                   : std_logic_vector(MEM_WIDTH - 1 downto 0);
-  signal w0_mem_rd_addr                   : std_logic_vector(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal w0_mem_rd_addr                   : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal w0_read_valid                    : std_logic;
 
   signal r1_write_req                     : ecm_drfm_write_req_t;
   signal r1_read_req                      : ecm_drfm_read_req_t;
   signal r1_read_valid                    : std_logic;
-  signal r1_read_max_iq_bits              : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal r1_read_max_iq_bits              : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
   signal r1_write_max_iq_bits             : unsigned_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
-  signal r1_prev_max_iq_bits              : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal r1_prev_max_iq_bits              : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
   signal r1_write_next_seq_num            : unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
-  signal w1_write_max_iq_bits_sel         : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal w1_write_max_iq_bits_sel         : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
 
   signal w2_mem_rd_data                   : std_logic_vector(MEM_WIDTH - 1 downto 0);
   signal w2_read_data                     : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
   signal r2_write_req                     : ecm_drfm_write_req_t;
   signal r2_read_req                      : ecm_drfm_read_req_t;
   signal r2_read_valid                    : std_logic;
-  signal r2_read_max_iq_bits              : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal r2_read_max_iq_bits              : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
   signal r2_max_iq_wr_valid               : std_logic;
-  signal r2_max_iq_wr_data                : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
-  signal w2_iq_shift                      : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal r2_max_iq_wr_data                : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal w2_iq_shift                      : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
 
   signal r3_read_data_scaled              : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
   signal r3_read_req                      : ecm_drfm_read_req_t;
@@ -117,7 +121,7 @@ architecture rtl of ecm_drfm is
   signal r_reporter_channel_seq_num       : unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal r_reporter_channel_addr_first    : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   signal r_reporter_channel_addr_last     : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  signal r_reporter_channel_max_iq_bits   : signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal r_reporter_channel_max_iq_bits   : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
 
   signal w_reporter_mem_read_valid        : std_logic;
   signal w_reporter_mem_read_addr         : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
@@ -174,7 +178,7 @@ begin
   process(all)
   begin
     if (r0_read_req.valid = '1') then
-      w0_mem_rd_addr  <= r0_read_req.address; --TODO: mux for reporting
+      w0_mem_rd_addr  <= r0_read_req.address;
       w0_read_valid   <= '1';
     else
       w0_mem_rd_addr  <= r_reporter_mem_read_addr;
@@ -182,7 +186,7 @@ begin
     end if;
   end process;
 
-  w0_mem_wr_data <= std_logic_vector(r0_write_req.data(1) & r0_write_req.data(0));
+  w0_mem_wr_data <= std_logic_vector(r0_write_req.data(1)) & std_logic_vector(r0_write_req.data(0));
 
   i_mem : entity mem_lib.ram_sdp
   generic map (
@@ -203,8 +207,8 @@ begin
     Rd_data   => w2_mem_rd_data
   );
 
-  w2_read_data(0) <= w2_mem_rd_data(ECM_DRFM_DATA_WIDTH - 1 downto 0);
-  w2_read_data(1) <= w2_mem_rd_data(ECM_DRFM_DATA_WIDTH * 2 - 1 downto ECM_DRFM_DATA_WIDTH);
+  w2_read_data(0) <= signed(w2_mem_rd_data(ECM_DRFM_DATA_WIDTH - 1 downto 0));
+  w2_read_data(1) <= signed(w2_mem_rd_data(ECM_DRFM_DATA_WIDTH * 2 - 1 downto ECM_DRFM_DATA_WIDTH));
 
   process(Clk)
   begin
@@ -240,7 +244,7 @@ begin
       if ((r1_write_req.valid = '1') and (r1_write_req.first = '1')) then
         r2_max_iq_wr_valid  <= '1';
         r2_max_iq_wr_data   <= w1_write_max_iq_bits_sel;
-      elsif ((r1_write_req.valid = '1') and (w1_write_max_iq_bits_sel > r1_prev_max_iq_bits))
+      elsif ((r1_write_req.valid = '1') and (w1_write_max_iq_bits_sel > r1_prev_max_iq_bits)) then
         r2_max_iq_wr_valid  <= '1';
         r2_max_iq_wr_data   <= w1_write_max_iq_bits_sel;
       else
@@ -270,8 +274,13 @@ begin
     end if;
   end process;
 
-  Output_ctrl <= r3_read_req;
-  Output_data <= r3_read_data_scaled;
+  process(all)
+  begin
+    Output_ctrl.valid       <= r3_read_req.valid;
+    Output_ctrl.last        <= r3_read_req.channel_last;
+    Output_ctrl.data_index  <= resize_up(r3_read_req.channel_index, Output_ctrl.data_index'length);
+    Output_data             <= r3_read_data_scaled;
+  end process;
 
   process(Clk)
   begin
@@ -345,7 +354,6 @@ begin
     Dwell_active            => r_dwell_active,
     Dwell_done              => r_dwell_done,
     Dwell_sequence_num      => r_dwell_sequence_num,
-    Dwell_reports_done      => Dwell_reports_done,
 
     Channel_report_pending  => r_channel_report_pending,
     Channel_was_read        => r_channel_was_read,
@@ -379,9 +387,9 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Error_ext_read_overflow <= r_read_req.valid and Read_req.valid;
+      Error_ext_read_overflow <= r0_read_req.valid and Read_req.valid;
       Error_int_read_overflow <= w_reporter_mem_read_valid and r_reporter_mem_read_valid and r0_read_req.valid;
-      Error_invalid_read      <= r_read_req.valid and not(r_channel_was_written(to_integer(r_read_req.channel_index)));
+      Error_invalid_read      <= r0_read_req.valid and not(r_channel_was_written(to_integer(r0_read_req.channel_index)));
     end if;
   end process;
 

@@ -25,7 +25,6 @@ port (
 
   Dwell_active            : in  std_logic;
   Dwell_done              : in  std_logic;
-  Dwell_tx_enabled        : in  std_logic;  --TODO: needed?
   Dwell_sequence_num      : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   Channel_report_pending  : in  std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
@@ -37,7 +36,7 @@ port (
   Channel_seq_num         : in  unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
   Channel_addr_first      : in  unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   Channel_addr_last       : in  unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  Channel_max_iq_bits     : in  signed(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  Channel_max_iq_bits     : in  unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
 
   Read_valid              : out std_logic;
   Read_addr               : out unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
@@ -103,8 +102,11 @@ architecture rtl of ecm_drfm_reporter is
   signal r_next_channel               : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r_packet_seq_num             : unsigned(31 downto 0);
 
-  signal r_channel_index              : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r_channel_index              : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r_words_in_msg               : unsigned(clog2(ECM_WORDS_PER_DMA_PACKET) - 1 downto 0);
+
+  signal r_segment_first_addr         : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal r_segment_last_addr          : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal r_segment_addr               : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal r_slice_samples_remaining    : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   signal r_segment_samples_remaining  : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
@@ -148,7 +150,7 @@ begin
         when S_START_WAIT =>
           if (or_reduce(Channel_report_pending) = '1') then
             s_state <= S_START_CHANNEL;
-          elsif (Dwell_done = '1')
+          elsif (Dwell_done = '1') then
             s_state <= S_START_SUMMARY;
           else
             s_state <= S_START_WAIT;
@@ -351,7 +353,7 @@ begin
 
     when S_CHANNEL_SEGMENT_TIMESTAMP_0 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(resize_up(Channel_timestamp(ESM_TIMESTAMP_WIDTH - 1 downto 32), 32));
+      w_fifo_partial_0_data   <= std_logic_vector(resize_up(Channel_timestamp(ECM_TIMESTAMP_WIDTH - 1 downto 32), 32));
 
     when S_CHANNEL_SEGMENT_TIMESTAMP_1 =>
       w_fifo_valid            <= '1';
@@ -359,11 +361,11 @@ begin
 
     when S_CHANNEL_SEGMENT_INFO =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(resize_up(Channel_addr_first), 16) & std_logic_vector(resize_up(Channel_addr_last), 16);
+      w_fifo_partial_0_data   <= std_logic_vector(resize_up(Channel_addr_first, 16)) & std_logic_vector(resize_up(Channel_addr_last, 16));
 
     when S_CHANNEL_SLICE_INFO =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(resize_up(r_segment_addr), 16) & std_logic_vector(resize_up(r_slice_samples_remaining), 16);
+      w_fifo_partial_0_data   <= std_logic_vector(resize_up(r_segment_addr, 16)) & std_logic_vector(resize_up(r_slice_samples_remaining, 16));
 
     when S_CHANNEL_IQ_RESULT =>
       w_fifo_valid            <= Read_result_valid;
