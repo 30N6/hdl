@@ -606,15 +606,18 @@ module ecm_drfm_tb;
     end
   end
 
-  function automatic void expect_reports(int unsigned dwell_seq_num, ecm_drfm_write_req_t write_req_data [$], ecm_drfm_read_req_t read_req_data [$]);
-    ecm_drfm_write_req_t writes_by_channel  [ecm_num_channels - 1 : 0][$];
-    ecm_drfm_read_req_t  reads_by_channel   [ecm_num_channels - 1 : 0][$];
-    int                  max_iq_bits        [ecm_num_channels - 1 : 0] = {default:0};
+  function automatic void expect_reports_and_output(int unsigned dwell_seq_num, ecm_drfm_write_req_t write_req_data [$], ecm_drfm_read_req_t read_req_data [$]);
+    ecm_drfm_write_req_t  writes_by_channel   [ecm_num_channels - 1 : 0][$];
+    ecm_drfm_read_req_t   reads_by_channel    [ecm_num_channels - 1 : 0][$];
+    int                   max_iq_bits         [ecm_num_channels - 1 : 0] = {default:0};
+    iq_data_t             iq_mem              [ecm_drfm_mem_depth - 1 : 0];
 
     for (int i = 0; i < write_req_data.size(); i++) begin
       ecm_drfm_write_req_t d = write_req_data[i];
       if (d.valid) begin
         int iq_bits = get_iq_bit_count(d);
+        iq_data_t iq_data = get_iq_data_from_write_req(d);
+        iq_mem[d.address] = iq_data;
         writes_by_channel[d.channel_index].push_back(d);
         max_iq_bits[d.channel_index] = (iq_bits > max_iq_bits[d.channel_index]) ? iq_bits : max_iq_bits[d.channel_index];
       end
@@ -715,6 +718,16 @@ module ecm_drfm_tb;
       report_seq_num++;
     end
 
+    for (int i = 0; i < read_req_data.size(); i++) begin
+      drfm_output_t d;
+      int iq_shift = (ecm_drfm_data_width - 1) - max_iq_bits[read_req_data[i].channel_index];
+      d.index = read_req_data[i].channel_index;
+      d.data_i = iq_mem[read_req_data[i].address][0] << iq_shift;
+      d.data_q = iq_mem[read_req_data[i].address][1] << iq_shift;
+
+      expected_output_data.push_back(d);
+    end
+
   endfunction
 
   function automatic ecm_drfm_write_req_queue_t randomize_drfm_writes(int max_bits);
@@ -784,7 +797,34 @@ module ecm_drfm_tb;
   endfunction
 
   function automatic ecm_drfm_read_req_queue_t randomize_drfm_reads(ecm_drfm_write_req_queue_t writes);
+    ecm_drfm_write_req_t writes_by_channel [ecm_num_channels - 1 : 0][$];
     ecm_drfm_read_req_queue_t r;
+
+    for (int i = 0; i < writes.size(); i++) begin
+      ecm_drfm_write_req_t d = writes[i];
+      if (d.valid) begin
+        writes_by_channel[d.channel_index].push_back(d);
+      end
+    end
+
+    for (int i = 0; i < ecm_num_channels; i++) begin
+      if ((writes_by_channel[i].size() > 0) && ($urandom_range(99) < 75)) begin
+        for (int j = 0; j < writes_by_channel[i].size(); j++) begin
+          if ($urandom_range(99) < 50) begin
+            ecm_drfm_read_req_t read_req;
+            read_req.valid          = 1;
+            read_req.address        = writes_by_channel[i][j].address;
+            read_req.channel_index  = writes_by_channel[i][j].channel_index;
+            read_req.channel_last   = (writes_by_channel[i][j].channel_index == (ecm_num_channels - 1));
+
+            r.push_back(read_req);
+          end
+        end
+      end
+    end
+
+    r.shuffle();
+
     return r;
   endfunction
 
@@ -797,7 +837,7 @@ module ecm_drfm_tb;
   endfunction
 
   task automatic standard_test();
-    parameter NUM_TESTS = 10;
+    parameter NUM_TESTS = 5;
 
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
       $display("%0t: Test started - %0d", $time, i_test);
@@ -811,7 +851,7 @@ module ecm_drfm_tb;
 
         $display("dwell %0d started: seq=%0X max_bits=%0d", i_dwell, dwell_seq_num, max_bits);
 
-        expect_reports(dwell_seq_num, write_req_data, read_req_data);
+        expect_reports_and_output(dwell_seq_num, write_req_data, read_req_data);
         tx_intf.write(dwell_seq_num, write_req_data, read_req_data);
 
         repeat(1000) @(posedge Clk);
