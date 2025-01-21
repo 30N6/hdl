@@ -60,8 +60,6 @@ architecture rtl of ecm_drfm_reporter is
 
   constant FIFO_DEPTH             : natural := 2048;
   constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - ECM_WORDS_PER_DMA_PACKET - 10;
-  constant MAX_PACKET_IQ_SAMPLES  : natural := 116;
-
   constant TIMEOUT_CYCLES         : natural := 1024;
 
   type state_t is
@@ -95,7 +93,9 @@ architecture rtl of ecm_drfm_reporter is
     S_SUMMARY_DWELL_SEQ_NUM,
     S_SUMMARY_CHANNEL_STATE,
     S_SUMMARY_PAD,
-    S_SUMMARY_DONE
+    S_SUMMARY_DONE,
+
+    S_WAIT_IDLE
   );
 
   signal s_state                      : state_t;
@@ -252,6 +252,9 @@ begin
           end if;
 
         when S_SUMMARY_DONE =>
+          s_state <= S_WAIT_IDLE;
+
+        when S_WAIT_IDLE =>
           s_state <= S_IDLE;
 
         end case;
@@ -311,7 +314,7 @@ begin
       end if;
 
       if (s_state = S_CHANNEL_HEADER_0) then
-        r_slice_samples_remaining   <= minimum(r_segment_samples_remaining, MAX_PACKET_IQ_SAMPLES);
+        r_slice_samples_remaining   <= minimum(r_segment_samples_remaining, ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT);
       elsif ((s_state = S_CHANNEL_IQ_RESULT) and (Read_result_valid = '1')) then
         r_slice_samples_remaining   <= r_slice_samples_remaining - 1;
       end if;
@@ -335,7 +338,7 @@ begin
         end if;
 
         if (s_state = S_CHANNEL_HEADER_0) then
-          r_read_samples_remaining  <= minimum(r_segment_samples_remaining, MAX_PACKET_IQ_SAMPLES);
+          r_read_samples_remaining  <= minimum(r_segment_samples_remaining, ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT);
           r_read_addr               <= r_segment_addr;
         elsif ((r_read_valid = '1') and (r_read_delay = '1')) then
           r_read_samples_remaining  <= r_read_samples_remaining - 1;
@@ -449,6 +452,7 @@ begin
     when S_CHANNEL_IQ_RESULT      =>  w_fifo_valid_opt <= Read_result_valid;
     when S_CHANNEL_DONE           =>  w_fifo_valid_opt <= '0';
     when S_SUMMARY_DONE           =>  w_fifo_valid_opt <= '0';
+    when S_WAIT_IDLE              =>  w_fifo_valid_opt <= '0';
     when others => null;
     end case;
   end process;
