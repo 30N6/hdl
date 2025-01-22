@@ -15,9 +15,7 @@ library ecm_lib;
 
 entity ecm_dwell_stats is
 generic (
-  AXI_DATA_WIDTH  : natural;
-  DATA_WIDTH      : natural;
-  MODULE_ID       : unsigned
+  AXI_DATA_WIDTH : natural
 );
 port (
   Clk_axi                   : in  std_logic;
@@ -33,7 +31,6 @@ port (
   Dwell_report_done         : out std_logic;
 
   Input_ctrl                : in  channelizer_control_t;
-  Input_data                : in  signed_array_t(1 downto 0)(DATA_WIDTH - 1 downto 0);  --unused
   Input_pwr                 : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   Axis_ready                : in  std_logic;

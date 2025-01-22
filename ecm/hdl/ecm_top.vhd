@@ -340,7 +340,6 @@ begin
       Dwell_report_done         => w_dwell_stats_report_done,
 
       Input_ctrl                => w_channelizer_chan_control,
-      Input_data                => w_channelizer_chan_data,
       Input_pwr                 => w_channelizer_chan_pwr,
 
       Axis_ready                => w_d2h_fifo_in_ready(0),
