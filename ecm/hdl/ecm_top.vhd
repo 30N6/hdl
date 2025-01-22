@@ -86,9 +86,12 @@ architecture rtl of ecm_top is
   signal r_ad9361_control             : std_logic_vector_array_t(AD9361_BIT_PIPE_DEPTH - 1 downto 0)(3 downto 0);
   signal r_ad9361_status              : std_logic_vector_array_t(AD9361_BIT_PIPE_DEPTH - 1 downto 0)(7 downto 0);
 
-  --signal w_dwell_active               : std_logic;
+  signal w_dwell_active               : std_logic;
+  signal w_dwell_done                 : std_logic;
   --signal w_dwell_data                 : esm_dwell_metadata_t;
-  --signal w_dwell_sequence_num         : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal w_dwell_sequence_num         : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal w_dwell_stats_report_done    : std_logic;
+  signal w_dwell_drfm_reports_done    : std_logic;
 
   signal r_adc_valid                  : std_logic;
   signal r_adc_data_i                 : signed(IQ_WIDTH - 1 downto 0);
@@ -111,6 +114,11 @@ architecture rtl of ecm_top is
 
   signal w_synthesizer16_control      : channelizer_control_t;
   signal w_synthesizer16_data         : signed_array_t(1 downto 0)(SYNTHESIZER16_DATA_WIDTH - 1 downto 0);
+
+  signal w_drfm_write_req             : ecm_drfm_write_req_t;
+  signal w_drfm_read_req              : ecm_drfm_read_req_t;
+  signal w_drfm_control               : channelizer_control_t;
+  signal w_drfm_data                  : signed_array_t(1 downto 0)(ECM_DDS_OUTPUT_WIDTH - 1 downto 0)
 
   signal w_dds_command                : dds_control_t;
   signal w_dds_sync                   : channelizer_control_t;
@@ -275,13 +283,8 @@ begin
       Error_mux_collision   => w_channelizer_errors.mux_collision
     );
   else generate
-    w_channelizer_warnings.demux_gap     <= '0';
-    w_channelizer_errors.demux_overflow  <= '0';
-    w_channelizer_errors.filter_overflow <= '0';
-    w_channelizer_errors.mux_overflow    <= '0';
-    w_channelizer_errors.mux_underflow   <= '0';
-    w_channelizer_errors.mux_collision   <= '0';
-
+    w_channelizer_warnings  <= (others => '0');
+    w_channelizer_errors    <= (others => '0');
     w_channelizer16_control <= (valid => '0', last => '0', data_index => (others => '0'));
     w_channelizer16_data    <= (others => (others => '0'));
     w_channelizer16_pwr     <= (others => '0');
@@ -311,15 +314,9 @@ begin
       Error_mux_fifo_underflow  => w_synthesizer_errors.mux_fifo_underflow
     );
   else generate
-    w_synthesizer_errors.stretcher_overflow  <= '0';
-    w_synthesizer_errors.stretcher_underflow <= '0';
-    w_synthesizer_errors.filter_overflow     <= '0';
-    w_synthesizer_errors.mux_input_overflow  <= '0';
-    w_synthesizer_errors.mux_fifo_overflow   <= '0';
-    w_synthesizer_errors.mux_fifo_underflo   <= '0';
-
-    w_dac_valid_out <= '1';
-    w_dac_data_out  <= (others => '0');
+    w_synthesizer_errors  <= (others => '0');
+    w_dac_valid_out       <= '1';
+    w_dac_data_out        <= (others => '0');
   end generate g_synthesizer;
 
   g_dwell_stats : if (ENABLE_DWELL_STATS) generate
@@ -331,81 +328,77 @@ begin
       MODULE_ID       => ECM_MODULE_ID_DWELL_STATS
     )
     port map (
-      Clk_axi                 => M_axis_clk,
-      Clk                     => Adc_clk_x4,
-      Rst                     => r_combined_rst,
+      Clk_axi                   => M_axis_clk,
+      Clk                       => Adc_clk_x4,
+      Rst                       => r_combined_rst,
 
-      Enable                  => w_enable_chan,
+      Enable                    => w_enable_chan,
 
-      Dwell_active            => w_dwell_active,    --TODO: measurement active
-      Dwell_data              => w_dwell_data,
-      Dwell_sequence_num      => w_dwell_sequence_num,
+      Dwell_measurement_active  => w_dwell_active,    --TODO: need a specific measurement active signal -- dwell_active is for entire dwell
+      Dwell_data                => w_dwell_data,
+      Dwell_sequence_num        => w_dwell_sequence_num,
+      Dwell_report_done         => w_dwell_stats_report_done,
 
-      Input_ctrl              => w_channelizer_chan_control,
-      Input_data              => w_channelizer_chan_data,
-      Input_pwr               => w_channelizer_chan_pwr,
+      Input_ctrl                => w_channelizer_chan_control,
+      Input_data                => w_channelizer_chan_data,
+      Input_pwr                 => w_channelizer_chan_pwr,
 
-      Axis_ready              => w_d2h_fifo_in_ready(0),
-      Axis_valid              => w_d2h_fifo_in_valid(0),
-      Axis_data               => w_d2h_fifo_in_data(0),
-      Axis_last               => w_d2h_fifo_in_last(0),
+      Axis_ready                => w_d2h_fifo_in_ready(0),
+      Axis_valid                => w_d2h_fifo_in_valid(0),
+      Axis_data                 => w_d2h_fifo_in_data(0),
+      Axis_last                 => w_d2h_fifo_in_last(0),
 
-      Error_reporter_timeout  => w_dwell_stats_errors.reporter_timeout,
-      Error_reporter_overflow => w_dwell_stats_errors.reporter_overflow
+      Error_reporter_timeout    => w_dwell_stats_errors.reporter_timeout,
+      Error_reporter_overflow   => w_dwell_stats_errors.reporter_overflow
     );
   else generate
     w_d2h_fifo_in_valid(0)  <= '0';
     w_d2h_fifo_in_data(0)   <= (others => '0');
     w_d2h_fifo_in_last(0)   <= '0';
-
-    w_dwell_stats_errors.reporter_timeout  <= '0';
-    w_dwell_stats_errors.reporter_overflow <= '0';
+    w_dwell_stats_errors    <= (others => '0');
   end generate g_dwell_stats;
 
   g_drfm : if (ENABLE_DRFM) generate
-    --i_drfm : entity ecm_lib.drfm
-    --generic map (
-    --  AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
-    --  DATA_WIDTH      => CHANNELIZER64_DATA_WIDTH,
-    --  NUM_CHANNELS    => 64,
-    --  MODULE_ID       => ESM_MODULE_ID_PDW_NARROW,
-    --  WIDE_BANDWIDTH  => FALSE,
-    --  DEBUG_ENABLE    => ENABLE_DEBUG
-    --)
-    --port map (
-    --  Clk_axi                       => M_axis_clk,
-    --  Clk                           => Adc_clk_x4,
-    --  Rst                           => r_combined_rst,
-    --
-    --  Enable                        => w_enable_pdw(1),
-    --
-    --  Dwell_active                  => w_dwell_active,
-    --  Dwell_data                    => w_dwell_data,
-    --  Dwell_sequence_num            => w_dwell_sequence_num,
-    --
-    --  Input_ctrl                    => w_channelizer64_chan_control,
-    --  Input_data                    => w_channelizer64_chan_data,
-    --  Input_power                   => w_channelizer64_chan_pwr,
-    --
-    --  Axis_ready                    => w_d2h_fifo_in_ready(3),
-    --  Axis_valid                    => w_d2h_fifo_in_valid(3),
-    --  Axis_data                     => w_d2h_fifo_in_data(3),
-    --  Axis_last                     => w_d2h_fifo_in_last(3),
-    --
-    --  Error_pdw_fifo_overflow       => w_pdw_encoder_errors(1).pdw_fifo_overflow,
-    --  Error_pdw_fifo_underflow      => w_pdw_encoder_errors(1).pdw_fifo_underflow,
-    --  Error_sample_buffer_busy      => w_pdw_encoder_errors(1).sample_buffer_busy,
-    --  Error_sample_buffer_underflow => w_pdw_encoder_errors(1).sample_buffer_underflow,
-    --  Error_sample_buffer_overflow  => w_pdw_encoder_errors(1).sample_buffer_overflow,
-    --  Error_reporter_timeout        => w_pdw_encoder_errors(1).reporter_timeout,
-    --  Error_reporter_overflow       => w_pdw_encoder_errors(1).reporter_overflow
-    --);
-  else generate
-    w_d2h_fifo_in_valid(1)  <= '0';
-    w_d2h_fifo_in_data(1)   <= (others => '0');
-    w_d2h_fifo_in_last(1)   <= '0';
+    i_drfm : entity ecm_lib.ecm_drfm
+    generic map (
+      AXI_DATA_WIDTH    => AXI_DATA_WIDTH
+      READ_LATENCY      => 4 --TODO: constant
+    )
+    port (
+      Clk_axi                 => M_axis_clk,
+      Clk                     => Adc_clk_x4,
+      Rst                     => r_combined_rst,
 
-    w_drfm_errors.todo       <= '0';
+      Dwell_active            => w_dwell_active,
+      Dwell_done              => w_dwell_done,
+      Dwell_sequence_num      => w_dwell_sequence_num,
+      Dwell_reports_done      => w_dwell_drfm_reports_done,
+
+      Write_req               => w_drfm_write_req,
+      Read_req                => w_drfm_read_req,
+
+      Output_ctrl             => w_drfm_control,
+      Output_data             => w_drfm_data,
+
+      Axis_ready              => w_d2h_fifo_in_ready(1),
+      Axis_valid              => w_d2h_fifo_in_valid(1),
+      Axis_data               => w_d2h_fifo_in_data(1),
+      Axis_last               => w_d2h_fifo_in_last(1),
+
+      Error_ext_read_overflow => w_drfm_errors.ext_read_overflow,
+      Error_int_read_overflow => w_drfm_errors.int_read_overflow,
+      Error_invalid_read      => w_drfm_errors.invalid_read,
+      Error_reporter_timeout  => w_drfm_errors.reporter_timeout,
+      Error_reporter_overflow => w_drfm_errors.reporter_overflow
+    );
+  else generate
+    w_dwell_drfm_reports_done <= '1';
+    w_drfm_control            <= (valid => '0', last => '0', data_index => (others => '0'));
+    w_drfm_data               <= (others => (others => '0'));
+    w_d2h_fifo_in_valid(1)    <= '0';
+    w_d2h_fifo_in_data(1)     <= (others => '0');
+    w_d2h_fifo_in_last(1)     <= '0';
+    w_drfm_errors             <= (others => '0');
   end generate g_drfm;
 
   i_dds : entity dsp_lib.channelized_dds
@@ -419,7 +412,7 @@ begin
     Clk           => Adc_clk_x4,
     Rst           => r_combined_rst,
 
-    Dwell_active  => w_dwell_active,  --TODO: right signal?
+    Dwell_active  => w_dwell_active,  --TODO: right signal? need transmit active, not dwell active
     Control_data  => w_dds_command,
     Sync_data     => w_dds_sync,
 

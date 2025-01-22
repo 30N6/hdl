@@ -131,7 +131,7 @@ interface dwell_tx_intf (input logic Clk);
     end
     dwell_active = 0;
     dwell_done = 0;
-    repeat(2) @(posedge Clk);
+    repeat(4) @(posedge Clk);
   endtask
 endinterface
 

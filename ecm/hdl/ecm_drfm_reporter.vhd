@@ -263,7 +263,13 @@ begin
   end process;
 
   Channel_reports_done  <= to_stdlogic((s_state = S_CHANNEL_DONE) and (r_segment_samples_remaining = 0));
-  Dwell_reports_done    <= to_stdlogic(s_state = S_SUMMARY_DONE);
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Dwell_reports_done <= to_stdlogic(s_state = S_SUMMARY_DONE);
+    end if;
+  end process;
 
   process(Clk)
   begin

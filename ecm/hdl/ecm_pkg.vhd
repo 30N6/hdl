@@ -162,17 +162,18 @@ package ecm_pkg is
     skip_pll_prelock_wait     : std_logic;
     skip_pll_lock_check       : std_logic;
     skip_pll_postlock_wait    : std_logic;
+    force_full_duration       : std_logic;
     repeat_count              : unsigned(ECM_DWELL_REPEAT_COUNT_WIDTH - 1 downto 0);
 
     tag                       : unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
     frequency                 : unsigned(ECM_DWELL_FREQUENCY_WIDTH - 1 downto 0);
     measurement_duration      : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
     total_duration_max        : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
-    force_full_duration       : std_logic;
     fast_lock_profile         : unsigned(ECM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 0);
 
     next_dwell_index          : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
   end record;
+  constant ECM_DWELL_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + ECM_DWELL_TAG_WIDTH + ECM_DWELL_FREQUENCY_WIDTH + ECM_DWELL_DURATION_WIDTH + 8 + 8;
 
   type ecm_dwell_program_entry_t is record
     enable                    : std_logic;
@@ -209,11 +210,10 @@ package ecm_pkg is
   --  dwell_entry               : ecm_dwell_entry_t;
   --  dwell_sequence_num        : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   --  measurement_duration      : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
-  --  full_duration             : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+  --  total_duration            : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   --  ts_dwell_start            : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
-  --  ts_dwell_end              : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
   --
-  --  -- array of 128? bit entries: num_samples, accum, max, padding? --TODO: update
+  --  -- array of 128? bit entries: num_samples, accum, max
   --end record;
 
   --type ecm_report_drfm_channel_data_t record
@@ -288,9 +288,13 @@ package ecm_pkg is
   type ecm_dwell_stats_errors_array_t is array (natural range <>) of ecm_dwell_stats_errors_t;
 
   type ecm_drfm_errors_t is record
-    todo                    : std_logic;
+    ext_read_overflow   : std_logic;
+    int_read_overflow   : std_logic;
+    invalid_read        : std_logic;
+    reporter_timeout    : std_logic;
+    reporter_overflow   : std_logic;
   end record;
-  constant ECM_DRFM_ERRORS_WIDTH : natural := 1;
+  constant ECM_DRFM_ERRORS_WIDTH : natural := 5;
   type ecm_drfm_errors_array_t is array (natural range <>) of ecm_drfm_errors_t;
 
   type ecm_status_reporter_errors_t is record
@@ -329,6 +333,7 @@ package ecm_pkg is
   function pack(v : ecm_status_reporter_errors_t) return std_logic_vector;
   function pack(v : ecm_status_flags_t) return std_logic_vector;
   function pack(v : ecm_config_data_t) return std_logic_vector;
+  function pack_aligned(v : ecm_dwell_entry_t) return std_logic_vector;
 
 end package ecm_pkg;
 
@@ -376,12 +381,12 @@ package body ecm_pkg is
     variable r : std_logic_vector(ECM_SYNTHESIZER_ERRORS_WIDTH - 1 downto 0);
   begin
     r := (
-          v.stretcher_overflow,
-          v.stretcher_underflow,
-          v.filter_overflow,
-          v.mux_input_overflow,
+          v.mux_fifo_underflow,
           v.mux_fifo_overflow,
-          v.mux_fifo_underflow
+          v.mux_input_overflow,
+          v.filter_overflow,
+          v.stretcher_underflow,
+          v.stretcher_overflow
          );
     return r;
   end function;
@@ -399,9 +404,13 @@ package body ecm_pkg is
   function pack(v : ecm_drfm_errors_t) return std_logic_vector is
     variable r : std_logic_vector(ECM_DRFM_ERRORS_WIDTH - 1 downto 0);
   begin
-    --r := (
-    --      v.todo
-    --     );
+    r := (
+          v.reporter_overflow,
+          v.reporter_timeout,
+          v.invalid_read,
+          v.int_read_overflow,
+          v.ext_read_overflow
+         );
     return r;
   end function;
 
@@ -435,6 +444,31 @@ package body ecm_pkg is
           std_logic_vector(v.message_type),
           std_logic_vector(v.module_id),
           v.data, v.last, v.first, v.valid);
+
+    return r;
+  end function;
+
+  function pack_aligned(v : ecm_dwell_entry_t) return std_logic_vector is
+    variable r        : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0);
+    variable v_flags  : std_logic_vector(7 downto 0);
+  begin
+    assert (ECM_DWELL_ENTRY_ALIGNED_WIDTH mod 32 = 0)
+      report "ECM_DWELL_ENTRY_ALIGNED_WIDTH must be a multiple of 32."
+      severity failure;
+
+    v_flags := (v.valid, v.global_counter_check, v.global_counter_dec, v.skip_pll_prelock_wait,
+                v.skip_pll_lock_check, v.skip_pll_postlock_wait, v.force_full_duration, '0');
+
+    r := (
+            std_logic_vector(resize_up(v.next_dwell_index, 8),
+            std_logic_vector(resize_up(v.fast_lock_profile, 8),
+            std_logic_vector(v.total_duration_max),
+            std_logic_vector(v.measurement_duration),
+            std_logic_vector(v.frequency),
+            std_logic_vector(v.tag),
+            std_logic_vector(resize_up(v.repeat_count, 8)),
+            v_flags
+         );
 
     return r;
   end function;
