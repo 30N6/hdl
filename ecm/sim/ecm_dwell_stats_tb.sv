@@ -125,11 +125,14 @@ module ecm_dwell_stats_tb;
     bit [7:0]   dwell_fast_lock_profile;
     bit [7:0]   dwell_next_dwell_index;
 
+    bit [15:0]  dwell_pll_pre_lock_delay;
+    bit [15:0]  dwell_pll_post_lock_delay;
+
     bit [15:0]  dwell_tag;
     bit [15:0]  dwell_frequency;
+
     bit [31:0]  dwell_measurement_duration;
     bit [31:0]  dwell_total_duration_max;
-
     bit [31:0]  dwell_sequence_num;
     bit [31:0]  dwell_actual_measurement_duration;
     bit [31:0]  dwell_actual_total_duration;
@@ -293,6 +296,15 @@ module ecm_dwell_stats_tb;
       return 0;
     end
 
+    if (report_a.dwell_pll_pre_lock_delay !== report_b.dwell_pll_pre_lock_delay) begin
+      $display("dwell_pll_pre_lock_delay mismatch: %X %X", report_a.dwell_pll_pre_lock_delay, report_b.dwell_pll_pre_lock_delay);
+      return 0;
+    end
+    if (report_a.dwell_pll_post_lock_delay !== report_b.dwell_pll_post_lock_delay) begin
+      $display("dwell_pll_post_lock_delay mismatch: %X %X", report_a.dwell_pll_post_lock_delay, report_b.dwell_pll_post_lock_delay);
+      return 0;
+    end
+
     if (report_a.dwell_tag !== report_b.dwell_tag) begin
       $display("dwell_tag mismatch: %X %X", report_a.dwell_tag, report_b.dwell_tag);
       return 0;
@@ -391,6 +403,8 @@ module ecm_dwell_stats_tb;
     report_header.dwell_repeat_count                = dwell_data.repeat_count;
     report_header.dwell_fast_lock_profile           = dwell_data.fast_lock_profile;
     report_header.dwell_next_dwell_index            = dwell_data.next_dwell_index;
+    report_header.dwell_pll_pre_lock_delay          = dwell_data.pll_pre_lock_delay;
+    report_header.dwell_pll_post_lock_delay         = dwell_data.pll_post_lock_delay;
     report_header.dwell_tag                         = dwell_data.tag;
     report_header.dwell_frequency                   = dwell_data.frequency;
     report_header.dwell_measurement_duration        = dwell_data.measurement_duration;
@@ -440,13 +454,15 @@ module ecm_dwell_stats_tb;
     r.skip_pll_lock_check     = $urandom;
     r.skip_pll_postlock_wait  = $urandom;
     r.force_full_duration     = $urandom;
+    r.pll_pre_lock_delay      = $urandom;
+    r.pll_post_lock_delay     = $urandom;
     r.repeat_count            = $urandom;
     r.tag                     = $urandom;
     r.frequency               = $urandom;
     r.measurement_duration    = $urandom;
     r.total_duration_max      = $urandom;
     r.fast_lock_profile       = $urandom;
-
+    r.next_dwell_index        = $urandom;
     return r;
   endfunction
 

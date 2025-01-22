@@ -90,6 +90,7 @@ package ecm_pkg is
   constant ECM_DWELL_FREQUENCY_WIDTH                  : natural := 16;
   constant ECM_DWELL_GLOBAL_COUNTER_WIDTH             : natural := 16;
   constant ECM_DWELL_POWER_ACCUM_WIDTH                : natural := 64;
+  constant ECM_DWELL_PLL_DELAY_WIDTH                  : natural := 16;
 
   constant ECM_TIMESTAMP_WIDTH                        : natural := 48;
   constant ECM_DDS_OUTPUT_WIDTH                       : natural := 12;
@@ -168,12 +169,17 @@ package ecm_pkg is
     fast_lock_profile         : unsigned(ECM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 0);
     next_dwell_index          : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
 
+    pll_pre_lock_delay        : unsigned(ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 0);
+    pll_post_lock_delay       : unsigned(ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 0);
+
     tag                       : unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
     frequency                 : unsigned(ECM_DWELL_FREQUENCY_WIDTH - 1 downto 0);
+
     measurement_duration      : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+
     total_duration_max        : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   end record;
-  constant ECM_DWELL_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 8 + 8 + ECM_DWELL_TAG_WIDTH + ECM_DWELL_FREQUENCY_WIDTH + ECM_DWELL_DURATION_WIDTH * 2;
+  constant ECM_DWELL_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 8 + 8 + ECM_DWELL_PLL_DELAY_WIDTH*2 + ECM_DWELL_TAG_WIDTH + ECM_DWELL_FREQUENCY_WIDTH + ECM_DWELL_DURATION_WIDTH * 2;
 
   type ecm_dwell_program_entry_t is record
     enable                    : std_logic;
@@ -467,6 +473,9 @@ package body ecm_pkg is
 
             std_logic_vector(v.tag),
             std_logic_vector(v.frequency),
+
+            std_logic_vector(v.pll_pre_lock_delay),
+            std_logic_vector(v.pll_post_lock_delay),
 
             v_flags,
             std_logic_vector(resize_up(v.repeat_count, 8)),
