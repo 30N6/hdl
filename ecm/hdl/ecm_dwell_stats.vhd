@@ -45,7 +45,6 @@ end entity ecm_dwell_stats;
 
 architecture rtl of ecm_dwell_stats is
 
-  constant POWER_ACCUM_WIDTH    : natural := CHAN_POWER_WIDTH + ECM_DWELL_DURATION_WIDTH;
   constant READ_LATENCY         : natural := 2;
   constant READ_PIPE_DEPTH      : natural := READ_LATENCY + 2;
 
@@ -56,7 +55,6 @@ architecture rtl of ecm_dwell_stats is
     S_WAIT_DONE,
     S_DONE,
     S_REPORT_WAIT,
-    S_CLEAR,
     S_REPORT_ACK
   );
 
@@ -73,13 +71,13 @@ architecture rtl of ecm_dwell_stats is
 
   signal s_state                      : state_t;
 
-  signal m_channel_accum              : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(POWER_ACCUM_WIDTH - 1 downto 0);
+  signal m_channel_accum              : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
   signal m_channel_max                : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
   signal m_channel_cycles             : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
 
   signal w_channel_wr_en              : std_logic;
   signal w_channel_wr_index           : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_channel_wr_accum           : unsigned(POWER_ACCUM_WIDTH - 1 downto 0);
+  signal w_channel_wr_accum           : unsigned(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
   signal w_channel_wr_max             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal w_channel_wr_cycles          : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   signal w_channel_rd_index           : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
@@ -88,14 +86,14 @@ architecture rtl of ecm_dwell_stats is
   signal r_read_pipe_active           : std_logic_vector(READ_PIPE_DEPTH - 1 downto 0);
   signal r_read_pipe_req              : std_logic_vector(READ_LATENCY - 1 downto 0);
   signal r_read_pipe_pwr              : unsigned_array_t(READ_LATENCY     downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
-  signal r_channel_rd_accum           : unsigned_array_t(READ_LATENCY - 1 downto 0)(POWER_ACCUM_WIDTH - 1 downto 0);
+  signal r_channel_rd_accum           : unsigned_array_t(READ_LATENCY - 1 downto 0)(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
   signal r_channel_rd_max             : unsigned_array_t(READ_LATENCY     downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
   signal r_channel_rd_cycles          : unsigned_array_t(READ_LATENCY     downto 0)(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
 
   signal r_channel_new_accum_d0_a     : unsigned(31 downto 0);
   signal r_channel_new_accum_d0_b     : unsigned(31 downto 0);
   signal r_channel_new_accum_d0_c     : unsigned(0 downto 0);
-  signal r_channel_new_accum_d1       : unsigned(POWER_ACCUM_WIDTH - 1 downto 0);
+  signal r_channel_new_accum_d1       : unsigned(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
   signal r_channel_new_max_valid_d0   : std_logic;
   signal r_channel_new_max_d1         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r_channel_new_cycles_d1      : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
@@ -111,6 +109,7 @@ architecture rtl of ecm_dwell_stats is
   signal w_report_read_req            : std_logic;
   signal w_report_read_index          : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal w_report_ack                 : std_logic;
+  signal w_clear_channels             : std_logic;
 
 begin
 
@@ -141,7 +140,7 @@ begin
   begin
     if rising_edge(Clk) then
       if (r_rst = '1') then
-        s_state <= S_CLEAR;
+        s_state <= S_IDLE;
       else
         case s_state is
         when S_IDLE =>
@@ -172,16 +171,9 @@ begin
 
         when S_REPORT_WAIT =>
           if (w_report_ack = '1') then
-            s_state <= S_CLEAR;
-          else
-            s_state <= S_REPORT_WAIT;
-          end if;
-
-        when S_CLEAR =>
-          if (r_clear_index = (ECM_NUM_CHANNELS - 1)) then
             s_state <= S_REPORT_ACK;
           else
-            s_state <= S_CLEAR;
+            s_state <= S_REPORT_WAIT;
           end if;
 
         when S_REPORT_ACK =>
@@ -213,7 +205,7 @@ begin
       if (w_channel_wr_en = '1') then
         m_channel_accum(to_integer(w_channel_wr_index)) <= w_channel_wr_accum;
         m_channel_max(to_integer(w_channel_wr_index))   <= w_channel_wr_max;
-        m_channel_cycles(to_integer(w_channel_wr_index) <= w_channel_wr_cycles;
+        m_channel_cycles(to_integer(w_channel_wr_index)) <= w_channel_wr_cycles;
       end if;
     end if;
   end process;
@@ -265,7 +257,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (s_state /= S_CLEAR) then
+      if (w_clear_channels = '0') then
         r_clear_index <= (others => '0');
       else
         r_clear_index <= r_clear_index + 1;
@@ -275,7 +267,7 @@ begin
 
   process(all)
   begin
-    if (s_state = S_CLEAR) then
+    if (w_clear_channels = '1') then
       w_channel_wr_en     <= '1';
       w_channel_wr_index  <= r_clear_index;
       w_channel_wr_accum  <= (others => '0');
@@ -324,7 +316,7 @@ begin
 
   w_dwell_done <= to_stdlogic(s_state = S_DONE);
 
-  i_reporter : entity ecm_lib.ecm_dwell_reporter
+  i_reporter : entity ecm_lib.ecm_dwell_stats_reporter
   generic map (
     AXI_DATA_WIDTH => AXI_DATA_WIDTH
   )
@@ -347,6 +339,7 @@ begin
     Read_cycles                 => r_channel_rd_cycles(READ_LATENCY - 1),
     Read_valid                  => r_read_pipe_req(READ_LATENCY - 1),
 
+    Clear_channels              => w_clear_channels,
     Report_ack                  => w_report_ack,
 
     Axis_ready                  => Axis_ready,

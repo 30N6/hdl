@@ -31,11 +31,12 @@ port (
 
   Read_req                    : out std_logic;
   Read_index                  : out unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  Read_accum                  : in  unsigned(POWER_ACCUM_WIDTH - 1 downto 0);
+  Read_accum                  : in  unsigned(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
   Read_max                    : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   Read_cycles                 : in  unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   Read_valid                  : in  std_logic;
 
+  Clear_channels              : out std_logic;
   Report_ack                  : out std_logic;
 
   Axis_ready                  : in  std_logic;
@@ -94,7 +95,7 @@ architecture rtl of ecm_dwell_stats_reporter is
   signal r_channel_index        : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r_words_in_msg         : unsigned(clog2(ECM_WORDS_PER_DMA_PACKET) - 1 downto 0);
 
-  signal r_read_accum           : unsigned(POWER_ACCUM_WIDTH - 1 downto 0);
+  signal r_read_accum           : unsigned(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
   signal r_read_max             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
   signal r_read_cycles          : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
 
@@ -209,6 +210,7 @@ begin
     end if;
   end process;
 
+  Clear_channels <= to_stdlogic(s_state = S_PAD) or Rst;
   Report_ack <= to_stdlogic(s_state = S_REPORT_ACK);
 
   process(Clk)
@@ -262,7 +264,7 @@ begin
 
   w_dwell_data_packed <= pack_aligned(Dwell_data);
 
-  process(Clk)
+  process(all)
   begin
     w_fifo_valid  <= '0';
     w_fifo_last   <= '0';

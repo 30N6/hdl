@@ -322,10 +322,7 @@ begin
   g_dwell_stats : if (ENABLE_DWELL_STATS) generate
     i_dwell_stats : entity ecm_lib.ecm_dwell_stats
     generic map (
-      AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
-      DATA_WIDTH      => CHANNELIZER16_DATA_WIDTH,
-      NUM_CHANNELS    => 16,
-      MODULE_ID       => ECM_MODULE_ID_DWELL_STATS
+      AXI_DATA_WIDTH => AXI_DATA_WIDTH
     )
     port map (
       Clk_axi                   => M_axis_clk,
@@ -334,6 +331,7 @@ begin
 
       Enable                    => w_enable_chan,
 
+      Dwell_active              => w_dwell_active,
       Dwell_measurement_active  => w_dwell_active,    --TODO: need a specific measurement active signal -- dwell_active is for entire dwell
       Dwell_data                => w_dwell_data,
       Dwell_sequence_num        => w_dwell_sequence_num,

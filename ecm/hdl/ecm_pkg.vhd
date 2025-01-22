@@ -89,6 +89,7 @@ package ecm_pkg is
   constant ECM_DWELL_TAG_WIDTH                        : natural := 16;
   constant ECM_DWELL_FREQUENCY_WIDTH                  : natural := 16;
   constant ECM_DWELL_GLOBAL_COUNTER_WIDTH             : natural := 16;
+  constant ECM_DWELL_POWER_ACCUM_WIDTH                : natural := 64;
 
   constant ECM_TIMESTAMP_WIDTH                        : natural := 48;
   constant ECM_DDS_OUTPUT_WIDTH                       : natural := 12;
@@ -164,16 +165,15 @@ package ecm_pkg is
     skip_pll_postlock_wait    : std_logic;
     force_full_duration       : std_logic;
     repeat_count              : unsigned(ECM_DWELL_REPEAT_COUNT_WIDTH - 1 downto 0);
+    fast_lock_profile         : unsigned(ECM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 0);
+    next_dwell_index          : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
 
     tag                       : unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
     frequency                 : unsigned(ECM_DWELL_FREQUENCY_WIDTH - 1 downto 0);
     measurement_duration      : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
     total_duration_max        : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
-    fast_lock_profile         : unsigned(ECM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 0);
-
-    next_dwell_index          : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
   end record;
-  constant ECM_DWELL_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + ECM_DWELL_TAG_WIDTH + ECM_DWELL_FREQUENCY_WIDTH + ECM_DWELL_DURATION_WIDTH * 2 + 8 + 8;
+  constant ECM_DWELL_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 8 + 8 + ECM_DWELL_TAG_WIDTH + ECM_DWELL_FREQUENCY_WIDTH + ECM_DWELL_DURATION_WIDTH * 2;
 
   type ecm_dwell_program_entry_t is record
     enable                    : std_logic;
@@ -459,15 +459,19 @@ package body ecm_pkg is
     v_flags := ('0', v.force_full_duration, v.skip_pll_postlock_wait, v.skip_pll_lock_check,
                 v.skip_pll_prelock_wait, v.global_counter_dec, v.global_counter_check, v.valid);
 
+    -- swapped by 32-bit word to match SV struct packing in TB
     r := (
-            std_logic_vector(resize_up(v.next_dwell_index, 8),
-            std_logic_vector(resize_up(v.fast_lock_profile, 8),
             std_logic_vector(v.total_duration_max),
+
             std_logic_vector(v.measurement_duration),
-            std_logic_vector(v.frequency),
+
             std_logic_vector(v.tag),
+            std_logic_vector(v.frequency),
+
+            v_flags,
             std_logic_vector(resize_up(v.repeat_count, 8)),
-            v_flags
+            std_logic_vector(resize_up(v.fast_lock_profile, 8)),
+            std_logic_vector(resize_up(v.next_dwell_index, 8))
          );
 
     return r;

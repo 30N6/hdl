@@ -32,8 +32,6 @@ interface dwell_stats_tx_intf (input logic Clk);
 
     repeat (5) @(posedge Clk);
 
-    //$display("%0t: input_data = %p", $time, input_data);
-
     for (int i = 0; i < input_data.size(); i++) begin
       d = input_data[i];
 
@@ -51,6 +49,7 @@ interface dwell_stats_tx_intf (input logic Clk);
 
     @(posedge Clk);
     dwell_measurement_active = 0;
+    repeat($urandom_range(10, 5)) @(posedge Clk);
 
     repeat ($urandom_range(1000, 500)) begin
       input_ctrl.valid      = 1;
@@ -123,12 +122,13 @@ module ecm_dwell_stats_tb;
     bit         dwell_padding;*/
     bit [7:0]   dwell_flags;
     bit [7:0]   dwell_repeat_count;
+    bit [7:0]   dwell_fast_lock_profile;
+    bit [7:0]   dwell_next_dwell_index;
+
     bit [15:0]  dwell_tag;
     bit [15:0]  dwell_frequency;
     bit [31:0]  dwell_measurement_duration;
     bit [31:0]  dwell_total_duration_max;
-    bit [7:0]   dwell_fast_lock_profile;
-    bit [7:0]   dwell_next_dwell_index;
 
     bit [31:0]  dwell_sequence_num;
     bit [31:0]  dwell_actual_measurement_duration;
@@ -181,7 +181,7 @@ module ecm_dwell_stats_tb;
 
   initial begin
     Rst = 1;
-    repeat(10) @(posedge Clk);
+    repeat(100) @(posedge Clk);
     Rst = 0;
   end
 
@@ -284,22 +284,6 @@ module ecm_dwell_stats_tb;
       $display("dwell_repeat_count mismatch: %X %X", report_a.dwell_repeat_count, report_b.dwell_repeat_count);
       return 0;
     end
-    if (report_a.dwell_tag !== report_b.dwell_tag) begin
-      $display("dwell_tag mismatch: %X %X", report_a.dwell_tag, report_b.dwell_tag);
-      return 0;
-    end
-    if (report_a.dwell_frequency !== report_b.dwell_frequency) begin
-      $display("dwell_frequency mismatch: %X %X", report_a.dwell_frequency, report_b.dwell_frequency);
-      return 0;
-    end
-    if (report_a.dwell_measurement_duration !== report_b.dwell_measurement_duration) begin
-      $display("dwell_measurement_duration mismatch: %X %X", report_a.dwell_measurement_duration, report_b.dwell_measurement_duration);
-      return 0;
-    end
-    if (report_a.dwell_total_duration_max !== report_b.dwell_total_duration_max) begin
-      $display("dwell_total_duration_max mismatch: %X %X", report_a.dwell_total_duration_max, report_b.dwell_total_duration_max);
-      return 0;
-    end
     if (report_a.dwell_fast_lock_profile !== report_b.dwell_fast_lock_profile) begin
       $display("dwell_fast_lock_profile mismatch: %X %X", report_a.dwell_fast_lock_profile, report_b.dwell_fast_lock_profile);
       return 0;
@@ -308,6 +292,26 @@ module ecm_dwell_stats_tb;
       $display("dwell_next_dwell_index mismatch: %X %X", report_a.dwell_next_dwell_index, report_b.dwell_next_dwell_index);
       return 0;
     end
+
+    if (report_a.dwell_tag !== report_b.dwell_tag) begin
+      $display("dwell_tag mismatch: %X %X", report_a.dwell_tag, report_b.dwell_tag);
+      return 0;
+    end
+    if (report_a.dwell_frequency !== report_b.dwell_frequency) begin
+      $display("dwell_frequency mismatch: %X %X", report_a.dwell_frequency, report_b.dwell_frequency);
+      return 0;
+    end
+
+    if (report_a.dwell_measurement_duration !== report_b.dwell_measurement_duration) begin
+      $display("dwell_measurement_duration mismatch: %X %X", report_a.dwell_measurement_duration, report_b.dwell_measurement_duration);
+      return 0;
+    end
+
+    if (report_a.dwell_total_duration_max !== report_b.dwell_total_duration_max) begin
+      $display("dwell_total_duration_max mismatch: %X %X", report_a.dwell_total_duration_max, report_b.dwell_total_duration_max);
+      return 0;
+    end
+
     if (report_a.dwell_sequence_num !== report_b.dwell_sequence_num) begin
       $display("dwell_sequence_num mismatch: %X %X", report_a.dwell_sequence_num, report_b.dwell_sequence_num);
       return 0;
@@ -385,12 +389,12 @@ module ecm_dwell_stats_tb;
     report_header.dwell_flags                       = {0, dwell_data.force_full_duration, dwell_data.skip_pll_postlock_wait, dwell_data.skip_pll_lock_check,
                                                        dwell_data.skip_pll_prelock_wait, dwell_data.global_counter_dec, dwell_data.global_counter_check, dwell_data.valid};
     report_header.dwell_repeat_count                = dwell_data.repeat_count;
+    report_header.dwell_fast_lock_profile           = dwell_data.fast_lock_profile;
+    report_header.dwell_next_dwell_index            = dwell_data.next_dwell_index;
     report_header.dwell_tag                         = dwell_data.tag;
     report_header.dwell_frequency                   = dwell_data.frequency;
     report_header.dwell_measurement_duration        = dwell_data.measurement_duration;
     report_header.dwell_total_duration_max          = dwell_data.total_duration_max;
-    report_header.dwell_fast_lock_profile           = dwell_data.fast_lock_profile;
-    report_header.dwell_next_dwell_index            = dwell_data.next_dwell_index;
     report_header.dwell_sequence_num                = dwell_seq_num;
     report_header.dwell_actual_measurement_duration = 0;
     report_header.dwell_actual_total_duration       = 0;
@@ -401,6 +405,7 @@ module ecm_dwell_stats_tb;
 
     for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
       r.data.push_back(report_header_packed[(NUM_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
+      //$display("  expecting word: %08X", report_header_packed[(NUM_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
     end
 
     for (int i_channel = 0; i_channel < ecm_num_channels; i_channel++) begin
