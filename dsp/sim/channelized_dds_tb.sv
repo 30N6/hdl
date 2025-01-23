@@ -77,15 +77,15 @@ module channelized_dds_tb;
 
   channelized_dds #(.OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .NUM_CHANNELS(NUM_CHANNELS), .CHANNEL_INDEX_WIDTH(CHANNEL_INDEX_WIDTH), .LATENCY(7)) dut
   (
-    .Clk          (Clk),
-    .Rst          (Rst),
+    .Clk                    (Clk),
+    .Rst                    (Rst),
 
-    .Dwell_active (1'b1),
-    .Control_data (ctrl_intf.data),
-    .Sync_data    (r_sync_input),
+    .Dwell_active_transmit  (1'b1),
+    .Control_data           (ctrl_intf.data),
+    .Sync_data              (r_sync_input),
 
-    .Output_ctrl  (w_output_ctrl),
-    .Output_data  (w_output_data)
+    .Output_ctrl            (w_output_ctrl),
+    .Output_data            (w_output_data)
   );
 
   always_ff @(posedge Clk) begin

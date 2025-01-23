@@ -87,8 +87,10 @@ architecture rtl of ecm_top is
   signal r_ad9361_status              : std_logic_vector_array_t(AD9361_BIT_PIPE_DEPTH - 1 downto 0)(7 downto 0);
 
   signal w_dwell_active               : std_logic;
+  signal w_dwell_active_meas          : std_logic;
+  signal w_dwell_active_tx            : std_logic;
   signal w_dwell_done                 : std_logic;
-  --signal w_dwell_data                 : esm_dwell_metadata_t;
+  signal w_dwell_data                 : esm_dwell_entry_t;
   signal w_dwell_sequence_num         : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal w_dwell_stats_report_done    : std_logic;
   signal w_dwell_drfm_reports_done    : std_logic;
@@ -118,12 +120,15 @@ architecture rtl of ecm_top is
   signal w_drfm_write_req             : ecm_drfm_write_req_t;
   signal w_drfm_read_req              : ecm_drfm_read_req_t;
   signal w_drfm_control               : channelizer_control_t;
-  signal w_drfm_data                  : signed_array_t(1 downto 0)(ECM_DDS_OUTPUT_WIDTH - 1 downto 0)
+  signal w_drfm_data                  : signed_array_t(1 downto 0)(ECM_DDS_OUTPUT_WIDTH - 1 downto 0);
 
   signal w_dds_command                : dds_control_t;
-  signal w_dds_sync                   : channelizer_control_t;
   signal w_dds_control                : channelizer_control_t;
-  signal w_dds_data                   : signed_array_t(1 downto 0)(ECM_DDS_OUTPUT_WIDTH - 1 downto 0)
+  signal w_dds_data                   : signed_array_t(1 downto 0)(ECM_DDS_OUTPUT_WIDTH - 1 downto 0);
+
+  signal w_sync_to_dwell_controller   : channelizer_control_t;
+  signal w_sync_to_dds                : channelizer_control_t;
+  signal w_output_control             : ecm_output_control_t;
 
   signal w_channelizer_warnings       : ecm_channelizer_warnings_t;
   signal w_channelizer_errors         : ecm_channelizer_errors_t;
@@ -197,20 +202,33 @@ begin
     PLL_POST_LOCK_DELAY_CYCLES  => PLL_POST_LOCK_DELAY_CYCLES
   )
   port map (
-    Clk                 => Adc_clk_x4,
-    Rst                 => r_combined_rst,
+    Clk                       => Adc_clk_x4,
+    Rst                       => r_combined_rst,
 
-    Module_config       => w_module_config,
+    Module_config             => w_module_config,
 
-    Ad9361_control      => w_ad9361_control,
-    Ad9361_status       => r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 1),
+    Ad9361_control            => w_ad9361_control,
+    Ad9361_status             => r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 1),
 
-    Dwell_active        => w_dwell_active,
-    Dwell_data          => w_dwell_data,
-    Dwell_sequence_num  => w_dwell_sequence_num,
+    Channelizer_ctrl          => w_channelizer16_control,
+    Channelizer_data          => w_channelizer16_data,
+    Channelizer_pwr           => w_channelizer16_pwr,
 
-    Dds_control         => w_dds_command,
-    Drfm_control        => w_drfm_command
+    Sync_data                 => w_sync_to_dwell_controller,
+
+    Dwell_active              => w_dwell_active,
+    Dwell_active_measurement  => w_dwell_active_meas,
+    Dwell_active_transmit     => w_dwell_active_tx,
+    Dwell_done                => w_dwell_done,
+    Dwell_data                => w_dwell_data,
+    Dwell_sequence_num        => w_dwell_sequence_num,
+    Dwell_report_done_drfm    => w_dwell_drfm_reports_done,
+    Dwell_report_done_stats   => w_dwell_stats_report_done,
+
+    Drfm_write_req            => w_drfm_write_req,
+    Drfm_read_req             => w_drfm_read_req,
+    Dds_control               => w_dds_command,
+    Output_control            => w_output_control,
 
   );
 
@@ -332,7 +350,7 @@ begin
       Enable                    => w_enable_chan,
 
       Dwell_active              => w_dwell_active,
-      Dwell_measurement_active  => w_dwell_active,    --TODO: need a specific measurement active signal -- dwell_active is for entire dwell
+      Dwell_active_measurement  => w_dwell_active_measurement,
       Dwell_data                => w_dwell_data,
       Dwell_sequence_num        => w_dwell_sequence_num,
       Dwell_report_done         => w_dwell_stats_report_done,
@@ -367,6 +385,7 @@ begin
       Rst                     => r_combined_rst,
 
       Dwell_active            => w_dwell_active,
+      Dwell_active_transmit   => w_dwell_active_tx,
       Dwell_done              => w_dwell_done,
       Dwell_sequence_num      => w_dwell_sequence_num,
       Dwell_reports_done      => w_dwell_drfm_reports_done,
@@ -406,15 +425,15 @@ begin
     LATENCY             => 7 --TODO
   )
   port map (
-    Clk           => Adc_clk_x4,
-    Rst           => r_combined_rst,
+    Clk                   => Adc_clk_x4,
+    Rst                   => r_combined_rst,
 
-    Dwell_active  => w_dwell_active,  --TODO: right signal? need transmit active, not dwell active
-    Control_data  => w_dds_command,
-    Sync_data     => w_dds_sync,
+    Dwell_active_transmit => w_dwell_active_tx,
+    Control_data          => w_dds_command,
+    Sync_data             => w_sync_to_dds,
 
-    Output_ctrl   => w_dds_control,
-    Output_data   => w_dds_data
+    Output_ctrl           => w_dds_control,
+    Output_data           => w_dds_data
   );
 
   i_status_reporter : entity ecm_lib.ecm_status_reporter

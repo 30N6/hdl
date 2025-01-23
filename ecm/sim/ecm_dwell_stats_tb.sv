@@ -205,7 +205,7 @@ module ecm_dwell_stats_tb;
     .Enable                   (1'b1),
 
     .Dwell_active             (dwell_tx_intf.dwell_active),
-    .Dwell_measurement_active (dwell_tx_intf.dwell_measurement_active),
+    .Dwell_active_measurement (dwell_tx_intf.dwell_measurement_active),
     .Dwell_data               (dwell_tx_intf.dwell_data),
     .Dwell_sequence_num       (dwell_tx_intf.dwell_sequence_num),
     .Dwell_report_done        (dwell_tx_intf.dwell_report_done),

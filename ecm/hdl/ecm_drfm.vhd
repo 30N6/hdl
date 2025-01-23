@@ -25,6 +25,7 @@ port (
   Rst                     : in  std_logic;
 
   Dwell_active            : in  std_logic;
+  Dwell_active_transmit   : in  std_logic;
   Dwell_done              : in  std_logic;
   Dwell_sequence_num      : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   Dwell_reports_done      : out std_logic;
@@ -70,6 +71,7 @@ architecture rtl of ecm_drfm is
 
   signal r_rst                            : std_logic;
   signal r_dwell_active                   : std_logic;
+  signal r_dwell_active_tx                : std_logic;
   signal r_dwell_done                     : std_logic;
   signal r_dwell_sequence_num             : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
@@ -140,6 +142,7 @@ begin
     if rising_edge(Clk) then
       r_rst                 <= Rst;
       r_dwell_active        <= Dwell_active;
+      r_dwell_active_tx     <= Dwell_active_transmit;
       r_dwell_done          <= Dwell_done;
       r_dwell_sequence_num  <= Dwell_sequence_num;
       r0_write_req          <= Write_req;
@@ -268,8 +271,8 @@ begin
   begin
     if rising_edge(Clk) then
       r3_read_req             <= r2_read_req;
-      r3_read_data_scaled(0)  <= shift_left(w2_read_data(0), to_integer(w2_iq_shift));
-      r3_read_data_scaled(1)  <= shift_left(w2_read_data(1), to_integer(w2_iq_shift));
+      r3_read_data_scaled(0)  <= shift_left(w2_read_data(0), to_integer(w2_iq_shift)) when (r_dwell_active_tx = '1') else (others => '0');
+      r3_read_data_scaled(1)  <= shift_left(w2_read_data(1), to_integer(w2_iq_shift)) when (r_dwell_active_tx = '1') else (others => '0');
     end if;
   end process;
 

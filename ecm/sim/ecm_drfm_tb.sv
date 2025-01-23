@@ -303,6 +303,7 @@ module ecm_drfm_tb;
     .Rst                      (Rst),
 
     .Dwell_active             (tx_intf.dwell_active),
+    .Dwell_active_transmit    (tx_intf.dwell_active),
     .Dwell_done               (tx_intf.dwell_done),
     .Dwell_sequence_num       (tx_intf.dwell_sequence_num),
     .Dwell_reports_done       (tx_intf.dwell_reports_done),

@@ -10,90 +10,92 @@ library dsp_lib;
 
 package ecm_pkg is
 
-  constant ECM_WORDS_PER_DMA_PACKET                   : natural := 128;
+  constant ECM_WORDS_PER_DMA_PACKET                       : natural := 128;
 
-  constant ECM_CONTROL_MAGIC_NUM                      : std_logic_vector(31 downto 0) := x"45434D43";
-  constant ECM_REPORT_MAGIC_NUM                       : std_logic_vector(31 downto 0) := x"45434D52";
+  constant ECM_CONTROL_MAGIC_NUM                          : std_logic_vector(31 downto 0) := x"45434D43";
+  constant ECM_REPORT_MAGIC_NUM                           : std_logic_vector(31 downto 0) := x"45434D52";
 
-  constant ECM_MODULE_ID_WIDTH                        : natural := 8;
-  constant ECM_MODULE_ID_CONTROL                      : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"00";
-  constant ECM_MODULE_ID_DWELL_CONTROLLER             : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"01";
-  constant ECM_MODULE_ID_DWELL_STATS                  : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"02";
-  constant ECM_MODULE_ID_DRFM                         : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"05";
-  constant ECM_MODULE_ID_STATUS                       : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"06";
+  constant ECM_MODULE_ID_WIDTH                            : natural := 8;
+  constant ECM_MODULE_ID_CONTROL                          : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"00";
+  constant ECM_MODULE_ID_DWELL_CONTROLLER                 : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"01";
+  constant ECM_MODULE_ID_DWELL_STATS                      : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"02";
+  constant ECM_MODULE_ID_DRFM                             : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"05";
+  constant ECM_MODULE_ID_STATUS                           : unsigned(ECM_MODULE_ID_WIDTH - 1 downto 0) := x"06";
 
-  constant ECM_MESSAGE_TYPE_WIDTH                     : natural := 8;
-  constant ECM_CONTROL_MESSAGE_TYPE_ENABLE            : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"00";
-  constant ECM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY       : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"01";
-  constant ECM_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM     : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"02";
-  constant ECM_CONTROL_MESSAGE_TYPE_CHANNEL_CONTROL   : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"03";
-  constant ECM_CONTROL_MESSAGE_TYPE_TX_INSTRUCTION    : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"03";
-  constant ECM_REPORT_MESSAGE_TYPE_DWELL_STATS        : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"10";
-  constant ECM_REPORT_MESSAGE_TYPE_DRFM_CHANNEL_DATA  : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"20";
-  constant ECM_REPORT_MESSAGE_TYPE_DRFM_SUMMARY       : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"21";
-  constant ECM_REPORT_MESSAGE_TYPE_STATUS             : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"30";
+  constant ECM_MESSAGE_TYPE_WIDTH                         : natural := 8;
+  constant ECM_CONTROL_MESSAGE_TYPE_ENABLE                : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"00";
+  constant ECM_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM         : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"01";
+  constant ECM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY           : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"02";
+  constant ECM_CONTROL_MESSAGE_TYPE_DWELL_CHANNEL_CONTROL : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"03";
+  constant ECM_CONTROL_MESSAGE_TYPE_DWELL_TX_INSTRUCTION  : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"04";
+  constant ECM_REPORT_MESSAGE_TYPE_DWELL_STATS            : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"10";
+  constant ECM_REPORT_MESSAGE_TYPE_DRFM_CHANNEL_DATA      : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"20";
+  constant ECM_REPORT_MESSAGE_TYPE_DRFM_SUMMARY           : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"21";
+  constant ECM_REPORT_MESSAGE_TYPE_STATUS                 : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"30";
 
-  constant ECM_CONFIG_ADDRESS_WIDTH                   : natural := 16;
+  constant ECM_CONFIG_ADDRESS_WIDTH                       : natural := 16;
 
-  constant ECM_NUM_CHANNELS                           : natural := 16;
-  constant ECM_CHANNEL_INDEX_WIDTH                    : natural := clog2(ECM_NUM_CHANNELS);
+  constant ECM_NUM_CHANNELS                               : natural := 16;
+  constant ECM_CHANNEL_INDEX_WIDTH                        : natural := clog2(ECM_NUM_CHANNELS);
 
-  constant ECM_TX_INSTRUCTION_TYPE_NOP                : natural := 0;
-  constant ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_BPSK     : natural := 1;
-  constant ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_CW_SWEEP : natural := 2;
-  constant ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_CW_STEP  : natural := 3;
-  constant ECM_TX_INSTRUCTION_TYPE_PLAYBACK           : natural := 4;
-  constant ECM_TX_INSTRUCTION_TYPE_WAIT               : natural := 5;
-  constant ECM_TX_INSTRUCTION_TYPE_JUMP               : natural := 6;
-  constant ECM_TX_INSTRUCTION_TYPE_WIDTH              : natural := 4;
+  constant ECM_NUM_TX_INSTRUCTIONS                        : natural := 512;
+  constant ECM_TX_INSTRUCTION_INDEX_WIDTH                 : natural := clog2(ECM_NUM_TX_INSTRUCTIONS);
+  constant ECM_TX_INSTRUCTION_LOOP_COUNTER_WIDTH          : natural := 16;
+  constant ECM_TX_INSTRUCTION_WAIT_DURATION_WIDTH         : natural := 20;
+  constant ECM_TX_INSTRUCTION_PLAYBACK_COUNTER_WIDTH      : natural := 16;
+  constant ECM_TX_INSTRUCTION_DATA_WIDTH                  : natural := 64;
 
-  constant ECM_TX_OUTPUT_CONTROL_DISABLED             : natural := 0;
-  constant ECM_TX_OUTPUT_CONTROL_DDS                  : natural := 1;
-  constant ECM_TX_OUTPUT_CONTROL_DRFM                 : natural := 2;
-  constant ECM_TX_OUTPUT_CONTROL_MIXER                : natural := 3;
-  constant ECM_TX_OUTPUT_CONTROL_WIDTH                : natural := 2;
+  constant ECM_TX_INSTRUCTION_TYPE_NOP                    : natural := 0;
+  constant ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_BPSK         : natural := 1;
+  constant ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_CW_SWEEP     : natural := 2;
+  constant ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_CW_STEP      : natural := 3;
+  constant ECM_TX_INSTRUCTION_TYPE_PLAYBACK               : natural := 4;
+  constant ECM_TX_INSTRUCTION_TYPE_WAIT                   : natural := 5;
+  constant ECM_TX_INSTRUCTION_TYPE_JUMP                   : natural := 6;
+  constant ECM_TX_INSTRUCTION_TYPE_WIDTH                  : natural := 4;
 
-  constant ECM_NUM_TX_INSTRUCTIONS                    : natural := 512;
-  constant ECM_TX_INSTRUCTION_INDEX_WIDTH             : natural := clog2(ECM_NUM_TX_INSTRUCTIONS);
-  constant ECM_TX_INSTRUCTION_LOOP_COUNTER_WIDTH      : natural := 16;
-  constant ECM_TX_INSTRUCTION_WAIT_DURATION_WIDTH     : natural := 20;
-  constant ECM_TX_INSTRUCTION_PLAYBACK_COUNTER_WIDTH  : natural := 16;
+  constant ECM_TX_OUTPUT_CONTROL_DISABLED                 : natural := 0;
+  constant ECM_TX_OUTPUT_CONTROL_DDS                      : natural := 1;
+  constant ECM_TX_OUTPUT_CONTROL_DRFM                     : natural := 2;
+  constant ECM_TX_OUTPUT_CONTROL_MIXER                    : natural := 3;
+  constant ECM_TX_OUTPUT_CONTROL_WIDTH                    : natural := 2;
 
-  constant ECM_NUM_FAST_LOCK_PROFILES                 : natural := 8;
-  constant ECM_FAST_LOCK_PROFILE_INDEX_WIDTH          : natural := clog2(ECM_NUM_FAST_LOCK_PROFILES);
+  constant ECM_NUM_FAST_LOCK_PROFILES                     : natural := 8;
+  constant ECM_FAST_LOCK_PROFILE_INDEX_WIDTH              : natural := clog2(ECM_NUM_FAST_LOCK_PROFILES);
 
-  constant ECM_NUM_DWELL_ENTRIES                      : natural := 16;
-  constant ECM_DWELL_ENTRY_INDEX_WIDTH                : natural := clog2(ECM_NUM_DWELL_ENTRIES);
-  constant ECM_NUM_CHANNEL_CONTROL_ENTRIES            : natural := ECM_NUM_CHANNELS * ECM_NUM_DWELL_ENTRIES;
+  constant ECM_NUM_DWELL_ENTRIES                          : natural := 16;
+  constant ECM_DWELL_ENTRY_INDEX_WIDTH                    : natural := clog2(ECM_NUM_DWELL_ENTRIES);
+  constant ECM_NUM_CHANNEL_CONTROL_ENTRIES                : natural := ECM_NUM_CHANNELS * ECM_NUM_DWELL_ENTRIES;
+  constant ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH    : natural := clog2(ECM_NUM_CHANNEL_CONTROL_ENTRIES);
 
-  constant ECM_CHANNEL_TX_MODE_NONE                   : natural := 0;
-  constant ECM_CHANNEL_TX_MODE_NOISE_ONLY             : natural := 1;
-  constant ECM_CHANNEL_TX_MODE_FORCE_TRIGGER          : natural := 2;
-  constant ECM_CHANNEL_TX_MODE_THRESHOLD_TRIGGER      : natural := 3;
-  constant ECM_CHANNEL_TX_MODE_WIDTH                  : natural := 2;
-  constant ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES         : natural := 4;
+  constant ECM_CHANNEL_TX_MODE_NONE                       : natural := 0;
+  constant ECM_CHANNEL_TX_MODE_NOISE_ONLY                 : natural := 1;
+  constant ECM_CHANNEL_TX_MODE_FORCE_TRIGGER              : natural := 2;
+  constant ECM_CHANNEL_TX_MODE_THRESHOLD_TRIGGER          : natural := 3;
+  constant ECM_CHANNEL_TX_MODE_WIDTH                      : natural := 2;
+  constant ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES             : natural := 4;
 
-  constant ECM_DRFM_DATA_WIDTH                        : natural := 16;
-  constant ECM_DRFM_DATA_WIDTH_WIDTH                  : natural := clog2(ECM_DRFM_DATA_WIDTH);
-  constant ECM_DRFM_MEM_DEPTH                         : natural := 1024 * 24;
-  constant ECM_DRFM_ADDR_WIDTH                        : natural := clog2(ECM_DRFM_MEM_DEPTH);
-  constant ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH        : natural := 32;
-  constant ECM_DRFM_SEGMENT_LENGTH_WIDTH              : natural := 16;  --TODO: shrink?
-  constant ECM_DRFM_SEGMENT_SLICE_LENGTH_WIDTH        : natural := 8;
-  constant ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH          : natural := 2;
-  constant ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT  : natural := 116;
+  constant ECM_DRFM_DATA_WIDTH                            : natural := 16;
+  constant ECM_DRFM_DATA_WIDTH_WIDTH                      : natural := clog2(ECM_DRFM_DATA_WIDTH);
+  constant ECM_DRFM_MEM_DEPTH                             : natural := 1024 * 24;
+  constant ECM_DRFM_ADDR_WIDTH                            : natural := clog2(ECM_DRFM_MEM_DEPTH);
+  constant ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH            : natural := 32;
+  constant ECM_DRFM_SEGMENT_LENGTH_WIDTH                  : natural := 16;  --TODO: shrink?
+  constant ECM_DRFM_SEGMENT_SLICE_LENGTH_WIDTH            : natural := 8;
+  constant ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH              : natural := 2;
+  constant ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT      : natural := 116;
 
-  constant ECM_DWELL_DURATION_WIDTH                   : natural := 32;
-  constant ECM_DWELL_SEQUENCE_NUM_WIDTH               : natural := 32;
-  constant ECM_DWELL_REPEAT_COUNT_WIDTH               : natural := 4;
-  constant ECM_DWELL_TAG_WIDTH                        : natural := 16;
-  constant ECM_DWELL_FREQUENCY_WIDTH                  : natural := 16;
-  constant ECM_DWELL_GLOBAL_COUNTER_WIDTH             : natural := 16;
-  constant ECM_DWELL_POWER_ACCUM_WIDTH                : natural := 64;
-  constant ECM_DWELL_PLL_DELAY_WIDTH                  : natural := 16;
+  constant ECM_DWELL_DURATION_WIDTH                       : natural := 32;
+  constant ECM_DWELL_SEQUENCE_NUM_WIDTH                   : natural := 32;
+  constant ECM_DWELL_REPEAT_COUNT_WIDTH                   : natural := 4;
+  constant ECM_DWELL_TAG_WIDTH                            : natural := 16;
+  constant ECM_DWELL_FREQUENCY_WIDTH                      : natural := 16;
+  constant ECM_DWELL_GLOBAL_COUNTER_WIDTH                 : natural := 16;
+  constant ECM_DWELL_POWER_ACCUM_WIDTH                    : natural := 64;
+  constant ECM_DWELL_PLL_DELAY_WIDTH                      : natural := 16;
 
-  constant ECM_TIMESTAMP_WIDTH                        : natural := 48;
-  constant ECM_DDS_OUTPUT_WIDTH                       : natural := 12;
+  constant ECM_TIMESTAMP_WIDTH                            : natural := 48;
+  constant ECM_DDS_OUTPUT_WIDTH                           : natural := 12;
 
   type ecm_tx_instruction_header_t is record
     valid               : std_logic;
@@ -145,6 +147,7 @@ package ecm_pkg is
     duration_gate_min           : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
     duration_gate_max           : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   end record;
+  constant ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 16 + 2*ECM_DRFM_SEGMENT_LENGTH_WIDTH;
 
   type ecm_channel_tx_program_entry_array_t is array (natural range <>) of ecm_channel_tx_program_entry_t;
 
@@ -156,6 +159,8 @@ package ecm_pkg is
     trigger_hyst_shift    : unsigned(ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH - 1 downto 0);
     program_entries       : ecm_channel_tx_program_entry_array_t(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1 downto 0);
   end record;
+  constant ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH := 8 + 8 + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH + 8 + 24 +
+                                                      ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES * ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH; -- 24 bits of padding
 
   type ecm_dwell_entry_t is record
     valid                     : std_logic;
@@ -183,9 +188,10 @@ package ecm_pkg is
 
   type ecm_dwell_program_entry_t is record
     enable                    : std_logic;
-    global_counter_init       : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
     initial_dwell_index       : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
+    global_counter_init       : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   end record;
+  constant ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + ECM_DWELL_GLOBAL_COUNTER_WIDTH;
 
   type ecm_hardware_control_entry_t is record
     reset                     : std_logic;
@@ -211,6 +217,8 @@ package ecm_pkg is
   --  message_type              : unsigned(ECM_MESSAGE_TYPE_WIDTH - 1 downto 0);
   --  address                   : unsigned(ECM_CONFIG_ADDRESS_WIDTH - 1 downto 0);
   --end record;
+  constant ECM_COMMON_HEADER_WIDTH  : natural := 96;
+
 
   --type ecm_report_dwell_stats_t is record
   --  dwell_entry               : ecm_dwell_entry_t;
@@ -256,6 +264,12 @@ package ecm_pkg is
     address             : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
     channel_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
     channel_last        : std_logic;
+  end record;
+
+  type ecm_output_control_t is record
+    valid               : std_logic;
+    channel_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+    control             : unsigned(ECM_TX_OUTPUT_CONTROL_WIDTH - 1 downto 0);
   end record;
 
 
@@ -330,6 +344,10 @@ package ecm_pkg is
   --function unpack(v : std_logic_vector) return ecm_tx_instruction_wait_t;
   --function unpack(v : std_logic_vector) return ecm_tx_instruction_jump_t;
   function unpack(v : std_logic_vector) return ecm_config_data_t;
+  function unpack_aligned(v : std_logic_vector(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_program_entry_t;
+  function unpack_aligned(v : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_entry_t;
+  function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t;
+  function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t;
 
   function pack(v : ecm_channelizer_warnings_t) return std_logic_vector;
   function pack(v : ecm_channelizer_errors_t) return std_logic_vector;
@@ -362,6 +380,69 @@ package body ecm_pkg is
 
     return r;
   end function;
+
+  function unpack_aligned(v : std_logic_vector(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_program_entry_t is
+    variable r : ecm_dwell_program_entry_t;
+  begin
+    r.enable              := v(0);
+    r.initial_dwell_index := v(8 + ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 8);
+    r.global_counter_init := v(16 + ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 16);
+    return r;
+  end function;
+
+  function unpack_aligned(v : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_entry_t;
+    variable r : ecm_dwell_entry_t;
+  begin
+
+    (v.force_full_duration, v.skip_pll_postlock_wait, v.skip_pll_lock_check,
+     v.skip_pll_prelock_wait, v.global_counter_dec, v.global_counter_check, v.valid) := v(6 downto 0);
+
+    r.repeat_count          := v(8 + ECM_DWELL_REPEAT_COUNT_WIDTH - 1 downto 8);
+    r.fast_lock_profile     := v(16 + ECM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 16);
+    r.next_dwell_index      := v(24 + ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 24);
+
+    r.pll_pre_lock_delay    := v(32 + ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 32);
+    r.pll_post_lock_delay   := v(48 + ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 48);
+
+    r.tag                   := v(64 + ECM_DWELL_TAG_WIDTH - 1 downto 64);
+    r.frequency             := v(80 + ECM_DWELL_FREQUENCY_WIDTH - 1 downto 80);
+
+    r.measurement_duration  := v(96 + ECM_DWELL_FREQUENCY_WIDTH - 1 downto 96);
+    r.total_duration_max    := v(128 + ECM_DWELL_DURATION_WIDTH - 1 downto 128);
+
+    return r;
+  end function;
+
+  function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t is
+    variable r : ecm_channel_tx_program_entry_t;
+  begin
+
+    r.valid                       := v(0);
+    r.trigger_immediate_after_min := v(8);
+    r.tx_program_index            := v(16 + ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 16);
+    r.duration_gate_min           := v(32 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 32);
+    r.duration_gate_max           := v(48 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 48);
+
+    return r;
+  end function;
+
+  function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t is
+    variable r : ecm_channel_control_entry_t;
+  begin
+    r.enable                := v(0);
+    r.tx_mode               := v(8 + ECM_CHANNEL_TX_MODE_WIDTH - 1 downto 8);
+    r.trigger_duration_max  := v(16 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 16);
+
+    r.trigger_threshold     := v(32 + CHAN_POWER_WIDTH - 1 downto 32);
+    r.trigger_hyst_shift    := v(64 + ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH - 1 downto 64);
+
+    for i in 0 to (ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1) loop
+      r.program_entries(i)  := unpack_aligned(v(64 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH * (i+1) - 1 downto 64 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH*i));
+    end loop;
+
+    return r;
+  end function;
+
 
   function pack(v : ecm_channelizer_warnings_t) return std_logic_vector is
     variable r : std_logic_vector(ECM_CHANNELIZER_WARNINGS_WIDTH - 1 downto 0);

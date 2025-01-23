@@ -25,7 +25,7 @@ port (
   Enable                    : in  std_logic;
 
   Dwell_active              : in  std_logic;
-  Dwell_measurement_active  : in  std_logic;
+  Dwell_active_measurement  : in  std_logic;
   Dwell_data                : in  ecm_dwell_entry_t;
   Dwell_sequence_num        : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   Dwell_report_done         : out std_logic;
@@ -58,58 +58,58 @@ architecture rtl of ecm_dwell_stats is
     S_REPORT_ACK
   );
 
-  signal r_rst                        : std_logic;
-  signal r_enable                     : std_logic;
+  signal r_rst                      : std_logic;
+  signal r_enable                   : std_logic;
 
-  signal r_dwell_active               : std_logic;
-  signal r_dwell_measurement_active   : std_logic;
-  signal r_dwell_data                 : ecm_dwell_entry_t;
-  signal r_dwell_sequence_num         : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal r_dwell_active             : std_logic;
+  signal r_dwell_active_meas        : std_logic;
+  signal r_dwell_data               : ecm_dwell_entry_t;
+  signal r_dwell_sequence_num       : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
-  signal r_input_ctrl                 : channelizer_control_t;
-  signal r_input_pwr                  : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r_input_ctrl               : channelizer_control_t;
+  signal r_input_pwr                : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  signal s_state                      : state_t;
+  signal s_state                    : state_t;
 
-  signal m_channel_accum              : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
-  signal m_channel_max                : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
-  signal m_channel_cycles             : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+  signal m_channel_accum            : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
+  signal m_channel_max              : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
+  signal m_channel_cycles           : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
 
-  signal w_channel_wr_en              : std_logic;
-  signal w_channel_wr_index           : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_channel_wr_accum           : unsigned(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
-  signal w_channel_wr_max             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-  signal w_channel_wr_cycles          : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
-  signal w_channel_rd_index           : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_channel_wr_en            : std_logic;
+  signal w_channel_wr_index         : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_channel_wr_accum         : unsigned(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
+  signal w_channel_wr_max           : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal w_channel_wr_cycles        : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+  signal w_channel_rd_index         : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
 
-  signal r_read_pipe_ctrl             : channelizer_control_array_t(READ_PIPE_DEPTH - 1 downto 0);
-  signal r_read_pipe_active           : std_logic_vector(READ_PIPE_DEPTH - 1 downto 0);
-  signal r_read_pipe_req              : std_logic_vector(READ_LATENCY - 1 downto 0);
-  signal r_read_pipe_pwr              : unsigned_array_t(READ_LATENCY     downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
-  signal r_channel_rd_accum           : unsigned_array_t(READ_LATENCY - 1 downto 0)(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
-  signal r_channel_rd_max             : unsigned_array_t(READ_LATENCY     downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
-  signal r_channel_rd_cycles          : unsigned_array_t(READ_LATENCY     downto 0)(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+  signal r_read_pipe_ctrl           : channelizer_control_array_t(READ_PIPE_DEPTH - 1 downto 0);
+  signal r_read_pipe_active         : std_logic_vector(READ_PIPE_DEPTH - 1 downto 0);
+  signal r_read_pipe_req            : std_logic_vector(READ_LATENCY - 1 downto 0);
+  signal r_read_pipe_pwr            : unsigned_array_t(READ_LATENCY     downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r_channel_rd_accum         : unsigned_array_t(READ_LATENCY - 1 downto 0)(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
+  signal r_channel_rd_max           : unsigned_array_t(READ_LATENCY     downto 0)(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r_channel_rd_cycles        : unsigned_array_t(READ_LATENCY     downto 0)(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
 
-  signal r_channel_new_accum_d0_a     : unsigned(31 downto 0);
-  signal r_channel_new_accum_d0_b     : unsigned(31 downto 0);
-  signal r_channel_new_accum_d0_c     : unsigned(0 downto 0);
-  signal r_channel_new_accum_d1       : unsigned(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
-  signal r_channel_new_max_valid_d0   : std_logic;
-  signal r_channel_new_max_d1         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-  signal r_channel_new_cycles_d1      : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+  signal r_channel_new_accum_d0_a   : unsigned(31 downto 0);
+  signal r_channel_new_accum_d0_b   : unsigned(31 downto 0);
+  signal r_channel_new_accum_d0_c   : unsigned(0 downto 0);
+  signal r_channel_new_accum_d1     : unsigned(ECM_DWELL_POWER_ACCUM_WIDTH - 1 downto 0);
+  signal r_channel_new_max_valid_d0 : std_logic;
+  signal r_channel_new_max_d1       : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r_channel_new_cycles_d1    : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
 
-  signal r_clear_index                : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
+  signal r_clear_index              : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
 
-  signal r_duration_measurement       : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
-  signal r_duration_total             : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
-  signal r_timestamp                  : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
-  signal r_ts_dwell_start             : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
+  signal r_duration_measurement     : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+  signal r_duration_total           : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+  signal r_timestamp                : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
+  signal r_ts_dwell_start           : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
 
-  signal w_dwell_done                 : std_logic;
-  signal w_report_read_req            : std_logic;
-  signal w_report_read_index          : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_report_ack                 : std_logic;
-  signal w_clear_channels             : std_logic;
+  signal w_dwell_done               : std_logic;
+  signal w_report_read_req          : std_logic;
+  signal w_report_read_index        : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_report_ack               : std_logic;
+  signal w_clear_channels           : std_logic;
 
 begin
 
@@ -124,10 +124,10 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_input_ctrl                <= Input_ctrl;
-      r_input_pwr                 <= Input_pwr;
-      r_dwell_active              <= Dwell_active;
-      r_dwell_measurement_active  <= Dwell_measurement_active;
+      r_input_ctrl            <= Input_ctrl;
+      r_input_pwr             <= Input_pwr;
+      r_dwell_active          <= Dwell_active;
+      r_dwell_active_meas     <= Dwell_active_measurement;
 
       if (s_state = S_IDLE) then
         r_dwell_data          <= Dwell_data;
@@ -144,7 +144,7 @@ begin
       else
         case s_state is
         when S_IDLE =>
-          if ((r_enable = '1') and (r_dwell_active = '1') and (r_dwell_measurement_active = '1')) then
+          if ((r_enable = '1') and (r_dwell_active = '1') and (r_dwell_active_meas = '1')) then
             s_state <= S_ACTIVE;
           else
             s_state <= S_IDLE;
@@ -153,7 +153,7 @@ begin
         when S_ACTIVE =>
           if (r_dwell_active = '0') then
             s_state <= S_DONE;
-          elsif (r_dwell_measurement_active = '0') then
+          elsif (r_dwell_active_meas = '0') then
             s_state <= S_WAIT_DONE;
           else
             s_state <= S_ACTIVE;
