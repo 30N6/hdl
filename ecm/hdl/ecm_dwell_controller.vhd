@@ -136,6 +136,8 @@ architecture rtl of ecm_dwell_controller is
   signal r_report_received_drfm     : std_logic;
   signal r_report_received_stats    : std_logic;
 
+  signal r_trigger_pending          : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
+
   signal r_dwell_sequence_num       : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   signal r_dwell_active             : std_logic;
@@ -422,6 +424,8 @@ begin
       end if;
     end if;
   end process;
+
+
 
 
   process(Clk)

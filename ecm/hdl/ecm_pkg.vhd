@@ -68,11 +68,11 @@ package ecm_pkg is
   constant ECM_NUM_CHANNEL_CONTROL_ENTRIES                : natural := ECM_NUM_CHANNELS * ECM_NUM_DWELL_ENTRIES;
   constant ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH    : natural := clog2(ECM_NUM_CHANNEL_CONTROL_ENTRIES);
 
-  constant ECM_CHANNEL_TX_MODE_NONE                       : natural := 0;
-  constant ECM_CHANNEL_TX_MODE_NOISE_ONLY                 : natural := 1;
-  constant ECM_CHANNEL_TX_MODE_FORCE_TRIGGER              : natural := 2;
-  constant ECM_CHANNEL_TX_MODE_THRESHOLD_TRIGGER          : natural := 3;
-  constant ECM_CHANNEL_TX_MODE_WIDTH                      : natural := 2;
+  constant ECM_CHANNEL_TRIGGER_MODE_NONE                  : natural := 0;
+  constant ECM_CHANNEL_TRIGGER_MODE_NOISE_ONLY            : natural := 1;
+  constant ECM_CHANNEL_TRIGGER_MODE_FORCE_TRIGGER         : natural := 2;
+  constant ECM_CHANNEL_TRIGGER_MODE_THRESHOLD_TRIGGER     : natural := 3;
+  constant ECM_CHANNEL_TRIGGER_MODE_WIDTH                 : natural := 2;
   constant ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES             : natural := 4;
 
   constant ECM_DRFM_DATA_WIDTH                            : natural := 16;
@@ -152,15 +152,18 @@ package ecm_pkg is
   type ecm_channel_tx_program_entry_array_t is array (natural range <>) of ecm_channel_tx_program_entry_t;
 
   type ecm_channel_control_entry_t is record
-    enable                : std_logic;
-    tx_mode               : unsigned(ECM_CHANNEL_TX_MODE_WIDTH - 1 downto 0);
-    trigger_duration_max  : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-    trigger_threshold     : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-    trigger_hyst_shift    : unsigned(ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH - 1 downto 0);
-    program_entries       : ecm_channel_tx_program_entry_array_t(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1 downto 0);
+    enable                          : std_logic;
+    trigger_mode                    : unsigned(ECM_CHANNEL_TRIGGER_MODE_WIDTH - 1 downto 0);
+    trigger_duration_max_minus_one  : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+    trigger_threshold               : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+    trigger_hyst_shift              : unsigned(ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH - 1 downto 0);
+    recording_address               : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+    program_entries                 : ecm_channel_tx_program_entry_array_t(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1 downto 0);
   end record;
-  constant ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH := 8 + 8 + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH + 8 + 24 +
-                                                      ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES * ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH; -- 24 bits of padding
+  constant ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH := 8 + 8 + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH + 8 + 8 + ECM_DRFM_ADDR_WIDTH +
+                                                      ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES * ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH; -- 8 bits of padding
+
+  type ecm_channel_control_entry_array_t is array (natural range <>) of ecm_channel_control_entry_t;
 
   type ecm_dwell_entry_t is record
     valid                     : std_logic;
@@ -429,15 +432,17 @@ package body ecm_pkg is
   function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t is
     variable r : ecm_channel_control_entry_t;
   begin
-    r.enable                := v(0);
-    r.tx_mode               := v(8 + ECM_CHANNEL_TX_MODE_WIDTH - 1 downto 8);
-    r.trigger_duration_max  := v(16 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 16);
+    r.enable                          := v(0);
+    r.trigger_mode                    := v(8 + ECM_CHANNEL_TRIGGER_MODE_WIDTH - 1 downto 8);
+    r.trigger_duration_max_minus_one  := v(16 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 16);
 
-    r.trigger_threshold     := v(32 + CHAN_POWER_WIDTH - 1 downto 32);
-    r.trigger_hyst_shift    := v(64 + ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH - 1 downto 64);
+    r.trigger_threshold               := v(32 + CHAN_POWER_WIDTH - 1 downto 32);
+    r.trigger_hyst_shift              := v(64 + ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH - 1 downto 64);
+
+    r.recording_address               := v(80 + ECM_DRFM_ADDR_WIDTH - 1 downto 80);
 
     for i in 0 to (ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1) loop
-      r.program_entries(i)  := unpack_aligned(v(64 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH * (i+1) - 1 downto 64 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH*i));
+      r.program_entries(i)  := unpack_aligned(v(96 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH * (i+1) - 1 downto 96 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH*i));
     end loop;
 
     return r;
