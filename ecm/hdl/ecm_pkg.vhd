@@ -38,7 +38,7 @@ package ecm_pkg is
   constant ECM_NUM_CHANNELS                               : natural := 16;
   constant ECM_CHANNEL_INDEX_WIDTH                        : natural := clog2(ECM_NUM_CHANNELS);
 
-  constant ECM_NUM_TX_INSTRUCTIONS                        : natural := 512;
+  constant ECM_NUM_TX_INSTRUCTIONS                        : natural := 512; --TODO: increase?
   constant ECM_TX_INSTRUCTION_INDEX_WIDTH                 : natural := clog2(ECM_NUM_TX_INSTRUCTIONS);
   constant ECM_TX_INSTRUCTION_LOOP_COUNTER_WIDTH          : natural := 16;
   constant ECM_TX_INSTRUCTION_WAIT_DURATION_WIDTH         : natural := 20;
@@ -69,9 +69,8 @@ package ecm_pkg is
   constant ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH    : natural := clog2(ECM_NUM_CHANNEL_CONTROL_ENTRIES);
 
   constant ECM_CHANNEL_TRIGGER_MODE_NONE                  : natural := 0;
-  constant ECM_CHANNEL_TRIGGER_MODE_NOISE_ONLY            : natural := 1;
-  constant ECM_CHANNEL_TRIGGER_MODE_FORCE_TRIGGER         : natural := 2;
-  constant ECM_CHANNEL_TRIGGER_MODE_THRESHOLD_TRIGGER     : natural := 3;
+  constant ECM_CHANNEL_TRIGGER_MODE_FORCE_TRIGGER         : natural := 1;
+  constant ECM_CHANNEL_TRIGGER_MODE_THRESHOLD_TRIGGER     : natural := 2;
   constant ECM_CHANNEL_TRIGGER_MODE_WIDTH                 : natural := 2;
   constant ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES             : natural := 4;
 
@@ -99,11 +98,11 @@ package ecm_pkg is
 
   type ecm_tx_instruction_header_t is record
     valid               : std_logic;
-    instruction_type    : unsigned(ECM_TX_INSTRUCTION_TYPE_WIDTH - 1 downto 0);
-    channel_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);   --TODO: remove? or use for error checking?
     output_control      : unsigned(ECM_TX_OUTPUT_CONTROL_WIDTH - 1 downto 0);
+    instruction_type    : unsigned(ECM_TX_INSTRUCTION_TYPE_WIDTH - 1 downto 0);
     dds_control         : dds_control_setup_entry_t;
   end record;
+  constant ECM_TX_INSTRUCTION_HEADER_PACKED_WIDTH : natural := 8 + DDS_CONTROL_SETUP_ENTRY_PACKED_WIDTH;
 
   type ecm_tx_instruction_dds_setup_bpsk_t is record
     header              : ecm_tx_instruction_header_t;
@@ -339,14 +338,14 @@ package ecm_pkg is
                                                ECM_DWELL_STATS_ERRORS_WIDTH +
                                                ECM_DRFM_ERRORS_WIDTH;
 
-  --function unpack(v : std_logic_vector) return ecm_tx_instruction_header_t;
-  --function unpack(v : std_logic_vector) return ecm_tx_instruction_dds_setup_bpsk_t;
-  --function unpack(v : std_logic_vector) return ecm_tx_instruction_dds_setup_cw_sweep_t;
-  --function unpack(v : std_logic_vector) return ecm_tx_instruction_dds_setup_cw_step_t;
-  --function unpack(v : std_logic_vector) return ecm_tx_instruction_playback_t;
-  --function unpack(v : std_logic_vector) return ecm_tx_instruction_wait_t;
-  --function unpack(v : std_logic_vector) return ecm_tx_instruction_jump_t;
-  function unpack(v : std_logic_vector) return ecm_config_data_t;
+  function unpack(v : std_logic_vector(ECM_CONFIG_DATA_WIDTH - 1 downto 0)) return ecm_config_data_t;
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_HEADER_PACKED_WIDTH - 1 downto 0)) return ecm_tx_instruction_header_t;
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_bpsk_t;
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_sweep_t;
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_step_t;
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_playback_t;
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_wait_t;
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_jump_t;
   function unpack_aligned(v : std_logic_vector(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_program_entry_t;
   function unpack_aligned(v : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_entry_t;
   function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t;
@@ -366,12 +365,14 @@ end package ecm_pkg;
 
 package body ecm_pkg is
 
-  function unpack(v : std_logic_vector) return ecm_config_data_t is
+
+  function unpack(v : std_logic_vector(ECM_CONFIG_DATA_WIDTH - 1 downto 0)) return ecm_config_data_t is
     variable r : ecm_config_data_t;
   begin
-    assert (v'length = ECM_CONFIG_DATA_WIDTH)
-      report "Invalid length."
-      severity failure;
+    --TODO: remove
+    --assert (v'length = ECM_CONFIG_DATA_WIDTH)
+    --  report "Invalid length."
+    --  severity failure;
 
     r.valid         := v(0);
     r.first         := v(1);
@@ -380,6 +381,55 @@ package body ecm_pkg is
     r.module_id     := unsigned(v(35 + ECM_MODULE_ID_WIDTH - 1 downto 35));
     r.message_type  := unsigned(v(35 + ECM_MODULE_ID_WIDTH + ECM_MESSAGE_TYPE_WIDTH - 1 downto 35 + ECM_MODULE_ID_WIDTH));
     r.address       := unsigned(v(35 + ECM_MODULE_ID_WIDTH + ECM_MESSAGE_TYPE_WIDTH + ECM_CONFIG_ADDRESS_WIDTH - 1 downto 35 + ECM_MODULE_ID_WIDTH + ECM_MESSAGE_TYPE_WIDTH));
+
+    return r;
+  end function;
+
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_HEADER_PACKED_WIDTH - 1 downto 0)) return ecm_tx_instruction_header_t is
+    variable r : ecm_tx_instruction_header_t;
+  begin
+
+    return r;
+  end function;
+
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_bpsk_t is
+    variable r : ecm_tx_instruction_dds_setup_bpsk_t;
+  begin
+
+    return r;
+  end function;
+
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_sweep_t is
+    variable r : ecm_tx_instruction_dds_setup_cw_sweep_t;
+  begin
+
+    return r;
+  end function;
+
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_step_t is
+    variable r : ecm_tx_instruction_dds_setup_cw_step_t;
+  begin
+
+    return r;
+  end function;
+
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_playback_t is
+    variable r : ecm_tx_instruction_playback_t;
+  begin
+
+    return r;
+  end function;
+
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_wait_t is
+    variable r : ecm_tx_instruction_wait_t;
+  begin
+
+    return r;
+  end function;
+
+  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_jump_t is
+    variable r : ecm_tx_instruction_jump_t;
+  begin
 
     return r;
   end function;

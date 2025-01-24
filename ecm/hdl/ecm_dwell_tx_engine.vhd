@@ -11,59 +11,92 @@ library ecm_lib;
 library dsp_lib;
   use dsp_lib.dsp_pkg.all;
 
-entity ecm_dwell_trigger is
+entity ecm_dwell_tx_engine is
 generic (
-  CHANNELIZER_DATA_WIDTH  : natural;
+  SYNC_LATENCY : natural
 );
 port (
-  Clk                         : in  std_logic;
-  Rst                         : in  std_logic;
+  Clk                     : in  std_logic;
+  Rst                     : in  std_logic;
 
-  Channel_entry_valid         : in  std_logic;
-  Channel_entry_index         : in  unsigned(ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH - 1 downto 0);
-  Channel_entry_data          : in  ecm_channel_control_entry_t;
+  Tx_instruction_valid    : in  std_logic;
+  Tx_instruction_index    : in  unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
+  Tx_instruction_data     : in  std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
 
-  Channelizer_ctrl            : in  channelizer_control_t;
-  Channelizer_data            : in  signed_array_t(1 downto 0)(CHANNELIZER_DATA_WIDTH - 1 downto 0);
-  Channelizer_pwr             : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  Tx_program_req_valid    : out std_logic;
+  Tx_program_req_channel  : out unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  Tx_program_req_index    : out unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
 
-  Dwell_channel_clear         : in  std_logic;
-  Dwell_start_measurement     : in  std_logic;
-  Dwell_active_measurement    : in  std_logic;
-  Dwell_index                 : in  unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
-  Dwell_immediate_tx          : out std_logic;  --TODO
+  Dwell_channel_clear     : in  std_logic;
+  Dwell_active_transmit   : in  std_logic;
 
-  Trigger_pending             : out std_logic;
+  Sync_data               : in  channelizer_control_t;
 
-  Tx_program_req_valid        : out std_logic;
-  Tx_program_req_channel      : out unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  Tx_program_req_index        : out unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
-
-  Drfm_write_req              : out ecm_drfm_write_req_t
+  Drfm_read_req           : out ecm_drfm_read_req_t;  --TODO
+  Dds_control             : out dds_control_t;  --TODO
+  Output_control          : out ecm_output_control_t  --TODO
 );
 begin
   -- PSL default clock is rising_edge(Clk);
   -- PSL channel_clear : assert always (rose(Dwell_channel_clear) = '1') -> next_a![0..ECM_NUM_CHANNELS] (Dwell_channel_clear = '1');
-end entity ecm_dwell_trigger;
+end entity ecm_dwell_tx_engine;
 
-architecture rtl of ecm_dwell_trigger is
+architecture rtl of ecm_dwell_tx_engine is
 
-  type channel_trigger_state_t is (S_IDLE, S_ACTIVE, S_COMPLETE);
+  type channel_program_state_t is (S_IDLE, S_DECODE, S_EXECUTE, S_COMPLETE);
 
   type channel_state_t is record
-    trigger_state       : channel_trigger_state_t;
-    continued_threshold : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-    recording_length    : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-    recording_address   : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+    program_state     : channel_program_state_t;
+    instruction_index : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
+    wait_count        : unsigned(ECM_TX_INSTRUCTION_WAIT_DURATION_WIDTH - 1 downto 0);
+    loop_count        : unsigned(ECM_TX_INSTRUCTION_LOOP_COUNTER_WIDTH - 1 downto 0);
+    playback_count    : unsigned(ECM_TX_INSTRUCTION_PLAYBACK_COUNTER_WIDTH - 1 downto 0);
   end record;
 
-  type channel_state_array_t is array (natural range <>) of channel_state_t;
+  type instruction_data_array_t is array (natural range <>) of std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
+  type channel_state_array_t    is array (natural range <>) of channel_state_t;
 
-  signal m_channel_control              : ecm_channel_control_entry_array_t(ECM_NUM_CHANNEL_CONTROL_ENTRIES - 1 downto 0);
+  signal m_instruction_data             : instruction_data_array_t(ECM_NUM_TX_INSTRUCTIONS - 1 downto 0);
   signal m_channel_state                : channel_state_array_t(ECM_NUM_CHANNELS - 1 downto 0);
 
-  signal w_channel_control_rd_index     : unsigned(ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH - 1 downto 0);
-  signal w_channel_state_rd_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r0_sync_data                   : channelizer_control_t;
+  signal r0_channel_state               : channel_state_t;
+
+  signal r1_sync_data                   : channelizer_control_t;
+  signal r1_channel_state               : channel_state_t;
+
+  signal r2_sync_data                   : channelizer_control_t;
+  signal r2_channel_state               : channel_state_t;
+  signal r2_instruction_data            : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
+
+  signal r3_sync_data                   : channelizer_control_t;
+  signal r3_channel_state               : channel_state_t;
+  signal r3_instruction_data            : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
+  signal w3_instruction_header          : ecm_tx_instruction_header_t;
+  signal w3_instruction_dds_setup_bpsk  : ecm_tx_instruction_dds_setup_bpsk_t;
+  signal w3_instruction_dds_setup_sweep : ecm_tx_instruction_dds_setup_cw_sweep_t;
+  signal w3_instruction_dds_setup_step  : ecm_tx_instruction_dds_setup_cw_step_t;
+  signal w3_instruction_playback        : ecm_tx_instruction_playback_t;
+  signal w3_instruction_wait            : ecm_tx_instruction_wait_t;
+  signal w3_instruction_jump            : ecm_tx_instruction_jump_t;
+
+  signal r4_sync_data                   : channelizer_control_t;
+  signal r4_channel_state               : channel_state_t;
+  signal r4_instruction_data            : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
+
+
+  signal r_tx_program_req_valid         : std_logic;
+  signal r_tx_program_req_channel       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r_tx_program_req_data          : channel_state_t;
+
+  signal r_channel_clear_index          : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
+  signal w_channel_state_wr_data        : channel_state_t;
+  signal w_channel_state_wr_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_channel_state_wr_en          : std_logic;
+
+  signal w_error_program_req_overflow   : std_logic;
+
+
 
   signal r0_channelizer_ctrl            : channelizer_control_t;
   signal r0_channelizer_data            : signed_array_t(1 downto 0)(CHANNELIZER_DATA_WIDTH - 1 downto 0);
@@ -105,10 +138,6 @@ architecture rtl of ecm_dwell_trigger is
 
   signal r_trigger_pending              : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
 
-  signal r_channel_clear_index          : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
-  signal w_channel_state_wr_data        : channel_state_t;
-  signal w_channel_state_wr_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_channel_state_wr_en          : std_logic;
 
 
 begin
@@ -116,36 +145,118 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (Channel_entry_valid = '1') then
-        m_channel_control(to_integer(Channel_entry_index)) <= Channel_entry_data;
+      if (Tx_instruction_valid = '1') then
+        m_instruction_data(to_integer(Tx_instruction_index)) <= Tx_instruction_data;
       end if;
     end if;
   end process;
 
-  w_channel_control_rd_index  <= Dwell_index & Channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  w_channel_state_rd_index    <= Channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r0_channelizer_ctrl <= Channelizer_ctrl;
-      r0_channelizer_data <= Channelizer_data;
-      r0_channelizer_pwr  <= Channelizer_pwr;
-      r0_channel_control  <= m_channel_control(to_integer(w_channel_control_rd_index));
-      r0_channel_state    <= m_channel_state(to_integer(w_channel_state_rd_index));
+      r0_sync_data      <= Sync_data;
+      r0_channel_state  <= m_channel_state(to_integer(Sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0)));
     end if;
   end process;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r1_channelizer_ctrl <= r0_channelizer_ctrl;
-      r1_channelizer_data <= r0_channelizer_data;
-      r1_channelizer_pwr  <= r0_channelizer_pwr;
-      r1_channel_control  <= r0_channel_control;
-      r1_channel_state    <= r0_channel_state;
+      r1_sync_data      <= r0_sync_data;
+      r1_channel_state  <= r0_channel_state;
     end if;
   end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r2_sync_data        <= r1_sync_data;
+      r2_channel_state    <= r1_channel_state;
+      r2_instruction_data <= m_instruction_data(to_integer(r1_channel_state.instruction_index));
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r3_sync_data        <= r2_sync_data;
+      r3_channel_state    <= r2_channel_state;
+      r3_instruction_data <= r2_instruction_data;
+    end if;
+  end process;
+
+  w3_instruction_header          <= unpack(r3_instruction_data(ECM_TX_INSTRUCTION_HEADER_PACKED_WIDTH - 1 downto 0));
+  w3_instruction_dds_setup_bpsk  <= unpack(r3_instruction_data);
+  w3_instruction_dds_setup_sweep <= unpack(r3_instruction_data);
+  w3_instruction_dds_setup_step  <= unpack(r3_instruction_data);
+  w3_instruction_playback        <= unpack(r3_instruction_data);
+  w3_instruction_wait            <= unpack(r3_instruction_data);
+  w3_instruction_jump            <= unpack(r3_instruction_data);
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r4_sync_data        <= r3_sync_data;
+      r4_channel_state    <= r3_channel_state;
+      r4_instruction_data <= r3_instruction_data;
+
+
+
+    end if;
+  end process;
+
+  --TODO: add stretcher to channelizer?
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (Rst = '1') then
+        r_tx_program_req_valid    <= '0';
+        r_tx_program_req_channel  <= (others => '-');
+        r_tx_program_req_data     <= (program_state => S_IDLE, others => '-');
+      else
+        if (Tx_program_req_valid = '1') then
+          r_tx_program_req_valid    <= '1';
+          r_tx_program_req_channel  <= Tx_program_req_channel;
+          r_tx_program_req_data     <= (program_state => S_DECODE, instruction_index => Tx_program_req_index, others => (others => '0'));
+        elsif (r3_channel_state_wr_en = '0') then
+          r_tx_program_req_valid    <= '0';
+          r_tx_program_req_channel  <= (others => '-');
+          r_tx_program_req_data     <= (program_state => S_IDLE, others => '-');
+        end if;
+      end if;
+    end if;
+  end process;
+
+  w_error_program_req_overflow <= Tx_program_req_valid and r_tx_program_req_valid and r3_channel_state_wr_en;
+
+  process(all)
+  begin
+    if (Dwell_channel_clear = '1') then
+      w_channel_state_wr_data   <= (program_state => S_IDLE, others => (others => '-'));
+      w_channel_state_wr_index  <= r_channel_clear_index;
+      w_channel_state_wr_en     <= '1';
+    elsif (r3_channel_state_wr_en = '1') then
+      w_channel_state_wr_data   <= r3_channel_state_wr_data;
+      w_channel_state_wr_index  <= r3_channel_state_wr_index;
+      w_channel_state_wr_en     <= '1';
+    else
+      w_channel_state_wr_data   <= r_tx_program_req_data;
+      w_channel_state_wr_index  <= r_tx_program_req_channel;
+      w_channel_state_wr_en     <= r_tx_program_req_valid;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (w_channel_state_wr_en = '1') then
+        m_channel_state(to_integer(w_channel_state_wr_index)) <= w_channel_state_wr_data;
+      end if;
+    end if;
+  end process;
+
 
   process(Clk)
   begin
