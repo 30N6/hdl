@@ -101,6 +101,8 @@ architecture rtl of ecm_dwell_controller is
   signal w_tx_instruction_index     : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
   signal w_tx_instruction_data      : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
 
+  signal w_drfm_write_req           : ecm_drfm_write_req_t;
+
   signal r_dwell_program_data       : ecm_dwell_program_entry_t;
   signal r_dwell_program_valid      : std_logic;
 
@@ -220,9 +222,10 @@ begin
     Tx_program_req_channel      => w_tx_program_req_channel,
     Tx_program_req_index        => w_tx_program_req_index,
 
-    Drfm_write_req              => Drfm_write_req
+    Drfm_write_req              => w_drfm_write_req
   );
 
+  Drfm_write_req <= w_drfm_write_req;
 
   process(Clk)
   begin

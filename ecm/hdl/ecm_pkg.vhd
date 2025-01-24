@@ -340,9 +340,9 @@ package ecm_pkg is
 
   function unpack(v : std_logic_vector(ECM_CONFIG_DATA_WIDTH - 1 downto 0)) return ecm_config_data_t;
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_HEADER_PACKED_WIDTH - 1 downto 0)) return ecm_tx_instruction_header_t;
-  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_bpsk_t;
-  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_sweep_t;
-  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_step_t;
+  --function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_bpsk_t;
+  --function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_sweep_t;
+  --function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_step_t;
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_playback_t;
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_wait_t;
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_jump_t;
@@ -389,33 +389,52 @@ package body ecm_pkg is
     variable r : ecm_tx_instruction_header_t;
   begin
 
-    return r;
-  end function;
-
-  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_bpsk_t is
-    variable r : ecm_tx_instruction_dds_setup_bpsk_t;
-  begin
+    r.valid             := v(0);
+    r.output_control    := v(2 downto 1);
+    r.instruction_type  := v(7 downto 4);
+    r.dds_control       := unpack(v(15 downto 8));
 
     return r;
   end function;
 
-  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_sweep_t is
-    variable r : ecm_tx_instruction_dds_setup_cw_sweep_t;
-  begin
-
-    return r;
-  end function;
-
-  function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_step_t is
-    variable r : ecm_tx_instruction_dds_setup_cw_step_t;
-  begin
-
-    return r;
-  end function;
+  --function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_bpsk_t is
+  --  variable r : ecm_tx_instruction_dds_setup_bpsk_t;
+  --begin
+  --
+  --  r.header          := unpack(v(15 downto 0));
+  --  r.dds_bpsk_setup  := unpack(v(63 downto 16));
+  --
+  --  return r;
+  --end function;
+  --
+  --function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_sweep_t is
+  --  variable r : ecm_tx_instruction_dds_setup_cw_sweep_t;
+  --begin
+  --
+  --  r.header              := unpack(v(15 downto 0));
+  --  r.dds_cw_sweep_setup  := unpack(v(63 downto 16));
+  --
+  --  return r;
+  --end function;
+  --
+  --function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_step_t is
+  --  variable r : ecm_tx_instruction_dds_setup_cw_step_t;
+  --begin
+  --
+  --  r.header              := unpack(v(15 downto 0));
+  --  r.dds_cw_step_setup   := unpack(v(63 downto 16));
+  --
+  --  return r;
+  --end function;
 
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_playback_t is
     variable r : ecm_tx_instruction_playback_t;
   begin
+
+    r.header            := unpack(v(15 downto 0));
+    r.mode              := v(16);
+    r.base_count        := unpack(v(47 downto 32));
+    r.rand_offset_mask  := unpack(v(63 downto 48));
 
     return r;
   end function;
@@ -424,12 +443,21 @@ package body ecm_pkg is
     variable r : ecm_tx_instruction_wait_t;
   begin
 
+    r.header            := unpack(v(15 downto 0));
+    r.base_duration     := unpack(v(35 downto 16));
+    r.rand_offset_mask  := unpack(v(59 downto 40));
+
     return r;
   end function;
 
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_jump_t is
     variable r : ecm_tx_instruction_jump_t;
   begin
+
+    r.header          := unpack(v(15 downto 0));
+    r.dest_index      := unpack(v(16 + ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 16));
+    r.counter_check   := v(32);
+    r.counter_value   := unpack(v(55 downto 40));
 
     return r;
   end function;
