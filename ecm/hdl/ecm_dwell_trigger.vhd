@@ -13,7 +13,7 @@ library dsp_lib;
 
 entity ecm_dwell_trigger is
 generic (
-  CHANNELIZER_DATA_WIDTH  : natural;
+  CHANNELIZER_DATA_WIDTH  : natural
 );
 port (
   Clk                         : in  std_logic;
@@ -43,10 +43,25 @@ port (
 );
 begin
   -- PSL default clock is rising_edge(Clk);
-  -- PSL channel_clear : assert always (rose(Dwell_channel_clear) = '1') -> next_a![0..ECM_NUM_CHANNELS] (Dwell_channel_clear = '1');
+  -- PSL channel_clear : assert always (rose(Dwell_channel_clear)) -> next_a![0 to ECM_NUM_CHANNELS] (Dwell_channel_clear = '1');
 end entity ecm_dwell_trigger;
 
 architecture rtl of ecm_dwell_trigger is
+
+  function saturate_channelizer_data(v : signed(CHANNELIZER_DATA_WIDTH - 1 downto 0)) return signed is
+    variable r : signed(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  begin
+    r := v(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+
+    if ((v < 0) and (and_reduce(v(CHANNELIZER_DATA_WIDTH - 2 downto ECM_DRFM_DATA_WIDTH)) = '0')) then
+      r := ((ECM_DRFM_DATA_WIDTH - 1) => '1', others => '0');
+    elsif ((v >= 0) and (or_reduce(v(CHANNELIZER_DATA_WIDTH - 2 downto ECM_DRFM_DATA_WIDTH)) = '1')) then
+      r := ((ECM_DRFM_DATA_WIDTH - 1) => '0', others => '1');
+    end if;
+
+    return r;
+  end function;
+
 
   type channel_trigger_state_t is (S_IDLE, S_ACTIVE, S_COMPLETE);
 
@@ -102,6 +117,7 @@ architecture rtl of ecm_dwell_trigger is
   signal r4_tx_program_req_valid        : std_logic;
   signal r4_tx_program_req_channel      : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r4_tx_program_req_index        : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
+  signal r4_trigger_immediate           : std_logic;
 
   signal r_trigger_pending              : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
 
@@ -160,7 +176,7 @@ begin
       r2_trigger_is_threshold   <= Dwell_active_measurement and r1_channel_control.enable and to_stdlogic(r1_channel_control.trigger_mode = ECM_CHANNEL_TRIGGER_MODE_THRESHOLD_TRIGGER);
       r2_threshold_check_new    <= to_stdlogic(r1_channelizer_pwr >= r1_channel_control.trigger_threshold);
       r2_threshold_check_cont   <= to_stdlogic(r1_channelizer_pwr >= r1_channel_state.continued_threshold);
-      r2_duration_finished      <= to_stdlogic(r1_channel_state.recording_length = r1_channel_state.trigger_duration_max_minus_one);
+      r2_duration_finished      <= to_stdlogic(r1_channel_state.recording_length = r1_channel_control.trigger_duration_max_minus_one);
       r2_duration_next          <= r1_channel_state.recording_length + 1;
       r2_address_next           <= r1_channel_state.recording_address + 1;
     end if;
@@ -179,13 +195,21 @@ begin
       r3_drfm_write_req.last          <= '-';
       r3_drfm_write_req.address       <= (others => '-');
       r3_drfm_write_req.channel_index <= r2_channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-      r3_drfm_write_req.data          <= r2_channelizer_data;
+
+      --TODO: handle saturation in software
+      if (r2_channel_control.drfm_gain = '1') then
+        r3_drfm_write_req.data(0)       <= saturate_channelizer_data(r2_channelizer_data(0));
+        r3_drfm_write_req.data(1)       <= saturate_channelizer_data(r2_channelizer_data(1));
+      else
+        r3_drfm_write_req.data(0)       <= r2_channelizer_data(0)(CHANNELIZER_DATA_WIDTH - 1 downto (CHANNELIZER_DATA_WIDTH - ECM_DRFM_DATA_WIDTH));
+        r3_drfm_write_req.data(1)       <= r2_channelizer_data(1)(CHANNELIZER_DATA_WIDTH - 1 downto (CHANNELIZER_DATA_WIDTH - ECM_DRFM_DATA_WIDTH));
+      end if;
 
       if (r2_channel_state.trigger_state = S_IDLE) then
         if ((r2_trigger_is_forced = '1') or ((r2_trigger_is_threshold = '1') and (r2_threshold_check_new = '1'))) then
           r3_channel_state_wr_en                        <= '1';
           r3_channel_state_wr_data.trigger_state        <= S_ACTIVE;
-          r3_channel_state_wr_data.continued_threshold  <= shift_right(r1_channel_control.trigger_threshold, r1_channel_control.trigger_hyst_shift);
+          r3_channel_state_wr_data.continued_threshold  <= shift_right(r1_channel_control.trigger_threshold, to_integer(r1_channel_control.trigger_hyst_shift));
           r3_channel_state_wr_data.recording_length     <= to_unsigned(1, ECM_DRFM_SEGMENT_LENGTH_WIDTH);
           r3_channel_state_wr_data.recording_address    <= r2_channel_control.recording_address;
 
@@ -194,7 +218,7 @@ begin
           r3_drfm_write_req.last                        <= '0';
           r3_drfm_write_req.address                     <= r2_channel_control.recording_address;
         end if;
-      elsif (r2_channel_state.trigger_state = S_ACTIVE)
+      elsif (r2_channel_state.trigger_state = S_ACTIVE) then
         r3_channel_state_wr_en                          <= r2_channelizer_ctrl.valid;
         r3_channel_state_wr_data.recording_length       <= r2_duration_next;
         r3_channel_state_wr_data.recording_address      <= r2_address_next;
@@ -243,7 +267,7 @@ begin
             if ((r3_channel_control.program_entries(i).valid = '1') and (r3_channel_control.program_entries(i).trigger_immediate_after_min = '1') and (r3_trigger_check_duration_min(i) = '1')) then
               r4_trigger_immediate    <= '1';
               r4_tx_program_req_valid <= '1';
-              r3_tx_program_req_index <= r3_channel_control.program_entries(i).tx_program_index;
+              r4_tx_program_req_index <= r3_channel_control.program_entries(i).tx_program_index;
               exit;
             end if;
           end loop;
@@ -254,7 +278,7 @@ begin
             if ((r3_channel_control.program_entries(i).valid = '1') and (r3_trigger_check_duration_min(i) = '1') and (r3_trigger_check_duration_max(i) = '1')) then
               r4_trigger_immediate    <= '1';
               r4_tx_program_req_valid <= '1';
-              r3_tx_program_req_index <= r3_channel_control.program_entries(i).tx_program_index;
+              r4_tx_program_req_index <= r3_channel_control.program_entries(i).tx_program_index;
               exit;
             end if;
           end loop;
@@ -268,7 +292,7 @@ begin
   Dwell_immediate_tx      <= r4_trigger_immediate;
   Tx_program_req_valid    <= r4_tx_program_req_valid;
   Tx_program_req_channel  <= r4_tx_program_req_channel;
-  Tx_program_req_index    <= r3_tx_program_req_index;
+  Tx_program_req_index    <= r4_tx_program_req_index;
 
   process(Clk)
   begin

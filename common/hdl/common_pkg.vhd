@@ -15,6 +15,7 @@ package common_pkg is
   function clog2(v : natural) return natural;
   function clog2_min1bit(v : natural) return natural;
   function and_reduce(v : unsigned) return std_logic;
+  function and_reduce(v : signed) return std_logic;
   function and_reduce(v : std_logic_vector) return std_logic;
   function or_reduce(v : unsigned) return std_logic;
   function or_reduce(v : signed) return std_logic;
@@ -71,6 +72,11 @@ package body common_pkg is
   begin
     v_ones := (others => '1');
     return to_stdlogic(v = v_ones);
+  end function;
+
+  function and_reduce(v : signed) return std_logic is
+  begin
+    return and_reduce(unsigned(v));
   end function;
 
   function and_reduce(v : std_logic_vector) return std_logic is

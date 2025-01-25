@@ -65,9 +65,6 @@ architecture rtl of ecm_top is
   constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + 4 + 4; -- +4 for filter, +4 for ifft
   constant SYNTHESIZER16_DATA_WIDTH   : natural := 16;
 
-  constant PLL_PRE_LOCK_DELAY_CYCLES  : natural := 2048;
-  constant PLL_POST_LOCK_DELAY_CYCLES : natural := 2048;
-
   constant AD9361_BIT_PIPE_DEPTH      : natural := 3;
 
   constant HEARTBEAT_INTERVAL         : natural := 31250000;
@@ -113,6 +110,10 @@ architecture rtl of ecm_top is
   signal w_channelizer16_control      : channelizer_control_t;
   signal w_channelizer16_data         : signed_array_t(1 downto 0)(CHANNELIZER16_DATA_WIDTH - 1 downto 0);
   signal w_channelizer16_pwr          : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+
+  signal w_stretched_control          : channelizer_control_t;
+  signal w_stretched_data             : signed_array_t(1 downto 0)(CHANNELIZER16_DATA_WIDTH - 1 downto 0);
+  signal w_stretched_pwr              : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   signal w_synthesizer16_control      : channelizer_control_t;
   signal w_synthesizer16_data         : signed_array_t(1 downto 0)(SYNTHESIZER16_DATA_WIDTH - 1 downto 0);
@@ -198,8 +199,8 @@ begin
 
   i_dwell_controller : entity ecm_lib.ecm_dwell_controller
   generic map (
-    PLL_PRE_LOCK_DELAY_CYCLES   => PLL_PRE_LOCK_DELAY_CYCLES,
-    PLL_POST_LOCK_DELAY_CYCLES  => PLL_POST_LOCK_DELAY_CYCLES
+    SYNC_TO_DRFM_READ_LATENCY => 5, --TODO: constant
+    CHANNELIZER_DATA_WIDTH    => CHANNELIZER16_DATA_WIDTH
   )
   port map (
     Clk                       => Adc_clk_x4,
@@ -210,9 +211,9 @@ begin
     Ad9361_control            => w_ad9361_control,
     Ad9361_status             => r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 1),
 
-    Channelizer_ctrl          => w_channelizer16_control,
-    Channelizer_data          => w_channelizer16_data,
-    Channelizer_pwr           => w_channelizer16_pwr,
+    Channelizer_ctrl          => w_stretched_control,
+    Channelizer_data          => w_stretched_data,
+    Channelizer_pwr           => w_stretched_pwr,
 
     Sync_data                 => w_sync_to_dwell_controller,
 
@@ -228,8 +229,7 @@ begin
     Drfm_write_req            => w_drfm_write_req,
     Drfm_read_req             => w_drfm_read_req,
     Dds_control               => w_dds_command,
-    Output_control            => w_output_control,
-
+    Output_control            => w_output_control
   );
 
   process(Adc_clk)
@@ -300,12 +300,34 @@ begin
       Error_mux_underflow   => w_channelizer_errors.mux_underflow,
       Error_mux_collision   => w_channelizer_errors.mux_collision
     );
+
+    i_stretcher : entity dsp_lib.chan_stretcher_2x
+    generic map (
+      FIFO_DEPTH => ECM_NUM_CHANNELS,
+      DATA_WIDTH => CHANNELIZER16_DATA_WIDTH
+    )
+    port map (
+      Clk                   => Adc_clk_x4,
+      Rst                   => r_combined_rst,
+
+      Input_control         => w_channelizer16_control,
+      Input_data            => w_channelizer16_data,
+      Input_pwr             => w_channelizer16_pwr,
+
+      Output_control        => w_stretched_control,
+      Output_data           => w_stretched_data,
+      Output_pwr            => w_stretched_pwr,
+
+      Error_fifo_overflow   => w_channelizer_errors.stretcher_overflow,
+      Error_fifo_underflow  => w_channelizer_errors.stretcher_underflow
+    );
+
   else generate
     w_channelizer_warnings  <= (others => '0');
     w_channelizer_errors    <= (others => '0');
-    w_channelizer16_control <= (valid => '0', last => '0', data_index => (others => '0'));
-    w_channelizer16_data    <= (others => (others => '0'));
-    w_channelizer16_pwr     <= (others => '0');
+    w_stretched_control     <= (valid => '0', last => '0', data_index => (others => '0'));
+    w_stretched_data        <= (others => (others => '0'));
+    w_stretched_pwr         <= (others => '0');
   end generate g_channelizer;
 
   g_synthesizer : if (ENABLE_SYNTHESIZER) generate

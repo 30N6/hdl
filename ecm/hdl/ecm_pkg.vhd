@@ -156,11 +156,12 @@ package ecm_pkg is
     trigger_duration_max_minus_one  : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
     trigger_threshold               : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
     trigger_hyst_shift              : unsigned(ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH - 1 downto 0);
+    drfm_gain                       : std_logic;
     recording_address               : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
     program_entries                 : ecm_channel_tx_program_entry_array_t(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1 downto 0);
   end record;
-  constant ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH := 8 + 8 + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH + 8 + 8 + ECM_DRFM_ADDR_WIDTH +
-                                                      ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES * ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH; -- 8 bits of padding
+  constant ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH + 8 + 8 + ECM_DRFM_ADDR_WIDTH +
+                                                                ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES * ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH;
 
   type ecm_channel_control_entry_array_t is array (natural range <>) of ecm_channel_control_entry_t;
 
@@ -282,13 +283,15 @@ package ecm_pkg is
   type ecm_channelizer_warnings_array_t is array (natural range <>) of ecm_channelizer_warnings_t; --TODO: remove array types?
 
   type ecm_channelizer_errors_t is record
-    demux_overflow  : std_logic;
-    filter_overflow : std_logic;
-    mux_overflow    : std_logic;
-    mux_underflow   : std_logic;
-    mux_collision   : std_logic;
+    demux_overflow      : std_logic;
+    filter_overflow     : std_logic;
+    mux_overflow        : std_logic;
+    mux_underflow       : std_logic;
+    mux_collision       : std_logic;
+    stretcher_overflow  : std_logic;
+    stretcher_underflow : std_logic;
   end record;
-  constant ECM_CHANNELIZER_ERRORS_WIDTH : natural := 5;
+  constant ECM_CHANNELIZER_ERRORS_WIDTH : natural := 7;
   type ecm_channelizer_errors_array_t is array (natural range <>) of ecm_channelizer_errors_t;
 
   type ecm_synthesizer_errors_t is record
@@ -340,16 +343,13 @@ package ecm_pkg is
 
   function unpack(v : std_logic_vector(ECM_CONFIG_DATA_WIDTH - 1 downto 0)) return ecm_config_data_t;
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_HEADER_PACKED_WIDTH - 1 downto 0)) return ecm_tx_instruction_header_t;
-  --function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_bpsk_t;
-  --function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_sweep_t;
-  --function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_step_t;
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_playback_t;
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_wait_t;
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_jump_t;
-  function unpack_aligned(v : std_logic_vector(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_program_entry_t;
-  function unpack_aligned(v : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_entry_t;
-  function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t;
-  function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t;
+  function unpack(v : std_logic_vector(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_program_entry_t;
+  function unpack(v : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_entry_t;
+  function unpack(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t;
+  function unpack(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t;
 
   function pack(v : ecm_channelizer_warnings_t) return std_logic_vector;
   function pack(v : ecm_channelizer_errors_t) return std_logic_vector;
@@ -369,11 +369,6 @@ package body ecm_pkg is
   function unpack(v : std_logic_vector(ECM_CONFIG_DATA_WIDTH - 1 downto 0)) return ecm_config_data_t is
     variable r : ecm_config_data_t;
   begin
-    --TODO: remove
-    --assert (v'length = ECM_CONFIG_DATA_WIDTH)
-    --  report "Invalid length."
-    --  severity failure;
-
     r.valid         := v(0);
     r.first         := v(1);
     r.last          := v(2);
@@ -390,42 +385,12 @@ package body ecm_pkg is
   begin
 
     r.valid             := v(0);
-    r.output_control    := v(2 downto 1);
-    r.instruction_type  := v(7 downto 4);
+    r.output_control    := unsigned(v(2 downto 1));
+    r.instruction_type  := unsigned(v(7 downto 4));
     r.dds_control       := unpack(v(15 downto 8));
 
     return r;
   end function;
-
-  --function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_bpsk_t is
-  --  variable r : ecm_tx_instruction_dds_setup_bpsk_t;
-  --begin
-  --
-  --  r.header          := unpack(v(15 downto 0));
-  --  r.dds_bpsk_setup  := unpack(v(63 downto 16));
-  --
-  --  return r;
-  --end function;
-  --
-  --function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_sweep_t is
-  --  variable r : ecm_tx_instruction_dds_setup_cw_sweep_t;
-  --begin
-  --
-  --  r.header              := unpack(v(15 downto 0));
-  --  r.dds_cw_sweep_setup  := unpack(v(63 downto 16));
-  --
-  --  return r;
-  --end function;
-  --
-  --function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_dds_setup_cw_step_t is
-  --  variable r : ecm_tx_instruction_dds_setup_cw_step_t;
-  --begin
-  --
-  --  r.header              := unpack(v(15 downto 0));
-  --  r.dds_cw_step_setup   := unpack(v(63 downto 16));
-  --
-  --  return r;
-  --end function;
 
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_playback_t is
     variable r : ecm_tx_instruction_playback_t;
@@ -433,8 +398,8 @@ package body ecm_pkg is
 
     r.header            := unpack(v(15 downto 0));
     r.mode              := v(16);
-    r.base_count        := unpack(v(47 downto 32));
-    r.rand_offset_mask  := unpack(v(63 downto 48));
+    r.base_count        := unsigned(v(47 downto 32));
+    r.rand_offset_mask  := unsigned(v(63 downto 48));
 
     return r;
   end function;
@@ -444,8 +409,8 @@ package body ecm_pkg is
   begin
 
     r.header            := unpack(v(15 downto 0));
-    r.base_duration     := unpack(v(35 downto 16));
-    r.rand_offset_mask  := unpack(v(59 downto 40));
+    r.base_duration     := unsigned(v(35 downto 16));
+    r.rand_offset_mask  := unsigned(v(59 downto 40));
 
     return r;
   end function;
@@ -455,72 +420,73 @@ package body ecm_pkg is
   begin
 
     r.header          := unpack(v(15 downto 0));
-    r.dest_index      := unpack(v(16 + ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 16));
+    r.dest_index      := unsigned(v(16 + ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 16));
     r.counter_check   := v(32);
-    r.counter_value   := unpack(v(55 downto 40));
+    r.counter_value   := unsigned(v(55 downto 40));
 
     return r;
   end function;
 
-  function unpack_aligned(v : std_logic_vector(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_program_entry_t is
+  function unpack(v : std_logic_vector(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_program_entry_t is
     variable r : ecm_dwell_program_entry_t;
   begin
     r.enable              := v(0);
-    r.initial_dwell_index := v(8 + ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 8);
-    r.global_counter_init := v(16 + ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 16);
+    r.initial_dwell_index := unsigned(v(8 + ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 8));
+    r.global_counter_init := unsigned(v(16 + ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 16));
     return r;
   end function;
 
-  function unpack_aligned(v : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_entry_t;
+  function unpack(v : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_entry_t is
     variable r : ecm_dwell_entry_t;
   begin
 
-    (v.force_full_duration, v.skip_pll_postlock_wait, v.skip_pll_lock_check,
-     v.skip_pll_prelock_wait, v.global_counter_dec, v.global_counter_check, v.valid) := v(6 downto 0);
+    (r.force_full_duration, r.skip_pll_postlock_wait, r.skip_pll_lock_check,
+     r.skip_pll_prelock_wait, r.global_counter_dec, r.global_counter_check, r.valid) := v(6 downto 0);
 
-    r.repeat_count          := v(8 + ECM_DWELL_REPEAT_COUNT_WIDTH - 1 downto 8);
-    r.fast_lock_profile     := v(16 + ECM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 16);
-    r.next_dwell_index      := v(24 + ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 24);
+    r.repeat_count          := unsigned(v(8 + ECM_DWELL_REPEAT_COUNT_WIDTH - 1 downto 8));
+    r.fast_lock_profile     := unsigned(v(16 + ECM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 16));
+    r.next_dwell_index      := unsigned(v(24 + ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 24));
 
-    r.pll_pre_lock_delay    := v(32 + ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 32);
-    r.pll_post_lock_delay   := v(48 + ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 48);
+    r.pll_pre_lock_delay    := unsigned(v(32 + ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 32));
+    r.pll_post_lock_delay   := unsigned(v(48 + ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 48));
 
-    r.tag                   := v(64 + ECM_DWELL_TAG_WIDTH - 1 downto 64);
-    r.frequency             := v(80 + ECM_DWELL_FREQUENCY_WIDTH - 1 downto 80);
+    r.tag                   := unsigned(v(64 + ECM_DWELL_TAG_WIDTH - 1 downto 64));
+    r.frequency             := unsigned(v(80 + ECM_DWELL_FREQUENCY_WIDTH - 1 downto 80));
 
-    r.measurement_duration  := v(96 + ECM_DWELL_FREQUENCY_WIDTH - 1 downto 96);
-    r.total_duration_max    := v(128 + ECM_DWELL_DURATION_WIDTH - 1 downto 128);
+    r.measurement_duration  := unsigned(v(96 + ECM_DWELL_DURATION_WIDTH - 1 downto 96));
+    r.total_duration_max    := unsigned(v(128 + ECM_DWELL_DURATION_WIDTH - 1 downto 128));
 
     return r;
   end function;
 
-  function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t is
+  function unpack(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t is
     variable r : ecm_channel_tx_program_entry_t;
   begin
 
     r.valid                       := v(0);
     r.trigger_immediate_after_min := v(8);
-    r.tx_program_index            := v(16 + ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 16);
-    r.duration_gate_min           := v(32 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 32);
-    r.duration_gate_max           := v(48 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 48);
+    r.tx_program_index            := unsigned(v(16 + ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 16));
+    r.duration_gate_min           := unsigned(v(32 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 32));
+    r.duration_gate_max           := unsigned(v(48 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 48));
 
     return r;
   end function;
 
-  function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t is
+  function unpack(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t is
     variable r : ecm_channel_control_entry_t;
   begin
     r.enable                          := v(0);
-    r.trigger_mode                    := v(8 + ECM_CHANNEL_TRIGGER_MODE_WIDTH - 1 downto 8);
-    r.trigger_duration_max_minus_one  := v(16 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 16);
+    r.trigger_mode                    := unsigned(v(8 + ECM_CHANNEL_TRIGGER_MODE_WIDTH - 1 downto 8));
+    r.trigger_duration_max_minus_one  := unsigned(v(16 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 16));
 
-    r.trigger_threshold               := v(32 + CHAN_POWER_WIDTH - 1 downto 32);
-    r.trigger_hyst_shift              := v(64 + ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH - 1 downto 64);
+    r.trigger_threshold               := unsigned(v(32 + CHAN_POWER_WIDTH - 1 downto 32));
+    r.trigger_hyst_shift              := unsigned(v(64 + ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH - 1 downto 64));
+    r.drfm_gain                       := v(72);
 
-    r.recording_address               := v(80 + ECM_DRFM_ADDR_WIDTH - 1 downto 80);
+    r.recording_address               := unsigned(v(80 + ECM_DRFM_ADDR_WIDTH - 1 downto 80));
 
     for i in 0 to (ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1) loop
-      r.program_entries(i)  := unpack_aligned(v(96 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH * (i+1) - 1 downto 96 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH*i));
+      r.program_entries(i)  := unpack(v(96 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH * (i+1) - 1 downto 96 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH*i));
     end loop;
 
     return r;
@@ -538,6 +504,8 @@ package body ecm_pkg is
     variable r : std_logic_vector(ECM_CHANNELIZER_ERRORS_WIDTH - 1 downto 0);
   begin
     r := (
+          v.stretcher_underflow,
+          v.stretcher_overflow,
           v.mux_collision,
           v.mux_underflow,
           v.mux_overflow,

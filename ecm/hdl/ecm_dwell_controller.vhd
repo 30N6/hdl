@@ -13,8 +13,8 @@ library dsp_lib;
 
 entity ecm_dwell_controller is
 generic (
-  SYNC_LATENCY            : natural
-  CHANNELIZER_DATA_WIDTH  : natural
+  SYNC_TO_DRFM_READ_LATENCY : natural;
+  CHANNELIZER_DATA_WIDTH    : natural
 );
 port (
   Clk                       : in  std_logic;
@@ -41,9 +41,9 @@ port (
   Dwell_report_done_stats   : in  std_logic;
 
   Drfm_write_req            : out ecm_drfm_write_req_t;
-  Drfm_read_req             : out ecm_drfm_read_req_t;  --TODO
-  Dds_control               : out dds_control_t;  --TODO
-  Output_control            : out ecm_output_control_t  --TODO
+  Drfm_read_req             : out ecm_drfm_read_req_t;
+  Dds_control               : out dds_control_t;
+  Output_control            : out ecm_output_control_t
 );
 end entity ecm_dwell_controller;
 
@@ -116,14 +116,14 @@ architecture rtl of ecm_dwell_controller is
   signal r_dwell_entry_d0           : ecm_dwell_entry_t;
   signal r_dwell_entry_d1           : ecm_dwell_entry_t;
 
-  signal r_global_counter           : unsigned(31 downto 0);
+  signal r_global_counter           : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   signal r_global_counter_is_zero   : std_logic;
 
   signal w_current_dwell_valid      : std_logic;
 
-  signal r_pll_pre_lock_cycles      : unsigned(clog2(PLL_PRE_LOCK_DELAY_CYCLES) - 1 downto 0);
+  signal r_pll_pre_lock_cycles      : unsigned(ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 0);
   signal r_pll_pre_lock_done        : std_logic;
-  signal r_pll_post_lock_cycles     : unsigned(clog2(PLL_POST_LOCK_DELAY_CYCLES) - 1 downto 0);
+  signal r_pll_post_lock_cycles     : unsigned(ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 0);
   signal r_pll_post_lock_done       : std_logic;
 
   signal w_pll_pre_lock_done        : std_logic;
@@ -140,7 +140,7 @@ architecture rtl of ecm_dwell_controller is
   signal r_report_received_drfm     : std_logic;
   signal r_report_received_stats    : std_logic;
 
-  signal r_dwell_sequence_num       : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal r_dwell_sequence_num       : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   signal r_dwell_active             : std_logic;
   signal r_dwell_start_meas         : std_logic;
@@ -170,7 +170,7 @@ begin
     end if;
   end process;
 
-  i_config : entity esm_lib.ecm_dwell_config_decoder
+  i_config : entity ecm_lib.ecm_dwell_config_decoder
   port map (
     Clk                         => Clk,
     Rst                         => r_rst,
@@ -198,31 +198,57 @@ begin
     CHANNELIZER_DATA_WIDTH => CHANNELIZER_DATA_WIDTH
   )
   port map (
-    Clk                         => Clk,
-    Rst                         => r_rst,
+    Clk                       => Clk,
+    Rst                       => r_rst,
 
-    Channel_entry_valid         => w_channel_entry_valid,
-    Channel_entry_index         => w_channel_entry_index,
-    Channel_entry_data          => w_channel_entry_data,
+    Channel_entry_valid       => w_channel_entry_valid,
+    Channel_entry_index       => w_channel_entry_index,
+    Channel_entry_data        => w_channel_entry_data,
 
-    Channelizer_ctrl            => r_channelizer_ctrl,
-    Channelizer_data            => r_channelizer_data,
-    Channelizer_pwr             => r_channelizer_pwr,
+    Channelizer_ctrl          => r_channelizer_ctrl,
+    Channelizer_data          => r_channelizer_data,
+    Channelizer_pwr           => r_channelizer_pwr,
 
-    Dwell_channel_clear         => r_dwell_report_wait,
-    Dwell_start_measurement     => r_dwell_start_meas,
-    Dwell_active_measurement    => r_dwell_active_meas,
-    Dwell_data                  => r_dwell_entry_d1,
-    Dwell_index                 => r_dwell_entry_index_d1,
-    Dwell_immediate_tx          => w_trigger_immediate_tx,
+    Dwell_channel_clear       => r_dwell_report_wait,
+    Dwell_start_measurement   => r_dwell_start_meas,
+    Dwell_active_measurement  => r_dwell_active_meas,
+    Dwell_index               => r_dwell_entry_index_d1,
+    Dwell_immediate_tx        => w_trigger_immediate_tx,
 
-    Trigger_pending             => w_trigger_pending,
+    Trigger_pending           => w_trigger_pending,
 
-    Tx_program_req_valid        => w_tx_program_req_valid,
-    Tx_program_req_channel      => w_tx_program_req_channel,
-    Tx_program_req_index        => w_tx_program_req_index,
+    Tx_program_req_valid      => w_tx_program_req_valid,
+    Tx_program_req_channel    => w_tx_program_req_channel,
+    Tx_program_req_index      => w_tx_program_req_index,
 
-    Drfm_write_req              => w_drfm_write_req
+    Drfm_write_req            => w_drfm_write_req
+  );
+
+  i_tx_engine : entity ecm_lib.ecm_dwell_tx_engine
+  generic map (
+    SYNC_TO_DRFM_READ_LATENCY => SYNC_TO_DRFM_READ_LATENCY + 1
+  )
+  port map (
+    Clk                     => Clk,
+    Rst                     => r_rst,
+
+    Tx_instruction_valid    => w_tx_instruction_valid,
+    Tx_instruction_index    => w_tx_instruction_index,
+    Tx_instruction_data     => w_tx_instruction_data,
+
+    Tx_program_req_valid    => w_tx_program_req_valid,
+    Tx_program_req_channel  => w_tx_program_req_channel,
+    Tx_program_req_index    => w_tx_program_req_index,
+    Drfm_write_req          => w_drfm_write_req,
+
+    Dwell_channel_clear     => r_dwell_report_wait,
+    Dwell_active_transmit   => r_dwell_active_tx,
+
+    Sync_data               => r_sync_data,
+
+    Drfm_read_req           => Drfm_read_req,
+    Dds_control             => Dds_control,
+    Output_control          => Output_control
   );
 
   Drfm_write_req <= w_drfm_write_req;
@@ -231,9 +257,7 @@ begin
   begin
     if rising_edge(Clk) then
       if (r_rst = '1') then
-        r_dwell_program_data.enable               <= '0';
-        r_dwell_program_data.initial_dwell_index  <= '-';
-        r_dwell_program_data.global_counter_init  <= (others => '-');
+        r_dwell_program_data <= (enable => '0', others => (others => '-'));
       else
         if (w_dwell_program_valid = '1') then
           r_dwell_program_data <= w_dwell_program_data;
@@ -339,6 +363,7 @@ begin
           end if;
 
         when S_DWELL_ACTIVE_TX =>
+          --TODO: terminate when all TX programs are terminated
           if (r_dwell_done_total = '1') then
             s_state <= S_DWELL_REPORT_WAIT;
           else
@@ -363,7 +388,7 @@ begin
 
         end case;
 
-        if ((w_dwell_program_valid = '1') and (w_dwell_entry_valid = '1') or (w_channel_entry_valid = '1') or (w_tx_instruction_valid = '1')) then
+        if ((w_dwell_program_valid = '1') or (w_dwell_entry_valid = '1') or (w_channel_entry_valid = '1') or (w_tx_instruction_valid = '1')) then
           s_state <= S_IDLE;
         end if;
       end if;
@@ -419,7 +444,7 @@ begin
         r_pll_pre_lock_done   <= '0';
       else
         r_pll_pre_lock_cycles <= r_pll_pre_lock_cycles + 1;
-        r_pll_pre_lock_done   <= to_stdlogic(r_pll_pre_lock_cycles = r_dwell_entry_d1.pll_pre_lock_cycles);
+        r_pll_pre_lock_done   <= to_stdlogic(r_pll_pre_lock_cycles = r_dwell_entry_d1.pll_pre_lock_delay);
       end if;
 
       if (s_state = S_PLL_WAIT_PRE_LOCK) then
@@ -427,7 +452,7 @@ begin
         r_pll_post_lock_done   <= '0';
       else
         r_pll_post_lock_cycles <= r_pll_post_lock_cycles + 1;
-        r_pll_post_lock_done   <= to_stdlogic(r_pll_post_lock_cycles = r_dwell_entry_d1.pll_post_lock_cycles);
+        r_pll_post_lock_done   <= to_stdlogic(r_pll_post_lock_cycles = r_dwell_entry_d1.pll_post_lock_delay);
       end if;
     end if;
   end process;
@@ -448,7 +473,7 @@ begin
         r_dwell_done_total    <= '0';
       else
         r_dwell_cycles_total  <= r_dwell_cycles_total + 1;
-        r_dwell_done_total    <= to_stdlogic(r_dwell_entry_d1.duration = r_dwell_cycles_total);
+        r_dwell_done_total    <= to_stdlogic(r_dwell_entry_d1.total_duration_max = r_dwell_cycles_total);
       end if;
     end if;
   end process;
@@ -465,7 +490,7 @@ begin
         end if;
         if (r_dwell_report_done_stats = '1') then
           r_report_received_stats <= '1';
-        end if'
+        end if;
       end if;
     end if;
   end process;
