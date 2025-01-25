@@ -154,7 +154,7 @@ begin
   w_status_read <= to_stdlogic(s_state = S_STATUS_MAIN);
   w_status_flags.channelizer_warnings  <= r_channelizer_warnings;
   w_status_flags.channelizer_errors    <= r_channelizer_errors;
-  w_status_flags.synthesizer_errors    <= r_channelizer_errors;
+  w_status_flags.synthesizer_errors    <= r_synthesizer_errors;
   w_status_flags.dwell_stats_errors    <= r_dwell_stats_errors;
   w_status_flags.drfm_errors           <= r_drfm_errors;
   w_status_flags_packed                <= pack(w_status_flags);
@@ -312,7 +312,7 @@ begin
 
     when S_ENABLES =>
       w_fifo_valid  <= '1';
-      w_fifo_data   <= x"000000" & "000" & r_enable_pdw_encoder & r_enable_channelizer & r_enable_status;
+      w_fifo_data   <= x"0000000" & "0" & r_enable_synthesizer & r_enable_channelizer & r_enable_status;
 
     when S_STATUS_MAIN =>
       w_fifo_valid  <= '1';

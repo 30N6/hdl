@@ -87,7 +87,7 @@ architecture rtl of ecm_top is
   signal w_dwell_active_meas          : std_logic;
   signal w_dwell_active_tx            : std_logic;
   signal w_dwell_done                 : std_logic;
-  signal w_dwell_data                 : esm_dwell_entry_t;
+  signal w_dwell_data                 : ecm_dwell_entry_t;
   signal w_dwell_sequence_num         : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal w_dwell_stats_report_done    : std_logic;
   signal w_dwell_drfm_reports_done    : std_logic;
@@ -121,7 +121,7 @@ architecture rtl of ecm_top is
   signal w_drfm_write_req             : ecm_drfm_write_req_t;
   signal w_drfm_read_req              : ecm_drfm_read_req_t;
   signal w_drfm_control               : channelizer_control_t;
-  signal w_drfm_data                  : signed_array_t(1 downto 0)(ECM_DDS_OUTPUT_WIDTH - 1 downto 0);
+  signal w_drfm_data                  : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
 
   signal w_dds_command                : dds_control_t;
   signal w_dds_control                : channelizer_control_t;
@@ -356,7 +356,7 @@ begin
   else generate
     w_synthesizer_errors  <= (others => '0');
     w_dac_valid_out       <= '1';
-    w_dac_data_out        <= (others => '0');
+    w_dac_data_out        <= (others => (others => '0'));
   end generate g_synthesizer;
 
   g_dwell_stats : if (ENABLE_DWELL_STATS) generate
@@ -372,13 +372,13 @@ begin
       Enable                    => w_enable_chan,
 
       Dwell_active              => w_dwell_active,
-      Dwell_active_measurement  => w_dwell_active_measurement,
+      Dwell_active_measurement  => w_dwell_active_meas,
       Dwell_data                => w_dwell_data,
       Dwell_sequence_num        => w_dwell_sequence_num,
       Dwell_report_done         => w_dwell_stats_report_done,
 
-      Input_ctrl                => w_channelizer_chan_control,
-      Input_pwr                 => w_channelizer_chan_pwr,
+      Input_ctrl                => w_stretched_control,
+      Input_pwr                 => w_stretched_pwr,
 
       Axis_ready                => w_d2h_fifo_in_ready(0),
       Axis_valid                => w_d2h_fifo_in_valid(0),
@@ -398,10 +398,10 @@ begin
   g_drfm : if (ENABLE_DRFM) generate
     i_drfm : entity ecm_lib.ecm_drfm
     generic map (
-      AXI_DATA_WIDTH    => AXI_DATA_WIDTH
+      AXI_DATA_WIDTH    => AXI_DATA_WIDTH,
       READ_LATENCY      => 4 --TODO: constant
     )
-    port (
+    port map (
       Clk_axi                 => M_axis_clk,
       Clk                     => Adc_clk_x4,
       Rst                     => r_combined_rst,

@@ -29,7 +29,8 @@ port (
   Drfm_write_req          : in  ecm_drfm_write_req_t;
 
   Dwell_channel_clear     : in  std_logic;
-  Dwell_active_transmit   : in  std_logic;
+  Dwell_transmit_active   : in  std_logic;
+  Dwell_transmit_done     : out std_logic;
 
   Sync_data               : in  channelizer_control_t;
 
@@ -44,7 +45,7 @@ end entity ecm_dwell_tx_engine;
 
 architecture rtl of ecm_dwell_tx_engine is
 
-  type channel_program_state_t is (S_IDLE, S_DECODE, S_EXECUTE, S_COMPLETE);
+  type channel_program_state_t is (S_IDLE, S_DECODE, S_EXECUTE);
 
   type channel_state_t is record
     program_state       : channel_program_state_t;
@@ -128,6 +129,8 @@ architecture rtl of ecm_dwell_tx_engine is
   signal w_drfm_state_wr_index          : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal w_drfm_state_wr_en_first       : std_logic;
   signal w_drfm_state_wr_en_last        : std_logic;
+
+  signal r_transmit_pending             : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
 
   signal w_error_program_req_overflow   : std_logic;
 
@@ -230,49 +233,52 @@ begin
       r4_output_control               <= OUTPUT_CONTROL_CLEAR;
       r4_output_control.channel_index <= r3_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
 
-      if (w3_instruction_header.valid = '0') then
-
-        r4_channel_state.program_state              <= S_COMPLETE;
+      if (Dwell_transmit_active = '0') then
         r4_dds_control.valid                        <= '1';
         r4_dds_control.setup_data.dds_output_select <= "00";
         r4_output_control.valid                     <= '1';
         r4_output_control.control                   <= to_unsigned(ECM_TX_OUTPUT_CONTROL_DISABLED, ECM_TX_OUTPUT_CONTROL_WIDTH);
-
       elsif (r3_channel_state.program_state = S_DECODE) then
+        if (w3_instruction_header.valid = '0') then
+          r4_channel_state.program_state              <= S_IDLE;
+          r4_dds_control.valid                        <= '1';
+          r4_dds_control.setup_data.dds_output_select <= "00";
+          r4_output_control.valid                     <= '1';
+          r4_output_control.control                   <= to_unsigned(ECM_TX_OUTPUT_CONTROL_DISABLED, ECM_TX_OUTPUT_CONTROL_WIDTH);
+        else
+          r4_dds_control.valid                        <= '1';
+          r4_dds_control.setup_data                   <= w3_instruction_header.dds_control;
+          r4_output_control.valid                     <= '1';
+          r4_output_control.control                   <= w3_instruction_header.output_control;
 
-        r4_dds_control.valid                        <= '1';
-        r4_dds_control.setup_data                   <= w3_instruction_header.dds_control;
-        r4_output_control.valid                     <= '1';
-        r4_output_control.control                   <= w3_instruction_header.output_control;
+          r4_channel_state.instruction_index          <= r3_instruction_index_next;
+          r4_channel_state.wait_count                 <= (others => '0');
+          r4_channel_state.playback_count             <= (others => '0');
+          r4_channel_state.playback_addr_curr         <= r3_drfm_state_first.addr;
+          r4_channel_state.playback_addr_first        <= r3_drfm_state_first.addr;
+          r4_channel_state.playback_addr_last         <= r3_drfm_state_last.addr;
 
-        r4_channel_state.instruction_index          <= r3_instruction_index_next;
-        r4_channel_state.wait_count                 <= (others => '0');
-        r4_channel_state.playback_count             <= (others => '0');
-        r4_channel_state.playback_addr_curr         <= r3_drfm_state_first.addr;
-        r4_channel_state.playback_addr_first        <= r3_drfm_state_first.addr;
-        r4_channel_state.playback_addr_last         <= r3_drfm_state_last.addr;
-
-        if (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_BPSK) then
-          r4_dds_control.control_type               <= to_unsigned(DDS_CONTROL_TYPE_LFSR, DDS_CONTROL_TYPE_WIDTH);
-        elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_CW_SWEEP) then
-          r4_dds_control.control_type               <= to_unsigned(DDS_CONTROL_TYPE_SIN_SWEEP, DDS_CONTROL_TYPE_WIDTH);
-        elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_CW_STEP) then
-          r4_dds_control.control_type               <= to_unsigned(DDS_CONTROL_TYPE_SIN_STEP, DDS_CONTROL_TYPE_WIDTH);
-        elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_PLAYBACK) then
-          r4_channel_state.program_state            <= S_EXECUTE;
-          r4_channel_state.instruction_index        <= r3_channel_state.instruction_index;
-          r4_channel_state.playback_count           <= w3_instruction_playback.base_count + (w3_instruction_playback.rand_offset_mask and w_rand(ECM_TX_INSTRUCTION_PLAYBACK_COUNTER_WIDTH - 1 downto 0));
-        elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_WAIT) then
-          r4_channel_state.program_state            <= S_EXECUTE;
-          r4_channel_state.instruction_index        <= r3_channel_state.instruction_index;
-          r4_channel_state.wait_count               <= w3_instruction_wait.base_duration + (w3_instruction_wait.rand_offset_mask and w_rand(ECM_TX_INSTRUCTION_WAIT_DURATION_WIDTH - 1 downto 0));
-        elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_JUMP) then
-          r4_channel_state.loop_count               <= r3_loop_count_next;
-          if ((w3_instruction_jump.counter_check = '0') or (r3_channel_state.loop_count /= w3_instruction_jump.counter_value)) then
-            r4_channel_state.instruction_index      <= w3_instruction_jump.dest_index;
+          if (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_BPSK) then
+            r4_dds_control.control_type               <= to_unsigned(DDS_CONTROL_TYPE_LFSR, DDS_CONTROL_TYPE_WIDTH);
+          elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_CW_SWEEP) then
+            r4_dds_control.control_type               <= to_unsigned(DDS_CONTROL_TYPE_SIN_SWEEP, DDS_CONTROL_TYPE_WIDTH);
+          elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_CW_STEP) then
+            r4_dds_control.control_type               <= to_unsigned(DDS_CONTROL_TYPE_SIN_STEP, DDS_CONTROL_TYPE_WIDTH);
+          elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_PLAYBACK) then
+            r4_channel_state.program_state            <= S_EXECUTE;
+            r4_channel_state.instruction_index        <= r3_channel_state.instruction_index;
+            r4_channel_state.playback_count           <= w3_instruction_playback.base_count + (w3_instruction_playback.rand_offset_mask and w_rand(ECM_TX_INSTRUCTION_PLAYBACK_COUNTER_WIDTH - 1 downto 0));
+          elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_WAIT) then
+            r4_channel_state.program_state            <= S_EXECUTE;
+            r4_channel_state.instruction_index        <= r3_channel_state.instruction_index;
+            r4_channel_state.wait_count               <= w3_instruction_wait.base_duration + (w3_instruction_wait.rand_offset_mask and w_rand(ECM_TX_INSTRUCTION_WAIT_DURATION_WIDTH - 1 downto 0));
+          elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_JUMP) then
+            r4_channel_state.loop_count               <= r3_loop_count_next;
+            if ((w3_instruction_jump.counter_check = '0') or (r3_channel_state.loop_count /= w3_instruction_jump.counter_value)) then
+              r4_channel_state.instruction_index      <= w3_instruction_jump.dest_index;
+            end if;
           end if;
         end if;
-
       elsif(r3_channel_state.program_state = S_EXECUTE) then
 
         r4_channel_state.playback_addr_curr           <= r3_playback_addr_next;
@@ -294,7 +300,7 @@ begin
             r4_channel_state.instruction_index        <= r3_instruction_index_next;
           end if;
         else
-          r4_channel_state.program_state              <= S_COMPLETE;
+          r4_channel_state.program_state              <= S_IDLE;
           r4_dds_control.valid                        <= '1';
           r4_dds_control.setup_data.dds_output_select <= "00";
           r4_output_control.valid                     <= '1';
@@ -389,8 +395,16 @@ begin
   begin
     if rising_edge(Clk) then
       if (w_channel_state_wr_en = '1') then
-        m_channel_state(to_integer(w_channel_state_wr_index)) <= w_channel_state_wr_data;
+        m_channel_state(to_integer(w_channel_state_wr_index))     <= w_channel_state_wr_data;
+        r_transmit_pending(to_integer(w_channel_state_wr_index))  <= to_stdlogic(w_channel_state_wr_data.program_state /= S_IDLE);
       end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Dwell_transmit_done <= not(or_reduce(r_transmit_pending));
     end if;
   end process;
 

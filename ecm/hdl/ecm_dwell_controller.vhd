@@ -154,6 +154,8 @@ architecture rtl of ecm_dwell_controller is
   signal w_tx_program_req_channel   : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal w_tx_program_req_index     : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
 
+  signal w_tx_programs_done         : std_logic;
+
 begin
 
   process(Clk)
@@ -242,7 +244,8 @@ begin
     Drfm_write_req          => w_drfm_write_req,
 
     Dwell_channel_clear     => r_dwell_report_wait,
-    Dwell_active_transmit   => r_dwell_active_tx,
+    Dwell_transmit_active   => r_dwell_active_tx,
+    Dwell_transmit_done     => w_tx_programs_done,
 
     Sync_data               => r_sync_data,
 
@@ -363,8 +366,7 @@ begin
           end if;
 
         when S_DWELL_ACTIVE_TX =>
-          --TODO: terminate when all TX programs are terminated
-          if (r_dwell_done_total = '1') then
+          if ((w_tx_programs_done = '1') or (r_dwell_done_total = '1')) then
             s_state <= S_DWELL_REPORT_WAIT;
           else
             s_state <= S_DWELL_ACTIVE_TX;
