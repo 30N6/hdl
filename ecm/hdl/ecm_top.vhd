@@ -63,7 +63,6 @@ architecture rtl of ecm_top is
   constant AXI_FIFO_DEPTH             : natural := 64;  --TODO: increase?
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
   constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + 4 + 4; -- +4 for filter, +4 for ifft
-  constant SYNTHESIZER16_DATA_WIDTH   : natural := 16;
 
   constant AD9361_BIT_PIPE_DEPTH      : natural := 3;
 
@@ -116,7 +115,7 @@ architecture rtl of ecm_top is
   signal w_stretched_pwr              : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   signal w_synthesizer16_control      : channelizer_control_t;
-  signal w_synthesizer16_data         : signed_array_t(1 downto 0)(SYNTHESIZER16_DATA_WIDTH - 1 downto 0);
+  signal w_synthesizer16_data         : signed_array_t(1 downto 0)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
 
   signal w_drfm_write_req             : ecm_drfm_write_req_t;
   signal w_drfm_read_req              : ecm_drfm_read_req_t;
@@ -125,7 +124,7 @@ architecture rtl of ecm_top is
 
   signal w_dds_command                : dds_control_t;
   signal w_dds_control                : channelizer_control_t;
-  signal w_dds_data                   : signed_array_t(1 downto 0)(ECM_DDS_OUTPUT_WIDTH - 1 downto 0);
+  signal w_dds_data                   : signed_array_t(1 downto 0)(ECM_DDS_DATA_WIDTH - 1 downto 0);
 
   signal w_sync_to_dwell_controller   : channelizer_control_t;
   signal w_sync_to_dds                : channelizer_control_t;
@@ -333,7 +332,7 @@ begin
   g_synthesizer : if (ENABLE_SYNTHESIZER) generate
     i_channelizer : entity dsp_lib.synthesizer_16
     generic map (
-      INPUT_DATA_WIDTH  => SYNTHESIZER16_DATA_WIDTH,
+      INPUT_DATA_WIDTH  => ECM_SYNTHESIZER_DATA_WIDTH,
       OUTPUT_DATA_WIDTH => IQ_WIDTH
     )
     port map (
@@ -441,7 +440,7 @@ begin
 
   i_dds : entity dsp_lib.channelized_dds
   generic map (
-    OUTPUT_DATA_WIDTH   => ECM_DDS_OUTPUT_WIDTH,
+    OUTPUT_DATA_WIDTH   => ECM_DDS_DATA_WIDTH,
     NUM_CHANNELS        => ECM_NUM_CHANNELS,
     CHANNEL_INDEX_WIDTH => ECM_CHANNEL_INDEX_WIDTH,
     LATENCY             => 7 --TODO

@@ -33,7 +33,7 @@ module channelized_dds_tb;
   parameter time CLK_HALF_PERIOD    = 4ns;
   parameter NUM_CHANNELS            = 16;
   parameter CHANNEL_INDEX_WIDTH     = $clog2(NUM_CHANNELS);
-  parameter OUTPUT_DATA_WIDTH       = 12;
+  parameter OUTPUT_DATA_WIDTH       = 16;
 
   logic Clk;
   logic Rst;

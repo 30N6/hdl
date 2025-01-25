@@ -94,7 +94,8 @@ package ecm_pkg is
   constant ECM_DWELL_PLL_DELAY_WIDTH                      : natural := 16;
 
   constant ECM_TIMESTAMP_WIDTH                            : natural := 48;
-  constant ECM_DDS_OUTPUT_WIDTH                           : natural := 12;
+  constant ECM_DDS_DATA_WIDTH                             : natural := 16;
+  constant ECM_SYNTHESIZER_DATA_WIDTH                     : natural := 16;
 
   type ecm_tx_instruction_header_t is record
     valid               : std_logic;
