@@ -112,21 +112,22 @@ module ecm_output_block_tb;
 
   ecm_output_block #(.ENABLE_DDS(1), .ENABLE_DRFM(1)) dut
   (
-  .Clk                 (Clk),
-  .Rst                 (Rst),
+  .Clk                    (Clk),
+  .Rst                    (Rst),
 
-  .Output_control      (ctrl_intf.data),
+  .Dwell_active_transmit  (1'b1),
+  .Output_control         (ctrl_intf.data),
 
-  .Dds_ctrl            (dds_intf.ctrl),
-  .Dds_data            (dds_intf.data),
+  .Dds_ctrl               (dds_intf.ctrl),
+  .Dds_data               (dds_intf.data),
 
-  .Drfm_ctrl           (drfm_intf.ctrl),
-  .Drfm_data           (drfm_intf.data),
+  .Drfm_ctrl              (drfm_intf.ctrl),
+  .Drfm_data              (drfm_intf.data),
 
-  .Synthesizer_ctrl    (w_output_ctrl),
-  .Synthesizer_data    (w_output_data),
+  .Synthesizer_ctrl       (w_output_ctrl),
+  .Synthesizer_data       (w_output_data),
 
-  .Error_dds_drfm_sync (w_error_dds_drfm_sync)
+  .Error_dds_drfm_sync    (w_error_dds_drfm_sync)
 );
 
   assign output_intf.ctrl = w_output_ctrl;

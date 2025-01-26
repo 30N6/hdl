@@ -482,21 +482,22 @@ begin
     ENABLE_DRFM => ENABLE_DRFM
   )
   port map (
-    Clk                 => Adc_clk_x4,
-    Rst                 => r_combined_rst,
+    Clk                       => Adc_clk_x4,
+    Rst                       => r_combined_rst,
 
-    Output_control      => w_output_control,
+    Dwell_active_transmit     => w_dwell_active_tx,
+    Output_control            => w_output_control,
 
-    Dds_ctrl            => w_dds_ctrl,
-    Dds_data            => w_dds_data,
+    Dds_ctrl                  => w_dds_ctrl,
+    Dds_data                  => w_dds_data,
 
-    Drfm_ctrl           => w_drfm_ctrl,
-    Drfm_data           => w_drfm_data,
+    Drfm_ctrl                 => w_drfm_ctrl,
+    Drfm_data                 => w_drfm_data,
 
-    Synthesizer_ctrl    => w_synthesizer16_ctrl,
-    Synthesizer_data    => w_synthesizer16_data,
+    Synthesizer_ctrl          => w_synthesizer16_ctrl,
+    Synthesizer_data          => w_synthesizer16_data,
 
-    Error_dds_drfm_sync => w_output_block_errors.dds_drfm_sync_mismatch
+    Error_dds_drfm_sync       => w_output_block_errors.dds_drfm_sync_mismatch
   );
 
   i_status_reporter : entity ecm_lib.ecm_status_reporter

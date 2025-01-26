@@ -45,7 +45,7 @@ end entity ecm_dwell_tx_engine;
 
 architecture rtl of ecm_dwell_tx_engine is
 
-  type channel_program_state_t is (S_IDLE, S_DECODE, S_EXECUTE);
+  type channel_program_state_t is (S_IDLE, S_START, S_DECODE, S_EXECUTE);
 
   type channel_state_t is record
     program_state       : channel_program_state_t;
@@ -217,8 +217,9 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r4_sync_data                    <= r3_sync_data;
-      r4_channel_state                <= r3_channel_state;
+      r4_sync_data                        <= r3_sync_data;
+      r4_channel_state                    <= r3_channel_state;
+      r4_channel_state.playback_addr_curr <= r3_playback_addr_next;
 
       r4_drfm_read_req.valid          <= r3_sync_data.valid and to_stdlogic((r3_channel_state.program_state = S_EXECUTE) and
                                                                             (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_PLAYBACK));
@@ -233,22 +234,23 @@ begin
       r4_output_control               <= OUTPUT_CONTROL_CLEAR;
       r4_output_control.channel_index <= r3_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
 
-      if (Dwell_transmit_active = '0') then
-        r4_dds_control.valid                        <= '1';
-        r4_dds_control.setup_data.dds_output_select <= "00";
-        r4_output_control.valid                     <= '1';
-        r4_output_control.control                   <= to_unsigned(ECM_TX_OUTPUT_CONTROL_DISABLED, ECM_TX_OUTPUT_CONTROL_WIDTH);
+
+      if (r3_channel_state.program_state = S_START) then
+        if (Dwell_transmit_active = '1') then
+          r4_channel_state.program_state              <= S_DECODE;
+        end if;
+
       elsif (r3_channel_state.program_state = S_DECODE) then
-        if (w3_instruction_header.valid = '0') then
+        if ((Dwell_transmit_active = '0') or (w3_instruction_header.valid = '0')) then
           r4_channel_state.program_state              <= S_IDLE;
           r4_dds_control.valid                        <= '1';
           r4_dds_control.setup_data.dds_output_select <= "00";
           r4_output_control.valid                     <= '1';
           r4_output_control.control                   <= to_unsigned(ECM_TX_OUTPUT_CONTROL_DISABLED, ECM_TX_OUTPUT_CONTROL_WIDTH);
         else
-          r4_dds_control.valid                        <= '1';
+          r4_dds_control.valid                        <= w3_instruction_header.dds_valid;
           r4_dds_control.setup_data                   <= w3_instruction_header.dds_control;
-          r4_output_control.valid                     <= '1';
+          r4_output_control.valid                     <= w3_instruction_header.output_valid;
           r4_output_control.control                   <= w3_instruction_header.output_control;
 
           r4_channel_state.instruction_index          <= r3_instruction_index_next;
@@ -279,11 +281,9 @@ begin
             end if;
           end if;
         end if;
-      elsif(r3_channel_state.program_state = S_EXECUTE) then
 
-        r4_channel_state.playback_addr_curr           <= r3_playback_addr_next;
-
-        if (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_PLAYBACK) then
+      elsif (r3_channel_state.program_state = S_EXECUTE) then
+        if ((Dwell_transmit_active = '1') and (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_PLAYBACK)) then
           if ((w3_instruction_playback.mode = '1') or (r3_segment_done = '1')) then
             r4_channel_state.playback_count           <= r3_playback_count_next;
 
@@ -292,7 +292,7 @@ begin
               r4_channel_state.instruction_index      <= r3_instruction_index_next;
             end if;
           end if;
-        elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_WAIT) then
+        elsif ((Dwell_transmit_active = '1') and (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_WAIT)) then
           r4_channel_state.wait_count                 <= r3_wait_count_next;
 
           if (r3_wait_done = '1') then
@@ -362,7 +362,7 @@ begin
         if (Tx_program_req_valid = '1') then
           r_tx_program_req_valid    <= '1';
           r_tx_program_req_channel  <= Tx_program_req_channel;
-          r_tx_program_req_data     <= (program_state => S_DECODE, instruction_index => Tx_program_req_index, others => (others => '0'));
+          r_tx_program_req_data     <= (program_state => S_START, instruction_index => Tx_program_req_index, others => (others => '0'));
         elsif (r4_sync_data.valid = '0') then
           r_tx_program_req_valid    <= '0';
           r_tx_program_req_channel  <= (others => '-');

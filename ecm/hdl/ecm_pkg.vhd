@@ -52,7 +52,7 @@ package ecm_pkg is
   constant ECM_TX_INSTRUCTION_TYPE_PLAYBACK               : natural := 4;
   constant ECM_TX_INSTRUCTION_TYPE_WAIT                   : natural := 5;
   constant ECM_TX_INSTRUCTION_TYPE_JUMP                   : natural := 6;
-  constant ECM_TX_INSTRUCTION_TYPE_WIDTH                  : natural := 4;
+  constant ECM_TX_INSTRUCTION_TYPE_WIDTH                  : natural := 3;
 
   constant ECM_TX_OUTPUT_CONTROL_DISABLED                 : natural := 0;
   constant ECM_TX_OUTPUT_CONTROL_DDS                      : natural := 1;
@@ -99,11 +99,15 @@ package ecm_pkg is
 
   type ecm_tx_instruction_header_t is record
     valid               : std_logic;
-    output_control      : unsigned(ECM_TX_OUTPUT_CONTROL_WIDTH - 1 downto 0);
     instruction_type    : unsigned(ECM_TX_INSTRUCTION_TYPE_WIDTH - 1 downto 0);
+
+    output_valid        : std_logic;
+    output_control      : unsigned(ECM_TX_OUTPUT_CONTROL_WIDTH - 1 downto 0);
+
+    dds_valid           : std_logic;
     dds_control         : dds_control_setup_entry_t;
   end record;
-  constant ECM_TX_INSTRUCTION_HEADER_PACKED_WIDTH : natural := 8 + DDS_CONTROL_SETUP_ENTRY_PACKED_WIDTH;
+  constant ECM_TX_INSTRUCTION_HEADER_PACKED_WIDTH : natural := 16;
 
   type ecm_tx_instruction_dds_setup_bpsk_t is record
     header              : ecm_tx_instruction_header_t;
@@ -392,12 +396,14 @@ package body ecm_pkg is
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_HEADER_PACKED_WIDTH - 1 downto 0)) return ecm_tx_instruction_header_t is
     variable r : ecm_tx_instruction_header_t;
   begin
+    r.valid             := v(3);
+    r.instruction_type  := unsigned(v(2 downto 0));
 
-    r.valid             := v(0);
-    r.output_control    := unsigned(v(2 downto 1));
-    r.instruction_type  := unsigned(v(7 downto 4));
-    r.dds_control       := unpack(v(15 downto 8));
+    r.output_valid      := v(7);
+    r.output_control    := unsigned(v(5 downto 4));
 
+    r.dds_valid         := v(11);
+    r.dds_control       := unpack(v(10 downto 8));
     return r;
   end function;
 

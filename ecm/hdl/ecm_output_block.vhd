@@ -17,21 +17,22 @@ generic (
   ENABLE_DRFM : boolean
 );
 port (
-  Clk                 : in  std_logic;
-  Rst                 : in  std_logic;
+  Clk                   : in  std_logic;
+  Rst                   : in  std_logic;
 
-  Output_control      : in  ecm_output_control_t;
+  Dwell_active_transmit : in  std_logic;
+  Output_control        : in  ecm_output_control_t;
 
-  Dds_ctrl            : in  channelizer_control_t;
-  Dds_data            : in  signed_array_t(1 downto 0)(ECM_DDS_DATA_WIDTH - 1 downto 0);
+  Dds_ctrl              : in  channelizer_control_t;
+  Dds_data              : in  signed_array_t(1 downto 0)(ECM_DDS_DATA_WIDTH - 1 downto 0);
 
-  Drfm_ctrl           : in  channelizer_control_t;
-  Drfm_data           : in  signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  Drfm_ctrl             : in  channelizer_control_t;
+  Drfm_data             : in  signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
 
-  Synthesizer_ctrl    : out channelizer_control_t;
-  Synthesizer_data    : out signed_array_t(1 downto 0)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
+  Synthesizer_ctrl      : out channelizer_control_t;
+  Synthesizer_data      : out signed_array_t(1 downto 0)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
 
-  Error_dds_drfm_sync : out std_logic
+  Error_dds_drfm_sync   : out std_logic
 );
 end entity ecm_output_block;
 
@@ -39,37 +40,38 @@ architecture rtl of ecm_output_block is
 
   constant PRODUCT_WIDTH    : natural := ECM_DDS_DATA_WIDTH + ECM_DRFM_DATA_WIDTH;
 
-  signal r_rst              : std_logic;
-  signal r_output_control   : ecm_output_control_t;
-  signal r_clear_index      : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
-  signal w_output_control   : ecm_output_control_t;
-  signal m_output_control   : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_TX_OUTPUT_CONTROL_WIDTH - 1 downto 0);
+  signal r_rst                    : std_logic;
+  signal r_dwell_active_transmit  : std_logic;
+  signal r_output_control         : ecm_output_control_t;
+  signal r_clear_index            : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
+  signal w_output_control         : ecm_output_control_t;
+  signal m_output_control         : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_TX_OUTPUT_CONTROL_WIDTH - 1 downto 0);
 
-  signal r0_dds_ctrl        : channelizer_control_t;
-  signal r0_dds_data        : signed_array_t(1 downto 0)(ECM_DDS_DATA_WIDTH - 1 downto 0);
-  signal r0_drfm_ctrl       : channelizer_control_t;
-  signal r0_drfm_data       : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  signal r0_dds_ctrl              : channelizer_control_t;
+  signal r0_dds_data              : signed_array_t(1 downto 0)(ECM_DDS_DATA_WIDTH - 1 downto 0);
+  signal r0_drfm_ctrl             : channelizer_control_t;
+  signal r0_drfm_data             : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
 
-  signal r1_dds_ctrl        : channelizer_control_t;
-  signal r1_dds_data        : signed_array_t(1 downto 0)(ECM_DDS_DATA_WIDTH - 1 downto 0);
-  signal r1_drfm_ctrl       : channelizer_control_t;
-  signal r1_drfm_data       : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  signal r1_dds_ctrl              : channelizer_control_t;
+  signal r1_dds_data              : signed_array_t(1 downto 0)(ECM_DDS_DATA_WIDTH - 1 downto 0);
+  signal r1_drfm_ctrl             : channelizer_control_t;
+  signal r1_drfm_data             : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
 
-  signal r2_shared_ctrl     : channelizer_control_t;
-  signal r2_dds_data        : signed_array_t(1 downto 0)(ECM_DDS_DATA_WIDTH - 1 downto 0);
-  signal r2_drfm_data       : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
-  signal r2_mult_ac         : signed(PRODUCT_WIDTH - 1 downto 0);
-  signal r2_mult_bd         : signed(PRODUCT_WIDTH - 1 downto 0);
-  signal r2_mult_ad         : signed(PRODUCT_WIDTH - 1 downto 0);
-  signal r2_mult_bc         : signed(PRODUCT_WIDTH - 1 downto 0);
+  signal r2_shared_ctrl           : channelizer_control_t;
+  signal r2_dds_data              : signed_array_t(1 downto 0)(ECM_DDS_DATA_WIDTH - 1 downto 0);
+  signal r2_drfm_data             : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  signal r2_mult_ac               : signed(PRODUCT_WIDTH - 1 downto 0);
+  signal r2_mult_bd               : signed(PRODUCT_WIDTH - 1 downto 0);
+  signal r2_mult_ad               : signed(PRODUCT_WIDTH - 1 downto 0);
+  signal r2_mult_bc               : signed(PRODUCT_WIDTH - 1 downto 0);
 
-  signal r3_shared_ctrl     : channelizer_control_t;
-  signal r3_dds_data        : signed_array_t(1 downto 0)(ECM_DDS_DATA_WIDTH - 1 downto 0);
-  signal r3_drfm_data       : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
-  signal r3_product_data    : signed_array_t(1 downto 0)(PRODUCT_WIDTH downto 0);
-  signal r3_output_control  : unsigned(ECM_TX_OUTPUT_CONTROL_WIDTH - 1 downto 0);
+  signal r3_shared_ctrl           : channelizer_control_t;
+  signal r3_dds_data              : signed_array_t(1 downto 0)(ECM_DDS_DATA_WIDTH - 1 downto 0);
+  signal r3_drfm_data             : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  signal r3_product_data          : signed_array_t(1 downto 0)(PRODUCT_WIDTH downto 0);
+  signal r3_output_control        : unsigned(ECM_TX_OUTPUT_CONTROL_WIDTH - 1 downto 0);
 
-  signal r4_output_ctrl     : channelizer_control_t;
+  signal r4_output_ctrl           : channelizer_control_t;
   signal r4_output_data     : signed_array_t(1 downto 0)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
 
 begin
@@ -89,8 +91,9 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_rst             <= Rst;
-      r_output_control  <= Output_control;
+      r_rst                   <= Rst;
+      r_dwell_active_transmit <= Dwell_active_transmit;
+      r_output_control        <= Output_control;
     end if;
   end process;
 
@@ -176,7 +179,9 @@ begin
     if rising_edge(Clk) then
       r4_output_ctrl <= r3_shared_ctrl;
 
-      if (r3_output_control = ECM_TX_OUTPUT_CONTROL_DDS) then
+      if (r_dwell_active_transmit = '0') then
+        r4_output_data <= (others => (others => '0'));
+      elsif (r3_output_control = ECM_TX_OUTPUT_CONTROL_DDS) then
         r4_output_data(0) <= r3_dds_data(0)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
         r4_output_data(1) <= r3_dds_data(1)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
       elsif (r3_output_control = ECM_TX_OUTPUT_CONTROL_DRFM) then

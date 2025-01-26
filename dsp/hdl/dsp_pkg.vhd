@@ -48,7 +48,7 @@ package dsp_pkg is
     dds_sin_phase_inc_select  : std_logic;  -- 0=sweep, 1=step
     dds_output_select         : std_logic_vector(1 downto 0); -- 00=off, 01=lfsr, 10=sweep, 11=mixer
   end record;
-  constant DDS_CONTROL_SETUP_ENTRY_PACKED_WIDTH : natural := 8;
+  constant DDS_CONTROL_SETUP_ENTRY_PACKED_WIDTH : natural := 3;
 
   type dds_control_lfsr_entry_t is record
     lfsr_phase_inc                      : unsigned(DDS_LFSR_PHASE_ACCUM_WIDTH - 1 downto 0);
@@ -84,7 +84,7 @@ package dsp_pkg is
   function invert_sign(v : signed; saturate : boolean) return signed;
   function int_to_signed_array(int_array : integer_array_t; output_length : natural; input_width : natural; output_width : natural) return signed_array_t;
 
-  function unpack(v : std_logic_vector) return dds_control_setup_entry_t;
+  function unpack(v : std_logic_vector(DDS_CONTROL_SETUP_ENTRY_PACKED_WIDTH - 1 downto 0)) return dds_control_setup_entry_t;
   function unpack(v : std_logic_vector) return dds_control_lfsr_entry_t;
   function unpack(v : std_logic_vector) return dds_control_sin_sweep_entry_t;
   function unpack(v : std_logic_vector) return dds_control_sin_step_entry_t;
@@ -125,17 +125,12 @@ package body dsp_pkg is
     return v_result;
   end function;
 
-  function unpack(v : std_logic_vector) return dds_control_setup_entry_t is
+  function unpack(v : std_logic_vector(DDS_CONTROL_SETUP_ENTRY_PACKED_WIDTH - 1 downto 0)) return dds_control_setup_entry_t is
     variable vm : std_logic_vector(v'length - 1 downto 0);
     variable r  : dds_control_setup_entry_t;
   begin
-    assert (v'length = DDS_CONTROL_SETUP_ENTRY_PACKED_WIDTH)
-      report "Unexpected length"
-      severity failure;
-
     r.dds_sin_phase_inc_select  := vm(0);
     r.dds_output_select         := vm(2 downto 1);
-
     return r;
   end function;
 

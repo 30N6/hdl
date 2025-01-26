@@ -8,6 +8,7 @@ custom_ip_files ecm_receiver [list \
   {"../common/hdl/math_pkg.vhd"             "common_lib"}   \
   {"../common/hdl/reset_extender.vhd"       "common_lib"}   \
   {"../common/hdl/clk_x4_phase_marker.vhd"  "common_lib"}   \
+  {"../common/hdl/xorshift_32.vhd"          "common_lib"}   \
   {"../axi/hdl/axis_async_fifo.vhd"         "axi_lib"}      \
   {"../axi/hdl/axis_sync_fifo.vhd"          "axi_lib"}      \
   {"../axi/hdl/axis_mux.vhd"                "axi_lib"}      \
