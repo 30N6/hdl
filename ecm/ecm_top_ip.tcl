@@ -28,40 +28,43 @@ custom_ip_files ecm_receiver [list \
   {"../dsp/hdl/fft_radix2_stage.vhd"        "dsp_lib"}      \
   {"../dsp/hdl/fft_twiddle_mem.vhd"         "dsp_lib"}      \
   {"../dsp/hdl/fft_radix2_output.vhd"       "dsp_lib"}      \
+  {"../dsp/hdl/fft_stretcher_2x.vhd"        "dsp_lib"}      \
+  {"../dsp/hdl/pfb_mux_2x.vhd"              "dsp_lib"}      \
   {"../dsp/hdl/pfb_demux_2x.vhd"            "dsp_lib"}      \
   {"../dsp/hdl/pfb_baseband_2x.vhd"         "dsp_lib"}      \
   {"../dsp/hdl/pfb_filter.vhd"              "dsp_lib"}      \
   {"../dsp/hdl/pfb_filter_buffer.vhd"       "dsp_lib"}      \
   {"../dsp/hdl/pfb_filter_mult.vhd"         "dsp_lib"}      \
   {"../dsp/hdl/pfb_filter_stage.vhd"        "dsp_lib"}      \
+  {"../dsp/hdl/chan_stretcher_2x.vhd"       "dsp_lib"}      \
   {"../dsp/hdl/channelizer_power.vhd"       "dsp_lib"}      \
   {"../dsp/hdl/channelizer_common.vhd"      "dsp_lib"}      \
-  {"../dsp/hdl/channelizer_8.vhd"           "dsp_lib"}      \
-  {"../dsp/hdl/channelizer_32.vhd"          "dsp_lib"}      \
-  {"../dsp/hdl/channelizer_64.vhd"          "dsp_lib"}      \
-  {"./hdl/esm_pkg.vhd"                      "esm_lib"}      \
-  {"./hdl/esm_debug_pkg.vhd"                "esm_lib"}      \
-  {"./hdl/esm_config.vhd"                   "esm_lib"}      \
-  {"./hdl/esm_dwell_config_decoder.vhd"     "esm_lib"}      \
-  {"./hdl/esm_dwell_controller.vhd"         "esm_lib"}      \
-  {"./hdl/esm_dwell_reporter.vhd"           "esm_lib"}      \
-  {"./hdl/esm_dwell_stats.vhd"              "esm_lib"}      \
-  {"./hdl/esm_pdw_iq_delay.vhd"             "esm_lib"}      \
-  {"./hdl/esm_pdw_threshold.vhd"            "esm_lib"}      \
-  {"./hdl/esm_pdw_sample_buffer.vhd"        "esm_lib"}      \
-  {"./hdl/esm_pdw_sample_processor.vhd"     "esm_lib"}      \
-  {"./hdl/esm_pdw_reporter.vhd"             "esm_lib"}      \
-  {"./hdl/esm_pdw_encoder_debug.vhd"        "esm_lib"}      \
-  {"./hdl/esm_pdw_encoder.vhd"              "esm_lib"}      \
-  {"./hdl/esm_status_reporter.vhd"          "esm_lib"}      \
-  {"./hdl/esm_receiver.vhd"                 "esm_lib"}      \
+  {"../dsp/hdl/channelizer_16.vhd"          "dsp_lib"}      \
+  {"../dsp/hdl/synthesizer_common.vhd"      "dsp_lib"}      \
+  {"../dsp/hdl/channelizer_16.vhd"          "dsp_lib"}      \
+  {"../dsp/hdl/channelized_dds_lut.vhd"     "dsp_lib"}      \
+  {"../dsp/hdl/channelized_dds.vhd"         "dsp_lib"}      \
+  {"./hdl/ecm_pkg.vhd"                      "ecm_lib"}      \
+  {"./hdl/ecm_config.vhd"                   "ecm_lib"}      \
+  {"./hdl/ecm_dwell_config_decoder.vhd"     "ecm_lib"}      \
+  {"./hdl/ecm_dwell_trigger.vhd"            "ecm_lib"}      \
+  {"./hdl/ecm_dwell_tx_engine.vhd"          "ecm_lib"}      \
+  {"./hdl/ecm_dwell_controller.vhd"         "ecm_lib"}      \
+  {"./hdl/ecm_dwell_stats_reporter.vhd"     "ecm_lib"}      \
+  {"./hdl/ecm_dwell_stats.vhd"              "ecm_lib"}      \
+  {"./hdl/ecm_drfm_reporter.vhd"            "ecm_lib"}      \
+  {"./hdl/ecm_drfm.vhd"                     "ecm_lib"}      \
+  {"./hdl/ecm_output_block.vhd"             "ecm_lib"}      \
+  {"./hdl/ecm_sync_block.vhd"               "ecm_lib"}      \
+  {"./hdl/ecm_status_reporter.vhd"          "ecm_lib"}      \
+  {"./hdl/ecm_top.vhd"                      "ecm_lib"}      \
 ]
 
-adi_ip_properties_lite ecm_receiver
+adi_ip_properties_lite ecm_top
 set cc [ipx::current_core]
 set_property company_url {https://github.com/30N6}  $cc
-set_property display_name "ECM top"                 $cc
-set_property description  "ECM top"                 $cc
+set_property display_name "ECM top level"           $cc
+set_property description  "ECM top level"           $cc
 
 adi_add_bus "S_axis" "slave"          \
   "xilinx.com:interface:axis_rtl:1.0" \

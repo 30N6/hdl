@@ -70,7 +70,7 @@ architecture rtl of ecm_dwell_config_decoder is
 
   signal w_message_done           : std_logic;
   signal r_message_done           : std_logic;
-  signal r_address                : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal r_address                : unsigned(ECM_CONFIG_ADDRESS_WIDTH - 1 downto 0);
 
 begin
 
