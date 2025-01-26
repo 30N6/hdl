@@ -30,6 +30,7 @@ port (
   Synthesizer_errors    : in  ecm_synthesizer_errors_t;
   Dwell_stats_errors    : in  ecm_dwell_stats_errors_t;
   Drfm_errors           : in  ecm_drfm_errors_t;
+  Output_block_errors   : in  ecm_output_block_errors_t;
 
   Axis_ready            : in  std_logic;
   Axis_valid            : out std_logic;
@@ -77,6 +78,7 @@ architecture rtl of ecm_status_reporter is
   signal r_synthesizer_errors       : ecm_synthesizer_errors_t;
   signal r_dwell_stats_errors       : ecm_dwell_stats_errors_t;
   signal r_drfm_errors              : ecm_drfm_errors_t;
+  signal r_output_block_errors      : ecm_output_block_errors_t;
 
   signal w_status_flags             : ecm_status_flags_t;
   signal w_status_flags_packed      : std_logic_vector(ECM_STATUS_FLAGS_WIDTH - 1 downto 0);
@@ -126,6 +128,7 @@ begin
       r_synthesizer_errors    <= Synthesizer_errors;
       r_dwell_stats_errors    <= Dwell_stats_errors;
       r_drfm_errors           <= Drfm_errors;
+      r_output_block_errors   <= Output_block_errors;
     end if;
   end process;
 
@@ -152,12 +155,13 @@ begin
   end process;
 
   w_status_read <= to_stdlogic(s_state = S_STATUS_MAIN);
-  w_status_flags.channelizer_warnings  <= r_channelizer_warnings;
-  w_status_flags.channelizer_errors    <= r_channelizer_errors;
-  w_status_flags.synthesizer_errors    <= r_synthesizer_errors;
-  w_status_flags.dwell_stats_errors    <= r_dwell_stats_errors;
-  w_status_flags.drfm_errors           <= r_drfm_errors;
-  w_status_flags_packed                <= pack(w_status_flags);
+  w_status_flags.channelizer_warnings <= r_channelizer_warnings;
+  w_status_flags.channelizer_errors   <= r_channelizer_errors;
+  w_status_flags.synthesizer_errors   <= r_synthesizer_errors;
+  w_status_flags.dwell_stats_errors   <= r_dwell_stats_errors;
+  w_status_flags.drfm_errors          <= r_drfm_errors;
+  w_status_flags.output_block_errors  <= r_output_block_errors;
+  w_status_flags_packed               <= pack(w_status_flags);
 
   process(Clk)
   begin

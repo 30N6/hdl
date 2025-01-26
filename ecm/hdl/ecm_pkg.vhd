@@ -323,6 +323,11 @@ package ecm_pkg is
   constant ECM_DRFM_ERRORS_WIDTH : natural := 5;
   type ecm_drfm_errors_array_t is array (natural range <>) of ecm_drfm_errors_t;
 
+  type ecm_output_block_errors_t is record
+    dds_drfm_sync_mismatch : std_logic;
+  end record;
+  constant ECM_OUTPUT_BLOCK_ERRORS_WIDTH : natural := 5;
+
   type ecm_status_reporter_errors_t is record
     reporter_timeout  : std_logic;
     reporter_overflow : std_logic;
@@ -335,12 +340,14 @@ package ecm_pkg is
     synthesizer_errors    : ecm_synthesizer_errors_t;
     dwell_stats_errors    : ecm_dwell_stats_errors_t;
     drfm_errors           : ecm_drfm_errors_t;
+    output_block_errors   : ecm_output_block_errors_t;
   end record;
   constant ECM_STATUS_FLAGS_WIDTH : natural := ECM_CHANNELIZER_WARNINGS_WIDTH +
                                                ECM_CHANNELIZER_ERRORS_WIDTH +
                                                ECM_SYNTHESIZER_ERRORS_WIDTH +
                                                ECM_DWELL_STATS_ERRORS_WIDTH +
-                                               ECM_DRFM_ERRORS_WIDTH;
+                                               ECM_DRFM_ERRORS_WIDTH +
+                                               ECM_OUTPUT_BLOCK_ERRORS_WIDTH;
 
   function unpack(v : std_logic_vector(ECM_CONFIG_DATA_WIDTH - 1 downto 0)) return ecm_config_data_t;
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_HEADER_PACKED_WIDTH - 1 downto 0)) return ecm_tx_instruction_header_t;
@@ -357,6 +364,7 @@ package ecm_pkg is
   function pack(v : ecm_synthesizer_errors_t) return std_logic_vector;
   function pack(v : ecm_dwell_stats_errors_t) return std_logic_vector;
   function pack(v : ecm_drfm_errors_t) return std_logic_vector;
+  function pack(v : ecm_output_block_errors_t) return std_logic_vector;
   function pack(v : ecm_status_reporter_errors_t) return std_logic_vector;
   function pack(v : ecm_status_flags_t) return std_logic_vector;
   function pack(v : ecm_config_data_t) return std_logic_vector;
@@ -553,6 +561,13 @@ package body ecm_pkg is
     return r;
   end function;
 
+  function pack(v : ecm_output_block_errors_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_OUTPUT_BLOCK_ERRORS_WIDTH - 1 downto 0);
+  begin
+    r(0) := v.dds_drfm_sync_mismatch;
+    return r;
+  end function;
+
   function pack(v : ecm_status_reporter_errors_t) return std_logic_vector is
     variable r : std_logic_vector(ECM_STATUS_REPORTER_ERRORS_WIDTH - 1 downto 0);
   begin
@@ -567,6 +582,7 @@ package body ecm_pkg is
     variable r : std_logic_vector(ECM_STATUS_FLAGS_WIDTH - 1 downto 0);
   begin
     r := (
+          pack(v.output_block_errors),
           pack(v.drfm_errors),
           pack(v.dwell_stats_errors),
           pack(v.synthesizer_errors),

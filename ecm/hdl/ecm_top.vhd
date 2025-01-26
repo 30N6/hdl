@@ -106,24 +106,24 @@ architecture rtl of ecm_top is
   signal w_dac_data_out               : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
   signal w_dac_valid_out              : std_logic;
 
-  signal w_channelizer16_control      : channelizer_control_t;
+  signal w_channelizer16_ctrl         : channelizer_control_t;
   signal w_channelizer16_data         : signed_array_t(1 downto 0)(CHANNELIZER16_DATA_WIDTH - 1 downto 0);
   signal w_channelizer16_pwr          : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  signal w_stretched_control          : channelizer_control_t;
+  signal w_stretched_ctrl             : channelizer_control_t;
   signal w_stretched_data             : signed_array_t(1 downto 0)(CHANNELIZER16_DATA_WIDTH - 1 downto 0);
   signal w_stretched_pwr              : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  signal w_synthesizer16_control      : channelizer_control_t;
+  signal w_synthesizer16_ctrl         : channelizer_control_t;
   signal w_synthesizer16_data         : signed_array_t(1 downto 0)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
 
   signal w_drfm_write_req             : ecm_drfm_write_req_t;
   signal w_drfm_read_req              : ecm_drfm_read_req_t;
-  signal w_drfm_control               : channelizer_control_t;
+  signal w_drfm_ctrl                  : channelizer_control_t;
   signal w_drfm_data                  : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
 
   signal w_dds_command                : dds_control_t;
-  signal w_dds_control                : channelizer_control_t;
+  signal w_dds_ctrl                   : channelizer_control_t;
   signal w_dds_data                   : signed_array_t(1 downto 0)(ECM_DDS_DATA_WIDTH - 1 downto 0);
 
   signal w_sync_to_dwell_controller   : channelizer_control_t;
@@ -135,6 +135,7 @@ architecture rtl of ecm_top is
   signal w_synthesizer_errors         : ecm_synthesizer_errors_t;
   signal w_dwell_stats_errors         : ecm_dwell_stats_errors_t;
   signal w_drfm_errors                : ecm_drfm_errors_t;
+  signal w_output_block_errors        : ecm_output_block_errors_t;
 
   signal w_d2h_fifo_in_ready          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
   signal w_d2h_fifo_in_valid          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
@@ -210,7 +211,7 @@ begin
     Ad9361_control            => w_ad9361_control,
     Ad9361_status             => r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 1),
 
-    Channelizer_ctrl          => w_stretched_control,
+    Channelizer_ctrl          => w_stretched_ctrl,
     Channelizer_data          => w_stretched_data,
     Channelizer_pwr           => w_stretched_pwr,
 
@@ -285,7 +286,7 @@ begin
       Input_valid           => r_adc_valid_x4,
       Input_data            => w_adc_data_in,
 
-      Output_chan_ctrl      => w_channelizer16_control,
+      Output_chan_ctrl      => w_channelizer16_ctrl,
       Output_chan_data      => w_channelizer16_data,
       Output_chan_pwr       => w_channelizer16_pwr,
 
@@ -309,11 +310,11 @@ begin
       Clk                   => Adc_clk_x4,
       Rst                   => r_combined_rst,
 
-      Input_control         => w_channelizer16_control,
+      Input_control         => w_channelizer16_ctrl,
       Input_data            => w_channelizer16_data,
       Input_pwr             => w_channelizer16_pwr,
 
-      Output_control        => w_stretched_control,
+      Output_control        => w_stretched_ctrl,
       Output_data           => w_stretched_data,
       Output_pwr            => w_stretched_pwr,
 
@@ -324,7 +325,7 @@ begin
   else generate
     w_channelizer_warnings  <= (others => '0');
     w_channelizer_errors    <= (others => '0');
-    w_stretched_control     <= (valid => '0', last => '0', data_index => (others => '0'));
+    w_stretched_ctrl        <= (valid => '0', last => '0', data_index => (others => '0'));
     w_stretched_data        <= (others => (others => '0'));
     w_stretched_pwr         <= (others => '0');
   end generate g_channelizer;
@@ -339,7 +340,7 @@ begin
       Clk                       => Adc_clk_x4,
       Rst                       => r_combined_rst,
 
-      Input_ctrl                => w_synthesizer16_control,
+      Input_ctrl                => w_synthesizer16_ctrl,
       Input_data                => w_synthesizer16_data,
 
       Output_valid              => w_dac_valid_out,
@@ -376,7 +377,7 @@ begin
       Dwell_sequence_num        => w_dwell_sequence_num,
       Dwell_report_done         => w_dwell_stats_report_done,
 
-      Input_ctrl                => w_stretched_control,
+      Input_ctrl                => w_stretched_ctrl,
       Input_pwr                 => w_stretched_pwr,
 
       Axis_ready                => w_d2h_fifo_in_ready(0),
@@ -414,7 +415,7 @@ begin
       Write_req               => w_drfm_write_req,
       Read_req                => w_drfm_read_req,
 
-      Output_ctrl             => w_drfm_control,
+      Output_ctrl             => w_drfm_ctrl,
       Output_data             => w_drfm_data,
 
       Axis_ready              => w_d2h_fifo_in_ready(1),
@@ -430,7 +431,7 @@ begin
     );
   else generate
     w_dwell_drfm_reports_done <= '1';
-    w_drfm_control            <= (valid => '0', last => '0', data_index => (others => '0'));
+    w_drfm_ctrl               <= (valid => '0', last => '0', data_index => (others => '0'));
     w_drfm_data               <= (others => (others => '0'));
     w_d2h_fifo_in_valid(1)    <= '0';
     w_d2h_fifo_in_data(1)     <= (others => '0');
@@ -453,8 +454,31 @@ begin
     Control_data          => w_dds_command,
     Sync_data             => w_sync_to_dds,
 
-    Output_ctrl           => w_dds_control,
+    Output_ctrl           => w_dds_ctrl,
     Output_data           => w_dds_data
+  );
+
+  i_output : entity ecm_lib.ecm_output_block
+  generic map (
+    ENABLE_DDS  => true,
+    ENABLE_DRFM => ENABLE_DRFM
+  )
+  port map (
+    Clk                 => Adc_clk_x4,
+    Rst                 => r_combined_rst,
+
+    Output_control      => w_output_control,
+
+    Dds_ctrl            => w_dds_ctrl,
+    Dds_data            => w_dds_data,
+
+    Drfm_ctrl           => w_drfm_ctrl,
+    Drfm_data           => w_drfm_data,
+
+    Synthesizer_ctrl    => w_synthesizer16_ctrl,
+    Synthesizer_data    => w_synthesizer16_data,
+
+    Error_dds_drfm_sync => w_output_block_errors.dds_drfm_sync_mismatch
   );
 
   i_status_reporter : entity ecm_lib.ecm_status_reporter
@@ -477,6 +501,7 @@ begin
     Synthesizer_errors    => w_synthesizer_errors,
     Dwell_stats_errors    => w_dwell_stats_errors,
     Drfm_errors           => w_drfm_errors,
+    Output_block_errors   => w_output_block_errors,
 
     Axis_ready            => w_d2h_fifo_in_ready(2),
     Axis_valid            => w_d2h_fifo_in_valid(2),
