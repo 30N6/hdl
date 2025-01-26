@@ -22,6 +22,9 @@ set library_file_list [list \
     ../mem/hdl/ram_sdp.vhd \
     ../mem/hdl/xpm_async_fifo.vhd \
     ] \
+  dsp_lib [list \
+    ../dsp/hdl/dsp_pkg.vhd \
+    ] \
   ecm_lib [list \
     ./hdl/ecm_pkg.vhd \
     ./hdl/ecm_config.vhd \

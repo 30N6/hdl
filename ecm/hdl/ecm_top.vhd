@@ -64,7 +64,7 @@ architecture rtl of ecm_top is
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
   constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + 4 + 4; -- +4 for filter, +4 for ifft
 
-  constant SYNC_TO_DRFM_READ_LATENCY  : natural := 5;
+  constant SYNC_TO_DRFM_READ_LATENCY  : natural := 6;
   constant DRFM_READ_LATENCY          : natural := 4;
   constant DDS_LATENCY                : natural := 7;
   constant SYNC_LATENCY_DDS           : natural := DDS_LATENCY;

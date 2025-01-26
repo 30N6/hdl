@@ -228,7 +228,7 @@ begin
 
   i_tx_engine : entity ecm_lib.ecm_dwell_tx_engine
   generic map (
-    SYNC_TO_DRFM_READ_LATENCY => SYNC_TO_DRFM_READ_LATENCY + 1
+    SYNC_TO_DRFM_READ_LATENCY => SYNC_TO_DRFM_READ_LATENCY - 1
   )
   port map (
     Clk                     => Clk,

@@ -38,7 +38,7 @@ architecture rtl of ecm_dwell_config_decoder is
   constant NUM_WORDS_DWELL_ENTRY    : natural := ECM_DWELL_ENTRY_ALIGNED_WIDTH / 32;
   constant NUM_WORDS_CHANNEL_ENTRY  : natural := ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH / 32;
   constant NUM_WORDS_TX_INSTRUCTION : natural := ECM_TX_INSTRUCTION_DATA_WIDTH / 32;
-  constant NUM_WORDS_MAX            : natural := NUM_WORDS_DWELL_ENTRY; --maximum(NUM_WORDS_DWELL_PROGRAM & NUM_WORDS_DWELL_ENTRY & NUM_WORDS_CHANNEL_ENTRY & NUM_WORDS_TX_INSTRUCTION);
+  constant NUM_WORDS_MAX            : natural := maximum(maximum(NUM_WORDS_DWELL_PROGRAM, NUM_WORDS_DWELL_ENTRY), maximum(NUM_WORDS_CHANNEL_ENTRY, NUM_WORDS_TX_INSTRUCTION));
   constant WORD_INDEX_WIDTH         : natural := clog2(NUM_WORDS_MAX);
 
   type state_t is

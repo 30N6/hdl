@@ -252,6 +252,8 @@ begin
     end if;
   end process;
 
+  Drfm_write_req <= r3_drfm_write_req;
+
   process(Clk)
   begin
     if rising_edge(Clk) then

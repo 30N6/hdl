@@ -147,7 +147,7 @@ package ecm_pkg is
     duration_gate_min           : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
     duration_gate_max           : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   end record;
-  constant ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 16 + 2*ECM_DRFM_SEGMENT_LENGTH_WIDTH;
+  constant ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 16 + 2*16;
 
   type ecm_channel_tx_program_entry_array_t is array (natural range <>) of ecm_channel_tx_program_entry_t;
 
@@ -161,7 +161,7 @@ package ecm_pkg is
     recording_address               : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
     program_entries                 : ecm_channel_tx_program_entry_array_t(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1 downto 0);
   end record;
-  constant ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH + 8 + 8 + ECM_DRFM_ADDR_WIDTH +
+  constant ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 16 + 32 + 8 + 8 + 16 +
                                                                 ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES * ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH;
 
   type ecm_channel_control_entry_array_t is array (natural range <>) of ecm_channel_control_entry_t;
@@ -188,7 +188,7 @@ package ecm_pkg is
 
     total_duration_max        : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   end record;
-  constant ECM_DWELL_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 8 + 8 + ECM_DWELL_PLL_DELAY_WIDTH*2 + ECM_DWELL_TAG_WIDTH + ECM_DWELL_FREQUENCY_WIDTH + ECM_DWELL_DURATION_WIDTH * 2;
+  constant ECM_DWELL_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 8 + 8 + 16*2 + 16 + 16 + 32*2;
 
   type ecm_dwell_program_entry_t is record
     enable                    : std_logic;

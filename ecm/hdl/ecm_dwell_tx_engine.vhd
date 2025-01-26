@@ -223,7 +223,7 @@ begin
       r4_drfm_read_req.valid          <= r3_sync_data.valid and to_stdlogic((r3_channel_state.program_state = S_EXECUTE) and
                                                                             (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_PLAYBACK));
       r4_drfm_read_req.address        <= r3_channel_state.playback_addr_curr;
-      r4_drfm_read_req.channel_index  <= resize_up(r3_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0), r4_dds_control.channel_index'length);
+      r4_drfm_read_req.channel_index  <= r3_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
       r4_drfm_read_req.channel_last   <= r3_sync_data.last;
 
       r4_dds_control                  <= DDS_CONTROL_CLEAR;
