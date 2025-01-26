@@ -78,6 +78,7 @@ set library_file_list [list \
     ./hdl/ecm_drfm_reporter.vhd \
     ./hdl/ecm_drfm.vhd \
     ./hdl/ecm_output_block.vhd \
+    ./hdl/ecm_sync_block.vhd \
     ./hdl/ecm_status_reporter.vhd \
     ./hdl/ecm_top.vhd \
     ./sim/ecm_top_tb.sv \

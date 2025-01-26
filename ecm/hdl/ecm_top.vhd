@@ -64,8 +64,13 @@ architecture rtl of ecm_top is
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
   constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + 4 + 4; -- +4 for filter, +4 for ifft
 
-  constant AD9361_BIT_PIPE_DEPTH      : natural := 3;
+  constant SYNC_TO_DRFM_READ_LATENCY  : natural := 5;
+  constant DRFM_READ_LATENCY          : natural := 4;
+  constant DDS_LATENCY                : natural := 7;
+  constant SYNC_LATENCY_DDS           : natural := DDS_LATENCY;
+  constant SYNC_LATENCY_DRFM          : natural := SYNC_TO_DRFM_READ_LATENCY + DRFM_READ_LATENCY;
 
+  constant AD9361_BIT_PIPE_DEPTH      : natural := 3;
   constant HEARTBEAT_INTERVAL         : natural := 31250000;
 
   signal w_clk_x4_p0                  : std_logic;
@@ -197,9 +202,22 @@ begin
     Module_config => w_module_config
   );
 
+  i_sync : entity ecm_lib.ecm_sync_block
+  generic map (
+    DDS_LATENCY   => SYNC_LATENCY_DDS,
+    DRFM_LATENCY  => SYNC_LATENCY_DRFM
+  )
+  port map (
+    Clk                 => Adc_clk_x4,
+    Rst                 => r_combined_rst,
+
+    Sync_dds            => w_sync_to_dds,
+    Sync_dwell_to_drfm  => w_sync_to_dwell_controller
+  );
+
   i_dwell_controller : entity ecm_lib.ecm_dwell_controller
   generic map (
-    SYNC_TO_DRFM_READ_LATENCY => 5, --TODO: constant
+    SYNC_TO_DRFM_READ_LATENCY => SYNC_TO_DRFM_READ_LATENCY,
     CHANNELIZER_DATA_WIDTH    => CHANNELIZER16_DATA_WIDTH
   )
   port map (
@@ -399,7 +417,7 @@ begin
     i_drfm : entity ecm_lib.ecm_drfm
     generic map (
       AXI_DATA_WIDTH    => AXI_DATA_WIDTH,
-      READ_LATENCY      => 4 --TODO: constant
+      READ_LATENCY      => DRFM_READ_LATENCY
     )
     port map (
       Clk_axi                 => M_axis_clk,
@@ -444,7 +462,7 @@ begin
     OUTPUT_DATA_WIDTH   => ECM_DDS_DATA_WIDTH,
     NUM_CHANNELS        => ECM_NUM_CHANNELS,
     CHANNEL_INDEX_WIDTH => ECM_CHANNEL_INDEX_WIDTH,
-    LATENCY             => 7 --TODO
+    LATENCY             => DDS_LATENCY
   )
   port map (
     Clk                   => Adc_clk_x4,
