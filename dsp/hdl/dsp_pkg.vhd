@@ -125,12 +125,11 @@ package body dsp_pkg is
     return v_result;
   end function;
 
-  function unpack(v : std_logic_vector(DDS_CONTROL_SETUP_ENTRY_PACKED_WIDTH - 1 downto 0)) return dds_control_setup_entry_t is
-    variable vm : std_logic_vector(v'length - 1 downto 0);
+  function unpack(v : std_logic_vector(DDS_CONTROL_SETUP_ENTRY_PACKED_WIDTH - 1 downto 0)) return dds_control_setup_entry_t is  --TODO: redo unpack functions - add vector dimensions
     variable r  : dds_control_setup_entry_t;
   begin
-    r.dds_sin_phase_inc_select  := vm(0);
-    r.dds_output_select         := vm(2 downto 1);
+    r.dds_sin_phase_inc_select  := v(0);
+    r.dds_output_select         := v(2 downto 1);
     return r;
   end function;
 

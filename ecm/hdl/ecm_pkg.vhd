@@ -177,7 +177,7 @@ package ecm_pkg is
     skip_pll_prelock_wait     : std_logic;
     skip_pll_lock_check       : std_logic;
     skip_pll_postlock_wait    : std_logic;
-    force_full_duration       : std_logic;
+    force_full_duration       : std_logic; --TODO: remove
     repeat_count              : unsigned(ECM_DWELL_REPEAT_COUNT_WIDTH - 1 downto 0);
     fast_lock_profile         : unsigned(ECM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 0);
     next_dwell_index          : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);

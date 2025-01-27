@@ -95,7 +95,7 @@ begin
     Output_data(0)            <= signed(w_fifo_rd_data_packed(CHAN_POWER_WIDTH + DATA_WIDTH - 1           downto CHAN_POWER_WIDTH));
     Output_data(1)            <= signed(w_fifo_rd_data_packed(CHAN_POWER_WIDTH + DATA_WIDTH * 2 - 1       downto CHAN_POWER_WIDTH + DATA_WIDTH));
     Output_control.data_index <= unsigned(w_fifo_rd_data_packed(CHAN_POWER_WIDTH + DATA_WIDTH * 2 + 6 - 1 downto CHAN_POWER_WIDTH + DATA_WIDTH * 2));
-    Output_control.last       <= w_fifo_rd_data_packed(CHAN_POWER_WIDTH + DATA_WIDTH * 2 + 7);
+    Output_control.last       <= w_fifo_rd_data_packed(CHAN_POWER_WIDTH + DATA_WIDTH * 2 + 6);
     Output_control.valid      <= w_fifo_rd_en;
   end process;
 

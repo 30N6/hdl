@@ -22,6 +22,7 @@ interface channelizer_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
     ctrl.data_index <= 'x;
     data[0]         <= 'x;
     data[1]         <= 'x;
+    power           <= 'x;
   endtask
 
   task write(input channelizer_transaction_t tx);
@@ -350,6 +351,11 @@ module ecm_dwell_controller_tb;
     logic [ecm_tx_instruction_data_width - 1 : 0]   inst_raw_data [$];
   } tx_instructions_t;
 
+  typedef tx_instructions_t tx_instructions_queue_t [$];
+  typedef ecm_dwell_entry_t ecm_dwell_entry_queue_t [$];
+
+
+
   function automatic logic [ecm_tx_instruction_header_packed_width - 1 : 0] pack_ecm_tx_instruction_header(ecm_tx_instruction_header_t header);
     logic [ecm_tx_instruction_header_packed_width - 1 : 0] r = '0;
 
@@ -403,7 +409,6 @@ module ecm_dwell_controller_tb;
     return header;
   endfunction
 
-
   function automatic tx_instructions_t randomize_tx_program_instructions(int start_addr, int max_length);
     tx_instructions_t                             result;
     ecm_tx_instruction_header_t                   header;
@@ -422,7 +427,7 @@ module ecm_dwell_controller_tb;
     result.inst_start_addr = start_addr;
 
     for (int i_top_level_block = 0; i_top_level_block < num_top_level_blocks; i_top_level_block++) begin
-      int block_start_addr  = result.inst_start_addr + inst_headers.size();
+      int block_start_addr  = result.inst_start_addr + result.inst_headers.size();
       int block_setup_len   = $urandom_range(8, 1);
 
       for (int i_block_setup = 0; i_block_setup < block_setup_len; i_block_setup++) begin
@@ -514,40 +519,125 @@ module ecm_dwell_controller_tb;
     return result;
   endfunction
 
+  function automatic tx_instructions_queue_t randomize_tx_programs(int num_programs);
+    tx_instructions_queue_t r;
 
-/*
-  task automatic send_dwell_entry(esm_message_dwell_entry_t entry);
-    bit [esm_message_dwell_entry_packed_width - 1 : 0] packed_entry = '0;
-    bit [31:0] config_data [] = new[4 + esm_message_dwell_entry_packed_width/32];
+    for (int i = 0; i < num_programs; i++) begin
+      r.push_back(randomize_tx_program_instructions(i * 32, 32));
+    end
 
-    $display("%0t: send_dwell_entry[%0d] = %p", $time, entry.entry_index, entry.entry_data);
+    return r;
+  endfunction
 
-    packed_entry[7   :   0] = entry.entry_index;
-    packed_entry[63  :  32] = 32'hDEADBEEF;
+  task automatic send_tx_program(tx_instructions_t data);
+    $display("%0t: sending tx program: addr=%0X", $time, data.inst_start_addr);
+    for (int i_inst = 0; i_inst < data.inst_raw_data.size(); i_inst++) begin
+      bit [31:0] config_data [] = new[4 + ecm_tx_instruction_data_width/32];
+      bit [15:0] address = data.inst_start_addr + i_inst;
 
-    packed_entry[79  :  64] = entry.entry_data.tag;
-    packed_entry[95  :  80] = entry.entry_data.frequency;
-    packed_entry[127 :  96] = entry.entry_data.duration;
-    packed_entry[135 : 128] = entry.entry_data.gain;
-    packed_entry[143 : 136] = entry.entry_data.fast_lock_profile;
-    packed_entry[167 : 160] = entry.entry_data.threshold_shift_narrow;
-    packed_entry[175 : 168] = entry.entry_data.threshold_shift_wide;
-    packed_entry[255 : 192] = entry.entry_data.channel_mask_narrow;
-    packed_entry[263 : 256] = entry.entry_data.channel_mask_wide;
-    packed_entry[287 : 272] = entry.entry_data.min_pulse_duration;
+      config_data[0] = ecm_control_magic_num;
+      config_data[1] = config_seq_num++;
+      config_data[2] = {ecm_module_id_dwell_controller, ecm_control_message_type_dwell_tx_instruction, address};
+      config_data[3] = 32'hDEADBEEF;
 
-    config_data[0] = esm_control_magic_num;
+      $display("    instruction[%0d]=%016X -- header=%p", i_inst, data.inst_raw_data[i_inst], data.inst_headers[i_inst]);
+
+      for (int i = 0; i < (ecm_tx_instruction_data_width/32); i++) begin
+        config_data[4 + i] = data.inst_raw_data[i_inst][i*32 +: 32];
+      end
+
+      write_config(config_data);
+    end
+  endtask
+
+  function automatic ecm_dwell_entry_t randomize_dwell_entry();
+    ecm_dwell_entry_t r;
+
+    r.valid                   = 1;
+    r.global_counter_check    = 0;  //TODO: verify
+    r.global_counter_dec      = 0;
+    r.skip_pll_prelock_wait   = $urandom;
+    r.skip_pll_lock_check     = 0;
+    r.skip_pll_postlock_wait  = 0;
+    r.force_full_duration     = 0; //TODO: remove
+    r.repeat_count            = ($urandom_range(99) < 50) ? $urandom_range(2, 0) : 0;
+    r.fast_lock_profile       = $urandom;
+    r.next_dwell_index        = $urandom;
+    r.pll_pre_lock_delay      = $urandom_range(500, 100);
+    r.pll_post_lock_delay     = $urandom_range(500, 100);
+    r.tag                     = $urandom;
+    r.frequency               = $urandom;
+    r.measurement_duration    = $urandom_range(5000, 1000);
+    r.total_duration_max      = r.measurement_duration + $urandom_range(10000, 5000);
+
+    return r;
+  endfunction
+
+  function automatic ecm_dwell_entry_queue_t randomize_dwell_entries(int num_dwells, bit use_counter);
+    ecm_dwell_entry_queue_t r;
+
+    for (int i = 0; i < num_dwells; i++) begin
+      ecm_dwell_entry_t d = randomize_dwell_entry();
+
+      if (use_counter) begin
+        d.global_counter_check  = 1;
+        d.global_counter_dec    = 1;
+        d.next_dwell_index      = (i + 1) % num_dwells;
+      end else begin
+        d.global_counter_check  = 0;
+        d.global_counter_dec    = $urandom;
+        d.next_dwell_index      = i + 1;
+      end
+
+      r.push_back(d);
+    end
+
+    if (!use_counter) begin
+      r.push_back({valid: 0, default:'x});
+    end
+
+    return r;
+  endfunction
+
+
+  task automatic send_dwell_entry(int index, ecm_dwell_entry_t entry);
+    bit [ecm_dwell_entry_aligned_width - 1 : 0] packed_entry = '0;
+    bit [31:0] config_data [] = new[4 + ecm_dwell_entry_aligned_width/32];
+    bit [15:0] address = index;
+
+    $display("%0t: send_dwell_entry[%0d] = %p", $time, index, entry);
+
+    packed_entry[0]         = entry.valid;
+    packed_entry[1]         = entry.global_counter_check;
+    packed_entry[2]         = entry.global_counter_dec;
+    packed_entry[3]         = entry.skip_pll_prelock_wait;
+    packed_entry[4]         = entry.skip_pll_lock_check;
+    packed_entry[5]         = entry.skip_pll_postlock_wait;
+    packed_entry[6]         = entry.force_full_duration;  //TODO: remove
+
+    packed_entry[15:8]      = entry.repeat_count;
+    packed_entry[23:16]     = entry.fast_lock_profile;
+    packed_entry[31:24]     = entry.next_dwell_index;
+    packed_entry[47:32]     = entry.pll_pre_lock_delay;
+    packed_entry[63:48]     = entry.pll_post_lock_delay;
+    packed_entry[79:64]     = entry.tag;
+    packed_entry[95:80]     = entry.frequency;
+    packed_entry[127:96]    = entry.measurement_duration;
+    packed_entry[159:128]   = entry.total_duration_max;
+
+    config_data[0] = ecm_control_magic_num;
     config_data[1] = config_seq_num++;
-    config_data[2] = {esm_module_id_dwell_controller, esm_control_message_type_dwell_entry, 16'h0000};
+    config_data[2] = {ecm_module_id_dwell_controller, ecm_control_message_type_dwell_entry, address};
     config_data[3] = 32'hDEADBEEF;
 
-    for (int i = 0; i < (esm_message_dwell_entry_packed_width/32); i++) begin
+    for (int i = 0; i < (ecm_dwell_entry_aligned_width/32); i++) begin
       config_data[4 + i] = packed_entry[i*32 +: 32];
     end
 
     write_config(config_data);
   endtask
 
+/*
   function automatic bit [31:0] pack_dwell_instruction(esm_dwell_instruction_t instruction);
     bit [31:0] r = '0;
 
@@ -722,10 +812,26 @@ module ecm_dwell_controller_tb;
   task automatic standard_tests();
     parameter NUM_TESTS = 20;
 
+    send_initial_config();
+
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
       int wait_cycles;
+      bit use_counter = $urandom;
+      int num_programs = $urandom_range(16, 4);
+      int num_dwells = $urandom_range(16, 4);
 
-      send_initial_config();
+      tx_instructions_queue_t tx_programs = randomize_tx_programs(num_programs);
+      ecm_dwell_entry_queue_t dwell_entries = randomize_dwell_entries(num_dwells, use_counter);
+
+      for (int i_program = 0; i_program < tx_programs.size(); i_program++) begin
+        send_tx_program(tx_programs[i_program]);
+      end
+
+      for (int i_dwell = 0; i_dwell < dwell_entries.size(); i_dwell++) begin
+        send_dwell_entry(i_dwell, dwell_entries[i_dwell]);
+      end
+
+
 
       for (int i_dwell = 0; i_dwell < ecm_num_dwell_entries; i_dwell++) begin
       /*
@@ -788,12 +894,15 @@ module ecm_dwell_controller_tb;
       Rst = 1;
       repeat(100) @(posedge Clk);
       Rst = 0;
+      repeat(100) @(posedge Clk);
     end
   endtask
 
   initial
   begin
+    chan_intf.clear();
     wait_for_reset();
+    repeat(100) @(posedge Clk);
     standard_tests();
 
     $finish;

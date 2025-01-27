@@ -42,7 +42,7 @@ custom_ip_files ecm_receiver [list \
   {"../dsp/hdl/channelizer_common.vhd"      "dsp_lib"}      \
   {"../dsp/hdl/channelizer_16.vhd"          "dsp_lib"}      \
   {"../dsp/hdl/synthesizer_common.vhd"      "dsp_lib"}      \
-  {"../dsp/hdl/channelizer_16.vhd"          "dsp_lib"}      \
+  {"../dsp/hdl/synthesizer_16.vhd"          "dsp_lib"}      \
   {"../dsp/hdl/channelized_dds_lut.vhd"     "dsp_lib"}      \
   {"../dsp/hdl/channelized_dds.vhd"         "dsp_lib"}      \
   {"./hdl/ecm_pkg.vhd"                      "ecm_lib"}      \
