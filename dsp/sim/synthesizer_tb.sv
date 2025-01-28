@@ -27,13 +27,14 @@ interface channelizer_intf #(parameter DATA_WIDTH, parameter INDEX_WIDTH) (input
 endinterface
 
 module synthesizer_tb;
-  parameter time CLK_HALF_PERIOD    = 4ns;
-  parameter NUM_CHANNELS            = 32;
-  parameter CHANNEL_INDEX_WIDTH     = $clog2(NUM_CHANNELS);
-  parameter NUM_COEFS_PER_CHANNEL   = (NUM_CHANNELS > 8) ? 12 : 8;
-  parameter INPUT_DATA_WIDTH        = 12;
-  parameter CHAN_OUTPUT_DATA_WIDTH  = INPUT_DATA_WIDTH + $clog2(NUM_COEFS_PER_CHANNEL) + $clog2(NUM_CHANNELS);
-  parameter SYNTH_OUTPUT_DATA_WIDTH = CHAN_OUTPUT_DATA_WIDTH + $clog2(NUM_CHANNELS) + $clog2(NUM_COEFS_PER_CHANNEL) + 1;
+  parameter time CLK_HALF_PERIOD        = 4ns;
+  parameter NUM_CHANNELS                = 32;
+  parameter CHANNEL_INDEX_WIDTH         = $clog2(NUM_CHANNELS);
+  parameter NUM_COEFS_PER_CHANNEL_CHAN  = 8;
+  parameter NUM_COEFS_PER_CHANNEL_SYNTH = 6;
+  parameter INPUT_DATA_WIDTH            = 12;
+  parameter CHAN_OUTPUT_DATA_WIDTH      = INPUT_DATA_WIDTH + $clog2(NUM_COEFS_PER_CHANNEL_CHAN) + $clog2(NUM_CHANNELS);
+  parameter SYNTH_OUTPUT_DATA_WIDTH     = CHAN_OUTPUT_DATA_WIDTH + $clog2(NUM_CHANNELS) + $clog2(NUM_COEFS_PER_CHANNEL_SYNTH) + 1;
 
   typedef struct
   {

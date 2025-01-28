@@ -62,8 +62,8 @@ architecture rtl of ecm_top is
 
   constant AXI_FIFO_DEPTH             : natural := 64;  --TODO: increase?
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
-  constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + 4 + 4; -- +4 for filter, +4 for ifft
-  constant SYNTHESIZER16_OUTPUT_WIDTH : natural := ECM_SYNTHESIZER_DATA_WIDTH + clog2(ECM_NUM_CHANNELS) + clog2(12) + 1;
+  constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + clog2(8) + clog2(ECM_NUM_CHANNELS); -- 8 taps per channel
+  constant SYNTHESIZER16_OUTPUT_WIDTH : natural := ECM_SYNTHESIZER_DATA_WIDTH + clog2(ECM_NUM_CHANNELS) + clog2(6) + 1; -- 6 taps per channel
 
   constant SYNC_TO_DRFM_READ_LATENCY  : natural := 6;
   constant DRFM_READ_LATENCY          : natural := 4;
@@ -352,7 +352,7 @@ begin
   end generate g_channelizer;
 
   g_synthesizer : if (ENABLE_SYNTHESIZER) generate
-    i_channelizer : entity dsp_lib.synthesizer_16
+    i_synthesizer : entity dsp_lib.synthesizer_16
     generic map (
       INPUT_DATA_WIDTH  => ECM_SYNTHESIZER_DATA_WIDTH,
       OUTPUT_DATA_WIDTH => SYNTHESIZER16_OUTPUT_WIDTH
