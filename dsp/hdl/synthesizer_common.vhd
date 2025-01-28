@@ -69,11 +69,11 @@ architecture rtl of synthesizer_common is
   signal w_mux_fifo_overflow    : std_logic;
   signal w_mux_fifo_underflow   : std_logic;
 
-  signal r_filter_index         : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal r_filter_last          : std_logic;
-  signal r_filter_data          : signed_array_t(1 downto 0)(FILTER_DATA_WIDTH - 1 downto 0);
-
 begin
+
+  assert (OUTPUT_DATA_WIDTH = (FILTER_DATA_WIDTH + 1))
+    report "Unexpected output data width -- must be INPUT_DATA_WIDTH + clog2(NUM_CHANNELS) + clog2(NUM_COEFS / NUM_CHANNELS) + 1"
+    severity failure;
 
   process(Clk)
   begin
@@ -162,18 +162,6 @@ begin
 
     Error_input_overflow  => w_filter_overflow
   );
-
-  --TODO: remove
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      if (w_filter_valid = '1') then
-        r_filter_index  <= w_filter_index;
-        r_filter_last   <= w_filter_last;
-        r_filter_data   <= w_filter_data;
-      end if;
-    end if;
-  end process;
 
   i_mux : entity dsp_lib.pfb_mux_2x
   generic map (

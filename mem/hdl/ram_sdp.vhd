@@ -5,6 +5,7 @@ library ieee;
 entity ram_sdp is
 generic (
   ADDR_WIDTH    : natural;
+  MEM_DEPTH     : natural := 2**ADDR_WIDTH;
   DATA_WIDTH    : natural;
   LATENCY       : natural;
   MEMORY_STYLE  : string := "block"
@@ -26,7 +27,7 @@ end entity ram_sdp;
 architecture rtl of ram_sdp is
   type data_array_t is array (integer range <>) of std_logic_vector(DATA_WIDTH - 1 downto 0);
 
-  signal m_ram                  : data_array_t(2**ADDR_WIDTH - 1 downto 0);
+  signal m_ram                  : data_array_t(MEM_DEPTH - 1 downto 0);
   signal r1_ram_out             : std_logic_vector(DATA_WIDTH - 1 downto 0);
   signal r2_ram_out             : std_logic_vector(DATA_WIDTH - 1 downto 0);
 

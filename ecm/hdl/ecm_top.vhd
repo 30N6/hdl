@@ -63,6 +63,7 @@ architecture rtl of ecm_top is
   constant AXI_FIFO_DEPTH             : natural := 64;  --TODO: increase?
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
   constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + 4 + 4; -- +4 for filter, +4 for ifft
+  constant SYNTHESIZER16_OUTPUT_WIDTH : natural := ECM_SYNTHESIZER_DATA_WIDTH + clog2(ECM_NUM_CHANNELS) + clog2(12) + 1;
 
   constant SYNC_TO_DRFM_READ_LATENCY  : natural := 6;
   constant DRFM_READ_LATENCY          : natural := 4;
@@ -119,8 +120,10 @@ architecture rtl of ecm_top is
   signal w_stretched_data             : signed_array_t(1 downto 0)(CHANNELIZER16_DATA_WIDTH - 1 downto 0);
   signal w_stretched_pwr              : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  signal w_synthesizer16_ctrl         : channelizer_control_t;
-  signal w_synthesizer16_data         : signed_array_t(1 downto 0)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
+  signal w_synthesizer16_input_ctrl   : channelizer_control_t;
+  signal w_synthesizer16_input_data   : signed_array_t(1 downto 0)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
+  signal w_synthesizer16_output_valid : std_logic;
+  signal w_synthesizer16_output_data  : signed_array_t(1 downto 0)(SYNTHESIZER16_OUTPUT_WIDTH - 1 downto 0);
 
   signal w_drfm_write_req             : ecm_drfm_write_req_t;
   signal w_drfm_read_req              : ecm_drfm_read_req_t;
@@ -352,17 +355,17 @@ begin
     i_channelizer : entity dsp_lib.synthesizer_16
     generic map (
       INPUT_DATA_WIDTH  => ECM_SYNTHESIZER_DATA_WIDTH,
-      OUTPUT_DATA_WIDTH => IQ_WIDTH
+      OUTPUT_DATA_WIDTH => SYNTHESIZER16_OUTPUT_WIDTH
     )
     port map (
       Clk                       => Adc_clk_x4,
       Rst                       => r_combined_rst,
 
-      Input_ctrl                => w_synthesizer16_ctrl,
-      Input_data                => w_synthesizer16_data,
+      Input_ctrl                => w_synthesizer16_input_ctrl,
+      Input_data                => w_synthesizer16_input_data,
 
-      Output_valid              => w_dac_valid_out,
-      Output_data               => w_dac_data_out,
+      Output_valid              => w_synthesizer16_output_valid,
+      Output_data               => w_synthesizer16_output_data,
 
       Error_stretcher_overflow  => w_synthesizer_errors.stretcher_overflow,
       Error_stretcher_underflow => w_synthesizer_errors.stretcher_underflow,
@@ -371,6 +374,10 @@ begin
       Error_mux_fifo_overflow   => w_synthesizer_errors.mux_fifo_overflow,
       Error_mux_fifo_underflow  => w_synthesizer_errors.mux_fifo_underflow
     );
+
+    w_dac_valid_out   <= w_synthesizer16_output_valid;
+    w_dac_data_out(0) <= w_synthesizer16_output_data(0)(SYNTHESIZER16_OUTPUT_WIDTH - 1 downto (SYNTHESIZER16_OUTPUT_WIDTH - IQ_WIDTH));
+    w_dac_data_out(1) <= w_synthesizer16_output_data(1)(SYNTHESIZER16_OUTPUT_WIDTH - 1 downto (SYNTHESIZER16_OUTPUT_WIDTH - IQ_WIDTH));
   else generate
     w_synthesizer_errors  <= (others => '0');
     w_dac_valid_out       <= '1';
@@ -494,8 +501,8 @@ begin
     Drfm_ctrl                 => w_drfm_ctrl,
     Drfm_data                 => w_drfm_data,
 
-    Synthesizer_ctrl          => w_synthesizer16_ctrl,
-    Synthesizer_data          => w_synthesizer16_data,
+    Synthesizer_ctrl          => w_synthesizer16_input_ctrl,
+    Synthesizer_data          => w_synthesizer16_input_data,
 
     Error_dds_drfm_sync       => w_output_block_errors.dds_drfm_sync_mismatch
   );

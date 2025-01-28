@@ -193,6 +193,7 @@ begin
   i_mem : entity mem_lib.ram_sdp
   generic map (
     ADDR_WIDTH    => ECM_DRFM_ADDR_WIDTH,
+    MEM_DEPTH     => ECM_DRFM_MEM_DEPTH,
     DATA_WIDTH    => MEM_WIDTH,
     LATENCY       => MEM_LATENCY
   )

@@ -91,7 +91,7 @@ interface dwell_tx_intf (input logic Clk);
       write_req.last          = 'x;
       write_req.channel_index = 'x;
       write_req.address       = 'x;
-      write_req.data          = {default: 'x};
+      write_req.data          = '{default: 'x};
       repeat ($urandom_range(1, 0)) @(posedge Clk);
     end
 
@@ -251,7 +251,7 @@ module ecm_drfm_tb;
   axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  report_rx_intf  (.Clk(Clk_axi));
 
   int unsigned    report_seq_num = 0;
-  int unsigned    segment_seq_num           [ecm_num_channels - 1 : 0] = {default: 0};
+  int unsigned    segment_seq_num           [ecm_num_channels - 1 : 0] = '{default: 0};
   expect_report_t expected_channel_reports  [ecm_num_channels - 1 : 0][$];
   expect_report_t expected_summary_reports  [$];
   drfm_output_t   expected_output_data      [$];
@@ -610,7 +610,7 @@ module ecm_drfm_tb;
   function automatic void expect_reports_and_output(int unsigned dwell_seq_num, ecm_drfm_write_req_t write_req_data [$], ecm_drfm_read_req_t read_req_data [$]);
     ecm_drfm_write_req_t  writes_by_channel   [ecm_num_channels - 1 : 0][$];
     ecm_drfm_read_req_t   reads_by_channel    [ecm_num_channels - 1 : 0][$];
-    int                   max_iq_bits         [ecm_num_channels - 1 : 0] = {default:0};
+    int                   max_iq_bits         [ecm_num_channels - 1 : 0] = '{default:0};
     iq_data_t             iq_mem              [ecm_drfm_mem_depth - 1 : 0];
 
     for (int i = 0; i < write_req_data.size(); i++) begin
@@ -739,7 +739,7 @@ module ecm_drfm_tb;
     int                             channel_data_index  [ecm_num_channels - 1 : 0];
     int                             num_frames;
     ecm_drfm_write_req_queue_t      r;
-    ecm_drfm_write_req_t            empty_req = {valid:0, default:'x};
+    ecm_drfm_write_req_t            empty_req = '{valid:0, default:'x};
     int                             current_bits = 1;
     bit                             channel_active = 0;
 
@@ -766,7 +766,7 @@ module ecm_drfm_tb;
       end
 
       for (int i = 0; i < ecm_num_channels; i++) begin
-        ecm_drfm_write_req_t d = {valid:0, default:'x};
+        ecm_drfm_write_req_t d = '{valid:0, default:'x};
         iq_data_t iq;
 
         if(channel_valid[i] && (f >= channel_frame_start[i]) && (channel_data_index[i] < channel_duration[i])) begin

@@ -34,7 +34,7 @@ end entity ecm_dwell_config_decoder;
 
 architecture rtl of ecm_dwell_config_decoder is
 
-  constant NUM_WORDS_DWELL_PROGRAM  : natural := ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH / 32;
+  constant NUM_WORDS_DWELL_PROGRAM  : natural := maximum(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH / 32, 2);
   constant NUM_WORDS_DWELL_ENTRY    : natural := ECM_DWELL_ENTRY_ALIGNED_WIDTH / 32;
   constant NUM_WORDS_CHANNEL_ENTRY  : natural := ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH / 32;
   constant NUM_WORDS_TX_INSTRUCTION : natural := ECM_TX_INSTRUCTION_DATA_WIDTH / 32;
