@@ -294,7 +294,7 @@ module ecm_drfm_tb;
   ecm_drfm
   #(
     .AXI_DATA_WIDTH (AXI_DATA_WIDTH),
-    .READ_LATENCY   (4)
+    .READ_LATENCY   (5)
   )
   dut
   (

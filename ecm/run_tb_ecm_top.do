@@ -76,6 +76,7 @@ set library_file_list [list \
     ./hdl/ecm_dwell_stats_reporter.vhd \
     ./hdl/ecm_dwell_stats.vhd \
     ./hdl/ecm_drfm_reporter.vhd \
+    ./hdl/ecm_drfm_mem.vhd \
     ./hdl/ecm_drfm.vhd \
     ./hdl/ecm_output_block.vhd \
     ./hdl/ecm_sync_block.vhd \

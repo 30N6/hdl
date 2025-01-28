@@ -29,6 +29,7 @@ set library_file_list [list \
   ecm_lib [list \
     ./hdl/ecm_pkg.vhd \
     ./hdl/ecm_drfm_reporter.vhd \
+    ./hdl/ecm_drfm_mem.vhd \
     ./hdl/ecm_drfm.vhd \
     ./sim/ecm_drfm_tb.sv \
     ] \

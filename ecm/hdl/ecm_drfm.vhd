@@ -52,7 +52,7 @@ end entity ecm_drfm;
 architecture rtl of ecm_drfm is
 
   constant MEM_WIDTH                    : natural := ECM_DRFM_DATA_WIDTH * 2;
-  constant MEM_LATENCY                  : natural := 2;
+  constant MEM_LATENCY                  : natural := 3;
 
   function get_iq_bit_count(v : signed(ECM_DRFM_DATA_WIDTH - 1 downto 0)) return unsigned is
     variable r : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
@@ -93,18 +93,21 @@ architecture rtl of ecm_drfm is
   signal r1_write_next_seq_num            : unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal w1_write_max_iq_bits_sel         : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
 
-  signal w2_mem_rd_data                   : std_logic_vector(MEM_WIDTH - 1 downto 0);
-  signal w2_read_data                     : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
   signal r2_write_req                     : ecm_drfm_write_req_t;
   signal r2_read_req                      : ecm_drfm_read_req_t;
   signal r2_read_valid                    : std_logic;
   signal r2_read_max_iq_bits              : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
   signal r2_max_iq_wr_valid               : std_logic;
   signal r2_max_iq_wr_data                : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
-  signal w2_iq_shift                      : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
 
-  signal r3_read_data_scaled              : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  signal r3_read_valid                    : std_logic;
   signal r3_read_req                      : ecm_drfm_read_req_t;
+  signal r3_iq_shift                      : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal w3_mem_rd_data                   : std_logic_vector(MEM_WIDTH - 1 downto 0);
+  signal w3_read_data                     : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+
+  signal r4_read_data_scaled              : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
+  signal r4_read_req                      : ecm_drfm_read_req_t;
 
   signal r_channel_was_written            : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
   signal r_channel_was_read               : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
@@ -133,7 +136,7 @@ architecture rtl of ecm_drfm is
 
 begin
 
-  assert (READ_LATENCY = 4)
+  assert (READ_LATENCY = (MEM_LATENCY + 2))
     report "Unexpected READ_LATENCY value."
     severity failure;
 
@@ -190,12 +193,10 @@ begin
 
   w0_mem_wr_data <= std_logic_vector(r0_write_req.data(1)) & std_logic_vector(r0_write_req.data(0));
 
-  i_mem : entity mem_lib.ram_sdp
+  i_mem : entity ecm_lib.ecm_drfm_mem
   generic map (
-    ADDR_WIDTH    => ECM_DRFM_ADDR_WIDTH,
-    MEM_DEPTH     => ECM_DRFM_MEM_DEPTH,
-    DATA_WIDTH    => MEM_WIDTH,
-    LATENCY       => MEM_LATENCY
+    DATA_WIDTH  => MEM_WIDTH,
+    LATENCY     => MEM_LATENCY
   )
   port map (
     Clk       => Clk,
@@ -204,14 +205,9 @@ begin
     Wr_addr   => r0_write_req.address,
     Wr_data   => w0_mem_wr_data,
 
-    Rd_en     => '1',
-    Rd_reg_ce => '1',
     Rd_addr   => w0_mem_rd_addr,
-    Rd_data   => w2_mem_rd_data
+    Rd_data   => w3_mem_rd_data
   );
-
-  w2_read_data(0) <= signed(w2_mem_rd_data(ECM_DRFM_DATA_WIDTH - 1 downto 0));
-  w2_read_data(1) <= signed(w2_mem_rd_data(ECM_DRFM_DATA_WIDTH * 2 - 1 downto ECM_DRFM_DATA_WIDTH));
 
   process(Clk)
   begin
@@ -266,23 +262,33 @@ begin
     end if;
   end process;
 
-  w2_iq_shift <= (ECM_DRFM_DATA_WIDTH - 1) - r2_read_max_iq_bits;
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r3_read_valid <= r2_read_valid;
+      r3_read_req   <= r2_read_req;
+      r3_iq_shift   <= (ECM_DRFM_DATA_WIDTH - 1) - r2_read_max_iq_bits;
+    end if;
+  end process;
+
+  w3_read_data(0) <= signed(w3_mem_rd_data(ECM_DRFM_DATA_WIDTH - 1 downto 0));
+  w3_read_data(1) <= signed(w3_mem_rd_data(ECM_DRFM_DATA_WIDTH * 2 - 1 downto ECM_DRFM_DATA_WIDTH));
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r3_read_req             <= r2_read_req;
-      r3_read_data_scaled(0)  <= shift_left(w2_read_data(0), to_integer(w2_iq_shift)) when (r_dwell_active_tx = '1') else (others => '0');
-      r3_read_data_scaled(1)  <= shift_left(w2_read_data(1), to_integer(w2_iq_shift)) when (r_dwell_active_tx = '1') else (others => '0');
+      r4_read_req             <= r3_read_req;
+      r4_read_data_scaled(0)  <= shift_left(w3_read_data(0), to_integer(r3_iq_shift)) when (r_dwell_active_tx = '1') else (others => '0');
+      r4_read_data_scaled(1)  <= shift_left(w3_read_data(1), to_integer(r3_iq_shift)) when (r_dwell_active_tx = '1') else (others => '0');
     end if;
   end process;
 
   process(all)
   begin
-    Output_ctrl.valid       <= r3_read_req.valid;
-    Output_ctrl.last        <= r3_read_req.channel_last;
-    Output_ctrl.data_index  <= resize_up(r3_read_req.channel_index, Output_ctrl.data_index'length);
-    Output_data             <= r3_read_data_scaled;
+    Output_ctrl.valid       <= r4_read_req.valid;
+    Output_ctrl.last        <= r4_read_req.channel_last;
+    Output_ctrl.data_index  <= resize_up(r4_read_req.channel_index, Output_ctrl.data_index'length);
+    Output_data             <= r4_read_data_scaled;
   end process;
 
   process(Clk)
@@ -339,8 +345,8 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_reporter_mem_result_valid <= r2_read_valid and not(r2_read_req.valid);
-      r_reporter_mem_result_data  <= w2_mem_rd_data;
+      r_reporter_mem_result_valid <= r3_read_valid and not(r3_read_req.valid);
+      r_reporter_mem_result_data  <= w3_mem_rd_data;
     end if;
   end process;
 

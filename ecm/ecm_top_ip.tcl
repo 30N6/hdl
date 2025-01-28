@@ -54,6 +54,7 @@ custom_ip_files ecm_receiver [list \
   {"./hdl/ecm_dwell_stats_reporter.vhd"     "ecm_lib"}      \
   {"./hdl/ecm_dwell_stats.vhd"              "ecm_lib"}      \
   {"./hdl/ecm_drfm_reporter.vhd"            "ecm_lib"}      \
+  {"./hdl/ecm_drfm_mem.vhd"                 "ecm_lib"}      \
   {"./hdl/ecm_drfm.vhd"                     "ecm_lib"}      \
   {"./hdl/ecm_output_block.vhd"             "ecm_lib"}      \
   {"./hdl/ecm_sync_block.vhd"               "ecm_lib"}      \
