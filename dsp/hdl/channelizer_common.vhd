@@ -228,7 +228,8 @@ begin
     NUM_POINTS        => NUM_CHANNELS,
     INDEX_WIDTH       => CHANNEL_INDEX_WIDTH,
     INPUT_DATA_WIDTH  => FILTER_DATA_WIDTH,
-    OUTPUT_DATA_WIDTH => FFT_DATA_WIDTH
+    OUTPUT_DATA_WIDTH => FFT_DATA_WIDTH,
+    INPUT_PIPE_STAGES => 1
   )
   port map (
     Clk             => Clk,

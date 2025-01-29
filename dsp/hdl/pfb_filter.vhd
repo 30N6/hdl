@@ -99,7 +99,8 @@ begin
       COEF_WIDTH          => COEF_WIDTH,
       COEF_DATA           => get_coefs_for_stage(i),
       INPUT_DATA_WIDTH    => INPUT_DATA_WIDTH,
-      OUTPUT_DATA_WIDTH   => OUTPUT_DATA_WIDTH
+      OUTPUT_DATA_WIDTH   => OUTPUT_DATA_WIDTH,
+      ANALYSIS_MODE       => ANALYSIS_MODE
     )
     port map (
       Clk                   => Clk,
