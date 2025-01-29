@@ -76,8 +76,13 @@ architecture rtl of fft_radix2_output is
   signal r4_k2                  : signed(K_WIDTH - 1 downto 0);
   signal r4_k3                  : signed(K_WIDTH - 1 downto 0);
 
-  signal r5_output_scaled_i     : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
-  signal r5_output_scaled_q     : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
+  signal r5_chan0_scaled_i      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r5_chan0_scaled_q      : signed(INPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto 0);
+  signal r5_k_sum_i             : signed(K_WIDTH downto 0);
+  signal r5_k_sum_q             : signed(K_WIDTH downto 0);
+
+  signal r6_output_scaled_i     : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
+  signal r6_output_scaled_q     : signed(OUTPUT_SCALED_WIDTH - 1 downto 0);
 
 begin
 
@@ -85,7 +90,7 @@ begin
     report "Invalid output width - expecting 1 bit of growth per stage."
     severity failure;
 
-  assert (LATENCY = 6)
+  assert (LATENCY = 8)
     report "Invalid latency."
     severity failure;
 
@@ -153,12 +158,27 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r5_output_scaled_i  <= resize_up(r4_chan0_scaled_i, OUTPUT_SCALED_WIDTH) + r4_k1 - r4_k3;
-      r5_output_scaled_q  <= resize_up(r4_chan0_scaled_q, OUTPUT_SCALED_WIDTH) + r4_k1 + r4_k2;
+      r5_chan0_scaled_i <= r4_chan0_scaled_i;
+      r5_chan0_scaled_q <= r4_chan0_scaled_q;
+      r5_k_sum_i        <= resize_up(r4_k1, K_WIDTH + 1) - r4_k3;
+      r5_k_sum_q        <= resize_up(r4_k1, K_WIDTH + 1) + r4_k2;
     end if;
   end process;
 
-  Output_i <= r5_output_scaled_i(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
-  Output_q <= r5_output_scaled_q(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r6_output_scaled_i  <= resize_up(r5_chan0_scaled_i, OUTPUT_SCALED_WIDTH) + r5_k_sum_i;
+      r6_output_scaled_q  <= resize_up(r5_chan0_scaled_q, OUTPUT_SCALED_WIDTH) + r5_k_sum_q;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Output_i <= r6_output_scaled_i(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
+      Output_q <= r6_output_scaled_q(OUTPUT_DATA_WIDTH + TWIDDLE_FRAC_WIDTH - 1 downto TWIDDLE_FRAC_WIDTH);
+    end if;
+  end process;
 
 end architecture rtl;

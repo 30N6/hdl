@@ -58,12 +58,12 @@ architecture rtl of ecm_dwell_controller is
     S_LOAD_DWELL_ENTRY_2,
     S_CHECK_DWELL_ENTRY,
 
-
     S_PLL_WAIT_PRE_LOCK,
     S_PLL_WAIT_POST_LOCK,
 
     S_DWELL_START_MEAS,
     S_DWELL_ACTIVE_MEAS,
+    S_DWELL_FLUSH_MEAS,
     S_DWELL_START_TX,
     S_DWELL_ACTIVE_TX,
 
@@ -74,6 +74,8 @@ architecture rtl of ecm_dwell_controller is
   type ecm_dwell_entry_array_t is array (natural range <>) of ecm_dwell_entry_t;
   type ecm_channel_control_entry_array_t is array (natural range <>) of ecm_channel_control_entry_t;
   type ecm_tx_instruction_data_array_t is array (natural range <>) of std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
+
+  constant MEAS_FLUSH_CYCLES        : natural := ECM_NUM_CHANNELS * 2 + 8;
 
   signal s_state                    : state_t;
 
@@ -135,6 +137,8 @@ architecture rtl of ecm_dwell_controller is
   signal r_dwell_cycles             : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   signal r_dwell_done_meas          : std_logic;
   signal r_dwell_done_total         : std_logic;
+  signal r_dwell_meas_flush_cycles  : unsigned(clog2(MEAS_FLUSH_CYCLES) - 1 downto 0);
+  signal r_dwell_meas_flush_done    : std_logic;
 
   signal r_report_received_drfm     : std_logic;
   signal r_report_received_stats    : std_logic;
@@ -351,10 +355,17 @@ begin
           s_state <= S_DWELL_ACTIVE_MEAS;
 
         when S_DWELL_ACTIVE_MEAS =>
-          if (r_dwell_done_meas = '1') then
-            s_state <= S_DWELL_START_TX;
+          if ((r_dwell_done_meas = '1') or (w_trigger_immediate_tx = '1')) then
+            s_state <= S_DWELL_FLUSH_MEAS;
           else
             s_state <= S_DWELL_ACTIVE_MEAS;
+          end if;
+
+        when S_DWELL_FLUSH_MEAS =>
+          if (r_dwell_meas_flush_done = '1') then
+            s_state <= S_DWELL_START_TX;
+          else
+            s_state <= S_DWELL_FLUSH_MEAS;
           end if;
 
         when S_DWELL_START_TX =>
@@ -470,6 +481,14 @@ begin
         r_dwell_done_meas     <= to_stdlogic(r_dwell_entry_d1.measurement_duration = r_dwell_cycles);
         r_dwell_done_total    <= to_stdlogic(r_dwell_entry_d1.total_duration_max = r_dwell_cycles);
       end if;
+
+      if (s_state /= S_DWELL_FLUSH_MEAS) then
+        r_dwell_meas_flush_cycles <= (others => '0');
+        r_dwell_meas_flush_done   <= '0';
+      else
+        r_dwell_meas_flush_cycles <= r_dwell_meas_flush_cycles + 1;
+        r_dwell_meas_flush_done   <= to_stdlogic(r_dwell_meas_flush_cycles = (MEAS_FLUSH_CYCLES - 1));
+      end if;
     end if;
   end process;
 
@@ -506,7 +525,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_dwell_active      <= to_stdlogic((s_state = S_DWELL_ACTIVE_MEAS) or (s_state = S_DWELL_START_TX) or (s_state = S_DWELL_ACTIVE_TX)); --include start_tx to avoid gaps
+      r_dwell_active      <= to_stdlogic((s_state = S_DWELL_ACTIVE_MEAS) or (s_state = S_DWELL_FLUSH_MEAS) or (s_state = S_DWELL_START_TX) or (s_state = S_DWELL_ACTIVE_TX)); --include flush_meas and start_tx to avoid gaps
       r_dwell_start_meas  <= to_stdlogic(s_state = S_DWELL_START_MEAS);
       r_dwell_active_meas <= to_stdlogic(s_state = S_DWELL_ACTIVE_MEAS);
       r_dwell_active_tx   <= to_stdlogic(s_state = S_DWELL_ACTIVE_TX);

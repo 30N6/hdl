@@ -70,6 +70,7 @@ architecture rtl of ecm_dwell_trigger is
     continued_threshold : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
     recording_length    : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
     recording_address   : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+    forced_trigger      : std_logic;
   end record;
 
   type channel_state_array_t is array (natural range <>) of channel_state_t;
@@ -207,11 +208,12 @@ begin
 
       if (r2_channel_state.trigger_state = S_IDLE) then
         if ((r2_trigger_is_forced = '1') or ((r2_trigger_is_threshold = '1') and (r2_threshold_check_new = '1'))) then
-          r3_channel_state_wr_en                        <= '1';
+          r3_channel_state_wr_en                        <= r2_channelizer_ctrl.valid;
           r3_channel_state_wr_data.trigger_state        <= S_ACTIVE;
           r3_channel_state_wr_data.continued_threshold  <= shift_right(r1_channel_control.trigger_threshold, to_integer(r1_channel_control.trigger_hyst_shift));
           r3_channel_state_wr_data.recording_length     <= to_unsigned(1, ECM_DRFM_SEGMENT_LENGTH_WIDTH);
           r3_channel_state_wr_data.recording_address    <= r2_channel_control.recording_address;
+          r3_channel_state_wr_data.forced_trigger       <= r2_trigger_is_forced;
 
           r3_drfm_write_req.valid                       <= r2_channelizer_ctrl.valid;
           r3_drfm_write_req.first                       <= '1';
@@ -264,7 +266,7 @@ begin
 
       if ((r3_channel_state_wr_en = '1') and (r3_trigger_pending = '0')) then
         if (r3_channel_state_wr_data.trigger_state = S_ACTIVE) then
-
+          --during S_ACTIVE, immediate triggers only
           for i in 0 to (ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1) loop
             if ((r3_channel_control.program_entries(i).valid = '1') and (r3_channel_control.program_entries(i).trigger_immediate_after_min = '1') and (r3_trigger_check_duration_min(i) = '1')) then
               r4_trigger_immediate    <= '1';
@@ -275,16 +277,19 @@ begin
           end loop;
 
         elsif (r3_channel_state_wr_data.trigger_state = S_COMPLETE) then
-
-          for i in 0 to (ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1) loop
-            if ((r3_channel_control.program_entries(i).valid = '1') and (r3_trigger_check_duration_min(i) = '1') and (r3_trigger_check_duration_max(i) = '1')) then
-              r4_trigger_immediate    <= '1';
-              r4_tx_program_req_valid <= '1';
-              r4_tx_program_req_index <= r3_channel_control.program_entries(i).tx_program_index;
-              exit;
-            end if;
-          end loop;
-
+          -- all other triggers on S_COMPLETE
+          if (r3_channel_state_wr_data.forced_trigger = '1') then
+            r4_tx_program_req_valid <= r3_channel_control.program_entries(0).valid;
+            r4_tx_program_req_index <= r3_channel_control.program_entries(0).tx_program_index;
+          else
+            for i in 0 to (ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1) loop
+              if ((r3_channel_control.program_entries(i).valid = '1') and (r3_trigger_check_duration_min(i) = '1') and (r3_trigger_check_duration_max(i) = '1')) then
+                r4_tx_program_req_valid <= '1';
+                r4_tx_program_req_index <= r3_channel_control.program_entries(i).tx_program_index;
+                exit;
+              end if;
+            end loop;
+          end if;
         end if;
       end if;
 
@@ -306,7 +311,7 @@ begin
   process(all)
   begin
     if (Dwell_channel_clear = '1') then
-      w_channel_state_wr_data   <= (trigger_state => S_IDLE, others => (others => '-'));
+      w_channel_state_wr_data   <= (trigger_state => S_IDLE, forced_trigger => '-', others => (others => '-'));
       w_channel_state_wr_index  <= r_channel_clear_index;
       w_channel_state_wr_en     <= '1';
     else
@@ -331,7 +336,7 @@ begin
       for i in 0 to (ECM_NUM_CHANNELS - 1) loop
         if (Dwell_start_measurement = '1') then
           r_trigger_pending(i) <= '0';
-        elsif ((w_channel_state_wr_en = '1') and (w_channel_state_wr_index = i) and (w_channel_state_wr_data.trigger_state /= S_IDLE)) then
+        elsif ((r4_tx_program_req_valid = '1') and (r4_tx_program_req_index = i)) then
           r_trigger_pending(i) <= '1';
         end if;
       end loop;

@@ -241,6 +241,13 @@ begin
         end if;
 
       elsif (r3_channel_state.program_state = S_DECODE) then
+        r4_channel_state.instruction_index    <= r3_instruction_index_next;
+        r4_channel_state.wait_count           <= w3_instruction_wait.base_duration + (w3_instruction_wait.rand_offset_mask and w_rand(ECM_TX_INSTRUCTION_WAIT_DURATION_WIDTH - 1 downto 0));
+        r4_channel_state.playback_count       <= w3_instruction_playback.base_count + (w3_instruction_playback.rand_offset_mask and w_rand(ECM_TX_INSTRUCTION_PLAYBACK_COUNTER_WIDTH - 1 downto 0));
+        r4_channel_state.playback_addr_curr   <= r3_drfm_state_first.addr;
+        r4_channel_state.playback_addr_first  <= r3_drfm_state_first.addr;
+        r4_channel_state.playback_addr_last   <= r3_drfm_state_last.addr;
+
         if ((Dwell_transmit_active = '0') or (w3_instruction_header.valid = '0')) then
           r4_channel_state.program_state              <= S_IDLE;
           r4_dds_control.valid                        <= '1';
@@ -253,13 +260,6 @@ begin
           r4_output_control.valid                     <= w3_instruction_header.output_valid;
           r4_output_control.control                   <= w3_instruction_header.output_control;
 
-          r4_channel_state.instruction_index          <= r3_instruction_index_next;
-          r4_channel_state.wait_count                 <= (others => '0');
-          r4_channel_state.playback_count             <= (others => '0');
-          r4_channel_state.playback_addr_curr         <= r3_drfm_state_first.addr;
-          r4_channel_state.playback_addr_first        <= r3_drfm_state_first.addr;
-          r4_channel_state.playback_addr_last         <= r3_drfm_state_last.addr;
-
           if (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_BPSK) then
             r4_dds_control.control_type               <= to_unsigned(DDS_CONTROL_TYPE_LFSR, DDS_CONTROL_TYPE_WIDTH);
           elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_CW_SWEEP) then
@@ -269,11 +269,9 @@ begin
           elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_PLAYBACK) then
             r4_channel_state.program_state            <= S_EXECUTE;
             r4_channel_state.instruction_index        <= r3_channel_state.instruction_index;
-            r4_channel_state.playback_count           <= w3_instruction_playback.base_count + (w3_instruction_playback.rand_offset_mask and w_rand(ECM_TX_INSTRUCTION_PLAYBACK_COUNTER_WIDTH - 1 downto 0));
           elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_WAIT) then
             r4_channel_state.program_state            <= S_EXECUTE;
             r4_channel_state.instruction_index        <= r3_channel_state.instruction_index;
-            r4_channel_state.wait_count               <= w3_instruction_wait.base_duration + (w3_instruction_wait.rand_offset_mask and w_rand(ECM_TX_INSTRUCTION_WAIT_DURATION_WIDTH - 1 downto 0));
           elsif (w3_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_JUMP) then
             r4_channel_state.loop_count               <= r3_loop_count_next;
             if ((w3_instruction_jump.counter_check = '0') or (r3_channel_state.loop_count /= w3_instruction_jump.counter_value)) then

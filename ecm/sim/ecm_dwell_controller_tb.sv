@@ -7,16 +7,30 @@ import dsp_pkg::*;
 typedef struct {
   int data_i;
   int data_q;
+  int data_p;
   int index;
   int wait_cycles;
 } channelizer_transaction_t;
+
+typedef struct {
+  int data_i [ecm_num_channels - 1 : 0];
+  int data_q [ecm_num_channels - 1 : 0];
+  int data_p [ecm_num_channels - 1 : 0];
+} channelizer_frame_t;
+typedef channelizer_frame_t channelizer_frame_queue_t [$];
 
 interface channelizer_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
   channelizer_control_t             ctrl;
   logic signed [DATA_WIDTH - 1 : 0] data [1:0];
   logic [chan_power_width - 1 : 0]  power;
+  logic                             active;
 
   task clear();
+    active <= 0;
+    clear_partial();
+  endtask
+
+  task clear_partial();
     ctrl.valid      <= 0;
     ctrl.last       <= 'x;
     ctrl.data_index <= 'x;
@@ -25,15 +39,49 @@ interface channelizer_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
     power           <= 'x;
   endtask
 
-  task write(input channelizer_transaction_t tx);
+  task write_single(input channelizer_transaction_t tx);
+    active          <= 1;
     ctrl.valid      <= 1;
     ctrl.last       <= (tx.index == (ecm_num_channels - 1));
     ctrl.data_index <= tx.index;
     data[0]         <= tx.data_i;
     data[1]         <= tx.data_q;
+    power           <= tx.data_p;
     @(posedge Clk);
     clear();
     repeat(tx.wait_cycles) @(posedge Clk);
+  endtask
+
+  task write_queue(input channelizer_frame_queue_t tx);
+    automatic int channel_order [$];
+    for (int i = 0; i < ecm_num_channels; i++) begin
+      channel_order.push_back(i);
+    end
+    channel_order.shuffle();
+    $display("write_queue: channel_order=%p", channel_order);
+
+    clear_partial();
+    active <= 1;
+    repeat(10) @(posedge Clk);  //TODO: stop before active_measurement
+
+    for (int i_frame = 0; i_frame < tx.size(); i_frame++) begin
+      for (int i_channel = 0; i_channel < ecm_num_channels; i_channel++) begin
+        //TODO: check meas_active and terminate if it ends
+        automatic int channel_index = channel_order[i_channel];
+        ctrl.valid      <= 1;
+        ctrl.last       <= (channel_index == (ecm_num_channels - 1));
+        ctrl.data_index <= channel_index;
+        data[0]         <= tx[i_frame].data_i[channel_index];
+        data[1]         <= tx[i_frame].data_q[channel_index];
+        power           <= tx[i_frame].data_p[channel_index];
+        @(posedge Clk);
+        clear_partial();
+        @(posedge Clk);
+      end
+    end
+    active <= 0;
+    @(posedge Clk);
+
   endtask
 endinterface
 
@@ -145,31 +193,39 @@ module ecm_dwell_controller_tb;
   ecm_drfm_read_req_intf                                          drfm_rd_intf  (.*);
   dwell_rx_intf                                                   dwell_intf    (.*);
 
-  logic                 w_rst_out;
-  logic                 w_enable_chan;
-  logic                 w_enable_synth;
-  logic                 w_enable_status;
-  ecm_config_data_t     w_module_config;
-  logic                 w_dwell_active;
-  logic                 w_dwell_active_meas;
-  logic                 w_dwell_active_tx;
-  logic                 w_dwell_done;
-  ecm_dwell_entry_t     w_dwell_data;
-  logic [31:0]          w_dwell_seq_num;
-  logic                 r_dwell_report_done_drfm;
-  logic                 r_dwell_report_done_stats;
+  channelizer_control_t                           r_chan_ctrl;
+  logic signed [CHANNELIZER_DATA_WIDTH - 1 : 0]   r_chan_data [1:0];
+  logic [chan_power_width - 1 : 0]                r_chan_power;
+  logic                                           r_chan_intf_active;
 
-  logic [3:0]           w_ad9361_control;
-  logic [3:0]           r_ad9361_control;
-  logic [7:0]           w_ad9361_status;
+  logic                     w_rst_out;
+  logic                     w_enable_chan;
+  logic                     w_enable_synth;
+  logic                     w_enable_status;
+  ecm_config_data_t         w_module_config;
+  logic                     w_dwell_active;
+  logic                     w_dwell_active_meas;
+  logic                     w_dwell_active_tx;
+  logic                     w_dwell_done;
+  ecm_dwell_entry_t         w_dwell_data;
+  logic [31:0]              w_dwell_seq_num;
+  logic                     r_dwell_report_done_drfm;
+  logic                     r_dwell_report_done_stats;
+  logic                     r_dwell_active_meas;
 
-  channelizer_control_t r_sync_data;
+  logic [3:0]               w_ad9361_control;
+  logic [3:0]               r_ad9361_control;
+  logic [7:0]               w_ad9361_status;
 
-  bit [31:0]            config_seq_num = 0;
-  ecm_dwell_entry_t     dwell_entry_mem [ecm_num_dwell_entries - 1 : 0];
+  channelizer_control_t     r_sync_data;
 
-  expect_t              expected_data [$];
-  int                   num_received = 0;
+  bit [31:0]                config_seq_num = 0;
+  ecm_dwell_entry_t         dwell_entry_mem [ecm_num_dwell_entries - 1 : 0];
+
+  expect_t                  expected_data [$];
+  int                       num_received = 0;
+
+  channelizer_frame_queue_t dwell_channelizer_tx_data [int];
 
   initial begin
     Clk_axi = 0;
@@ -222,9 +278,9 @@ module ecm_dwell_controller_tb;
     .Ad9361_control           (w_ad9361_control),
     .Ad9361_status            (w_ad9361_status),
 
-    .Channelizer_ctrl         (chan_intf.ctrl),
-    .Channelizer_data         (chan_intf.data),
-    .Channelizer_pwr          (chan_intf.power),
+    .Channelizer_ctrl         (r_chan_ctrl), //(chan_intf.ctrl),
+    .Channelizer_data         (r_chan_data), //(chan_intf.data),
+    .Channelizer_pwr          (r_chan_power), //(chan_intf.power),
 
     .Sync_data                (r_sync_data),
 
@@ -253,14 +309,15 @@ module ecm_dwell_controller_tb;
   //TODO: combined rx interface - allow checking of wr->rd sequence; for reads, capture the dds and output control states
 
   always_ff @(posedge Clk) begin
-    r_ad9361_control <= w_ad9361_control;
+    r_ad9361_control    <= w_ad9361_control;
+    r_dwell_active_meas <= w_dwell_active_meas;
   end
 
   initial begin
     w_ad9361_status <= 0;
 
     while (1) begin
-      if (w_ad9361_control != r_ad9361_control) begin
+      if (w_ad9361_control !== r_ad9361_control) begin
         w_ad9361_status <= '0;
         repeat ($urandom_range(10, 5)) @(posedge Clk);
         w_ad9361_status <= '1;
@@ -319,6 +376,50 @@ module ecm_dwell_controller_tb;
       while (w_dwell_active) begin
         @(posedge Clk);
       end
+    end
+  end
+
+  always_ff @(posedge Clk) begin
+    r_chan_intf_active <= chan_intf.active;
+
+    if (chan_intf.active) begin
+      r_chan_ctrl   <= chan_intf.ctrl;
+      r_chan_data   <= chan_intf.data;
+      r_chan_power  <= chan_intf.power;
+    end else begin
+      r_chan_data   <= '{default: 'x};
+      if (!r_chan_ctrl.valid) begin
+        r_chan_ctrl.valid       <= 1;
+        r_chan_ctrl.last        <= ((r_chan_ctrl.data_index + 1) % ecm_num_channels) == (ecm_num_channels - 1);
+        r_chan_ctrl.data_index  <= ((r_chan_ctrl.data_index + 1) % ecm_num_channels);
+        r_chan_power            <= $urandom;
+      end else begin
+        r_chan_ctrl.valid       <= 0;
+        r_chan_ctrl.last        <= 'x;
+        r_chan_power            <= 'x;
+      end
+
+      if (Rst || r_chan_intf_active) begin
+        r_chan_ctrl.data_index  <= 0;
+        r_chan_ctrl.valid       <= 1;
+      end
+    end
+  end
+
+  initial begin
+    wait_for_reset();
+    @(posedge Clk);
+
+    forever begin
+      if (w_dwell_active_meas && !r_dwell_active_meas) begin
+        if (dwell_channelizer_tx_data.exists(w_dwell_seq_num)) begin
+          $display("%0t: dwell_seq_num=%0d - sending channelizer data", $time, w_dwell_seq_num);
+          chan_intf.write_queue(dwell_channelizer_tx_data[w_dwell_seq_num]);
+          $display("%0t: dwell_seq_num=%0d - channelizer data sent", $time, w_dwell_seq_num);
+        end
+      end
+
+      @(posedge Clk);
     end
   end
 
@@ -561,10 +662,13 @@ module ecm_dwell_controller_tb;
     end
   endtask
 
-  function automatic channel_entry_queue_t randomize_channel_entries(int num_dwells, int num_tx_programs, bit enable_immediate);
+  function automatic channel_entry_queue_t randomize_channel_entries(dwell_data_queue_t dwell_entries, int num_tx_programs, bit enable_immediate);
     channel_entry_queue_t r;
 
-    for (int i_dwell = 0; i_dwell < num_dwells; i_dwell++) begin
+    for (int i_dwell = 0; i_dwell < dwell_entries.size(); i_dwell++) begin
+      int max_trigger_duration = (dwell_entries[i_dwell].entry.measurement_duration / (2*ecm_num_channels)) * 0.9;
+      max_trigger_duration = (max_trigger_duration > 1536) ? 1536 : max_trigger_duration;
+
       for (int i_channel = 0; i_channel < ecm_num_channels; i_channel++) begin
         ecm_channel_control_entry_t d;
         int thresh_bits;
@@ -573,9 +677,9 @@ module ecm_dwell_controller_tb;
         d.trigger_mode                    = $urandom_range(ecm_channel_trigger_mode_threshold_trigger, ecm_channel_trigger_mode_none);
 
         if ($urandom_range(99) < 50) begin
-          d.trigger_duration_max_minus_one  = 1536;
+          d.trigger_duration_max_minus_one  = max_trigger_duration;
         end else begin
-          d.trigger_duration_max_minus_one  = $urandom_range(1536, 100);
+          d.trigger_duration_max_minus_one  = $urandom_range(max_trigger_duration, 100);
         end
 
         thresh_bits = $urandom_range(30, 16);
@@ -592,8 +696,8 @@ module ecm_dwell_controller_tb;
           d.program_entries[i_program_entry].duration_gate_min            = $urandom_range(500, 50);
 
           if ($urandom_range(99) < 50) begin
-            d.program_entries[i_program_entry].duration_gate_min  = 1536;
-            d.program_entries[i_program_entry].duration_gate_max  = 1536;
+            d.program_entries[i_program_entry].duration_gate_min  = max_trigger_duration;
+            d.program_entries[i_program_entry].duration_gate_max  = max_trigger_duration;
           end else begin
             d.program_entries[i_program_entry].duration_gate_min  = $urandom_range(500, 50);
             d.program_entries[i_program_entry].duration_gate_max  = $urandom_range(d.trigger_duration_max_minus_one, d.program_entries[i_program_entry].duration_gate_min);
@@ -670,8 +774,8 @@ module ecm_dwell_controller_tb;
     r.pll_post_lock_delay     = $urandom_range(500, 100);
     r.tag                     = $urandom;
     r.frequency               = $urandom;
-    r.measurement_duration    = $urandom_range(5000, 1000);
-    r.total_duration_max      = r.measurement_duration + $urandom_range(10000, 5000);
+    r.measurement_duration    = $urandom_range(5000*ecm_num_channels, 100*ecm_num_channels);
+    r.total_duration_max      = r.measurement_duration + $urandom_range(5000*ecm_num_channels, 1000*ecm_num_channels);
 
     return r;
   endfunction
@@ -763,6 +867,96 @@ module ecm_dwell_controller_tb;
 
     write_config(config_data);
   endtask
+
+  function automatic void generate_channelizer_data(ecm_dwell_program_entry_t dwell_program, dwell_data_queue_t dwell_entries, channel_entry_queue_t channel_entries, int initial_seq_num);
+    ecm_dwell_entry_t             dwell_mem [ecm_num_dwell_entries - 1 : 0] = '{default: '{default:'0}};
+    ecm_channel_control_entry_t   channel_mem [ecm_num_dwell_entries - 1 : 0][ecm_num_channels - 1 : 0] = '{default: '{default: '{default:'0}}};
+    int                           dwell_index = dwell_program.initial_dwell_index;
+    int                           global_counter = dwell_program.global_counter_init;
+    int                           repeat_count = 0;
+    int                           num_dwells = 0;
+    int                           dwell_seq_num = initial_seq_num;
+    int                           dwell_channelizer_data[int][ecm_num_channels - 1:0];
+
+    if (!dwell_program.enable) begin
+      return;
+    end
+
+    $display("%p", dwell_entries);
+
+    $display("generate_channelizer_data: dwell_program started - dwell_index=%0d global_counter=%0d", dwell_index, global_counter);
+
+    for (int i = 0; i < dwell_entries.size(); i++) begin
+      dwell_data_t d = dwell_entries[i];
+      dwell_mem[d.dwell_index] = d.entry;
+    end
+    for (int i = 0; i < channel_entries.size(); i++) begin
+      channel_entry_t d = channel_entries[i];
+      channel_mem[d.dwell_index][d.channel_index] = d.entry;
+    end
+
+    forever begin
+      ecm_dwell_entry_t dwell_entry = dwell_mem[dwell_index];
+      channelizer_frame_queue_t dwell_frame_queue;
+      int num_dwell_frames = dwell_entry.measurement_duration / (2*ecm_num_channels);
+
+      $display("generate_channelizer_data: dwell_index=%0d - duration=%0d num_dwell_frames=%0d", dwell_index, dwell_entry.measurement_duration, num_dwell_frames);
+
+      if (!dwell_entry.valid || (dwell_entry.global_counter_check && (global_counter == 0))) begin
+        $display("generate_channelizer_data: exiting: valid=%0d counter_check=%0d counter_value=%0d", dwell_entry.valid, dwell_entry.global_counter_check, global_counter);
+        break;
+      end
+
+      for (int i = 0; i < num_dwell_frames; i++) begin
+        channelizer_frame_t d = '{default: 0};
+        dwell_frame_queue.push_back(d);
+      end
+
+      $display("generate_channelizer_data: dwell_started - index=%0d  seq_num=%0d  repeat_count=%0d  global_counter=%0d", dwell_index, dwell_seq_num, repeat_count, global_counter);
+      for (int i_channel = 0; i_channel < ecm_num_channels; i_channel++) begin
+        ecm_channel_control_entry_t chan_entry = channel_mem[dwell_index][i_channel];
+        if (!chan_entry.enable || (chan_entry.trigger_mode == ecm_channel_trigger_mode_none)) begin
+          //channel disabled or no trigger - data doesn't matter
+          foreach(dwell_frame_queue[i]) begin
+            dwell_frame_queue[i].data_i[i_channel] = $urandom;
+            dwell_frame_queue[i].data_q[i_channel] = $urandom;
+            dwell_frame_queue[i].data_p[i_channel] = $urandom;
+          end
+        end else begin
+          foreach(dwell_frame_queue[i]) begin
+            dwell_frame_queue[i].data_i[i_channel] = 0;
+            dwell_frame_queue[i].data_q[i_channel] = 0;
+            dwell_frame_queue[i].data_p[i_channel] = 0;
+          end
+          //TODO: randomize something that may trigger the tx program
+        end
+      end
+
+      $display("generate_channelizer_data: adding queue (size=%0d) for seq=%0d", dwell_frame_queue.size(), dwell_seq_num);
+      dwell_channelizer_tx_data[dwell_seq_num] = dwell_frame_queue; //TODO: transmit
+
+      dwell_seq_num++;
+
+      if (dwell_entry.global_counter_dec) begin
+        global_counter--;
+      end
+
+      if (repeat_count == dwell_entry.repeat_count) begin
+        dwell_index = dwell_entry.next_dwell_index;
+        repeat_count = 0;
+      end else begin
+        repeat_count++;
+      end
+
+      if (num_dwells > 100) begin
+        $error("too many dwells - infinite loop?");
+        break;
+      end
+      num_dwells++;
+    end
+
+  endfunction
+
 
 
 /*
@@ -859,11 +1053,18 @@ module ecm_dwell_controller_tb;
       int num_programs = $urandom_range(16, 4);
       int num_dwells = $urandom_range(16, 4);
       bit enable_immediate_trigger = $urandom;
+      int dwell_seq_num = 0;
 
       tx_instructions_queue_t   tx_programs     = randomize_tx_programs(num_programs);
-      channel_entry_queue_t     channel_entries = randomize_channel_entries(num_dwells, num_programs, enable_immediate_trigger);
       dwell_data_queue_t        dwell_entries   = randomize_dwell_entries(num_dwells, use_counter);
+      channel_entry_queue_t     channel_entries = randomize_channel_entries(dwell_entries, num_programs, enable_immediate_trigger);
       ecm_dwell_program_entry_t dwell_program;
+
+      dwell_program.enable              = 1;
+      dwell_program.initial_dwell_index = $urandom_range(2, 0);
+      dwell_program.global_counter_init = num_dwells - dwell_program.initial_dwell_index + 1;
+
+      generate_channelizer_data(dwell_program, dwell_entries, channel_entries, dwell_seq_num);
 
       for (int i_program = 0; i_program < tx_programs.size(); i_program++) begin
         send_tx_program(tx_programs[i_program]);
@@ -877,14 +1078,12 @@ module ecm_dwell_controller_tb;
         send_dwell_entry(dwell_entries[i_dwell]);
       end
 
-      dwell_program.enable              = 1;
-      dwell_program.initial_dwell_index = $urandom_range(2, 0);
-      dwell_program.global_counter_init = num_dwells - dwell_program.initial_dwell_index + 1;
-
       send_dwell_program(dwell_program);
 
+      //generate_expected_dwell_events(dwell_program, dwell_entries
 
-      repeat (100000) @(posedge Clk);
+
+      repeat (1000000) @(posedge Clk);
 
 
       for (int i_dwell = 0; i_dwell < ecm_num_dwell_entries; i_dwell++) begin
