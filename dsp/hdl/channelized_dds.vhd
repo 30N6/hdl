@@ -84,15 +84,21 @@ architecture rtl of channelized_dds is
   signal r1_sync_data                 : channelizer_control_t;
   signal r1_channel_control           : dds_channel_control_t;
   signal r1_channel_state             : dds_channel_state_t;
-  signal w1_lfsr_phase_accum_sum      : unsigned(DDS_LFSR_PHASE_ACCUM_WIDTH downto 0);
   signal w1_sin_step_rand_offset      : unsigned(DDS_SIN_PHASE_ACCUM_WIDTH - 2 downto 0);
 
   signal r2_sync_data                 : channelizer_control_t;
   signal r2_channel_state             : dds_channel_state_t;
-  signal r2_channel_setup             : dds_control_setup_entry_t;
+  signal r2_channel_control           : dds_channel_control_t;
   signal r2_sin_phase_inc             : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
-  signal r2_lfsr_toggle               : std_logic;
+  signal r2_lfsr_phase_accum_sum      : unsigned(DDS_LFSR_PHASE_ACCUM_WIDTH downto 0);
   signal r2_sin_phase_accum_dithered  : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+  signal r2_sin_step_done             : std_logic;
+  signal r2_sin_step_phase_inc_next   : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+  signal r2_sin_step_phase_cycle_next : unsigned(DDS_SIN_STEP_PERIOD_WIDTH - 1 downto 0);
+  signal r2_sin_sweep_phase_inc_upper : std_logic;
+  signal r2_sin_sweep_phase_inc_lower : std_logic;
+  signal r2_sin_sweep_phase_inc       : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+
   signal w2_sin_lookup_half           : std_logic;
   signal w2_sin_lookup_index          : unsigned(DDS_SIN_LOOKUP_INDEX_WIDTH - 1 downto 0);
 
@@ -178,7 +184,6 @@ begin
     end if;
   end process;
 
-  w1_lfsr_phase_accum_sum <= ('0' & r1_channel_state.lfsr_phase_accum) + ('0' & r1_channel_control.lfsr_control.lfsr_phase_inc);
   w1_sin_step_rand_offset <= r1_channel_control.sin_step_control.sin_step_phase_inc_rand_offset_mask and w_rand(DDS_SIN_PHASE_ACCUM_WIDTH - 2 downto 0);
 
   process(Clk)
@@ -186,32 +191,23 @@ begin
     if rising_edge(Clk) then
       r2_sync_data                      <= r1_sync_data;
       r2_channel_state                  <= r1_channel_state;
-      r2_channel_setup                  <= r1_channel_control.setup;
+      r2_channel_control                <= r1_channel_control;
 
-      r2_channel_state.lfsr_phase_accum <= w1_lfsr_phase_accum_sum(DDS_LFSR_PHASE_ACCUM_WIDTH - 1 downto 0);
-      r2_lfsr_toggle                    <= w1_lfsr_phase_accum_sum(DDS_LFSR_PHASE_ACCUM_WIDTH);
-
+      r2_lfsr_phase_accum_sum           <= ('0' & r1_channel_state.lfsr_phase_accum) + ('0' & r1_channel_control.lfsr_control.lfsr_phase_inc);
       r2_sin_phase_accum_dithered       <= r1_channel_state.sin_phase_accum + ('0' & w_rand(31));
 
-      if (r1_channel_state.sin_sweep_phase_inc > r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_stop) then
-        r2_channel_state.sin_sweep_phase_inc <= r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_start;
-      elsif (r1_channel_state.sin_sweep_phase_inc < r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_start) then
-        r2_channel_state.sin_sweep_phase_inc <= r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_stop;
-      else
-        r2_channel_state.sin_sweep_phase_inc <= r1_channel_state.sin_sweep_phase_inc + r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_step;
-      end if;
+      r2_sin_step_done                  <= to_stdlogic(r1_channel_state.sin_step_cycle = r1_channel_control.sin_step_control.sin_step_period_minus_one);
+      r2_sin_step_phase_inc_next        <= r1_channel_control.sin_step_control.sin_step_phase_inc_min + signed('0' & w1_sin_step_rand_offset);
+      r2_sin_step_phase_cycle_next      <= r1_channel_state.sin_step_cycle + 1;
 
-      if (r1_channel_state.sin_step_cycle = r1_channel_control.sin_step_control.sin_step_period_minus_one) then
-        r2_channel_state.sin_step_cycle     <= (others => '0');
-        r2_channel_state.sin_step_phase_inc <= r1_channel_control.sin_step_control.sin_step_phase_inc_min + signed('0' & w1_sin_step_rand_offset);
-      else
-        r2_channel_state.sin_step_cycle     <= r1_channel_state.sin_step_cycle + 1;
-      end if;
+      r2_sin_sweep_phase_inc_upper      <= to_stdlogic(r1_channel_state.sin_sweep_phase_inc > r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_stop);
+      r2_sin_sweep_phase_inc_lower      <= to_stdlogic(r1_channel_state.sin_sweep_phase_inc < r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_start);
+      r2_sin_sweep_phase_inc            <= r1_channel_state.sin_sweep_phase_inc + r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_step;
 
       if (r1_channel_control.setup.dds_sin_phase_inc_select = '0') then
-        r2_sin_phase_inc <= r1_channel_state.sin_sweep_phase_inc;
+        r2_sin_phase_inc                <= r1_channel_state.sin_sweep_phase_inc;
       else
-        r2_sin_phase_inc <= r1_channel_state.sin_step_phase_inc;
+        r2_sin_phase_inc                <= r1_channel_state.sin_step_phase_inc;
       end if;
     end if;
   end process;
@@ -224,17 +220,33 @@ begin
     if rising_edge(Clk) then
       r3_sync_data      <= r2_sync_data;
       r3_channel_state  <= r2_channel_state;
-      r3_channel_setup  <= r2_channel_setup;
+      r3_channel_setup  <= r2_channel_control.setup;
 
-      r3_lfsr_output <= lfsr_output(r2_channel_state.lfsr_reg_state_g1 & r2_channel_state.lfsr_reg_state_g2, OUTPUT_TAPS_G1 & OUTPUT_TAPS_G2);
+      r3_lfsr_output                    <= lfsr_output(r2_channel_state.lfsr_reg_state_g1 & r2_channel_state.lfsr_reg_state_g2, OUTPUT_TAPS_G1 & OUTPUT_TAPS_G2);
 
-      r3_channel_state.sin_phase_accum <= r2_channel_state.sin_phase_accum + r2_sin_phase_inc;
+      r3_channel_state.lfsr_phase_accum <= r2_lfsr_phase_accum_sum(DDS_LFSR_PHASE_ACCUM_WIDTH - 1 downto 0);
+      r3_channel_state.sin_phase_accum  <= r2_channel_state.sin_phase_accum + r2_sin_phase_inc;
+
+      if (r2_sin_step_done = '1') then
+        r3_channel_state.sin_step_cycle     <= (others => '0');
+        r3_channel_state.sin_step_phase_inc <= r2_sin_step_phase_inc_next;
+      else
+        r3_channel_state.sin_step_cycle     <= r2_sin_step_phase_cycle_next;
+      end if;
+
+      if (r2_sin_sweep_phase_inc_upper = '1') then
+        r3_channel_state.sin_sweep_phase_inc <= r2_channel_control.sin_sweep_control.sin_sweep_phase_inc_start;
+      elsif (r2_sin_sweep_phase_inc_lower = '1') then
+        r3_channel_state.sin_sweep_phase_inc <= r2_channel_control.sin_sweep_control.sin_sweep_phase_inc_stop;
+      else
+        r3_channel_state.sin_sweep_phase_inc <= r2_sin_sweep_phase_inc;
+      end if;
 
       if (r_rst = '1') then
         r3_channel_state.lfsr_reg_state_g1 <= (others => '1');
         r3_channel_state.lfsr_reg_state_g2 <= (others => '1');
       else
-        if (r2_lfsr_toggle = '1') then
+        if (r2_lfsr_phase_accum_sum(DDS_LFSR_PHASE_ACCUM_WIDTH) = '1') then
           r3_channel_state.lfsr_reg_state_g1 <= update_lfsr(r2_channel_state.lfsr_reg_state_g1, POLY_G1);
           r3_channel_state.lfsr_reg_state_g2 <= update_lfsr(r2_channel_state.lfsr_reg_state_g2, POLY_G2);
         end if;
