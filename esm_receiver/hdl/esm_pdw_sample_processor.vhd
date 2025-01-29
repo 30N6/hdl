@@ -163,6 +163,8 @@ architecture rtl of esm_pdw_sample_processor is
   signal w_sample_buffer_overflow   : std_logic;
   signal w_sample_buffer_underflow  : std_logic;
 
+  attribute dont_touch              : string;
+  attribute dont_touch of r0_input_threshold_value : signal is "true";
 begin
 
   g_debug : if (DEBUG_ENABLE) generate
