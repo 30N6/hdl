@@ -65,7 +65,7 @@ architecture rtl of ecm_top is
   constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + clog2(8) + clog2(ECM_NUM_CHANNELS); -- 8 taps per channel
   constant SYNTHESIZER16_OUTPUT_WIDTH : natural := ECM_SYNTHESIZER_DATA_WIDTH + clog2(ECM_NUM_CHANNELS) + clog2(6) + 1; -- 6 taps per channel
 
-  constant SYNC_TO_DRFM_READ_LATENCY  : natural := 6;
+  constant SYNC_TO_DRFM_READ_LATENCY  : natural := 7;
   constant DRFM_READ_LATENCY          : natural := 4;
   constant DDS_LATENCY                : natural := 7;
   constant SYNC_LATENCY_DDS           : natural := DDS_LATENCY;

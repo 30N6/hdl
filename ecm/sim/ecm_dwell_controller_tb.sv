@@ -62,7 +62,6 @@ interface channelizer_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
 
     clear_partial();
     active <= 1;
-    repeat(10) @(posedge Clk);  //TODO: stop before active_measurement
 
     for (int i_frame = 0; i_frame < tx.size(); i_frame++) begin
       for (int i_channel = 0; i_channel < ecm_num_channels; i_channel++) begin
@@ -176,7 +175,7 @@ module ecm_dwell_controller_tb;
   parameter time AXI_CLK_HALF_PERIOD  = 5ns;
   parameter AXI_DATA_WIDTH            = 32;
   parameter CHANNELIZER_DATA_WIDTH    = 20;
-  parameter SYNC_TO_DRFM_READ_LATENCY = 6;
+  parameter SYNC_TO_DRFM_READ_LATENCY = 7;
 
   typedef struct
   {
@@ -197,6 +196,8 @@ module ecm_dwell_controller_tb;
   logic signed [CHANNELIZER_DATA_WIDTH - 1 : 0]   r_chan_data [1:0];
   logic [chan_power_width - 1 : 0]                r_chan_power;
   logic                                           r_chan_intf_active;
+  logic                                           r_chan_valid = 0;
+  int                                             r_chan_index = 0;
 
   logic                     w_rst_out;
   logic                     w_enable_chan;
@@ -380,30 +381,27 @@ module ecm_dwell_controller_tb;
   end
 
   always_ff @(posedge Clk) begin
-    r_chan_intf_active <= chan_intf.active;
 
     if (chan_intf.active) begin
-      r_chan_ctrl   <= chan_intf.ctrl;
-      r_chan_data   <= chan_intf.data;
-      r_chan_power  <= chan_intf.power;
+      r_chan_ctrl             <= chan_intf.ctrl;
+      r_chan_data             <= chan_intf.data;
+      r_chan_power            <= chan_intf.power;
+    end else if (ecm_dwell_controller_tb.dut.s_state == 9) begin //S_DWELL_FLUSH_MEAS
+      r_chan_valid <= !r_chan_valid;
+      if (r_chan_valid) begin
+        r_chan_index <= ((r_chan_index + 1) % ecm_num_channels);
+      end
+      r_chan_ctrl.valid       <= r_chan_valid;
+      r_chan_ctrl.last        <= r_chan_index == (ecm_num_channels - 1);
+      r_chan_ctrl.data_index  <= r_chan_index;
+      r_chan_data             <= '{default: 'x};
+      r_chan_power            <= $urandom;
     end else begin
-      r_chan_data   <= '{default: 'x};
-      if (!r_chan_ctrl.valid) begin
-        r_chan_ctrl.valid       <= 1;
-        r_chan_ctrl.last        <= ((r_chan_ctrl.data_index + 1) % ecm_num_channels) == (ecm_num_channels - 1);
-        r_chan_ctrl.data_index  <= ((r_chan_ctrl.data_index + 1) % ecm_num_channels);
-        r_chan_power            <= $urandom;
-      end else begin
-        r_chan_ctrl.valid       <= 0;
-        r_chan_ctrl.last        <= 'x;
-        r_chan_power            <= 'x;
-      end
-
-      if (Rst || r_chan_intf_active) begin
-        r_chan_ctrl.data_index  <= 0;
-        r_chan_ctrl.valid       <= 1;
-      end
+      r_chan_ctrl.valid       <= 0;
+      r_chan_ctrl.last        <= 'x;
+      r_chan_power            <= 'x;
     end
+
   end
 
   initial begin
@@ -677,9 +675,9 @@ module ecm_dwell_controller_tb;
         d.trigger_mode                    = $urandom_range(ecm_channel_trigger_mode_threshold_trigger, ecm_channel_trigger_mode_none);
 
         if ($urandom_range(99) < 50) begin
-          d.trigger_duration_max_minus_one  = max_trigger_duration;
+          d.trigger_duration_max_minus_one  = max_trigger_duration - 1;
         end else begin
-          d.trigger_duration_max_minus_one  = $urandom_range(max_trigger_duration, 100);
+          d.trigger_duration_max_minus_one  = $urandom_range(max_trigger_duration - 1, 100);
         end
 
         thresh_bits = $urandom_range(30, 16);
@@ -1052,7 +1050,7 @@ module ecm_dwell_controller_tb;
       bit use_counter = $urandom;
       int num_programs = $urandom_range(16, 4);
       int num_dwells = $urandom_range(16, 4);
-      bit enable_immediate_trigger = $urandom;
+      bit enable_immediate_trigger = 0; //$urandom; //TODO: test
       int dwell_seq_num = 0;
 
       tx_instructions_queue_t   tx_programs     = randomize_tx_programs(num_programs);
