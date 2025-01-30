@@ -147,7 +147,7 @@ package ecm_pkg is
   type ecm_channel_tx_program_entry_t is record
     valid                       : std_logic;
     trigger_immediate_after_min : std_logic;
-    tx_program_index            : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
+    tx_instruction_index        : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
     duration_gate_min           : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
     duration_gate_max           : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   end record;
@@ -485,7 +485,7 @@ package body ecm_pkg is
 
     r.valid                       := v(0);
     r.trigger_immediate_after_min := v(8);
-    r.tx_program_index            := unsigned(v(16 + ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 16));
+    r.tx_instruction_index        := unsigned(v(16 + ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 16));
     r.duration_gate_min           := unsigned(v(32 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 32));
     r.duration_gate_max           := unsigned(v(48 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 48));
 
@@ -518,7 +518,7 @@ package body ecm_pkg is
 
     r.valid                       := v(0);
     r.trigger_immediate_after_min := v(1);
-    r.tx_program_index            := unsigned(v(2 + ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 2));
+    r.tx_instruction_index        := unsigned(v(2 + ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 2));
     r.duration_gate_min           := unsigned(v(2 + ECM_TX_INSTRUCTION_INDEX_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto
                                                 2 + ECM_TX_INSTRUCTION_INDEX_WIDTH));
     r.duration_gate_max           := unsigned(v(2 + ECM_TX_INSTRUCTION_INDEX_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto
@@ -692,7 +692,7 @@ package body ecm_pkg is
     r := (
           std_logic_vector(v.duration_gate_max),
           std_logic_vector(v.duration_gate_min),
-          std_logic_vector(v.tx_program_index),
+          std_logic_vector(v.tx_instruction_index),
           v.trigger_immediate_after_min,
           v.valid
          );

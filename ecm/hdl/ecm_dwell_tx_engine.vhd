@@ -388,7 +388,7 @@ begin
           r_tx_program_req_valid    <= '1';
           r_tx_program_req_channel  <= Tx_program_req_channel;
           r_tx_program_req_data     <= (program_state => S_START, instruction_index => Tx_program_req_index, others => (others => '0'));
-        elsif (r5_sync_data.valid = '0') then
+        elsif ((r5_sync_data.valid = '1') and (r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) = r_tx_program_req_channel)) then
           r_tx_program_req_valid    <= '0';
           r_tx_program_req_channel  <= (others => '-');
           r_tx_program_req_data     <= (program_state => S_IDLE, others => (others => '-'));
@@ -405,14 +405,16 @@ begin
       w_channel_state_wr_data   <= (program_state => S_IDLE, others => (others => '-'));
       w_channel_state_wr_index  <= r_channel_clear_index;
       w_channel_state_wr_en     <= '1';
-    elsif (r5_sync_data.valid = '1') then
-      w_channel_state_wr_data   <= r5_channel_state;
-      w_channel_state_wr_index  <= r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-      w_channel_state_wr_en     <= '1';
     else
-      w_channel_state_wr_data   <= r_tx_program_req_data;
-      w_channel_state_wr_index  <= r_tx_program_req_channel;
-      w_channel_state_wr_en     <= r_tx_program_req_valid;
+      if ((r_tx_program_req_valid = '1') and (r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) = r_tx_program_req_channel)) then
+        w_channel_state_wr_data   <= r_tx_program_req_data;
+        w_channel_state_wr_index  <= r_tx_program_req_channel;
+        w_channel_state_wr_en     <= r_tx_program_req_valid and r5_sync_data.valid;
+      else
+        w_channel_state_wr_data   <= r5_channel_state;
+        w_channel_state_wr_index  <= r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+        w_channel_state_wr_en     <= r5_sync_data.valid;
+      end if;
     end if;
   end process;
 

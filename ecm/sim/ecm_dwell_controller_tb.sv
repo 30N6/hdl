@@ -218,7 +218,7 @@ module ecm_dwell_controller_tb;
   logic [3:0]               r_ad9361_control;
   logic [7:0]               w_ad9361_status;
 
-  channelizer_control_t     r_sync_data;
+  channelizer_control_t     r_sync_data = '{default: '0};
 
   bit [31:0]                config_seq_num = 0;
   ecm_dwell_entry_t         dwell_entry_mem [ecm_num_dwell_entries - 1 : 0];
@@ -328,22 +328,6 @@ module ecm_dwell_controller_tb;
   end
 
   initial begin
-    automatic logic [ecm_channel_index_width - 1 : 0] channel_index = 0;
-    @(posedge Clk);
-
-    forever begin
-      r_sync_data.valid       <= 1;
-      r_sync_data.last        <= (channel_index == (ecm_num_channels - 1));
-      r_sync_data.data_index  <= channel_index;
-      @(posedge Clk);
-      r_sync_data.valid       <= 0;
-      r_sync_data.last        <= 'x;
-      r_sync_data.data_index  <= 'x;
-      @(posedge Clk);
-    end
-  end
-
-  initial begin
     r_dwell_report_done_drfm  <= 0;
     r_dwell_report_done_stats <= 0;
     @(posedge Clk);
@@ -381,7 +365,6 @@ module ecm_dwell_controller_tb;
   end
 
   always_ff @(posedge Clk) begin
-
     if (chan_intf.active) begin
       r_chan_ctrl             <= chan_intf.ctrl;
       r_chan_data             <= chan_intf.data;
@@ -401,7 +384,17 @@ module ecm_dwell_controller_tb;
       r_chan_ctrl.last        <= 'x;
       r_chan_power            <= 'x;
     end
+  end
 
+  always_ff @(posedge Clk) begin
+    if (!r_sync_data.valid) begin
+      r_sync_data.valid       <= 1;
+      r_sync_data.last        <= ((r_sync_data.data_index + 1) % ecm_num_channels) == (ecm_num_channels - 1);
+      r_sync_data.data_index  <= ((r_sync_data.data_index + 1) % ecm_num_channels);
+    end else begin
+      r_sync_data.valid       <= 0;
+      r_sync_data.last        <= 'x;
+    end
   end
 
   initial begin
@@ -591,8 +584,10 @@ module ecm_dwell_controller_tb;
 
         raw_data = '0;
         raw_data[15:0]  = pack_ecm_tx_instruction_header(header);
-        raw_data[31:16] = inst_setup_playback.base_count;
-        raw_data[47:32] = inst_setup_playback.rand_offset_mask;
+        raw_data[16]    = inst_setup_playback.mode;
+        raw_data[47:32] = inst_setup_playback.base_count;
+        raw_data[63:48] = inst_setup_playback.rand_offset_mask;
+        $display("inst_setup_playback=%p  raw_data=%016X", inst_setup_playback, raw_data);
       end
       result.inst_headers.push_back(header);
       result.inst_raw_data.push_back(raw_data);
@@ -660,7 +655,7 @@ module ecm_dwell_controller_tb;
     end
   endtask
 
-  function automatic channel_entry_queue_t randomize_channel_entries(dwell_data_queue_t dwell_entries, int num_tx_programs, bit enable_immediate);
+  function automatic channel_entry_queue_t randomize_channel_entries(dwell_data_queue_t dwell_entries, tx_instructions_queue_t tx_programs, bit enable_immediate);
     channel_entry_queue_t r;
 
     for (int i_dwell = 0; i_dwell < dwell_entries.size(); i_dwell++) begin
@@ -671,7 +666,7 @@ module ecm_dwell_controller_tb;
         ecm_channel_control_entry_t d;
         int thresh_bits;
 
-        d.enable                          = ($urandom_range(99) < 75);
+        d.enable                          = ($urandom_range(99) < 90);
         d.trigger_mode                    = $urandom_range(ecm_channel_trigger_mode_threshold_trigger, ecm_channel_trigger_mode_none);
 
         if ($urandom_range(99) < 50) begin
@@ -688,9 +683,11 @@ module ecm_dwell_controller_tb;
         d.recording_address   = i_channel * (ecm_drfm_mem_depth / ecm_num_channels);
 
         for (int i_program_entry = 0; i_program_entry < ecm_num_channel_tx_program_entries; i_program_entry++) begin
-          d.program_entries[i_program_entry].valid                        = $urandom;
+          int tx_program_index = $urandom_range(tx_programs.size() - 1, 0);
+
+          d.program_entries[i_program_entry].valid                        = ($urandom_range(99) < 75);
           d.program_entries[i_program_entry].trigger_immediate_after_min  = enable_immediate ? $urandom : 0;
-          d.program_entries[i_program_entry].tx_program_index             = $urandom_range(num_tx_programs);
+          d.program_entries[i_program_entry].tx_instruction_index         = tx_programs[tx_program_index].inst_start_addr;
           d.program_entries[i_program_entry].duration_gate_min            = $urandom_range(500, 50);
 
           if ($urandom_range(99) < 50) begin
@@ -714,7 +711,7 @@ module ecm_dwell_controller_tb;
 
     r[0]      = data.valid;
     r[8]      = data.trigger_immediate_after_min;
-    r[31:16]  = data.tx_program_index;
+    r[31:16]  = data.tx_instruction_index;
     r[47:32]  = data.duration_gate_min;
     r[63:48]  = data.duration_gate_max;
 
@@ -1055,7 +1052,7 @@ module ecm_dwell_controller_tb;
 
       tx_instructions_queue_t   tx_programs     = randomize_tx_programs(num_programs);
       dwell_data_queue_t        dwell_entries   = randomize_dwell_entries(num_dwells, use_counter);
-      channel_entry_queue_t     channel_entries = randomize_channel_entries(dwell_entries, num_programs, enable_immediate_trigger);
+      channel_entry_queue_t     channel_entries = randomize_channel_entries(dwell_entries, tx_programs, enable_immediate_trigger);
       ecm_dwell_program_entry_t dwell_program;
 
       dwell_program.enable              = 1;

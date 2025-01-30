@@ -283,7 +283,7 @@ begin
             if ((r3_channel_control.program_entries(i).valid = '1') and (r3_channel_control.program_entries(i).trigger_immediate_after_min = '1') and (r3_trigger_check_duration_min(i) = '1')) then
               r4_trigger_immediate    <= '1';
               r4_tx_program_req_valid <= '1';
-              r4_tx_program_req_index <= r3_channel_control.program_entries(i).tx_program_index;
+              r4_tx_program_req_index <= r3_channel_control.program_entries(i).tx_instruction_index;
               exit;
             end if;
           end loop;
@@ -292,12 +292,12 @@ begin
           -- all other triggers on S_COMPLETE
           if (r3_channel_state_wr_data.forced_trigger = '1') then
             r4_tx_program_req_valid <= r3_channel_control.program_entries(0).valid;
-            r4_tx_program_req_index <= r3_channel_control.program_entries(0).tx_program_index;
+            r4_tx_program_req_index <= r3_channel_control.program_entries(0).tx_instruction_index;
           else
             for i in 0 to (ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1) loop
               if ((r3_channel_control.program_entries(i).valid = '1') and (r3_trigger_check_duration_min(i) = '1') and (r3_trigger_check_duration_max(i) = '1')) then
                 r4_tx_program_req_valid <= '1';
-                r4_tx_program_req_index <= r3_channel_control.program_entries(i).tx_program_index;
+                r4_tx_program_req_index <= r3_channel_control.program_entries(i).tx_instruction_index;
                 exit;
               end if;
             end loop;
@@ -348,7 +348,7 @@ begin
       for i in 0 to (ECM_NUM_CHANNELS - 1) loop
         if (Dwell_start_measurement = '1') then
           r_trigger_pending(i) <= '0';
-        elsif ((r4_tx_program_req_valid = '1') and (r4_tx_program_req_index = i)) then
+        elsif ((r4_tx_program_req_valid = '1') and (r4_tx_program_req_channel = i)) then
           r_trigger_pending(i) <= '1';
         end if;
       end loop;
