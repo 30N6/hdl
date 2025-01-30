@@ -89,7 +89,7 @@ architecture rtl of channelized_dds is
   signal r2_sync_data                 : channelizer_control_t;
   signal r2_channel_state             : dds_channel_state_t;
   signal r2_channel_control           : dds_channel_control_t;
-  signal r2_sin_phase_inc             : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+  signal r2_sin_phase_accum_next      : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
   signal r2_lfsr_phase_accum_sum      : unsigned(DDS_LFSR_PHASE_ACCUM_WIDTH downto 0);
   signal r2_sin_phase_accum_dithered  : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
   signal r2_sin_step_done             : std_logic;
@@ -205,9 +205,9 @@ begin
       r2_sin_sweep_phase_inc            <= r1_channel_state.sin_sweep_phase_inc + r1_channel_control.sin_sweep_control.sin_sweep_phase_inc_step;
 
       if (r1_channel_control.setup.dds_sin_phase_inc_select = '0') then
-        r2_sin_phase_inc                <= r1_channel_state.sin_sweep_phase_inc;
+        r2_sin_phase_accum_next         <= r1_channel_state.sin_phase_accum + r1_channel_state.sin_sweep_phase_inc;
       else
-        r2_sin_phase_inc                <= r1_channel_state.sin_step_phase_inc;
+        r2_sin_phase_accum_next         <= r1_channel_state.sin_phase_accum + r1_channel_state.sin_step_phase_inc;
       end if;
     end if;
   end process;
@@ -225,7 +225,7 @@ begin
       r3_lfsr_output                    <= lfsr_output(r2_channel_state.lfsr_reg_state_g1 & r2_channel_state.lfsr_reg_state_g2, OUTPUT_TAPS_G1 & OUTPUT_TAPS_G2);
 
       r3_channel_state.lfsr_phase_accum <= r2_lfsr_phase_accum_sum(DDS_LFSR_PHASE_ACCUM_WIDTH - 1 downto 0);
-      r3_channel_state.sin_phase_accum  <= r2_channel_state.sin_phase_accum + r2_sin_phase_inc;
+      r3_channel_state.sin_phase_accum  <= r2_sin_phase_accum_next;
 
       if (r2_sin_step_done = '1') then
         r3_channel_state.sin_step_cycle     <= (others => '0');
