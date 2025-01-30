@@ -72,8 +72,6 @@ architecture rtl of ecm_dwell_controller is
   );
 
   type ecm_dwell_entry_array_t is array (natural range <>) of ecm_dwell_entry_t;
-  type ecm_channel_control_entry_array_t is array (natural range <>) of ecm_channel_control_entry_t;
-  type ecm_tx_instruction_data_array_t is array (natural range <>) of std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
 
   constant MEAS_FLUSH_CYCLES        : natural := ECM_NUM_CHANNELS * 2 + 8;
 
@@ -109,8 +107,6 @@ architecture rtl of ecm_dwell_controller is
   signal r_dwell_program_valid      : std_logic;
 
   signal m_dwell_entry              : ecm_dwell_entry_array_t(ECM_NUM_DWELL_ENTRIES - 1 downto 0);
-  signal m_channel_entry            : ecm_channel_control_entry_array_t(ECM_NUM_CHANNEL_CONTROL_ENTRIES - 1 downto 0);
-  signal m_tx_instruction           : ecm_tx_instruction_data_array_t(ECM_NUM_TX_INSTRUCTIONS - 1 downto 0);
 
   signal r_dwell_entry_index        : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
   signal r_dwell_entry_index_d0     : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
@@ -284,14 +280,6 @@ begin
     if rising_edge(Clk) then
       if (w_dwell_entry_valid = '1') then
         m_dwell_entry(to_integer(w_dwell_entry_index)) <= w_dwell_entry_data;
-      end if;
-
-      if (w_channel_entry_valid = '1') then
-        m_channel_entry(to_integer(w_channel_entry_index)) <= w_channel_entry_data;
-      end if;
-
-      if (w_tx_instruction_valid = '1') then
-        m_tx_instruction(to_integer(w_tx_instruction_index)) <= w_tx_instruction_data;
       end if;
     end if;
   end process;

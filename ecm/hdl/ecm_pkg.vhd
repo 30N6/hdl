@@ -152,7 +152,7 @@ package ecm_pkg is
     duration_gate_max           : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   end record;
   constant ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 16 + 2*16;
-
+  constant ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH         : natural := 1 + 1 + ECM_TX_INSTRUCTION_INDEX_WIDTH + 2*ECM_DRFM_SEGMENT_LENGTH_WIDTH;
   type ecm_channel_tx_program_entry_array_t is array (natural range <>) of ecm_channel_tx_program_entry_t;
 
   type ecm_channel_control_entry_t is record
@@ -165,10 +165,11 @@ package ecm_pkg is
     recording_address               : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
     program_entries                 : ecm_channel_tx_program_entry_array_t(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1 downto 0);
   end record;
-  constant ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 16 + 32 + 8 + 8 + 16 +
-                                                                ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES * ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH;
-
-  type ecm_channel_control_entry_array_t is array (natural range <>) of ecm_channel_control_entry_t;
+  constant ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH  : natural := 8 + 8 + 16 + 32 + 8 + 8 + 16 +
+                                                                 ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES * ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH;
+  constant ECM_CHANNEL_CONTROL_ENTRY_WIDTH          : natural := 1 + ECM_CHANNEL_TRIGGER_MODE_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH +
+                                                                 ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH + 1 + ECM_DRFM_ADDR_WIDTH +
+                                                                 ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES * ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH;
 
   type ecm_dwell_entry_t is record
     valid                     : std_logic;
@@ -358,10 +359,12 @@ package ecm_pkg is
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_playback_t;
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_wait_t;
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0)) return ecm_tx_instruction_jump_t;
-  function unpack(v : std_logic_vector(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_program_entry_t;
-  function unpack(v : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_entry_t;
-  function unpack(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t;
-  function unpack(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t;
+  function unpack_aligned(v : std_logic_vector(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_program_entry_t;
+  function unpack_aligned(v : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_entry_t;
+  function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t;
+  function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t;
+  function unpack(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t;
+  function unpack(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t;
 
   function pack(v : ecm_channelizer_warnings_t) return std_logic_vector;
   function pack(v : ecm_channelizer_errors_t) return std_logic_vector;
@@ -373,6 +376,8 @@ package ecm_pkg is
   function pack(v : ecm_status_flags_t) return std_logic_vector;
   function pack(v : ecm_config_data_t) return std_logic_vector;
   function pack_aligned(v : ecm_dwell_entry_t) return std_logic_vector;
+  function pack(v : ecm_channel_tx_program_entry_t) return std_logic_vector;
+  function pack(v : ecm_channel_control_entry_t) return std_logic_vector;
 
 end package ecm_pkg;
 
@@ -442,7 +447,7 @@ package body ecm_pkg is
     return r;
   end function;
 
-  function unpack(v : std_logic_vector(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_program_entry_t is
+  function unpack_aligned(v : std_logic_vector(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_program_entry_t is
     variable r : ecm_dwell_program_entry_t;
   begin
     r.enable              := v(0);
@@ -451,7 +456,7 @@ package body ecm_pkg is
     return r;
   end function;
 
-  function unpack(v : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_entry_t is
+  function unpack_aligned(v : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_entry_t is
     variable r : ecm_dwell_entry_t;
   begin
 
@@ -474,7 +479,7 @@ package body ecm_pkg is
     return r;
   end function;
 
-  function unpack(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t is
+  function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t is
     variable r : ecm_channel_tx_program_entry_t;
   begin
 
@@ -487,7 +492,7 @@ package body ecm_pkg is
     return r;
   end function;
 
-  function unpack(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t is
+  function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t is
     variable r : ecm_channel_control_entry_t;
   begin
     r.enable                          := v(0);
@@ -501,7 +506,46 @@ package body ecm_pkg is
     r.recording_address               := unsigned(v(80 + ECM_DRFM_ADDR_WIDTH - 1 downto 80));
 
     for i in 0 to (ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1) loop
-      r.program_entries(i)  := unpack(v(96 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH * (i+1) - 1 downto 96 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH*i));
+      r.program_entries(i)  := unpack_aligned(v(96 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH * (i+1) - 1 downto 96 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH*i));
+    end loop;
+
+    return r;
+  end function;
+
+  function unpack(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t is
+    variable r : ecm_channel_tx_program_entry_t;
+  begin
+
+    r.valid                       := v(0);
+    r.trigger_immediate_after_min := v(1);
+    r.tx_program_index            := unsigned(v(2 + ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 2));
+    r.duration_gate_min           := unsigned(v(2 + ECM_TX_INSTRUCTION_INDEX_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto
+                                                2 + ECM_TX_INSTRUCTION_INDEX_WIDTH));
+    r.duration_gate_max           := unsigned(v(2 + ECM_TX_INSTRUCTION_INDEX_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto
+                                                2 + ECM_TX_INSTRUCTION_INDEX_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH));
+
+    return r;
+  end function;
+
+  function unpack(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t is
+    variable r : ecm_channel_control_entry_t;
+  begin
+    r.enable                          := v(0);
+    r.trigger_mode                    := unsigned(v(1 + ECM_CHANNEL_TRIGGER_MODE_WIDTH - 1 downto 1));
+    r.trigger_duration_max_minus_one  := unsigned(v(1 + ECM_CHANNEL_TRIGGER_MODE_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto
+                                                    1 + ECM_CHANNEL_TRIGGER_MODE_WIDTH));
+    r.trigger_threshold               := unsigned(v(1 + ECM_CHANNEL_TRIGGER_MODE_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH - 1 downto
+                                                    1 + ECM_CHANNEL_TRIGGER_MODE_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH));
+    r.trigger_hyst_shift              := unsigned(v(1 + ECM_CHANNEL_TRIGGER_MODE_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH + ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH - 1 downto
+                                                    1 + ECM_CHANNEL_TRIGGER_MODE_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH));
+    r.drfm_gain                       := v(1 + ECM_CHANNEL_TRIGGER_MODE_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH + ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH);
+
+    r.recording_address               := unsigned(v(2 + ECM_CHANNEL_TRIGGER_MODE_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH + ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH + ECM_DRFM_ADDR_WIDTH - 1 downto
+                                                    2 + ECM_CHANNEL_TRIGGER_MODE_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH + ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH));
+
+    for i in 0 to (ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1) loop
+      r.program_entries(i)  := unpack(v(2 + ECM_CHANNEL_TRIGGER_MODE_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH + ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH + ECM_DRFM_ADDR_WIDTH + ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH * (i+1) - 1 downto
+                                        2 + ECM_CHANNEL_TRIGGER_MODE_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH + CHAN_POWER_WIDTH + ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH + ECM_DRFM_ADDR_WIDTH + ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH * i));
     end loop;
 
     return r;
@@ -636,6 +680,44 @@ package body ecm_pkg is
             std_logic_vector(resize_up(v.repeat_count, 8)),
             std_logic_vector(resize_up(v.fast_lock_profile, 8)),
             std_logic_vector(resize_up(v.next_dwell_index, 8))
+         );
+
+    return r;
+  end function;
+
+  function pack(v : ecm_channel_tx_program_entry_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH - 1 downto 0);
+  begin
+
+    r := (
+          std_logic_vector(v.duration_gate_max),
+          std_logic_vector(v.duration_gate_min),
+          std_logic_vector(v.tx_program_index),
+          v.trigger_immediate_after_min,
+          v.valid
+         );
+
+    return r;
+  end function;
+
+  function pack(v : ecm_channel_control_entry_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_WIDTH - 1 downto 0);
+    variable packed_program_entries : std_logic_vector(ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES * ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH - 1 downto 0);
+  begin
+
+    for i in 0 to (ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1) loop
+      packed_program_entries(ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH * (i + 1) - 1 downto ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH * i) := pack(v.program_entries(i));
+    end loop;
+
+    r := (
+          packed_program_entries,
+          std_logic_vector(v.recording_address),
+          v.drfm_gain,
+          std_logic_vector(v.trigger_hyst_shift),
+          std_logic_vector(v.trigger_threshold),
+          std_logic_vector(v.trigger_duration_max_minus_one),
+          std_logic_vector(v.trigger_mode),
+          v.enable
          );
 
     return r;

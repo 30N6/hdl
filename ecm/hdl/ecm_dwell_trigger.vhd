@@ -11,6 +11,8 @@ library ecm_lib;
 library dsp_lib;
   use dsp_lib.dsp_pkg.all;
 
+library mem_lib;
+
 entity ecm_dwell_trigger is
 generic (
   CHANNELIZER_DATA_WIDTH  : natural
@@ -62,7 +64,6 @@ architecture rtl of ecm_dwell_trigger is
     return r;
   end function;
 
-
   type channel_trigger_state_t is (S_IDLE, S_ACTIVE, S_COMPLETE);
 
   type channel_state_t is record
@@ -75,23 +76,23 @@ architecture rtl of ecm_dwell_trigger is
 
   type channel_state_array_t is array (natural range <>) of channel_state_t;
 
-  signal m_channel_control              : ecm_channel_control_entry_array_t(ECM_NUM_CHANNEL_CONTROL_ENTRIES - 1 downto 0);
   signal m_channel_state                : channel_state_array_t(ECM_NUM_CHANNELS - 1 downto 0);
 
+  signal w_channel_control_wr_data      : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_WIDTH - 1 downto 0);
   signal w_channel_control_rd_index     : unsigned(ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH - 1 downto 0);
   signal w_channel_state_rd_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
 
   signal r0_channelizer_ctrl            : channelizer_control_t;
   signal r0_channelizer_data            : signed_array_t(1 downto 0)(CHANNELIZER_DATA_WIDTH - 1 downto 0);
   signal r0_channelizer_pwr             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-  signal r0_channel_control             : ecm_channel_control_entry_t;
   signal r0_channel_state               : channel_state_t;
 
   signal r1_channelizer_ctrl            : channelizer_control_t;
   signal r1_channelizer_data            : signed_array_t(1 downto 0)(CHANNELIZER_DATA_WIDTH - 1 downto 0);
   signal r1_channelizer_pwr             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-  signal r1_channel_control             : ecm_channel_control_entry_t;
   signal r1_channel_state               : channel_state_t;
+  signal w1_channel_control_rd_data     : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_WIDTH - 1 downto 0);
+  signal w1_channel_control             : ecm_channel_control_entry_t;
 
   signal r2_channelizer_ctrl            : channelizer_control_t;
   signal r2_channelizer_data            : signed_array_t(1 downto 0)(CHANNELIZER_DATA_WIDTH - 1 downto 0);
@@ -127,22 +128,9 @@ architecture rtl of ecm_dwell_trigger is
   signal w_channel_state_wr_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal w_channel_state_wr_en          : std_logic;
 
-  attribute ram_style                       : string;
-  attribute ram_style of m_channel_control  : signal is "block";
-
 begin
 
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      if (Channel_entry_valid = '1') then
-        m_channel_control(to_integer(Channel_entry_index)) <= Channel_entry_data;
-      end if;
-    end if;
-  end process;
-
-  w_channel_control_rd_index  <= Dwell_index & Channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  w_channel_state_rd_index    <= Channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  w_channel_state_rd_index <= Channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
 
   process(Clk)
   begin
@@ -150,10 +138,33 @@ begin
       r0_channelizer_ctrl <= Channelizer_ctrl;
       r0_channelizer_data <= Channelizer_data;
       r0_channelizer_pwr  <= Channelizer_pwr;
-      r0_channel_control  <= m_channel_control(to_integer(w_channel_control_rd_index));
       r0_channel_state    <= m_channel_state(to_integer(w_channel_state_rd_index));
     end if;
   end process;
+
+  w_channel_control_wr_data   <= pack(Channel_entry_data);
+  w_channel_control_rd_index  <= Dwell_index & Channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+
+  m_channel_control : entity mem_lib.ram_sdp
+  generic map (
+    ADDR_WIDTH  => ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH,
+    DATA_WIDTH  => ECM_CHANNEL_CONTROL_ENTRY_WIDTH,
+    LATENCY     => 2
+  )
+  port map (
+    Clk       => Clk,
+
+    Wr_en     => Channel_entry_valid,
+    Wr_addr   => Channel_entry_index,
+    Wr_data   => w_channel_control_wr_data,
+
+    Rd_en     => '1',
+    Rd_reg_ce => '1',
+    Rd_addr   => w_channel_control_rd_index,
+    Rd_data   => w1_channel_control_rd_data
+  );
+
+  w1_channel_control <= unpack(w1_channel_control_rd_data);
 
   process(Clk)
   begin
@@ -161,7 +172,6 @@ begin
       r1_channelizer_ctrl <= r0_channelizer_ctrl;
       r1_channelizer_data <= r0_channelizer_data;
       r1_channelizer_pwr  <= r0_channelizer_pwr;
-      r1_channel_control  <= r0_channel_control;
       r1_channel_state    <= r0_channel_state;
     end if;
   end process;
@@ -172,14 +182,14 @@ begin
       r2_channelizer_ctrl       <= r1_channelizer_ctrl;
       r2_channelizer_data       <= r1_channelizer_data;
       r2_channelizer_pwr        <= r1_channelizer_pwr;
-      r2_channel_control        <= r1_channel_control;
+      r2_channel_control        <= w1_channel_control;
       r2_channel_state          <= r1_channel_state;
 
-      r2_trigger_is_forced      <= Dwell_active_measurement and r1_channel_control.enable and to_stdlogic(r1_channel_control.trigger_mode = ECM_CHANNEL_TRIGGER_MODE_FORCE_TRIGGER);
-      r2_trigger_is_threshold   <= Dwell_active_measurement and r1_channel_control.enable and to_stdlogic(r1_channel_control.trigger_mode = ECM_CHANNEL_TRIGGER_MODE_THRESHOLD_TRIGGER);
-      r2_threshold_check_new    <= to_stdlogic(r1_channelizer_pwr >= r1_channel_control.trigger_threshold);
+      r2_trigger_is_forced      <= Dwell_active_measurement and w1_channel_control.enable and to_stdlogic(w1_channel_control.trigger_mode = ECM_CHANNEL_TRIGGER_MODE_FORCE_TRIGGER);
+      r2_trigger_is_threshold   <= Dwell_active_measurement and w1_channel_control.enable and to_stdlogic(w1_channel_control.trigger_mode = ECM_CHANNEL_TRIGGER_MODE_THRESHOLD_TRIGGER);
+      r2_threshold_check_new    <= to_stdlogic(r1_channelizer_pwr >= w1_channel_control.trigger_threshold);
       r2_threshold_check_cont   <= to_stdlogic(r1_channelizer_pwr >= r1_channel_state.continued_threshold);
-      r2_duration_finished      <= to_stdlogic(r1_channel_state.recording_length = r1_channel_control.trigger_duration_max_minus_one);
+      r2_duration_finished      <= to_stdlogic(r1_channel_state.recording_length = w1_channel_control.trigger_duration_max_minus_one);
       r2_duration_next          <= r1_channel_state.recording_length + 1;
       r2_address_next           <= r1_channel_state.recording_address + 1;
     end if;
@@ -212,7 +222,7 @@ begin
         if ((r2_trigger_is_forced = '1') or ((r2_trigger_is_threshold = '1') and (r2_threshold_check_new = '1'))) then
           r3_channel_state_wr_en                        <= r2_channelizer_ctrl.valid;
           r3_channel_state_wr_data.trigger_state        <= S_ACTIVE;
-          r3_channel_state_wr_data.continued_threshold  <= shift_right(r1_channel_control.trigger_threshold, to_integer(r1_channel_control.trigger_hyst_shift));
+          r3_channel_state_wr_data.continued_threshold  <= shift_right(r2_channel_control.trigger_threshold, to_integer(r2_channel_control.trigger_hyst_shift));
           r3_channel_state_wr_data.recording_length     <= to_unsigned(1, ECM_DRFM_SEGMENT_LENGTH_WIDTH);
           r3_channel_state_wr_data.recording_address    <= r2_channel_control.recording_address;
           r3_channel_state_wr_data.forced_trigger       <= r2_trigger_is_forced;

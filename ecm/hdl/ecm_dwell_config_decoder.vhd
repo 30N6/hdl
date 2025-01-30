@@ -192,15 +192,15 @@ begin
   begin
     if rising_edge(Clk) then
       Dwell_program_valid         <= r_message_done and to_stdlogic(r_message_type = DWELL_PROGRAM);
-      Dwell_program_data          <= unpack(r_packed_data(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0));
+      Dwell_program_data          <= unpack_aligned(r_packed_data(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0));
 
       Dwell_entry_valid           <= r_message_done and to_stdlogic(r_message_type = DWELL_ENTRY);
       Dwell_entry_index           <= r_address(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
-      Dwell_entry_data            <= unpack(r_packed_data(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0));
+      Dwell_entry_data            <= unpack_aligned(r_packed_data(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0));
 
       Dwell_channel_entry_valid   <= r_message_done and to_stdlogic(r_message_type = CHANNEL_ENTRY);
       Dwell_channel_entry_index   <= r_address(ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH - 1 downto 0);
-      Dwell_channel_entry_data    <= unpack(r_packed_data(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0));
+      Dwell_channel_entry_data    <= unpack_aligned(r_packed_data(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0));
 
       Dwell_tx_instruction_valid  <= r_message_done and to_stdlogic(r_message_type = TX_INSTRUCTION);
       Dwell_tx_instruction_index  <= r_address(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
