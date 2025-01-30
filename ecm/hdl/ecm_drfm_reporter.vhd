@@ -67,7 +67,8 @@ architecture rtl of ecm_drfm_reporter is
     S_IDLE,
 
     S_START_WAIT,
-    S_READ_CHANNEL,
+    S_READ_CHANNEL_0,
+    S_READ_CHANNEL_1,
     S_START_CHANNEL,
     S_CONTINUE_CHANNEL,
     S_START_SUMMARY,
@@ -103,6 +104,8 @@ architecture rtl of ecm_drfm_reporter is
   signal r_packet_seq_num             : unsigned(31 downto 0);
   signal r_channel_index              : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r_words_in_msg               : unsigned(clog2(ECM_WORDS_PER_DMA_PACKET) - 1 downto 0);
+
+  signal r_channel_samples_remaining  : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
 
   signal r_segment_first_addr         : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal r_segment_last_addr          : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
@@ -153,14 +156,17 @@ begin
 
         when S_START_WAIT =>
           if (or_reduce(Channel_report_pending) = '1') then
-            s_state <= S_READ_CHANNEL;
+            s_state <= S_READ_CHANNEL_0;
           elsif (Dwell_done = '1') then
             s_state <= S_START_SUMMARY;
           else
             s_state <= S_START_WAIT;
           end if;
 
-        when S_READ_CHANNEL =>
+        when S_READ_CHANNEL_0 =>
+          s_state <= S_READ_CHANNEL_1;
+
+        when S_READ_CHANNEL_1 =>
           s_state <= S_START_CHANNEL;
 
         when S_START_CHANNEL =>
@@ -309,11 +315,18 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      r_channel_samples_remaining <= resize(Channel_addr_last - Channel_addr_first + 1, ECM_DRFM_SEGMENT_LENGTH_WIDTH);
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
       if (s_state = S_START_CHANNEL) then
         r_segment_first_addr        <= Channel_addr_first;
         r_segment_last_addr         <= Channel_addr_last;
         r_segment_addr              <= Channel_addr_first;
-        r_segment_samples_remaining <= resize(Channel_addr_last - Channel_addr_first + 1, ECM_DRFM_SEGMENT_LENGTH_WIDTH);
+        r_segment_samples_remaining <= r_channel_samples_remaining;
       elsif ((s_state = S_CHANNEL_IQ_RESULT) and (Read_result_valid = '1')) then
         r_segment_addr              <= r_segment_addr + 1;
         r_segment_samples_remaining <= r_segment_samples_remaining - 1;
@@ -450,7 +463,8 @@ begin
     case s_state is
     when S_IDLE                   =>  w_fifo_valid_opt <= '0';
     when S_START_WAIT             =>  w_fifo_valid_opt <= '0';
-    when S_READ_CHANNEL           =>  w_fifo_valid_opt <= '0';
+    when S_READ_CHANNEL_0         =>  w_fifo_valid_opt <= '0';
+    when S_READ_CHANNEL_1         =>  w_fifo_valid_opt <= '0';
     when S_START_CHANNEL          =>  w_fifo_valid_opt <= '0';
     when S_CONTINUE_CHANNEL       =>  w_fifo_valid_opt <= '0';
     when S_START_SUMMARY          =>  w_fifo_valid_opt <= '0';
