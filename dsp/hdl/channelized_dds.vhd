@@ -32,7 +32,7 @@ end entity channelized_dds;
 architecture rtl of channelized_dds is
 
   constant SIN_LUT_LATENCY            : natural := 3;
-  constant DDS_LATENCY                : natural := 7;
+  constant DDS_LATENCY                : natural := 8;
 
   constant POLY_G1                    : unsigned(DDS_LFSR_REG_WIDTH - 1 downto 0) := "1000000100";
   constant POLY_G2                    : unsigned(DDS_LFSR_REG_WIDTH - 1 downto 0) := "1110100110";
@@ -99,13 +99,13 @@ architecture rtl of channelized_dds is
   signal r2_sin_sweep_phase_inc_lower : std_logic;
   signal r2_sin_sweep_phase_inc       : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
 
-  signal w2_sin_lookup_half           : std_logic;
-  signal w2_sin_lookup_index          : unsigned(DDS_SIN_LOOKUP_INDEX_WIDTH - 1 downto 0);
-
   signal r3_sync_data                 : channelizer_control_t;
   signal r3_channel_state             : dds_channel_state_t;
   signal r3_channel_setup             : dds_control_setup_entry_t;
   signal r3_lfsr_output               : std_logic;
+  signal r3_sin_phase_accum_dithered  : signed(DDS_SIN_PHASE_ACCUM_WIDTH - 1 downto 0);
+  signal w3_sin_lookup_half           : std_logic;
+  signal w3_sin_lookup_index          : unsigned(DDS_SIN_LOOKUP_INDEX_WIDTH - 1 downto 0);
 
   signal r4_sync_data                 : channelizer_control_t;
   signal r4_channel_setup             : dds_control_setup_entry_t;
@@ -114,10 +114,14 @@ architecture rtl of channelized_dds is
   signal r5_sync_data                 : channelizer_control_t;
   signal r5_channel_setup             : dds_control_setup_entry_t;
   signal r5_lfsr_output               : std_logic;
-  signal w5_sin_iq                    : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
   signal r6_sync_data                 : channelizer_control_t;
-  signal r6_output_data               : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  signal r6_channel_setup             : dds_control_setup_entry_t;
+  signal r6_lfsr_output               : std_logic;
+
+  signal r7_sync_data                 : channelizer_control_t;
+  signal r7_output_data               : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+  signal w6_sin_iq                    : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
 begin
 
@@ -212,15 +216,13 @@ begin
     end if;
   end process;
 
-  w2_sin_lookup_half  <= r2_sin_phase_accum_dithered(DDS_SIN_PHASE_ACCUM_WIDTH - 1);
-  w2_sin_lookup_index <= unsigned(r2_sin_phase_accum_dithered(DDS_SIN_PHASE_ACCUM_WIDTH - 2 downto (DDS_SIN_PHASE_ACCUM_WIDTH - 1 - DDS_SIN_LOOKUP_INDEX_WIDTH)));
-
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r3_sync_data      <= r2_sync_data;
-      r3_channel_state  <= r2_channel_state;
-      r3_channel_setup  <= r2_channel_control.setup;
+      r3_sync_data                <= r2_sync_data;
+      r3_channel_state            <= r2_channel_state;
+      r3_channel_setup            <= r2_channel_control.setup;
+      r3_sin_phase_accum_dithered <= r2_sin_phase_accum_dithered;
 
       r3_lfsr_output                    <= lfsr_output(r2_channel_state.lfsr_reg_state_g1 & r2_channel_state.lfsr_reg_state_g2, OUTPUT_TAPS_G1 & OUTPUT_TAPS_G2);
 
@@ -281,6 +283,18 @@ begin
     end if;
   end process;
 
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r6_sync_data      <= r5_sync_data;
+      r6_channel_setup  <= r5_channel_setup;
+      r6_lfsr_output    <= r5_lfsr_output;
+    end if;
+  end process;
+
+  w3_sin_lookup_half  <= r3_sin_phase_accum_dithered(DDS_SIN_PHASE_ACCUM_WIDTH - 1);
+  w3_sin_lookup_index <= unsigned(r3_sin_phase_accum_dithered(DDS_SIN_PHASE_ACCUM_WIDTH - 2 downto (DDS_SIN_PHASE_ACCUM_WIDTH - 1 - DDS_SIN_LOOKUP_INDEX_WIDTH)));
+
   i_sin_lut : entity dsp_lib.channelized_dds_lut
   generic map (
     DATA_WIDTH => OUTPUT_DATA_WIDTH,
@@ -289,49 +303,49 @@ begin
   port map (
     Clk         => Clk,
 
-    Read_half   => w2_sin_lookup_half,
-    Read_index  => w2_sin_lookup_index,
+    Read_half   => w3_sin_lookup_half,
+    Read_index  => w3_sin_lookup_index,
 
-    Read_data   => w5_sin_iq
+    Read_data   => w6_sin_iq
   );
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r6_sync_data <= r5_sync_data;
+      r7_sync_data <= r6_sync_data;
 
-      if (r5_channel_setup.dds_output_select = "01") then
-        if (r5_lfsr_output = '1') then
-          r6_output_data(0) <= to_signed(2**(OUTPUT_DATA_WIDTH-1) - 1, OUTPUT_DATA_WIDTH);
+      if (r6_channel_setup.dds_output_select = "01") then
+        if (r6_lfsr_output = '1') then
+          r7_output_data(0) <= to_signed(2**(OUTPUT_DATA_WIDTH-1) - 1, OUTPUT_DATA_WIDTH);
         else
-          r6_output_data(0) <= -to_signed(2**(OUTPUT_DATA_WIDTH-1) - 1, OUTPUT_DATA_WIDTH);
+          r7_output_data(0) <= -to_signed(2**(OUTPUT_DATA_WIDTH-1) - 1, OUTPUT_DATA_WIDTH);
         end if;
-        r6_output_data(1) <= (others => '0');
+        r7_output_data(1) <= (others => '0');
 
-      elsif (r5_channel_setup.dds_output_select = "10") then
-          r6_output_data(0) <= w5_sin_iq(0);
-          r6_output_data(1) <= w5_sin_iq(1);
+      elsif (r6_channel_setup.dds_output_select = "10") then
+          r7_output_data(0) <= w6_sin_iq(0);
+          r7_output_data(1) <= w6_sin_iq(1);
 
-      elsif (r5_channel_setup.dds_output_select = "11") then
-        if (r5_lfsr_output = '1') then
-          r6_output_data(0) <= w5_sin_iq(0);
-          r6_output_data(1) <= w5_sin_iq(1);
+      elsif (r6_channel_setup.dds_output_select = "11") then
+        if (r6_lfsr_output = '1') then
+          r7_output_data(0) <= w6_sin_iq(0);
+          r7_output_data(1) <= w6_sin_iq(1);
         else
-          r6_output_data(0) <= -w5_sin_iq(0);
-          r6_output_data(1) <= -w5_sin_iq(1);
+          r7_output_data(0) <= -w6_sin_iq(0);
+          r7_output_data(1) <= -w6_sin_iq(1);
         end if;
 
       else
-        r6_output_data <= (others => (others => '0'));
+        r7_output_data <= (others => (others => '0'));
       end if;
 
       if (r_dwell_active_tx = '0') then
-        r6_output_data <= (others => (others => '0'));
+        r7_output_data <= (others => (others => '0'));
       end if;
     end if;
   end process;
 
-  Output_ctrl <= r6_sync_data;
-  Output_data <= r6_output_data;
+  Output_ctrl <= r7_sync_data;
+  Output_data <= r7_output_data;
 
 end architecture rtl;

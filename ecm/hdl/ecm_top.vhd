@@ -67,7 +67,7 @@ architecture rtl of ecm_top is
 
   constant SYNC_TO_DRFM_READ_LATENCY  : natural := 7;
   constant DRFM_READ_LATENCY          : natural := 4;
-  constant DDS_LATENCY                : natural := 7;
+  constant DDS_LATENCY                : natural := 8;
   constant SYNC_LATENCY_DDS           : natural := DDS_LATENCY;
   constant SYNC_LATENCY_DRFM          : natural := SYNC_TO_DRFM_READ_LATENCY + DRFM_READ_LATENCY;
 

@@ -127,6 +127,8 @@ architecture rtl of ecm_dwell_trigger is
   signal w_channel_state_wr_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal w_channel_state_wr_en          : std_logic;
 
+  attribute ram_style                       : string;
+  attribute ram_style of m_channel_control  : signal is "block";
 
 begin
 

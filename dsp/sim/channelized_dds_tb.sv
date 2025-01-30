@@ -75,7 +75,7 @@ module channelized_dds_tb;
     end
   end
 
-  channelized_dds #(.OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .NUM_CHANNELS(NUM_CHANNELS), .CHANNEL_INDEX_WIDTH(CHANNEL_INDEX_WIDTH), .LATENCY(7)) dut
+  channelized_dds #(.OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .NUM_CHANNELS(NUM_CHANNELS), .CHANNEL_INDEX_WIDTH(CHANNEL_INDEX_WIDTH), .LATENCY(8)) dut
   (
     .Clk                    (Clk),
     .Rst                    (Rst),
