@@ -239,6 +239,7 @@ begin
 
         r3_drfm_write_req.valid                         <= r2_channelizer_ctrl.valid;
         r3_drfm_write_req.first                         <= '0';
+        r3_drfm_write_req.last                          <= '0';
         r3_drfm_write_req.address                       <= r2_address_next;
 
         if (r2_trigger_is_forced = '1') then
