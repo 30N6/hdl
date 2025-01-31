@@ -278,9 +278,7 @@ begin
         if ((Dwell_transmit_active = '0') or (w4_instruction_header.valid = '0')) then
           r5_channel_state.program_state              <= S_IDLE;
           r5_dds_control.valid                        <= r4_sync_data.valid;
-          r5_dds_control.setup_data.dds_output_select <= "00";
           r5_output_control.valid                     <= r4_sync_data.valid;
-          r5_output_control.control                   <= to_unsigned(ECM_TX_OUTPUT_CONTROL_DISABLED, ECM_TX_OUTPUT_CONTROL_WIDTH);
         else
           r5_dds_control.valid                        <= r4_sync_data.valid and w4_instruction_header.dds_valid;
           r5_dds_control.setup_data                   <= w4_instruction_header.dds_control;
