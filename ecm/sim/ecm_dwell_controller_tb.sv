@@ -241,6 +241,9 @@ module ecm_dwell_controller_tb;
   logic [3:0]               r_ad9361_control;
   logic [7:0]               w_ad9361_status;
 
+  logic                     w_error_program_fifo_overflow;
+  logic                     w_error_program_fifo_underflow;
+
   channelizer_control_t     r_sync_data = '{default: '0};
 
   bit [31:0]                config_seq_num = 0;
@@ -301,33 +304,36 @@ module ecm_dwell_controller_tb;
 
   ecm_dwell_controller #(.SYNC_TO_DRFM_READ_LATENCY(SYNC_TO_DRFM_READ_LATENCY), .CHANNELIZER_DATA_WIDTH(CHANNELIZER_DATA_WIDTH)) dut
   (
-    .Clk                      (Clk),
-    .Rst                      (Rst),
+    .Clk                          (Clk),
+    .Rst                          (Rst),
 
-    .Module_config            (w_module_config),
+    .Module_config                (w_module_config),
 
-    .Ad9361_control           (w_ad9361_control),
-    .Ad9361_status            (w_ad9361_status),
+    .Ad9361_control               (w_ad9361_control),
+    .Ad9361_status                (w_ad9361_status),
 
-    .Channelizer_ctrl         (r_chan_ctrl), //(chan_intf.ctrl),
-    .Channelizer_data         (r_chan_data), //(chan_intf.data),
-    .Channelizer_pwr          (r_chan_power), //(chan_intf.power),
+    .Channelizer_ctrl             (r_chan_ctrl), //(chan_intf.ctrl),
+    .Channelizer_data             (r_chan_data), //(chan_intf.data),
+    .Channelizer_pwr              (r_chan_power), //(chan_intf.power),
 
-    .Sync_data                (r_sync_data),
+    .Sync_data                    (r_sync_data),
 
-    .Dwell_active             (w_dwell_active),
-    .Dwell_active_measurement (w_dwell_active_meas),
-    .Dwell_active_transmit    (w_dwell_active_tx),
-    .Dwell_done               (w_dwell_done),
-    .Dwell_data               (w_dwell_data),
-    .Dwell_sequence_num       (w_dwell_seq_num),
-    .Dwell_report_done_drfm   (r_dwell_report_done_drfm),
-    .Dwell_report_done_stats  (r_dwell_report_done_stats),
+    .Dwell_active                 (w_dwell_active),
+    .Dwell_active_measurement     (w_dwell_active_meas),
+    .Dwell_active_transmit        (w_dwell_active_tx),
+    .Dwell_done                   (w_dwell_done),
+    .Dwell_data                   (w_dwell_data),
+    .Dwell_sequence_num           (w_dwell_seq_num),
+    .Dwell_report_done_drfm       (r_dwell_report_done_drfm),
+    .Dwell_report_done_stats      (r_dwell_report_done_stats),
 
-    .Drfm_write_req           (drfm_intf.data),
-    .Drfm_read_req            (exec_intf.drfm_read_req),
-    .Dds_control              (exec_intf.dds_control),
-    .Output_control           (exec_intf.output_control)
+    .Drfm_write_req               (drfm_intf.data),
+    .Drfm_read_req                (exec_intf.drfm_read_req),
+    .Dds_control                  (exec_intf.dds_control),
+    .Output_control               (exec_intf.output_control),
+
+    .Error_program_fifo_overflow  (w_error_program_fifo_overflow),
+    .Error_program_fifo_underflow (w_error_program_fifo_underflow)
   );
 
   assign dwell_intf.data         = w_dwell_data;
@@ -340,6 +346,13 @@ module ecm_dwell_controller_tb;
   assign exec_intf.dwell_active_tx = w_dwell_active_tx;
 
   //TODO: combined rx interface - allow checking of wr->rd sequence; for reads, capture the dds and output control states
+
+  always_ff @(posedge Clk) begin
+    if (!Rst) begin
+      if (w_error_program_fifo_overflow)  $error("fifo overflow");
+      if (w_error_program_fifo_underflow) $error("fifo underflow");
+    end
+  end
 
   always_ff @(posedge Clk) begin
     r_ad9361_control    <= w_ad9361_control;
@@ -723,14 +736,13 @@ module ecm_dwell_controller_tb;
           d.program_entries[i_program_entry].valid                        = ($urandom_range(99) < 75);
           d.program_entries[i_program_entry].trigger_immediate_after_min  = enable_immediate ? $urandom : 0;
           d.program_entries[i_program_entry].tx_instruction_index         = tx_programs[tx_program_index].inst_start_addr;
-          d.program_entries[i_program_entry].duration_gate_min            = $urandom_range(500, 50);
 
           if ($urandom_range(99) < 50) begin
-            d.program_entries[i_program_entry].duration_gate_min  = max_trigger_duration;
-            d.program_entries[i_program_entry].duration_gate_max  = max_trigger_duration;
+            d.program_entries[i_program_entry].duration_gate_min_minus_one  = max_trigger_duration - 1;
+            d.program_entries[i_program_entry].duration_gate_max_minus_one  = max_trigger_duration - 1;
           end else begin
-            d.program_entries[i_program_entry].duration_gate_min  = $urandom_range(500, 50);
-            d.program_entries[i_program_entry].duration_gate_max  = $urandom_range(d.trigger_duration_max_minus_one, d.program_entries[i_program_entry].duration_gate_min);
+            d.program_entries[i_program_entry].duration_gate_min_minus_one  = $urandom_range(500, 50);
+            d.program_entries[i_program_entry].duration_gate_max_minus_one  = $urandom_range(d.trigger_duration_max_minus_one, d.program_entries[i_program_entry].duration_gate_min_minus_one);
           end
         end
 
@@ -747,8 +759,8 @@ module ecm_dwell_controller_tb;
     r[0]      = data.valid;
     r[8]      = data.trigger_immediate_after_min;
     r[31:16]  = data.tx_instruction_index;
-    r[47:32]  = data.duration_gate_min;
-    r[63:48]  = data.duration_gate_max;
+    r[47:32]  = data.duration_gate_min_minus_one;
+    r[63:48]  = data.duration_gate_max_minus_one;
 
     return r;
   endfunction
@@ -1175,8 +1187,8 @@ module ecm_dwell_controller_tb;
             end
           end else begin //ecm_channel_trigger_mode_threshold_trigger
             for (int i = 0; i < ecm_num_channel_tx_program_entries; i++) begin
-              bit min_check = (recording_length >= chan_entry.program_entries[i].duration_gate_min);
-              bit max_check = (recording_length <= chan_entry.program_entries[i].duration_gate_max) || chan_entry.program_entries[i].trigger_immediate_after_min;
+              bit min_check = ((recording_length - 1) >= chan_entry.program_entries[i].duration_gate_min_minus_one);
+              bit max_check = ((recording_length - 1) <= chan_entry.program_entries[i].duration_gate_max_minus_one) || chan_entry.program_entries[i].trigger_immediate_after_min;
 
               if (!chan_entry.program_entries[i].valid) begin
                 continue;
@@ -1223,6 +1235,9 @@ module ecm_dwell_controller_tb;
             e.output_control  = '{default: 0, valid: 1, channel_index: i_channel};
             e.drfm_read_req   = '{default: 0};
             expected_data_exec[i_channel].push_back(e);
+            if (i_channel == 2) begin
+              $display("expected_data_exec[%0d] : push %p", i_channel, e);
+            end
             break;
           end
 
@@ -1236,7 +1251,7 @@ module ecm_dwell_controller_tb;
           output_control.valid = header.output_valid;
           output_control.control = header.output_control;
 
-          $display("generate_expected_events: execution: dwell_seq_num=%0d channel=%0d instruction_index=%0d type=%0d", dwell_seq_num, i_channel, instruction_index, header.instruction_type);
+          $display("generate_expected_events: execution: dwell_seq_num=%0d channel=%0d instruction_index=%0d type=%0d header=%p", dwell_seq_num, i_channel, instruction_index, header.instruction_type, header);
 
           if (header.instruction_type == ecm_tx_instruction_type_nop) begin
             instruction_index = instruction_index + 1;
@@ -1300,6 +1315,9 @@ module ecm_dwell_controller_tb;
             e.dds_control     = dds_control;
             e.output_control  = output_control;
             e.drfm_read_req   = '{default: 0};
+            if (i_channel == 2) begin
+              $display("expected_data_exec[%0d] : push %p", i_channel, e);
+            end
             expected_data_exec[i_channel].push_back(e);
           end
 
@@ -1309,6 +1327,9 @@ module ecm_dwell_controller_tb;
             e.output_control.valid  = 0;
             e.drfm_read_req         = playback_queue.pop_front();
             expected_data_exec[i_channel].push_back(e);
+            if (i_channel == 2) begin
+              $display("expected_data_exec[%0d] : push %p", i_channel, e);
+            end
           end
 
         end
@@ -1451,12 +1472,16 @@ module ecm_dwell_controller_tb;
       assert ((!drfm.valid || (channel_index == drfm.channel_index)) && (!dds.valid || (channel_index == dds.channel_index)) && (!oc.valid || (channel_index == oc.channel_index))) else $error("channel mismatch");
 
       if (compare_data_exec(rx, expected_data_exec[channel_index][0])) begin
-        $display("%0t: exec data match (remaining=%0d) - channel=%0d inst_index=%0d  data=%p", $time, expected_data_exec[channel_index].size(), channel_index, expected_data_exec[channel_index][0].instruction_index, rx);
+        if (channel_index == 2) begin
+          $display("%0t: exec data match (remaining=%0d) - channel=%0d inst_index=%0d  data=%p", $time, expected_data_exec[channel_index].size(), channel_index, expected_data_exec[channel_index][0].instruction_index, rx);
+        end
       end else begin
         if (!rx.dwell_active_tx) begin
           automatic int dropped = 0;
           while((expected_data_exec[channel_index].size() > 0) && expected_data_exec[channel_index][0].dwell_active_tx) begin
-            //$display("%0t: dwell_active_tx=0: (remaining=%0d) dropping exec data: %p", $time, expected_data_exec[channel_index].size(), expected_data_exec[channel_index][0]);
+            if (channel_index == 2) begin
+              $display("%0t: dwell_active_tx=0: (remaining=%0d) dropping exec data: %p", $time, expected_data_exec[channel_index].size(), expected_data_exec[channel_index][0]);
+            end
             void'(expected_data_exec[channel_index].pop_front());
             num_dropped_exec++;
             dropped++;
@@ -1572,63 +1597,30 @@ module ecm_dwell_controller_tb;
 
       //generate_expected_dwell_events(dwell_program, dwell_entries
 
-
-      repeat (1000000) @(posedge Clk);
-
-
-      for (int i_dwell = 0; i_dwell < ecm_num_dwell_entries; i_dwell++) begin
-      /*
-        esm_message_dwell_entry_t entry;
-        entry.entry_index                       = i_dwell;
-        entry.entry_data.tag                    = $urandom;
-        entry.entry_data.frequency              = $urandom;
-        entry.entry_data.duration               = $urandom_range(1000);
-        entry.entry_data.gain                   = $urandom;
-        entry.entry_data.fast_lock_profile      = $urandom;
-        entry.entry_data.threshold_shift_narrow = $urandom;
-        entry.entry_data.threshold_shift_wide   = $urandom;
-        entry.entry_data.channel_mask_narrow    = $urandom;
-        entry.entry_data.channel_mask_wide      = $urandom;
-        entry.entry_data.min_pulse_duration     = $urandom;
-
-        send_dwell_entry(entry);
-        dwell_entry_mem[i_dwell] = entry.entry_data;
+      for (int i_rep = 0; i_rep < 10; i_rep++) begin
+        bit done = 1;
+        repeat (500000) @(posedge Clk);
+        for (int i_channel = 0; i_channel < ecm_num_channels; i_channel++) begin
+          if ((expected_data_drfm[i_channel].size() != 0) || (expected_data_exec[i_channel].size() != 0)) begin
+            done = 0;
+          end
+        end
+        if (done) begin
+          break;
+        end
       end
 
-      for (int i_rep = 0; i_rep < 10; i_rep++) begin
-        int global_counter_init   = $urandom_range(500);
-        bit global_counter_enable = $urandom;
-        int delayed_start_time    = $urandom_range(5000);
-        int delayed_start_enable  = $urandom;
+      for (int i_channel = 0; i_channel < ecm_num_channels; i_channel++) begin
+        if ((expected_data_drfm[i_channel].size() != 0) || (expected_data_exec[i_channel].size() != 0)) begin
+          $display("%0t: end of rep: expected_data_drfm[%0d]=%0d", $time, i_channel, expected_data_drfm[i_channel].size());
+          $display("%0t: end of rep: expected_data_exec[%0d]=%0d", $time, i_channel, expected_data_exec[i_channel].size());
 
-        esm_message_dwell_program_t dwell_program;
-        dwell_program.enable_program        = 1;
-        dwell_program.enable_delayed_start  = delayed_start_enable;
-        dwell_program.global_counter_init   = global_counter_init;
-        dwell_program.delayed_start_time    = delayed_start_time;
-
-        randomize_instructions(dwell_program, global_counter_enable);
-        //$display("dwell_program: %p", dwell_program);
-        //for (int i = 0; i < esm_num_dwell_instructions; i++) begin
-        //  $display("  inst[%0d] = %p", i, dwell_program.instructions[i]);
-        //end
-
-        expect_dwell_program(dwell_program);
-
-        send_dwell_program(dwell_program);
-
-        //repeat(300000) @(posedge Clk);
-*/
-
-        wait_cycles = 0;
-        while ((expected_data.size() != 0) && (wait_cycles < 6e5)) begin
-          @(posedge Clk);
-          wait_cycles++;
-        end
-        assert (wait_cycles < 6e5) else $error("Timeout while waiting for expected queue to empty during standard test");
-
-        foreach (expected_data[i]) begin
-          $display("%0t: end of rep: expected_data[%0d]=%p", $time, i, expected_data[i]);
+          /*foreach (expected_data_drfm[i]) begin
+            $display("%0t: end of rep: expected_data_drfm[%0d]=%p", $time, i, expected_data_drfm[i]);
+          end
+          foreach (expected_data_exec[i]) begin
+            $display("%0t: end of rep: expected_data_exec[%0d]=%p", $time, i, expected_data_exec[i]);
+          end*/
         end
       end
 

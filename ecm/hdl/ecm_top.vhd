@@ -144,6 +144,7 @@ architecture rtl of ecm_top is
   signal w_dwell_stats_errors         : ecm_dwell_stats_errors_t;
   signal w_drfm_errors                : ecm_drfm_errors_t;
   signal w_output_block_errors        : ecm_output_block_errors_t;
+  signal w_dwell_controller_errors    : ecm_dwell_controller_errors_t;
 
   signal w_d2h_fifo_in_ready          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
   signal w_d2h_fifo_in_valid          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
@@ -224,33 +225,36 @@ begin
     CHANNELIZER_DATA_WIDTH    => CHANNELIZER16_DATA_WIDTH
   )
   port map (
-    Clk                       => Adc_clk_x4,
-    Rst                       => r_combined_rst,
+    Clk                           => Adc_clk_x4,
+    Rst                           => r_combined_rst,
 
-    Module_config             => w_module_config,
+    Module_config                 => w_module_config,
 
-    Ad9361_control            => w_ad9361_control,
-    Ad9361_status             => r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 1),
+    Ad9361_control                => w_ad9361_control,
+    Ad9361_status                 => r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 1),
 
-    Channelizer_ctrl          => w_stretched_ctrl,
-    Channelizer_data          => w_stretched_data,
-    Channelizer_pwr           => w_stretched_pwr,
+    Channelizer_ctrl              => w_stretched_ctrl,
+    Channelizer_data              => w_stretched_data,
+    Channelizer_pwr               => w_stretched_pwr,
 
-    Sync_data                 => w_sync_to_dwell_controller,
+    Sync_data                     => w_sync_to_dwell_controller,
 
-    Dwell_active              => w_dwell_active,
-    Dwell_active_measurement  => w_dwell_active_meas,
-    Dwell_active_transmit     => w_dwell_active_tx,
-    Dwell_done                => w_dwell_done,
-    Dwell_data                => w_dwell_data,
-    Dwell_sequence_num        => w_dwell_sequence_num,
-    Dwell_report_done_drfm    => w_dwell_drfm_reports_done,
-    Dwell_report_done_stats   => w_dwell_stats_report_done,
+    Dwell_active                  => w_dwell_active,
+    Dwell_active_measurement      => w_dwell_active_meas,
+    Dwell_active_transmit         => w_dwell_active_tx,
+    Dwell_done                    => w_dwell_done,
+    Dwell_data                    => w_dwell_data,
+    Dwell_sequence_num            => w_dwell_sequence_num,
+    Dwell_report_done_drfm        => w_dwell_drfm_reports_done,
+    Dwell_report_done_stats       => w_dwell_stats_report_done,
 
-    Drfm_write_req            => w_drfm_write_req,
-    Drfm_read_req             => w_drfm_read_req,
-    Dds_control               => w_dds_command,
-    Output_control            => w_output_control
+    Drfm_write_req                => w_drfm_write_req,
+    Drfm_read_req                 => w_drfm_read_req,
+    Dds_control                   => w_dds_command,
+    Output_control                => w_output_control,
+
+    Error_program_fifo_overflow   => w_dwell_controller_errors.program_fifo_overflow,
+    Error_program_fifo_underflow  => w_dwell_controller_errors.program_fifo_underflow
   );
 
   process(Adc_clk)
@@ -514,25 +518,26 @@ begin
     HEARTBEAT_INTERVAL    => HEARTBEAT_INTERVAL
   )
   port map (
-    Clk_axi               => M_axis_clk,
-    Clk                   => Adc_clk_x4,
-    Rst                   => r_combined_rst,
+    Clk_axi                 => M_axis_clk,
+    Clk                     => Adc_clk_x4,
+    Rst                     => r_combined_rst,
 
-    Enable_status         => w_enable_status,
-    Enable_channelizer    => w_enable_chan,
-    Enable_synthesizer    => w_enable_synth,
+    Enable_status           => w_enable_status,
+    Enable_channelizer      => w_enable_chan,
+    Enable_synthesizer      => w_enable_synth,
 
-    Channelizer_warnings  => w_channelizer_warnings,
-    Channelizer_errors    => w_channelizer_errors,
-    Synthesizer_errors    => w_synthesizer_errors,
-    Dwell_stats_errors    => w_dwell_stats_errors,
-    Drfm_errors           => w_drfm_errors,
-    Output_block_errors   => w_output_block_errors,
+    Channelizer_warnings    => w_channelizer_warnings,
+    Channelizer_errors      => w_channelizer_errors,
+    Synthesizer_errors      => w_synthesizer_errors,
+    Dwell_stats_errors      => w_dwell_stats_errors,
+    Drfm_errors             => w_drfm_errors,
+    Output_block_errors     => w_output_block_errors,
+    Dwell_controller_errors => w_dwell_controller_errors,
 
-    Axis_ready            => w_d2h_fifo_in_ready(2),
-    Axis_valid            => w_d2h_fifo_in_valid(2),
-    Axis_data             => w_d2h_fifo_in_data(2),
-    Axis_last             => w_d2h_fifo_in_last(2)
+    Axis_ready              => w_d2h_fifo_in_ready(2),
+    Axis_valid              => w_d2h_fifo_in_valid(2),
+    Axis_data               => w_d2h_fifo_in_data(2),
+    Axis_last               => w_d2h_fifo_in_last(2)
   );
 
   --TODO: remove?

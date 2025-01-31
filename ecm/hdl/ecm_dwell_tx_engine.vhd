@@ -11,32 +11,37 @@ library ecm_lib;
 library dsp_lib;
   use dsp_lib.dsp_pkg.all;
 
+library mem_lib;
+
 entity ecm_dwell_tx_engine is
 generic (
   SYNC_TO_DRFM_READ_LATENCY : natural
 );
 port (
-  Clk                     : in  std_logic;
-  Rst                     : in  std_logic;
+  Clk                           : in  std_logic;
+  Rst                           : in  std_logic;
 
-  Tx_instruction_valid    : in  std_logic;
-  Tx_instruction_index    : in  unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
-  Tx_instruction_data     : in  std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
+  Tx_instruction_valid          : in  std_logic;
+  Tx_instruction_index          : in  unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
+  Tx_instruction_data           : in  std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
 
-  Tx_program_req_valid    : in  std_logic;
-  Tx_program_req_channel  : in  unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  Tx_program_req_index    : in  unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
-  Drfm_write_req          : in  ecm_drfm_write_req_t;
+  Tx_program_req_valid          : in  std_logic;
+  Tx_program_req_channel        : in  unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  Tx_program_req_index          : in  unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
+  Drfm_write_req                : in  ecm_drfm_write_req_t;
 
-  Dwell_channel_clear     : in  std_logic;
-  Dwell_transmit_active   : in  std_logic;
-  Dwell_transmit_done     : out std_logic;
+  Dwell_channel_clear           : in  std_logic;
+  Dwell_transmit_active         : in  std_logic;
+  Dwell_transmit_done           : out std_logic;
 
-  Sync_data               : in  channelizer_control_t;
+  Sync_data                     : in  channelizer_control_t;
 
-  Drfm_read_req           : out ecm_drfm_read_req_t;
-  Dds_control             : out dds_control_t;
-  Output_control          : out ecm_output_control_t
+  Drfm_read_req                 : out ecm_drfm_read_req_t;
+  Dds_control                   : out dds_control_t;
+  Output_control                : out ecm_output_control_t;
+
+  Error_program_fifo_overflow   : out std_logic;
+  Error_program_fifo_underflow  : out std_logic
 );
 begin
   -- PSL default clock is rising_edge(Clk);
@@ -71,6 +76,8 @@ architecture rtl of ecm_dwell_tx_engine is
                                                             setup_data => (dds_sin_phase_inc_select => '0', dds_output_select => (others => '0')),
                                                             control_type => (others => '0'), control_data => (others => '0'));
   constant OUTPUT_CONTROL_CLEAR         : ecm_output_control_t := (valid => '0', channel_index => (others => '-'), control => (others => '0'));
+
+  constant TX_PROGRAM_FIFO_WIDTH        : natural := ECM_CHANNEL_INDEX_WIDTH + ECM_TX_INSTRUCTION_INDEX_WIDTH;
 
   signal w_rand                         : unsigned(31 downto 0);
 
@@ -127,8 +134,12 @@ architecture rtl of ecm_dwell_tx_engine is
   signal r5_output_control              : ecm_output_control_t;
 
   signal r_tx_program_req_valid         : std_logic;
-  signal r_tx_program_req_channel       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal r_tx_program_req_data          : channel_state_t;
+  signal r_tx_program_req_data          : std_logic_vector(TX_PROGRAM_FIFO_WIDTH - 1 downto 0);
+  signal w_tx_program_fifo_rd_en        : std_logic;
+  signal w_tx_program_fifo_empty        : std_logic;
+  signal w_tx_program_fifo_rd_data      : std_logic_vector(TX_PROGRAM_FIFO_WIDTH - 1 downto 0);
+  signal w_tx_program_fifo_rd_channel   : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_tx_program_fifo_rd_index     : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
 
   signal r_channel_clear_index          : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
   signal w_channel_state_wr_data        : channel_state_t;
@@ -143,7 +154,8 @@ architecture rtl of ecm_dwell_tx_engine is
 
   signal r_transmit_pending             : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
 
-  signal w_error_program_req_overflow   : std_logic;
+  signal w_error_fifo_overflow          : std_logic;
+  signal w_error_fifo_underflow         : std_logic;
 
 begin
 
@@ -390,36 +402,47 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (Rst = '1') then
-        r_tx_program_req_valid    <= '0';
-        r_tx_program_req_channel  <= (others => '-');
-        r_tx_program_req_data     <= (program_state => S_IDLE, others => (others => '-'));
-      else
-        if (Tx_program_req_valid = '1') then
-          r_tx_program_req_valid    <= '1';
-          r_tx_program_req_channel  <= Tx_program_req_channel;
-          r_tx_program_req_data     <= (program_state => S_START, instruction_index => Tx_program_req_index, others => (others => '0'));
-        elsif ((r5_sync_data.valid = '1') and (r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) = r_tx_program_req_channel)) then
-          r_tx_program_req_valid    <= '0';
-          r_tx_program_req_channel  <= (others => '-');
-          r_tx_program_req_data     <= (program_state => S_IDLE, others => (others => '-'));
-        end if;
-      end if;
+      r_tx_program_req_valid  <= Tx_program_req_valid;
+      r_tx_program_req_data   <= std_logic_vector(Tx_program_req_channel) & std_logic_vector(Tx_program_req_index);
     end if;
   end process;
 
-  w_error_program_req_overflow <= Tx_program_req_valid and r_tx_program_req_valid and r5_sync_data.valid;
+  i_tx_program_fifo : entity mem_lib.xpm_fallthrough_fifo
+  generic map (
+    FIFO_DEPTH => 2*ECM_NUM_CHANNELS,
+    FIFO_WIDTH => TX_PROGRAM_FIFO_WIDTH
+  )
+  port map (
+    Clk           => Clk,
+    Rst           => Rst,
+
+    Wr_en         => r_tx_program_req_valid,
+    Wr_data       => r_tx_program_req_data,
+    Almost_full   => open,
+    Full          => open,
+
+    Rd_en         => w_tx_program_fifo_rd_en,
+    Rd_data       => w_tx_program_fifo_rd_data,
+    Empty         => w_tx_program_fifo_empty,
+
+    Overflow      => w_error_fifo_overflow,
+    Underflow     => w_error_fifo_underflow
+  );
+
+  w_tx_program_fifo_rd_index    <= unsigned(w_tx_program_fifo_rd_data(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0));
+  w_tx_program_fifo_rd_channel  <= unsigned(w_tx_program_fifo_rd_data(ECM_TX_INSTRUCTION_INDEX_WIDTH + ECM_CHANNEL_INDEX_WIDTH - 1 downto ECM_TX_INSTRUCTION_INDEX_WIDTH));
 
   process(all)
   begin
-    if ((r_tx_program_req_valid = '1') and (r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) = r_tx_program_req_channel)) then
-      w_channel_state_wr_data   <= r_tx_program_req_data;
-      w_channel_state_wr_index  <= r_tx_program_req_channel;
-      w_channel_state_wr_en     <= r_tx_program_req_valid and r5_sync_data.valid;
+    w_channel_state_wr_index <= r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+    w_channel_state_wr_en    <= r5_sync_data.valid;
+
+    if ((w_tx_program_fifo_empty = '0') and (r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) = w_tx_program_fifo_rd_channel)) then
+      w_channel_state_wr_data <= (program_state => S_START, instruction_index => w_tx_program_fifo_rd_index, others => (others => '0'));
+      w_tx_program_fifo_rd_en <= r5_sync_data.valid;
     else
-      w_channel_state_wr_data   <= r5_channel_state;
-      w_channel_state_wr_index  <= r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-      w_channel_state_wr_en     <= r5_sync_data.valid;
+      w_channel_state_wr_data <= r5_channel_state;
+      w_tx_program_fifo_rd_en <= '0';
     end if;
   end process;
 
@@ -437,6 +460,15 @@ begin
   begin
     if rising_edge(Clk) then
       Dwell_transmit_done <= not(or_reduce(r_transmit_pending));
+    end if;
+  end process;
+
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Error_program_fifo_overflow  <= w_error_fifo_overflow;
+      Error_program_fifo_underflow <= w_error_fifo_underflow;
     end if;
   end process;
 

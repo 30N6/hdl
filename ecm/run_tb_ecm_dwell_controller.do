@@ -102,7 +102,8 @@ foreach {library file_list} $library_file_list {
 }
 set last_compile_time $time_now
 
-vsim -suppress 12110 $top_level glbl.glbl -novopt
+#  -novopt
+vsim -suppress 12110 $top_level glbl.glbl
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all

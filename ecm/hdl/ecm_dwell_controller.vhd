@@ -17,33 +17,36 @@ generic (
   CHANNELIZER_DATA_WIDTH    : natural
 );
 port (
-  Clk                       : in  std_logic;
-  Rst                       : in  std_logic;
+  Clk                           : in  std_logic;
+  Rst                           : in  std_logic;
 
-  Module_config             : in  ecm_config_data_t;
+  Module_config                 : in  ecm_config_data_t;
 
-  Ad9361_control            : out std_logic_vector(3 downto 0);
-  Ad9361_status             : in  std_logic_vector(7 downto 0);
+  Ad9361_control                : out std_logic_vector(3 downto 0);
+  Ad9361_status                 : in  std_logic_vector(7 downto 0);
 
-  Channelizer_ctrl          : in  channelizer_control_t;
-  Channelizer_data          : in  signed_array_t(1 downto 0)(CHANNELIZER_DATA_WIDTH - 1 downto 0);
-  Channelizer_pwr           : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  Channelizer_ctrl              : in  channelizer_control_t;
+  Channelizer_data              : in  signed_array_t(1 downto 0)(CHANNELIZER_DATA_WIDTH - 1 downto 0);
+  Channelizer_pwr               : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  Sync_data                 : in  channelizer_control_t;
+  Sync_data                     : in  channelizer_control_t;
 
-  Dwell_active              : out std_logic;
-  Dwell_active_measurement  : out std_logic;
-  Dwell_active_transmit     : out std_logic;
-  Dwell_done                : out std_logic;
-  Dwell_data                : out ecm_dwell_entry_t;
-  Dwell_sequence_num        : out unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
-  Dwell_report_done_drfm    : in  std_logic;
-  Dwell_report_done_stats   : in  std_logic;
+  Dwell_active                  : out std_logic;
+  Dwell_active_measurement      : out std_logic;
+  Dwell_active_transmit         : out std_logic;
+  Dwell_done                    : out std_logic;
+  Dwell_data                    : out ecm_dwell_entry_t;
+  Dwell_sequence_num            : out unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  Dwell_report_done_drfm        : in  std_logic;
+  Dwell_report_done_stats       : in  std_logic;
 
-  Drfm_write_req            : out ecm_drfm_write_req_t;
-  Drfm_read_req             : out ecm_drfm_read_req_t;
-  Dds_control               : out dds_control_t;
-  Output_control            : out ecm_output_control_t
+  Drfm_write_req                : out ecm_drfm_write_req_t;
+  Drfm_read_req                 : out ecm_drfm_read_req_t;
+  Dds_control                   : out dds_control_t;
+  Output_control                : out ecm_output_control_t;
+
+  Error_program_fifo_overflow   : out std_logic;
+  Error_program_fifo_underflow  : out std_logic
 );
 end entity ecm_dwell_controller;
 
@@ -73,87 +76,90 @@ architecture rtl of ecm_dwell_controller is
 
   type ecm_dwell_entry_array_t is array (natural range <>) of ecm_dwell_entry_t;
 
-  constant MEAS_FLUSH_CYCLES        : natural := ECM_NUM_CHANNELS * 2 + 8;
+  constant MEAS_FLUSH_CYCLES            : natural := ECM_NUM_CHANNELS * 2 + 8;
 
-  signal s_state                    : state_t;
+  signal s_state                        : state_t;
 
-  signal r_rst                      : std_logic;
-  signal r_ad9361_status            : std_logic_vector(7 downto 0);
-  signal r_channelizer_ctrl         : channelizer_control_t;
-  signal r_channelizer_data         : signed_array_t(1 downto 0)(CHANNELIZER_DATA_WIDTH - 1 downto 0);
-  signal r_channelizer_pwr          : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
-  signal r_sync_data                : channelizer_control_t;
-  signal r_dwell_report_done_drfm   : std_logic;
-  signal r_dwell_report_done_stats  : std_logic;
+  signal r_rst                          : std_logic;
+  signal r_ad9361_status                : std_logic_vector(7 downto 0);
+  signal r_channelizer_ctrl             : channelizer_control_t;
+  signal r_channelizer_data             : signed_array_t(1 downto 0)(CHANNELIZER_DATA_WIDTH - 1 downto 0);
+  signal r_channelizer_pwr              : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+  signal r_sync_data                    : channelizer_control_t;
+  signal r_dwell_report_done_drfm       : std_logic;
+  signal r_dwell_report_done_stats      : std_logic;
 
-  signal w_dwell_program_valid      : std_logic;
-  signal w_dwell_program_data       : ecm_dwell_program_entry_t;
+  signal w_dwell_program_valid          : std_logic;
+  signal w_dwell_program_data           : ecm_dwell_program_entry_t;
 
-  signal w_dwell_entry_valid        : std_logic;
-  signal w_dwell_entry_index        : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
-  signal w_dwell_entry_data         : ecm_dwell_entry_t;
+  signal w_dwell_entry_valid            : std_logic;
+  signal w_dwell_entry_index            : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
+  signal w_dwell_entry_data             : ecm_dwell_entry_t;
 
-  signal w_channel_entry_valid      : std_logic;
-  signal w_channel_entry_index      : unsigned(ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH - 1 downto 0);
-  signal w_channel_entry_data       : ecm_channel_control_entry_t;
+  signal w_channel_entry_valid          : std_logic;
+  signal w_channel_entry_index          : unsigned(ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH - 1 downto 0);
+  signal w_channel_entry_data           : ecm_channel_control_entry_t;
 
-  signal w_tx_instruction_valid     : std_logic;
-  signal w_tx_instruction_index     : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
-  signal w_tx_instruction_data      : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
+  signal w_tx_instruction_valid         : std_logic;
+  signal w_tx_instruction_index         : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
+  signal w_tx_instruction_data          : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
 
-  signal w_drfm_write_req           : ecm_drfm_write_req_t;
+  signal w_drfm_write_req               : ecm_drfm_write_req_t;
 
-  signal r_dwell_program_data       : ecm_dwell_program_entry_t;
-  signal r_dwell_program_valid      : std_logic;
+  signal r_dwell_program_data           : ecm_dwell_program_entry_t;
+  signal r_dwell_program_valid          : std_logic;
 
-  signal m_dwell_entry              : ecm_dwell_entry_array_t(ECM_NUM_DWELL_ENTRIES - 1 downto 0);
+  signal m_dwell_entry                  : ecm_dwell_entry_array_t(ECM_NUM_DWELL_ENTRIES - 1 downto 0);
 
-  signal r_dwell_entry_index        : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
-  signal r_dwell_entry_index_d0     : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
-  signal r_dwell_entry_index_d1     : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
-  signal r_dwell_entry_d0           : ecm_dwell_entry_t;
-  signal r_dwell_entry_d1           : ecm_dwell_entry_t;
+  signal r_dwell_entry_index            : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
+  signal r_dwell_entry_index_d0         : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
+  signal r_dwell_entry_index_d1         : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
+  signal r_dwell_entry_d0               : ecm_dwell_entry_t;
+  signal r_dwell_entry_d1               : ecm_dwell_entry_t;
 
-  signal r_global_counter           : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
-  signal r_global_counter_is_zero   : std_logic;
+  signal r_global_counter               : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
+  signal r_global_counter_is_zero       : std_logic;
 
-  signal w_current_dwell_valid      : std_logic;
+  signal w_current_dwell_valid          : std_logic;
 
-  signal r_pll_pre_lock_cycles      : unsigned(ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 0);
-  signal r_pll_pre_lock_done        : std_logic;
-  signal r_pll_post_lock_cycles     : unsigned(ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 0);
-  signal r_pll_post_lock_done       : std_logic;
+  signal r_pll_pre_lock_cycles          : unsigned(ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 0);
+  signal r_pll_pre_lock_done            : std_logic;
+  signal r_pll_post_lock_cycles         : unsigned(ECM_DWELL_PLL_DELAY_WIDTH - 1 downto 0);
+  signal r_pll_post_lock_done           : std_logic;
 
-  signal w_pll_pre_lock_done        : std_logic;
-  signal w_pll_locked               : std_logic;
-  signal w_pll_post_lock_done       : std_logic;
+  signal w_pll_pre_lock_done            : std_logic;
+  signal w_pll_locked                   : std_logic;
+  signal w_pll_post_lock_done           : std_logic;
 
-  signal r_dwell_repeat             : unsigned(3 downto 0);
+  signal r_dwell_repeat                 : unsigned(3 downto 0);
 
-  signal r_dwell_cycles             : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
-  signal r_dwell_done_meas          : std_logic;
-  signal r_dwell_done_total         : std_logic;
-  signal r_dwell_meas_flush_cycles  : unsigned(clog2(MEAS_FLUSH_CYCLES) - 1 downto 0);
-  signal r_dwell_meas_flush_done    : std_logic;
+  signal r_dwell_cycles                 : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+  signal r_dwell_done_meas              : std_logic;
+  signal r_dwell_done_total             : std_logic;
+  signal r_dwell_meas_flush_cycles      : unsigned(clog2(MEAS_FLUSH_CYCLES) - 1 downto 0);
+  signal r_dwell_meas_flush_done        : std_logic;
 
-  signal r_report_received_drfm     : std_logic;
-  signal r_report_received_stats    : std_logic;
+  signal r_report_received_drfm         : std_logic;
+  signal r_report_received_stats        : std_logic;
 
-  signal r_dwell_sequence_num       : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal r_dwell_sequence_num           : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
-  signal r_dwell_active             : std_logic;
-  signal r_dwell_start_meas         : std_logic;
-  signal r_dwell_active_meas        : std_logic;
-  signal r_dwell_active_tx          : std_logic;
-  signal r_dwell_report_wait        : std_logic;
+  signal r_dwell_active                 : std_logic;
+  signal r_dwell_start_meas             : std_logic;
+  signal r_dwell_active_meas            : std_logic;
+  signal r_dwell_active_tx              : std_logic;
+  signal r_dwell_report_wait            : std_logic;
 
-  signal w_trigger_immediate_tx     : std_logic;
-  signal w_trigger_pending          : std_logic;
-  signal w_tx_program_req_valid     : std_logic;
-  signal w_tx_program_req_channel   : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_tx_program_req_index     : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
+  signal w_trigger_immediate_tx         : std_logic;
+  signal w_trigger_pending              : std_logic;
+  signal w_tx_program_req_valid         : std_logic;
+  signal w_tx_program_req_channel       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w_tx_program_req_index         : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
 
-  signal w_tx_programs_done         : std_logic;
+  signal w_tx_programs_done             : std_logic;
+
+  signal w_error_program_fifo_overflow  : std_logic;
+  signal w_error_program_fifo_underflow : std_logic;
 
 begin
 
@@ -230,27 +236,30 @@ begin
     SYNC_TO_DRFM_READ_LATENCY => SYNC_TO_DRFM_READ_LATENCY - 1
   )
   port map (
-    Clk                     => Clk,
-    Rst                     => r_rst,
+    Clk                           => Clk,
+    Rst                           => r_rst,
 
-    Tx_instruction_valid    => w_tx_instruction_valid,
-    Tx_instruction_index    => w_tx_instruction_index,
-    Tx_instruction_data     => w_tx_instruction_data,
+    Tx_instruction_valid          => w_tx_instruction_valid,
+    Tx_instruction_index          => w_tx_instruction_index,
+    Tx_instruction_data           => w_tx_instruction_data,
 
-    Tx_program_req_valid    => w_tx_program_req_valid,
-    Tx_program_req_channel  => w_tx_program_req_channel,
-    Tx_program_req_index    => w_tx_program_req_index,
-    Drfm_write_req          => w_drfm_write_req,
+    Tx_program_req_valid          => w_tx_program_req_valid,
+    Tx_program_req_channel        => w_tx_program_req_channel,
+    Tx_program_req_index          => w_tx_program_req_index,
+    Drfm_write_req                => w_drfm_write_req,
 
-    Dwell_channel_clear     => r_dwell_report_wait,
-    Dwell_transmit_active   => r_dwell_active_tx,
-    Dwell_transmit_done     => w_tx_programs_done,
+    Dwell_channel_clear           => r_dwell_report_wait,
+    Dwell_transmit_active         => r_dwell_active_tx,
+    Dwell_transmit_done           => w_tx_programs_done,
 
-    Sync_data               => r_sync_data,
+    Sync_data                     => r_sync_data,
 
-    Drfm_read_req           => Drfm_read_req,
-    Dds_control             => Dds_control,
-    Output_control          => Output_control
+    Drfm_read_req                 => Drfm_read_req,
+    Dds_control                   => Dds_control,
+    Output_control                => Output_control,
+
+    Error_program_fifo_overflow   => w_error_program_fifo_overflow,
+    Error_program_fifo_underflow  => w_error_program_fifo_underflow
   );
 
   Drfm_write_req <= w_drfm_write_req;
@@ -534,6 +543,14 @@ begin
   begin
     if rising_edge(Clk) then
       Ad9361_control <= std_logic_vector(r_dwell_entry_d1.fast_lock_profile & '0');
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Error_program_fifo_overflow   <= w_error_program_fifo_overflow;
+      Error_program_fifo_underflow  <= w_error_program_fifo_underflow;
     end if;
   end process;
 

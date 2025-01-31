@@ -259,8 +259,8 @@ begin
       end if;
 
       for i in 0 to (ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1) loop
-        r3_trigger_check_duration_min(i) <= to_stdlogic((r2_channel_state.trigger_state = S_ACTIVE) and (r2_channel_state.recording_length >= r2_channel_control.program_entries(i).duration_gate_min));
-        r3_trigger_check_duration_max(i) <= to_stdlogic((r2_channel_state.trigger_state = S_ACTIVE) and (r2_channel_state.recording_length <= r2_channel_control.program_entries(i).duration_gate_max));
+        r3_trigger_check_duration_min(i) <= to_stdlogic((r2_channel_state.trigger_state = S_ACTIVE) and (r2_channel_state.recording_length >= r2_channel_control.program_entries(i).duration_gate_min_minus_one));
+        r3_trigger_check_duration_max(i) <= to_stdlogic((r2_channel_state.trigger_state = S_ACTIVE) and (r2_channel_state.recording_length <= r2_channel_control.program_entries(i).duration_gate_max_minus_one));
       end loop;
 
       r3_trigger_pending <= r_trigger_pending(to_integer(r2_channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0)));

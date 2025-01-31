@@ -17,25 +17,26 @@ generic (
   HEARTBEAT_INTERVAL    : natural
 );
 port (
-  Clk_axi               : in  std_logic;
-  Clk                   : in  std_logic;
-  Rst                   : in  std_logic;
+  Clk_axi                 : in  std_logic;
+  Clk                     : in  std_logic;
+  Rst                     : in  std_logic;
 
-  Enable_status         : in  std_logic;
-  Enable_channelizer    : in  std_logic;
-  Enable_synthesizer    : in  std_logic;
+  Enable_status           : in  std_logic;
+  Enable_channelizer      : in  std_logic;
+  Enable_synthesizer      : in  std_logic;
 
-  Channelizer_warnings  : in  ecm_channelizer_warnings_t;
-  Channelizer_errors    : in  ecm_channelizer_errors_t;
-  Synthesizer_errors    : in  ecm_synthesizer_errors_t;
-  Dwell_stats_errors    : in  ecm_dwell_stats_errors_t;
-  Drfm_errors           : in  ecm_drfm_errors_t;
-  Output_block_errors   : in  ecm_output_block_errors_t;
+  Channelizer_warnings    : in  ecm_channelizer_warnings_t;
+  Channelizer_errors      : in  ecm_channelizer_errors_t;
+  Synthesizer_errors      : in  ecm_synthesizer_errors_t;
+  Dwell_stats_errors      : in  ecm_dwell_stats_errors_t;
+  Drfm_errors             : in  ecm_drfm_errors_t;
+  Output_block_errors     : in  ecm_output_block_errors_t;
+  Dwell_controller_errors : in  ecm_dwell_controller_errors_t;
 
-  Axis_ready            : in  std_logic;
-  Axis_valid            : out std_logic;
-  Axis_data             : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  Axis_last             : out std_logic
+  Axis_ready              : in  std_logic;
+  Axis_valid              : out std_logic;
+  Axis_data               : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  Axis_last               : out std_logic
 );
 end entity ecm_status_reporter;
 
@@ -79,6 +80,7 @@ architecture rtl of ecm_status_reporter is
   signal r_dwell_stats_errors       : ecm_dwell_stats_errors_t;
   signal r_drfm_errors              : ecm_drfm_errors_t;
   signal r_output_block_errors      : ecm_output_block_errors_t;
+  signal r_dwell_controller_errors  : ecm_dwell_controller_errors_t;
 
   signal w_status_flags             : ecm_status_flags_t;
   signal w_status_flags_packed      : std_logic_vector(ECM_STATUS_FLAGS_WIDTH - 1 downto 0);
@@ -155,13 +157,14 @@ begin
   end process;
 
   w_status_read <= to_stdlogic(s_state = S_STATUS_MAIN);
-  w_status_flags.channelizer_warnings <= r_channelizer_warnings;
-  w_status_flags.channelizer_errors   <= r_channelizer_errors;
-  w_status_flags.synthesizer_errors   <= r_synthesizer_errors;
-  w_status_flags.dwell_stats_errors   <= r_dwell_stats_errors;
-  w_status_flags.drfm_errors          <= r_drfm_errors;
-  w_status_flags.output_block_errors  <= r_output_block_errors;
-  w_status_flags_packed               <= pack(w_status_flags);
+  w_status_flags.channelizer_warnings     <= r_channelizer_warnings;
+  w_status_flags.channelizer_errors       <= r_channelizer_errors;
+  w_status_flags.synthesizer_errors       <= r_synthesizer_errors;
+  w_status_flags.dwell_stats_errors       <= r_dwell_stats_errors;
+  w_status_flags.drfm_errors              <= r_drfm_errors;
+  w_status_flags.output_block_errors      <= r_output_block_errors;
+  w_status_flags.dwell_controller_errors  <= r_dwell_controller_errors;
+  w_status_flags_packed                   <= pack(w_status_flags);
 
   process(Clk)
   begin

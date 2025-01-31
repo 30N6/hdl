@@ -148,8 +148,8 @@ package ecm_pkg is
     valid                       : std_logic;
     trigger_immediate_after_min : std_logic;
     tx_instruction_index        : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
-    duration_gate_min           : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-    duration_gate_max           : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+    duration_gate_min_minus_one : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+    duration_gate_max_minus_one : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   end record;
   constant ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 16 + 2*16;
   constant ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH         : natural := 1 + 1 + ECM_TX_INSTRUCTION_INDEX_WIDTH + 2*ECM_DRFM_SEGMENT_LENGTH_WIDTH;
@@ -286,7 +286,6 @@ package ecm_pkg is
     demux_gap       : std_logic;
   end record;
   constant ECM_CHANNELIZER_WARNINGS_WIDTH : natural := 1;
-  type ecm_channelizer_warnings_array_t is array (natural range <>) of ecm_channelizer_warnings_t; --TODO: remove array types?
 
   type ecm_channelizer_errors_t is record
     demux_overflow      : std_logic;
@@ -298,7 +297,6 @@ package ecm_pkg is
     stretcher_underflow : std_logic;
   end record;
   constant ECM_CHANNELIZER_ERRORS_WIDTH : natural := 7;
-  type ecm_channelizer_errors_array_t is array (natural range <>) of ecm_channelizer_errors_t;
 
   type ecm_synthesizer_errors_t is record
     stretcher_overflow  : std_logic;
@@ -309,14 +307,12 @@ package ecm_pkg is
     mux_fifo_underflow  : std_logic;
   end record;
   constant ECM_SYNTHESIZER_ERRORS_WIDTH : natural := 6;
-  type ecm_synthesizer_errors_array_t is array (natural range <>) of ecm_synthesizer_errors_t;
 
   type ecm_dwell_stats_errors_t is record
     reporter_timeout  : std_logic;
     reporter_overflow : std_logic;
   end record;
   constant ECM_DWELL_STATS_ERRORS_WIDTH : natural := 2;
-  type ecm_dwell_stats_errors_array_t is array (natural range <>) of ecm_dwell_stats_errors_t;
 
   type ecm_drfm_errors_t is record
     ext_read_overflow   : std_logic;
@@ -326,12 +322,17 @@ package ecm_pkg is
     reporter_overflow   : std_logic;
   end record;
   constant ECM_DRFM_ERRORS_WIDTH : natural := 5;
-  type ecm_drfm_errors_array_t is array (natural range <>) of ecm_drfm_errors_t;
 
   type ecm_output_block_errors_t is record
     dds_drfm_sync_mismatch : std_logic;
   end record;
-  constant ECM_OUTPUT_BLOCK_ERRORS_WIDTH : natural := 5;
+  constant ECM_OUTPUT_BLOCK_ERRORS_WIDTH : natural := 1;
+
+  type ecm_dwell_controller_errors_t is record
+    program_fifo_overflow   : std_logic;
+    program_fifo_underflow  : std_logic;
+  end record;
+  constant ECM_DWELL_CONTROLLER_ERRORS_WIDTH : natural := 2;
 
   type ecm_status_reporter_errors_t is record
     reporter_timeout  : std_logic;
@@ -340,19 +341,21 @@ package ecm_pkg is
   constant ECM_STATUS_REPORTER_ERRORS_WIDTH : natural := 2;
 
   type ecm_status_flags_t is record
-    channelizer_warnings  : ecm_channelizer_warnings_t;
-    channelizer_errors    : ecm_channelizer_errors_t;
-    synthesizer_errors    : ecm_synthesizer_errors_t;
-    dwell_stats_errors    : ecm_dwell_stats_errors_t;
-    drfm_errors           : ecm_drfm_errors_t;
-    output_block_errors   : ecm_output_block_errors_t;
+    channelizer_warnings    : ecm_channelizer_warnings_t;
+    channelizer_errors      : ecm_channelizer_errors_t;
+    synthesizer_errors      : ecm_synthesizer_errors_t;
+    dwell_stats_errors      : ecm_dwell_stats_errors_t;
+    drfm_errors             : ecm_drfm_errors_t;
+    output_block_errors     : ecm_output_block_errors_t;
+    dwell_controller_errors : ecm_dwell_controller_errors_t;
   end record;
   constant ECM_STATUS_FLAGS_WIDTH : natural := ECM_CHANNELIZER_WARNINGS_WIDTH +
                                                ECM_CHANNELIZER_ERRORS_WIDTH +
                                                ECM_SYNTHESIZER_ERRORS_WIDTH +
                                                ECM_DWELL_STATS_ERRORS_WIDTH +
                                                ECM_DRFM_ERRORS_WIDTH +
-                                               ECM_OUTPUT_BLOCK_ERRORS_WIDTH;
+                                               ECM_OUTPUT_BLOCK_ERRORS_WIDTH +
+                                               ECM_DWELL_CONTROLLER_ERRORS_WIDTH;
 
   function unpack(v : std_logic_vector(ECM_CONFIG_DATA_WIDTH - 1 downto 0)) return ecm_config_data_t;
   function unpack(v : std_logic_vector(ECM_TX_INSTRUCTION_HEADER_PACKED_WIDTH - 1 downto 0)) return ecm_tx_instruction_header_t;
@@ -372,6 +375,7 @@ package ecm_pkg is
   function pack(v : ecm_dwell_stats_errors_t) return std_logic_vector;
   function pack(v : ecm_drfm_errors_t) return std_logic_vector;
   function pack(v : ecm_output_block_errors_t) return std_logic_vector;
+  function pack(v : ecm_dwell_controller_errors_t) return std_logic_vector;
   function pack(v : ecm_status_reporter_errors_t) return std_logic_vector;
   function pack(v : ecm_status_flags_t) return std_logic_vector;
   function pack(v : ecm_config_data_t) return std_logic_vector;
@@ -486,8 +490,8 @@ package body ecm_pkg is
     r.valid                       := v(0);
     r.trigger_immediate_after_min := v(8);
     r.tx_instruction_index        := unsigned(v(16 + ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 16));
-    r.duration_gate_min           := unsigned(v(32 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 32));
-    r.duration_gate_max           := unsigned(v(48 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 48));
+    r.duration_gate_min_minus_one := unsigned(v(32 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 32));
+    r.duration_gate_max_minus_one := unsigned(v(48 + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 48));
 
     return r;
   end function;
@@ -519,9 +523,9 @@ package body ecm_pkg is
     r.valid                       := v(0);
     r.trigger_immediate_after_min := v(1);
     r.tx_instruction_index        := unsigned(v(2 + ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 2));
-    r.duration_gate_min           := unsigned(v(2 + ECM_TX_INSTRUCTION_INDEX_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto
+    r.duration_gate_min_minus_one := unsigned(v(2 + ECM_TX_INSTRUCTION_INDEX_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto
                                                 2 + ECM_TX_INSTRUCTION_INDEX_WIDTH));
-    r.duration_gate_max           := unsigned(v(2 + ECM_TX_INSTRUCTION_INDEX_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto
+    r.duration_gate_max_minus_one := unsigned(v(2 + ECM_TX_INSTRUCTION_INDEX_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto
                                                 2 + ECM_TX_INSTRUCTION_INDEX_WIDTH + ECM_DRFM_SEGMENT_LENGTH_WIDTH));
 
     return r;
@@ -618,6 +622,14 @@ package body ecm_pkg is
     return r;
   end function;
 
+  function pack(v : ecm_dwell_controller_errors_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_DWELL_CONTROLLER_ERRORS_WIDTH - 1 downto 0);
+  begin
+    r(0) := v.program_fifo_overflow;
+    r(1) := v.program_fifo_underflow;
+    return r;
+  end function;
+
   function pack(v : ecm_status_reporter_errors_t) return std_logic_vector is
     variable r : std_logic_vector(ECM_STATUS_REPORTER_ERRORS_WIDTH - 1 downto 0);
   begin
@@ -632,6 +644,7 @@ package body ecm_pkg is
     variable r : std_logic_vector(ECM_STATUS_FLAGS_WIDTH - 1 downto 0);
   begin
     r := (
+          pack(v.dwell_controller_errors),
           pack(v.output_block_errors),
           pack(v.drfm_errors),
           pack(v.dwell_stats_errors),
@@ -690,8 +703,8 @@ package body ecm_pkg is
   begin
 
     r := (
-          std_logic_vector(v.duration_gate_max),
-          std_logic_vector(v.duration_gate_min),
+          std_logic_vector(v.duration_gate_max_minus_one),
+          std_logic_vector(v.duration_gate_min_minus_one),
           std_logic_vector(v.tx_instruction_index),
           v.trigger_immediate_after_min,
           v.valid
