@@ -277,14 +277,14 @@ begin
 
         if ((Dwell_transmit_active = '0') or (w4_instruction_header.valid = '0')) then
           r5_channel_state.program_state              <= S_IDLE;
-          r5_dds_control.valid                        <= '1';
+          r5_dds_control.valid                        <= r4_sync_data.valid;
           r5_dds_control.setup_data.dds_output_select <= "00";
-          r5_output_control.valid                     <= '1';
+          r5_output_control.valid                     <= r4_sync_data.valid;
           r5_output_control.control                   <= to_unsigned(ECM_TX_OUTPUT_CONTROL_DISABLED, ECM_TX_OUTPUT_CONTROL_WIDTH);
         else
-          r5_dds_control.valid                        <= w4_instruction_header.dds_valid;
+          r5_dds_control.valid                        <= r4_sync_data.valid and w4_instruction_header.dds_valid;
           r5_dds_control.setup_data                   <= w4_instruction_header.dds_control;
-          r5_output_control.valid                     <= w4_instruction_header.output_valid;
+          r5_output_control.valid                     <= r4_sync_data.valid and w4_instruction_header.output_valid;
           r5_output_control.control                   <= w4_instruction_header.output_control;
 
           if (w4_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_DDS_SETUP_BPSK) then
@@ -326,14 +326,20 @@ begin
           end if;
         else
           r5_channel_state.program_state              <= S_IDLE;
-          r5_dds_control.valid                        <= '1';
+          r5_dds_control.valid                        <= r4_sync_data.valid;
           r5_dds_control.setup_data.dds_output_select <= "00";
-          r5_output_control.valid                     <= '1';
+          r5_output_control.valid                     <= r4_sync_data.valid;
           r5_output_control.control                   <= to_unsigned(ECM_TX_OUTPUT_CONTROL_DISABLED, ECM_TX_OUTPUT_CONTROL_WIDTH);
         end if;
-
       end if;
 
+      if ((Dwell_channel_clear = '1') and (r5_channel_state.program_state /= S_IDLE)) then
+        r5_channel_state.program_state              <= S_IDLE;
+        r5_dds_control.valid                        <= r4_sync_data.valid;
+        r5_dds_control.setup_data.dds_output_select <= "00";
+        r5_output_control.valid                     <= r4_sync_data.valid;
+        r5_output_control.control                   <= to_unsigned(ECM_TX_OUTPUT_CONTROL_DISABLED, ECM_TX_OUTPUT_CONTROL_WIDTH);
+      end if;
     end if;
   end process;
 
@@ -345,6 +351,13 @@ begin
   begin
     if rising_edge(Clk) then
       r_drfm_write_req <= Drfm_write_req;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_channel_clear_index <= r_channel_clear_index + 1;
     end if;
   end process;
 
@@ -401,20 +414,14 @@ begin
 
   process(all)
   begin
-    if (Dwell_channel_clear = '1') then
-      w_channel_state_wr_data   <= (program_state => S_IDLE, others => (others => '-'));
-      w_channel_state_wr_index  <= r_channel_clear_index;
-      w_channel_state_wr_en     <= '1';
+    if ((r_tx_program_req_valid = '1') and (r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) = r_tx_program_req_channel)) then
+      w_channel_state_wr_data   <= r_tx_program_req_data;
+      w_channel_state_wr_index  <= r_tx_program_req_channel;
+      w_channel_state_wr_en     <= r_tx_program_req_valid and r5_sync_data.valid;
     else
-      if ((r_tx_program_req_valid = '1') and (r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) = r_tx_program_req_channel)) then
-        w_channel_state_wr_data   <= r_tx_program_req_data;
-        w_channel_state_wr_index  <= r_tx_program_req_channel;
-        w_channel_state_wr_en     <= r_tx_program_req_valid and r5_sync_data.valid;
-      else
-        w_channel_state_wr_data   <= r5_channel_state;
-        w_channel_state_wr_index  <= r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-        w_channel_state_wr_en     <= r5_sync_data.valid;
-      end if;
+      w_channel_state_wr_data   <= r5_channel_state;
+      w_channel_state_wr_index  <= r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+      w_channel_state_wr_en     <= r5_sync_data.valid;
     end if;
   end process;
 

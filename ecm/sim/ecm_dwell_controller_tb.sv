@@ -194,6 +194,12 @@ module ecm_dwell_controller_tb;
     logic signed [ecm_drfm_data_width - 1 : 0] packed_wr_q;
   } expect_drfm_t;
 
+  typedef struct {
+    ecm_drfm_read_req_t   drfm_read_req;
+    dds_control_t         dds_control;
+    ecm_output_control_t  output_control;
+  } expect_exec_t;
+
   logic Clk_axi;
   logic Clk;
   logic Rst;
@@ -240,6 +246,9 @@ module ecm_dwell_controller_tb;
 
   expect_drfm_t             expected_data_drfm [ecm_num_channels - 1 : 0] [$];
   int                       num_received_drfm = 0;
+
+  expect_exec_t             expected_data_exec [ecm_num_channels - 1 : 0] [$];
+  int                       num_received_exec = 0;
 
   channelizer_frame_queue_t dwell_channelizer_tx_data [int];
 
@@ -1181,18 +1190,34 @@ module ecm_dwell_controller_tb;
         end
 
       end
-
+/*
       for (int i_channel = 0; i_channel < ecm_num_channels; i_channel++) begin
         ecm_channel_control_entry_t chan_entry = channel_mem[dwell_index][i_channel];
         int instruction_index = trigger_instruction_index[i_channel];
+        int loop_count;
+
 
         if (!trigger_active[i_channel]) begin
           continue;
         end
 
+        forever begin
+          ecm_tx_instruction_header_t header = instruction_mem_header[instruction_index];
+          if (!header.valid) begin
+            break;
+          end
 
+          if (header.instruction_type == ecm_tx_instruction_type_nop) begin
+          end else if (header.instruction_type == ecm_tx_instruction_type_dds_setup_bpsk) begin
+          end else if (header.instruction_type == ecm_tx_instruction_type_dds_setup_cw_sweep) begin
+          end else if (header.instruction_type == ecm_tx_instruction_type_dds_setup_cw_step) begin
+          end else if (header.instruction_type == ecm_tx_instruction_type_playback) begin
+          end else if (header.instruction_type == ecm_tx_instruction_type_nop) begin
+          end else if (header.instruction_type == ecm_tx_instruction_type_nop) begin
+          end
+        end
       end
-
+*/
 
       dwell_seq_num++;
 
@@ -1236,9 +1261,9 @@ module ecm_dwell_controller_tb;
       drfm_rx.write_data = d;
 
       if (compare_data_drfm(drfm_rx, expected_data_drfm[d.channel_index][0])) begin
-        $display("%0t: data match (remaining=%0d) - channel=%0d data=%p", $time, expected_data_drfm[d.channel_index].size(), d.channel_index, drfm_rx);
+        $display("%0t: drfm data match (remaining=%0d) - channel=%0d data=%p", $time, expected_data_drfm[d.channel_index].size(), d.channel_index, drfm_rx);
       end else begin
-        $error("%0t: error -- data mismatch: channel=%0d  expected=%p  actual=%p", $time, d.channel_index, expected_data_drfm[d.channel_index][0], drfm_rx);
+        $error("%0t: error -- drfm data mismatch: channel=%0d  expected=%p  actual=%p", $time, d.channel_index, expected_data_drfm[d.channel_index][0], drfm_rx);
       end
       num_received_drfm++;
       void'(expected_data_drfm[d.channel_index].pop_front());
@@ -1248,7 +1273,7 @@ module ecm_dwell_controller_tb;
   final begin
     for (int i = 0; i < ecm_num_channels; i++) begin
       if ( expected_data_drfm[i].size() != 0 ) begin
-        $error("Unexpected data remaining in queue[%0d]:", i);
+        $error("Unexpected data remaining in drfm queue[%0d]:", i);
         while ( expected_data_drfm[i].size() != 0 ) begin
           $display("%p", expected_data_drfm[i][0]);
           void'(expected_data_drfm[i].pop_front());
@@ -1257,6 +1282,77 @@ module ecm_dwell_controller_tb;
     end
   end
 
+  function automatic bit compare_data_exec(expect_exec_t a, expect_exec_t b);
+    if (a.drfm_read_req.valid || b.drfm_read_req.valid) begin
+      if (a.drfm_read_req !== b.drfm_read_req) begin
+        $display("drfm_read_req mismatch: %p %p", a.drfm_read_req, b.drfm_read_req);
+        return 0;
+      end
+    end
+
+    if (a.dds_control.valid || b.dds_control.valid) begin
+      if (a.dds_control !== b.dds_control) begin
+        $display("dds_control mismatch: %p %p", a.dds_control, b.dds_control);
+        return 0;
+      end
+    end
+
+    if (a.output_control.valid || b.output_control.valid) begin
+      if (a.output_control !== b.output_control) begin
+        $display("output_control mismatch: %p %p", a.output_control, b.output_control);
+        return 0;
+      end
+    end
+
+    return 1;
+  endfunction
+
+  initial begin
+    automatic ecm_drfm_read_req_t drfm;
+    automatic dds_control_t dds;
+    automatic ecm_output_control_t oc;
+    automatic expect_exec_t rx;
+
+    wait_for_reset();
+
+    /*forever begin
+      automatic int channel_index = -1;
+      exec_intf.read(drfm, dds, oc);
+      rx.drfm_read_req = drfm;
+      rx.dds_control = dds;
+      rx.output_control = oc;
+
+      if (drfm.valid) begin
+        channel_index = drfm.channel_index;
+      end else if (dds.valid) begin
+        channel_index = dds.channel_index;
+      end else if (oc.valid) begin
+        channel_index = oc.channel_index;
+      end
+
+      assert ((!drfm.valid || (channel_index == drfm.channel_index)) && (!dds.valid || (channel_index == dds.channel_index)) && (!oc.valid || (channel_index == oc.channel_index))) else $error("channel mismatch");
+
+      if (compare_data_exec(rx, expected_data_exec[channel_index][0])) begin
+        $display("%0t: exec data match (remaining=%0d) - channel=%0d data=%p", $time, expected_data_exec[channel_index].size(), channel_index, rx);
+      end else begin
+        $error("%0t: error -- exec data mismatch: channel=%0d  expected=%p  actual=%p", $time, channel_index, expected_data_exec[channel_index][0], rx);
+      end
+      num_received_exec++;
+      void'(expected_data_exec[channel_index].pop_front());
+    end*/
+  end
+
+  final begin
+    for (int i = 0; i < ecm_num_channels; i++) begin
+      if ( expected_data_exec[i].size() != 0 ) begin
+        $error("Unexpected data remaining in exec queue[%0d]:", i);
+        while ( expected_data_exec[i].size() != 0 ) begin
+          $display("%p", expected_data_exec[i][0]);
+          void'(expected_data_exec[i].pop_front());
+        end
+      end
+    end
+  end
 /*
   function automatic void expect_dwell_program(esm_message_dwell_program_t dwell_program);
     int global_counter = dwell_program.global_counter_init;
@@ -1399,7 +1495,7 @@ module ecm_dwell_controller_tb;
         end
       end
 
-      $display("%0t: Standard test finished: num_received=%0d  num_received_drfm=%0d", $time, num_received, num_received_drfm);
+      $display("%0t: Standard test finished: num_received=%0d  num_received_drfm=%0d num_received_exec=%0d", $time, num_received, num_received_drfm, num_received_exec);
 
       Rst = 1;
       repeat(100) @(posedge Clk);
