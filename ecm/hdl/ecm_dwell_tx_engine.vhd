@@ -343,7 +343,7 @@ begin
         end if;
       end if;
 
-      if ((Dwell_channel_clear = '1') and (r5_channel_state.program_state /= S_IDLE)) then
+      if ((Dwell_channel_clear = '1') and (r4_channel_state.program_state /= S_IDLE)) then
         r5_channel_state.program_state              <= S_IDLE;
         r5_dds_control.valid                        <= r4_sync_data.valid;
         r5_dds_control.setup_data.dds_output_select <= "00";
