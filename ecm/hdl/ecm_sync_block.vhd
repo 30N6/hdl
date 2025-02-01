@@ -27,10 +27,10 @@ end entity ecm_sync_block;
 
 architecture rtl of ecm_sync_block is
 
-  constant DDS_DELAY  : natural := DRFM_LATENCY - DDS_LATENCY;
+  constant DDS_DELAY    : natural := DRFM_LATENCY - DDS_LATENCY;
 
-  signal r_rst        : std_logic;
-  signal r_dds_rst    : std_logic_vector(DDS_DELAY - 1 downto 0);
+  signal r_rst          : std_logic;
+  signal r_dds_rst      : std_logic_vector(DDS_DELAY - 1 downto 0);
 
   signal r_channel_dds  : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r_channel_drfm : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);

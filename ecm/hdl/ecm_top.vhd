@@ -60,7 +60,6 @@ architecture rtl of ecm_top is
   constant ENABLE_DRFM                : boolean := true;
   constant ENABLE_DEBUG               : boolean := false;
 
-  constant AXI_FIFO_DEPTH             : natural := 64;  --TODO: increase?
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
   constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + clog2(8) + clog2(ECM_NUM_CHANNELS); -- 8 taps per channel
   constant SYNTHESIZER16_OUTPUT_WIDTH : natural := ECM_SYNTHESIZER_DATA_WIDTH + clog2(ECM_NUM_CHANNELS) + clog2(6) + 1; -- 6 taps per channel
@@ -539,7 +538,6 @@ begin
     Axis_last               => w_d2h_fifo_in_last(2)
   );
 
-  --TODO: remove?
   g_d2h_fifo : for i in 0 to (NUM_D2H_MUX_INPUTS - 1) generate
     i_fifo : entity axi_lib.axis_minififo
     generic map (

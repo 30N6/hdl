@@ -58,7 +58,7 @@ end entity ecm_drfm_reporter;
 
 architecture rtl of ecm_drfm_reporter is
 
-  constant FIFO_DEPTH             : natural := 2048;
+  constant FIFO_DEPTH             : natural := 8192;
   constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - ECM_WORDS_PER_DMA_PACKET - 10;
   constant TIMEOUT_CYCLES         : natural := 1024;
 

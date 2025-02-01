@@ -33,7 +33,7 @@ port (
   Dwell_start_measurement     : in  std_logic;
   Dwell_active_measurement    : in  std_logic;
   Dwell_index                 : in  unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
-  Dwell_immediate_tx          : out std_logic;  --TODO
+  Dwell_immediate_tx          : out std_logic;
 
   Trigger_pending             : out std_logic;
 
