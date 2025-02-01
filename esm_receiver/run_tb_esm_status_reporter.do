@@ -23,6 +23,9 @@ set library_file_list [list \
   mem_lib [list \
     ../mem/hdl/ram_sdp.vhd \
     ] \
+  dsp_lib [list \
+    ../dsp/hdl/dsp_pkg.vhd \
+    ] \
   esm_lib [list \
     ./hdl/esm_pkg.vhd \
     ./hdl/esm_status_reporter.vhd \

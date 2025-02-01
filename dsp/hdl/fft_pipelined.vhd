@@ -16,7 +16,8 @@ generic (
   NUM_POINTS        : natural;
   INDEX_WIDTH       : natural;
   INPUT_DATA_WIDTH  : natural;
-  OUTPUT_DATA_WIDTH : natural
+  OUTPUT_DATA_WIDTH : natural;
+  INPUT_PIPE_STAGES : natural
 );
 port (
   Clk             : in  std_logic;
@@ -47,7 +48,6 @@ architecture rtl of fft_pipelined is
   constant FFT32_OUTPUT_WIDTH       : natural := FFT16_OUTPUT_WIDTH + 1;
   constant FFT64_OUTPUT_WIDTH       : natural := FFT32_OUTPUT_WIDTH + 1;
 
-  constant NUM_INPUT_PIPE_STAGES    : natural := 1;
   constant INPUT_READ_INDEX_8       : natural_array_t(0 to 7) := (0, 2, 4, 6, 1, 3, 5, 7);
   constant INPUT_READ_INDEX_16      : natural_array_t(0 to 15) := (0, 4, 8, 12, 2, 6, 10, 14,   1, 5, 9, 13, 3, 7, 11, 15);
   constant INPUT_READ_INDEX_32      : natural_array_t(0 to 31) := (0, 8, 16, 24,   4, 12, 20, 28,    2, 10, 18, 26,    6, 14, 22, 30,    1, 9, 17, 25,   5, 13, 21, 29,    3, 11, 19, 27,    7, 15, 23, 31);
@@ -70,11 +70,11 @@ architecture rtl of fft_pipelined is
   signal r_input_active             : std_logic;
   signal r_input_index              : unsigned(INDEX_WIDTH - 1 downto 0);
 
-  signal r_input_index_pipe         : unsigned_array_t(NUM_INPUT_PIPE_STAGES - 1 downto 0)(INDEX_WIDTH - 1 downto 0);
-  signal r_input_active_pipe        : std_logic_vector(NUM_INPUT_PIPE_STAGES - 1 downto 0);
-  signal r_input_last_pipe          : std_logic_vector(NUM_INPUT_PIPE_STAGES - 1 downto 0);
+  signal r_input_index_pipe         : unsigned_array_t(INPUT_PIPE_STAGES - 1 downto 0)(INDEX_WIDTH - 1 downto 0);
+  signal r_input_active_pipe        : std_logic_vector(INPUT_PIPE_STAGES - 1 downto 0);
+  signal r_input_last_pipe          : std_logic_vector(INPUT_PIPE_STAGES - 1 downto 0);
 
-  signal r_fft4_inpput_control      : fft_control_t;
+  signal r_fft4_input_control       : fft_control_t;
   signal r_fft4_input_i             : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
   signal r_fft4_input_q             : signed_array_t(3 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
@@ -144,7 +144,7 @@ begin
   generic map (
     ADDR_WIDTH  => INPUT_BUFFER_ADDR_WIDTH,
     DATA_WIDTH  => INPUT_MEM_DATA_WIDTH,
-    LATENCY     => NUM_INPUT_PIPE_STAGES
+    LATENCY     => INPUT_PIPE_STAGES
   )
   port map (
     Clk       => Clk,
@@ -163,7 +163,7 @@ begin
   generic map (
     ADDR_WIDTH  => PAGE_INDEX_WIDTH,
     DATA_WIDTH  => INPUT_MEM_INFO_WIDTH,
-    LATENCY     => NUM_INPUT_PIPE_STAGES
+    LATENCY     => INPUT_PIPE_STAGES
   )
   port map (
     Clk       => Clk,
@@ -205,10 +205,10 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (NUM_INPUT_PIPE_STAGES > 1) then
-        r_input_index_pipe      <= r_input_index_pipe(NUM_INPUT_PIPE_STAGES - 2 downto 0)   & r_input_index;
-        r_input_active_pipe     <= r_input_active_pipe(NUM_INPUT_PIPE_STAGES - 2 downto 0)  & r_input_active;
-        r_input_last_pipe       <= r_input_last_pipe(NUM_INPUT_PIPE_STAGES - 2 downto 0)    & to_stdlogic(r_input_index = (NUM_POINTS-1));
+      if (INPUT_PIPE_STAGES > 1) then
+        r_input_index_pipe      <= r_input_index_pipe(INPUT_PIPE_STAGES - 2 downto 0)   & r_input_index;
+        r_input_active_pipe     <= r_input_active_pipe(INPUT_PIPE_STAGES - 2 downto 0)  & r_input_active;
+        r_input_last_pipe       <= r_input_last_pipe(INPUT_PIPE_STAGES - 2 downto 0)    & to_stdlogic(r_input_index = (NUM_POINTS-1));
       else
         r_input_index_pipe(0)   <=  r_input_index;
         r_input_active_pipe(0)  <=  r_input_active;
@@ -220,9 +220,9 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (r_input_active_pipe(NUM_INPUT_PIPE_STAGES - 1) = '1') then
+      if (r_input_active_pipe(INPUT_PIPE_STAGES - 1) = '1') then
         for i in 0 to 3 loop
-          if (r_input_index_pipe(NUM_INPUT_PIPE_STAGES - 1)(1 downto 0) = i) then
+          if (r_input_index_pipe(INPUT_PIPE_STAGES - 1)(1 downto 0) = i) then
 
             r_fft4_input_i(i) <= signed(w_input_rd_data(INPUT_MEM_DATA_WIDTH - 1 downto (INPUT_MEM_DATA_WIDTH - INPUT_DATA_WIDTH)));
             r_fft4_input_q(i) <= signed(w_input_rd_data(INPUT_DATA_WIDTH - 1 downto 0));
@@ -230,11 +230,11 @@ begin
         end loop;
       end if;
 
-      r_fft4_inpput_control.valid       <= r_input_active_pipe(NUM_INPUT_PIPE_STAGES - 1) and to_stdlogic(r_input_index_pipe(NUM_INPUT_PIPE_STAGES - 1)(1 downto 0) = 3);
-      r_fft4_inpput_control.last        <= r_input_last_pipe(NUM_INPUT_PIPE_STAGES - 1);
-      r_fft4_inpput_control.reverse     <= w_input_rd_info(FFT_TAG_WIDTH);
-      r_fft4_inpput_control.data_index  <= resize_up(r_input_index_pipe(NUM_INPUT_PIPE_STAGES - 1)(INDEX_WIDTH - 1 downto 2) & "00", r_fft4_inpput_control.data_index'length);
-      r_fft4_inpput_control.tag         <= w_input_rd_info(FFT_TAG_WIDTH - 1 downto 0);
+      r_fft4_input_control.valid      <= r_input_active_pipe(INPUT_PIPE_STAGES - 1) and to_stdlogic(r_input_index_pipe(INPUT_PIPE_STAGES - 1)(1 downto 0) = 3);
+      r_fft4_input_control.last       <= r_input_last_pipe(INPUT_PIPE_STAGES - 1);
+      r_fft4_input_control.reverse    <= w_input_rd_info(FFT_TAG_WIDTH);
+      r_fft4_input_control.data_index <= resize_up(r_input_index_pipe(INPUT_PIPE_STAGES - 1)(INDEX_WIDTH - 1 downto 2) & "00", r_fft4_input_control.data_index'length);
+      r_fft4_input_control.tag        <= w_input_rd_info(FFT_TAG_WIDTH - 1 downto 0);
     end if;
   end process;
 
@@ -247,7 +247,7 @@ begin
   port map (
     Clk             => Clk,
 
-    Input_control   => r_fft4_inpput_control,
+    Input_control   => r_fft4_input_control,
     Input_i         => r_fft4_input_i,
     Input_q         => r_fft4_input_q,
 

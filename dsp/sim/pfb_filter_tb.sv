@@ -144,7 +144,8 @@ module pfb_filter_tb;
     .OUTPUT_DATA_WIDTH    (OUTPUT_DATA_WIDTH),
     .COEF_WIDTH           (COEF_WIDTH),
     .NUM_COEFS            (NUM_COEFS),
-    .COEF_DATA            (COEF_DATA)
+    .COEF_DATA            (COEF_DATA),
+    .ANALYSIS_MODE        (1) //TODO: test synthesis mode
   )
   dut
   (

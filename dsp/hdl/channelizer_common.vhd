@@ -11,13 +11,14 @@ library dsp_lib;
 
 entity channelizer_common is
 generic (
-  INPUT_DATA_WIDTH  : natural;
-  OUTPUT_DATA_WIDTH : natural;
-  NUM_CHANNELS      : natural;
-  NUM_COEFS         : natural;
-  COEF_WIDTH        : natural;
-  COEF_DATA         : signed_array_t(NUM_COEFS - 1 downto 0)(COEF_WIDTH - 1 downto 0);
-  FFT_PATH_ENABLE   : boolean
+  INPUT_DATA_WIDTH    : natural;
+  OUTPUT_DATA_WIDTH   : natural;
+  NUM_CHANNELS        : natural;
+  NUM_COEFS           : natural;
+  COEF_WIDTH          : natural;
+  COEF_DATA           : signed_array_t(NUM_COEFS - 1 downto 0)(COEF_WIDTH - 1 downto 0);
+  FFT_PATH_ENABLE     : boolean;
+  BASEBANDING_ENABLE  : boolean
 );
 port (
   Clk                   : in  std_logic;
@@ -138,7 +139,8 @@ begin
     OUTPUT_DATA_WIDTH   => FILTER_DATA_WIDTH,
     COEF_WIDTH          => COEF_WIDTH,
     NUM_COEFS           => NUM_COEFS,
-    COEF_DATA           => COEF_DATA
+    COEF_DATA           => COEF_DATA,
+    ANALYSIS_MODE       => true
   )
   port map (
     Clk                   => Clk,
@@ -226,7 +228,8 @@ begin
     NUM_POINTS        => NUM_CHANNELS,
     INDEX_WIDTH       => CHANNEL_INDEX_WIDTH,
     INPUT_DATA_WIDTH  => FILTER_DATA_WIDTH,
-    OUTPUT_DATA_WIDTH => FFT_DATA_WIDTH
+    OUTPUT_DATA_WIDTH => FFT_DATA_WIDTH,
+    INPUT_PIPE_STAGES => 1
   )
   port map (
     Clk             => Clk,
@@ -244,24 +247,31 @@ begin
   w_chan_output_valid <= w_fft_output_control.valid and w_fft_output_control.reverse;
   w_raw_output_valid  <= w_fft_output_control.valid and not(w_fft_output_control.reverse);
 
-  i_baseband : entity dsp_lib.pfb_baseband_2x
-  generic map (
-    CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
-    DATA_WIDTH          => FFT_DATA_WIDTH
-  )
-  port map (
-    Clk           => Clk,
+  g_baseband : if (BASEBANDING_ENABLE) generate
+    i_baseband : entity dsp_lib.pfb_baseband_2x
+    generic map (
+      CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
+      DATA_WIDTH          => FFT_DATA_WIDTH
+    )
+    port map (
+      Clk           => Clk,
 
-    Input_valid   => w_chan_output_valid,
-    Input_index   => w_fft_output_control.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0),
-    Input_last    => w_fft_output_control.last,
-    Input_data    => w_fft_data,
+      Input_valid   => w_chan_output_valid,
+      Input_index   => w_fft_output_control.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0),
+      Input_last    => w_fft_output_control.last,
+      Input_data    => w_fft_data,
 
-    Output_valid  => w_baseband_valid,
-    Output_index  => w_baseband_index,
-    Output_last   => w_baseband_last,
-    Output_data   => w_baseband_data
-  );
+      Output_valid  => w_baseband_valid,
+      Output_index  => w_baseband_index,
+      Output_last   => w_baseband_last,
+      Output_data   => w_baseband_data
+    );
+  else generate
+    w_baseband_valid  <= w_chan_output_valid;
+    w_baseband_index  <= w_fft_output_control.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0);
+    w_baseband_last   <= w_fft_output_control.last;
+    w_baseband_data   <= w_fft_data;
+  end generate g_baseband;
 
   i_power : entity dsp_lib.channelizer_power
   generic map (

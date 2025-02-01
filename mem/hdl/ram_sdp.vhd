@@ -5,9 +5,11 @@ library ieee;
 entity ram_sdp is
 generic (
   ADDR_WIDTH    : natural;
+  MEM_DEPTH     : natural := 2**ADDR_WIDTH;
   DATA_WIDTH    : natural;
   LATENCY       : natural;
-  MEMORY_STYLE  : string := "block"
+  MEMORY_STYLE  : string := "block";
+  CASCADE_HGT   : natural := 0
 );
 port (
   Clk       : in  std_logic;
@@ -26,12 +28,15 @@ end entity ram_sdp;
 architecture rtl of ram_sdp is
   type data_array_t is array (integer range <>) of std_logic_vector(DATA_WIDTH - 1 downto 0);
 
-  signal m_ram                  : data_array_t(2**ADDR_WIDTH - 1 downto 0);
+  signal m_ram                  : data_array_t(MEM_DEPTH - 1 downto 0);
   signal r1_ram_out             : std_logic_vector(DATA_WIDTH - 1 downto 0);
   signal r2_ram_out             : std_logic_vector(DATA_WIDTH - 1 downto 0);
 
-  attribute ram_style           : string;
-  attribute ram_style of m_ram  : signal is MEMORY_STYLE;
+  attribute ram_style               : string;
+  attribute ram_style of m_ram      : signal is MEMORY_STYLE;
+
+  attribute cascade_height          : integer;
+  attribute cascade_height of m_ram : signal is CASCADE_HGT;
 
 begin
 

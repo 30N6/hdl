@@ -295,7 +295,7 @@ begin
     end if;
   end process;
 
-  process(Clk)
+  process(all)
   begin
     w_fifo_valid  <= '0';
     w_fifo_last   <= '0';

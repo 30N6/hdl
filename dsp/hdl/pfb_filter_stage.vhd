@@ -16,7 +16,8 @@ generic (
   COEF_WIDTH          : natural;
   COEF_DATA           : signed_array_t(NUM_CHANNELS - 1 downto 0)(COEF_WIDTH - 1 downto 0);
   INPUT_DATA_WIDTH    : natural;
-  OUTPUT_DATA_WIDTH   : natural
+  OUTPUT_DATA_WIDTH   : natural;
+  ANALYSIS_MODE       : boolean
 );
 port (
   Clk                   : in  std_logic;
@@ -39,6 +40,15 @@ begin
 end entity pfb_filter_stage;
 
 architecture rtl of pfb_filter_stage is
+
+  function get_filter_stage_latency return natural is
+  begin
+    if (ANALYSIS_MODE) then
+      return 3;
+    else
+      return 4;
+    end if;
+  end;
 
   signal r0_input_valid     : std_logic;
   signal r0_input_index     : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
@@ -152,7 +162,7 @@ begin
     INPUT_B_FRAC_WIDTH  => COEF_WIDTH - 1,
     INPUT_C_DATA_WIDTH  => OUTPUT_DATA_WIDTH,
     OUTPUT_DATA_WIDTH   => OUTPUT_DATA_WIDTH,
-    LATENCY             => 3
+    LATENCY             => get_filter_stage_latency
   )
   port map (
     Clk             => Clk,

@@ -39,6 +39,7 @@ set library_file_list [list \
     ./hdl/channelizer_power.vhd \
     ./hdl/channelizer_common.vhd \
     ./hdl/channelizer_8.vhd \
+    ./hdl/channelizer_16.vhd \
     ./hdl/channelizer_32.vhd \
     ./hdl/channelizer_64.vhd \
     ./sim/channelizer_tb.sv \
@@ -117,12 +118,18 @@ set last_compile_time $time_now
 #set BreakOnAssertion 2
 #run -all
 
-#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=32
+#-novopt
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=16 -novopt
 #set NumericStdNoWarnings 1
 #set BreakOnAssertion 2
 #run -all
 
-vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=64
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=32
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
+vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=64  -novopt
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all

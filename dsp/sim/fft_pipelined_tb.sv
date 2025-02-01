@@ -98,7 +98,8 @@ module fft_pipelined_tb;
     .NUM_POINTS        (NUM_POINTS),
     .INDEX_WIDTH       ($clog2(NUM_POINTS)),
     .INPUT_DATA_WIDTH  (INPUT_WIDTH),
-    .OUTPUT_DATA_WIDTH (OUTPUT_WIDTH)
+    .OUTPUT_DATA_WIDTH (OUTPUT_WIDTH),
+    .INPUT_PIPE_STAGES (2)
   )
   dut
   (

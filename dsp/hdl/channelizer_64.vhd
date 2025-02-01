@@ -11,8 +11,9 @@ library dsp_lib;
 
 entity channelizer_64 is
 generic (
-  INPUT_DATA_WIDTH  : natural;
-  OUTPUT_DATA_WIDTH : natural
+  INPUT_DATA_WIDTH    : natural;
+  OUTPUT_DATA_WIDTH   : natural;
+  BASEBANDING_ENABLE  : boolean
 );
 port (
   Clk                   : in  std_logic;
@@ -145,13 +146,14 @@ begin
 
   i_channelizer : entity dsp_lib.channelizer_common
   generic map (
-    INPUT_DATA_WIDTH  => INPUT_DATA_WIDTH,
-    OUTPUT_DATA_WIDTH => OUTPUT_DATA_WIDTH,
-    NUM_CHANNELS      => NUM_CHANNELS,
-    NUM_COEFS         => NUM_COEFS,
-    COEF_WIDTH        => COEF_WIDTH,
-    COEF_DATA         => COEF_DATA,
-    FFT_PATH_ENABLE   => false
+    INPUT_DATA_WIDTH    => INPUT_DATA_WIDTH,
+    OUTPUT_DATA_WIDTH   => OUTPUT_DATA_WIDTH,
+    NUM_CHANNELS        => NUM_CHANNELS,
+    NUM_COEFS           => NUM_COEFS,
+    COEF_WIDTH          => COEF_WIDTH,
+    COEF_DATA           => COEF_DATA,
+    FFT_PATH_ENABLE     => false,
+    BASEBANDING_ENABLE  => BASEBANDING_ENABLE
   )
   port map (
     Clk                   => Clk,

@@ -114,7 +114,7 @@ set last_compile_time $time_now
 #set BreakOnAssertion 2
 #run -all
 
-vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=64
+vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=64 -novopt
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all

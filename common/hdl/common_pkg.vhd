@@ -15,14 +15,17 @@ package common_pkg is
   function clog2(v : natural) return natural;
   function clog2_min1bit(v : natural) return natural;
   function and_reduce(v : unsigned) return std_logic;
+  function and_reduce(v : signed) return std_logic;
   function and_reduce(v : std_logic_vector) return std_logic;
   function or_reduce(v : unsigned) return std_logic;
+  function or_reduce(v : signed) return std_logic;
   function or_reduce(v : std_logic_vector) return std_logic;
   function resize_up(v : signed; n : natural) return signed;
   function resize_up(v : unsigned; n : natural) return unsigned;
   function resize_up(v : std_logic_vector; n : natural) return std_logic_vector;
   function shift_right(v : std_logic_vector; n : natural) return std_logic_vector;
   function byteswap(v : std_logic_vector; w : natural) return std_logic_vector;
+  function first_bit_index(v : std_logic_vector) return unsigned;
 
 end package common_pkg;
 
@@ -71,12 +74,22 @@ package body common_pkg is
     return to_stdlogic(v = v_ones);
   end function;
 
+  function and_reduce(v : signed) return std_logic is
+  begin
+    return and_reduce(unsigned(v));
+  end function;
+
   function and_reduce(v : std_logic_vector) return std_logic is
   begin
     return and_reduce(unsigned(v));
   end function;
 
   function or_reduce(v : unsigned) return std_logic is
+  begin
+    return to_stdlogic(v /= 0);
+  end function;
+
+  function or_reduce(v : signed) return std_logic is
   begin
     return to_stdlogic(v /= 0);
   end function;
@@ -128,6 +141,21 @@ package body common_pkg is
       j := v'length / w - i - 1;
       r(w * (i + 1) - 1 downto w * i) := v(w * (j + 1) - 1 downto w * j);
     end loop;
+    return r;
+  end function;
+
+  function first_bit_index(v : std_logic_vector) return unsigned is
+    variable r : unsigned(clog2(v'length) - 1 downto 0);
+  begin
+    r := (others => '0');
+
+    for i in 0 to (v'length - 1) loop
+      if (v(i) = '1') then
+        r := to_unsigned(i, r'length);
+        exit;
+      end if;
+    end loop;
+
     return r;
   end function;
 

@@ -69,11 +69,20 @@ architecture rtl of pfb_filter_mult is
   signal r2_sub_index         : unsigned(SUB_INDEX_WIDTH - 1 downto 0);
   signal r2_last              : std_logic;
   signal r2_sum               : signed(OUTPUT_DATA_WIDTH - 1 downto 0);
+  signal r2_mult_result       : signed(MULT_RESULT_WIDTH - 1 downto 0);
+  signal r2_input_c           : signed(INPUT_C_DATA_WIDTH - 1 downto 0);
+  signal w2_mult_scaled       : signed(MULT_SCALED_WIDTH - 1 downto 0);
+
+  signal r3_valid             : std_logic;
+  signal r3_index             : unsigned(INDEX_WIDTH - 1 downto 0);
+  signal r3_sub_index         : unsigned(SUB_INDEX_WIDTH - 1 downto 0);
+  signal r3_last              : std_logic;
+  signal r3_sum               : signed(OUTPUT_DATA_WIDTH - 1 downto 0);
 
 begin
 
-  assert (LATENCY = 3)
-    report "Latency expected to be 3."
+  assert ((LATENCY = 3) or (LATENCY = 4))
+    report "Latency expected to be 3 or 4."
     severity failure;
 
   process(Clk)
@@ -101,23 +110,60 @@ begin
     end if;
   end process;
 
-  w1_mult_scaled <= r1_mult_result(MULT_RESULT_WIDTH - 1 downto INPUT_B_FRAC_WIDTH);  --shift_left(r1_mult_result, INPUT_B_FRAC_WIDTH);
+  g_output : if (LATENCY = 3) generate
 
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      r2_valid      <= r1_valid;
-      r2_index      <= r1_index;
-      r2_sub_index  <= r1_sub_index;
-      r2_last       <= r1_last;
-      r2_sum        <= resize_up(w1_mult_scaled, OUTPUT_DATA_WIDTH) + r1_input_c;
-    end if;
-  end process;
+    w1_mult_scaled <= r1_mult_result(MULT_RESULT_WIDTH - 1 downto INPUT_B_FRAC_WIDTH);  --shift_left(r1_mult_result, INPUT_B_FRAC_WIDTH);
 
-  Output_valid      <= r2_valid;
-  Output_index      <= r2_index;
-  Output_sub_index  <= r2_sub_index;
-  Output_last       <= r2_last;
-  Output_data       <= r2_sum;
+    process(Clk)
+    begin
+      if rising_edge(Clk) then
+        r2_valid      <= r1_valid;
+        r2_index      <= r1_index;
+        r2_sub_index  <= r1_sub_index;
+        r2_last       <= r1_last;
+        r2_sum        <= resize_up(w1_mult_scaled, OUTPUT_DATA_WIDTH) + r1_input_c;
+      end if;
+    end process;
+
+    Output_valid      <= r2_valid;
+    Output_index      <= r2_index;
+    Output_sub_index  <= r2_sub_index;
+    Output_last       <= r2_last;
+    Output_data       <= r2_sum;
+
+  else generate
+
+    process(Clk)
+    begin
+      if rising_edge(Clk) then
+        r2_valid        <= r1_valid;
+        r2_index        <= r1_index;
+        r2_sub_index    <= r1_sub_index;
+        r2_last         <= r1_last;
+        r2_mult_result  <= r1_mult_result;
+        r2_input_c      <= r1_input_c;
+      end if;
+    end process;
+
+    w2_mult_scaled <= r2_mult_result(MULT_RESULT_WIDTH - 1 downto INPUT_B_FRAC_WIDTH);  --shift_left(r2_mult_result, INPUT_B_FRAC_WIDTH);
+
+    process(Clk)
+    begin
+      if rising_edge(Clk) then
+        r3_valid      <= r2_valid;
+        r3_index      <= r2_index;
+        r3_sub_index  <= r2_sub_index;
+        r3_last       <= r2_last;
+        r3_sum        <= resize_up(w2_mult_scaled, OUTPUT_DATA_WIDTH) + r2_input_c;
+      end if;
+    end process;
+
+    Output_valid      <= r3_valid;
+    Output_index      <= r3_index;
+    Output_sub_index  <= r3_sub_index;
+    Output_last       <= r3_last;
+    Output_data       <= r3_sum;
+
+  end generate g_output;
 
 end architecture rtl;

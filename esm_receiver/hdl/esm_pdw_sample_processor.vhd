@@ -381,7 +381,7 @@ begin
   w_pending_fifo_wr_en <= r2_input_ctrl.valid and to_stdlogic(r2_context.state = S_IDLE) and Dwell_active and r2_new_detect and r2_channel_enabled and not(w_pending_fifo_full);
   w_pending_fifo_rd_en <= Pdw_ready and not(w_fifo_empty);
 
-  i_pdw_pending_fifo : entity mem_lib.xpm_fallthough_fifo
+  i_pdw_pending_fifo : entity mem_lib.xpm_fallthrough_fifo
   generic map (
     FIFO_DEPTH  => PDW_FIFO_DEPTH,
     FIFO_WIDTH  => 1
@@ -403,7 +403,7 @@ begin
     Underflow   => w_pending_fifo_underflow
   );
 
-  i_pdw_data_fifo : entity mem_lib.xpm_fallthough_fifo
+  i_pdw_data_fifo : entity mem_lib.xpm_fallthrough_fifo
   generic map (
     FIFO_DEPTH  => PDW_FIFO_DEPTH,
     FIFO_WIDTH  => ESM_PDW_FIFO_DATA_WIDTH
