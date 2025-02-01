@@ -59,7 +59,7 @@ end entity ecm_drfm_reporter;
 architecture rtl of ecm_drfm_reporter is
 
   constant FIFO_DEPTH             : natural := 8192;
-  constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - ECM_WORDS_PER_DMA_PACKET - 10;
+  constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - ECM_WORDS_PER_DMA_PACKET - 16;
   constant TIMEOUT_CYCLES         : natural := 1024;
 
   type state_t is
@@ -121,16 +121,24 @@ architecture rtl of ecm_drfm_reporter is
   signal w_fifo_almost_full           : std_logic;
   signal w_fifo_ready                 : std_logic;
 
+  signal r_fifo_almost_full           : std_logic;
+
   signal w_fifo_valid                 : std_logic;
   signal w_fifo_valid_opt             : std_logic;
   signal w_fifo_last                  : std_logic;
   signal w_fifo_partial_0_data        : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   signal w_fifo_partial_1_data        : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
 
-  signal r_fifo_valid                 : std_logic;
-  signal r_fifo_last                  : std_logic;
-  signal r_fifo_partial_0_data        : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal r_fifo_partial_1_data        : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal r0_fifo_valid                : std_logic;
+  signal r0_fifo_last                 : std_logic;
+  signal r0_fifo_partial_0_data       : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal r0_fifo_partial_1_data       : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal r0_fifo_almost_full          : std_logic;
+
+  signal r1_fifo_valid                : std_logic;
+  signal r1_fifo_last                 : std_logic;
+  signal r1_fifo_data                 : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal r1_fifo_almost_full          : std_logic;
 
   signal r_timeout                    : unsigned(clog2(TIMEOUT_CYCLES) - 1 downto 0);
 
@@ -170,14 +178,14 @@ begin
           s_state <= S_START_CHANNEL;
 
         when S_START_CHANNEL =>
-          if (w_fifo_almost_full = '0') then
+          if (r1_fifo_almost_full = '0') then
             s_state <= S_CHANNEL_HEADER_0;
           else
             s_state <= S_START_CHANNEL;
           end if;
 
         when S_CONTINUE_CHANNEL =>
-          if (w_fifo_almost_full = '0') then
+          if (r1_fifo_almost_full = '0') then
             s_state <= S_CHANNEL_HEADER_0;
           else
             s_state <= S_CONTINUE_CHANNEL;
@@ -233,7 +241,7 @@ begin
 
 
         when S_START_SUMMARY =>
-          if (w_fifo_almost_full = '0') then
+          if (r1_fifo_almost_full = '0') then
             s_state <= S_SUMMARY_HEADER_0;
           else
             s_state <= S_START_SUMMARY;
@@ -339,7 +347,6 @@ begin
       end if;
     end if;
   end process;
-
 
   process(Clk)
   begin
@@ -488,10 +495,19 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_fifo_valid          <= w_fifo_valid_opt;
-      r_fifo_partial_0_data <= w_fifo_partial_0_data;
-      r_fifo_partial_1_data <= w_fifo_partial_1_data;
-      r_fifo_last           <= w_fifo_last;
+      r0_fifo_valid           <= w_fifo_valid_opt;
+      r0_fifo_partial_0_data  <= w_fifo_partial_0_data;
+      r0_fifo_partial_1_data  <= w_fifo_partial_1_data;
+      r0_fifo_last            <= w_fifo_last;
+    end if;
+ end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r1_fifo_valid <= r0_fifo_valid;
+      r1_fifo_data  <= r0_fifo_partial_0_data or r0_fifo_partial_1_data;
+      r1_fifo_last  <= r0_fifo_last;
     end if;
  end process;
 
@@ -505,9 +521,9 @@ begin
     S_axis_clk          => Clk,
     S_axis_resetn       => not(Rst),
     S_axis_ready        => w_fifo_ready,
-    S_axis_valid        => r_fifo_valid,
-    S_axis_data         => r_fifo_partial_0_data or r_fifo_partial_1_data,
-    S_axis_last         => r_fifo_last,
+    S_axis_valid        => r1_fifo_valid,
+    S_axis_data         => r1_fifo_data,
+    S_axis_last         => r1_fifo_last,
     S_axis_almost_full  => w_fifo_almost_full,
 
     M_axis_clk          => Clk_axi,
@@ -516,6 +532,14 @@ begin
     M_axis_data         => Axis_data,
     M_axis_last         => Axis_last
   );
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r0_fifo_almost_full <= w_fifo_almost_full;
+      r1_fifo_almost_full <= r0_fifo_almost_full;
+    end if;
+  end process;
 
   process(Clk)
   begin
@@ -532,7 +556,7 @@ begin
   begin
     if rising_edge(Clk) then
       Error_timeout   <= to_stdlogic(r_timeout = (TIMEOUT_CYCLES - 1));
-      Error_overflow  <= r_fifo_valid and not(w_fifo_ready);
+      Error_overflow  <= r1_fifo_valid and not(w_fifo_ready);
     end if;
   end process;
 
