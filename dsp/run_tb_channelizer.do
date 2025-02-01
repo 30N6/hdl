@@ -119,20 +119,20 @@ set last_compile_time $time_now
 #run -all
 
 #-novopt
-vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=16 -novopt
-set NumericStdNoWarnings 1
-set BreakOnAssertion 2
-run -all
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=16 -novopt
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
 
 #vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=32
 #set NumericStdNoWarnings 1
 #set BreakOnAssertion 2
 #run -all
 
-#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=64
-#set NumericStdNoWarnings 1
-#set BreakOnAssertion 2
-#run -all
+vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=64  -novopt
+set NumericStdNoWarnings 1
+set BreakOnAssertion 2
+run -all
 
 # If waves exists
 if [file exist wave.do] {

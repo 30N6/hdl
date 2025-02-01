@@ -17,7 +17,7 @@ interface dwell_stats_tx_intf (input logic Clk);
   esm_dwell_metadata_t                          dwell_data;
   logic [esm_dwell_sequence_num_width - 1 : 0]  dwell_sequence_num;
 
-  channelizer_control_t                         input_ctrl = {valid:0, default:0};
+  channelizer_control_t                         input_ctrl = '{valid:0, default:0};
   logic [chan_power_width - 1 : 0]              input_pwr;
 
   task write(esm_dwell_metadata_t data, int unsigned seq_num, dwell_channel_data_t input_data []);
@@ -374,8 +374,8 @@ module esm_dwell_stats_tb;
     int num_padding_words = 0;
     int channel_index = 0;
 
-    longint unsigned channel_accum [NUM_CHANNELS] = {default:0};
-    int unsigned channel_max [NUM_CHANNELS] = {default:0};
+    longint unsigned channel_accum [NUM_CHANNELS] = '{default:0};
+    int unsigned channel_max [NUM_CHANNELS] = '{default:0};
 
     $display("%0t: num_header_words=%0d channels_per_packet=%0d num_packets=%0d", $time, NUM_HEADER_WORDS, channels_per_packet, num_packets);
 
