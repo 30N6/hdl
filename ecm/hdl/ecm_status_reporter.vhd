@@ -12,9 +12,8 @@ library ecm_lib;
 
 entity ecm_status_reporter is
 generic (
-  AXI_DATA_WIDTH        : natural;
-  MODULE_ID             : unsigned;
-  HEARTBEAT_INTERVAL    : natural
+  AXI_DATA_WIDTH      : natural;
+  HEARTBEAT_INTERVAL  : natural
 );
 port (
   Clk_axi                 : in  std_logic;
@@ -43,8 +42,7 @@ end entity ecm_status_reporter;
 architecture rtl of ecm_status_reporter is
 
   constant FIFO_DEPTH             : natural := 256;
-  constant MAX_WORDS_PER_PACKET   : natural := 64;
-  constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - MAX_WORDS_PER_PACKET - 10;
+  constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - ECM_WORDS_PER_DMA_PACKET - 10;
 
   constant TIMEOUT_CYCLES         : natural := 1024;
 
@@ -97,7 +95,7 @@ architecture rtl of ecm_status_reporter is
   signal r_packet_seq_num           : unsigned(31 downto 0);
   signal r_trigger_timestamp        : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
 
-  signal r_words_in_msg             : unsigned(clog2(MAX_WORDS_PER_PACKET) - 1 downto 0);
+  signal r_words_in_msg             : unsigned(clog2(ECM_WORDS_PER_DMA_PACKET) - 1 downto 0);
 
   signal w_fifo_almost_full         : std_logic;
   signal w_fifo_ready               : std_logic;
@@ -122,15 +120,16 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_enable_status         <= Enable_status;
-      r_enable_channelizer    <= Enable_channelizer;
-      r_enable_synthesizer    <= Enable_synthesizer;
-      r_channelizer_warnings  <= Channelizer_warnings;
-      r_channelizer_errors    <= Channelizer_errors;
-      r_synthesizer_errors    <= Synthesizer_errors;
-      r_dwell_stats_errors    <= Dwell_stats_errors;
-      r_drfm_errors           <= Drfm_errors;
-      r_output_block_errors   <= Output_block_errors;
+      r_enable_status           <= Enable_status;
+      r_enable_channelizer      <= Enable_channelizer;
+      r_enable_synthesizer      <= Enable_synthesizer;
+      r_channelizer_warnings    <= Channelizer_warnings;
+      r_channelizer_errors      <= Channelizer_errors;
+      r_synthesizer_errors      <= Synthesizer_errors;
+      r_dwell_stats_errors      <= Dwell_stats_errors;
+      r_drfm_errors             <= Drfm_errors;
+      r_output_block_errors     <= Output_block_errors;
+      r_dwell_controller_errors <= Dwell_controller_errors;
     end if;
   end process;
 
@@ -273,7 +272,7 @@ begin
           s_state <= S_PAD;
 
         when S_PAD =>
-          if (r_words_in_msg = (MAX_WORDS_PER_PACKET - 1)) then
+          if (r_words_in_msg = (ECM_WORDS_PER_DMA_PACKET - 1)) then
             s_state <= S_DONE;
           else
             s_state <= S_PAD;
@@ -315,7 +314,7 @@ begin
 
     when S_HEADER_2 =>
       w_fifo_valid  <= '1';
-      w_fifo_data   <= std_logic_vector(MODULE_ID) & std_logic_vector(ECM_REPORT_MESSAGE_TYPE_STATUS) & x"0000";
+      w_fifo_data   <= std_logic_vector(ECM_MODULE_ID_STATUS) & std_logic_vector(ECM_REPORT_MESSAGE_TYPE_STATUS) & x"0000";
 
     when S_ENABLES =>
       w_fifo_valid  <= '1';
@@ -340,7 +339,7 @@ begin
     when S_PAD =>
       w_fifo_valid  <= '1';
       w_fifo_data   <= (others => '0');
-      w_fifo_last   <= to_stdlogic(r_words_in_msg = (MAX_WORDS_PER_PACKET - 1));
+      w_fifo_last   <= to_stdlogic(r_words_in_msg = (ECM_WORDS_PER_DMA_PACKET - 1));
 
     when others => null;
     end case;

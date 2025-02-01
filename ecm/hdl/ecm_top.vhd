@@ -513,9 +513,8 @@ begin
 
   i_status_reporter : entity ecm_lib.ecm_status_reporter
   generic map (
-    AXI_DATA_WIDTH        => AXI_DATA_WIDTH,
-    MODULE_ID             => ECM_MODULE_ID_STATUS,
-    HEARTBEAT_INTERVAL    => HEARTBEAT_INTERVAL
+    AXI_DATA_WIDTH      => AXI_DATA_WIDTH,
+    HEARTBEAT_INTERVAL  => HEARTBEAT_INTERVAL
   )
   port map (
     Clk_axi                 => M_axis_clk,
