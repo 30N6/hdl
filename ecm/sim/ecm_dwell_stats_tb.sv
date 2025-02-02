@@ -19,7 +19,7 @@ interface dwell_stats_tx_intf (input logic Clk);
   logic [ecm_dwell_sequence_num_width - 1 : 0]  dwell_sequence_num;
   logic                                         dwell_report_done;
 
-  channelizer_control_t                         input_ctrl = {valid:0, default:0};
+  channelizer_control_t                         input_ctrl = '{valid:0, default:0};
   logic [chan_power_width - 1 : 0]              input_pwr;
 
   task write(ecm_dwell_entry_t data, int unsigned seq_num, dwell_channel_data_t input_data []);
@@ -383,9 +383,9 @@ module ecm_dwell_stats_tb;
     int num_padding_words = 0;
     int channel_index = 0;
 
-    int unsigned      channel_cycles  [ecm_num_channels - 1 : 0] = {default:0};
-    longint unsigned  channel_accum   [ecm_num_channels - 1 : 0] = {default:0};
-    int unsigned      channel_max     [ecm_num_channels - 1 : 0] = {default:0};
+    int unsigned      channel_cycles  [ecm_num_channels - 1 : 0] = '{default:0};
+    longint unsigned  channel_accum   [ecm_num_channels - 1 : 0] = '{default:0};
+    int unsigned      channel_max     [ecm_num_channels - 1 : 0] = '{default:0};
 
     for (int i = 0; i < dwell_input.size(); i++) begin
       channel_cycles[dwell_input[i].channel]  += 1;
@@ -398,7 +398,7 @@ module ecm_dwell_stats_tb;
     report_header.module_id               = ecm_module_id_dwell_stats;
     report_header.message_type            = ecm_report_message_type_dwell_stats;
 
-    report_header.dwell_flags                       = {0, dwell_data.force_full_duration, dwell_data.skip_pll_postlock_wait, dwell_data.skip_pll_lock_check,
+    report_header.dwell_flags                       = {0, 0, dwell_data.skip_pll_postlock_wait, dwell_data.skip_pll_lock_check,
                                                        dwell_data.skip_pll_prelock_wait, dwell_data.global_counter_dec, dwell_data.global_counter_check, dwell_data.valid};
     report_header.dwell_repeat_count                = dwell_data.repeat_count;
     report_header.dwell_fast_lock_profile           = dwell_data.fast_lock_profile;
@@ -453,7 +453,6 @@ module ecm_dwell_stats_tb;
     r.skip_pll_prelock_wait   = $urandom;
     r.skip_pll_lock_check     = $urandom;
     r.skip_pll_postlock_wait  = $urandom;
-    r.force_full_duration     = $urandom;
     r.pll_pre_lock_delay      = $urandom;
     r.pll_post_lock_delay     = $urandom;
     r.repeat_count            = $urandom;

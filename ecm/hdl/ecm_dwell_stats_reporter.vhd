@@ -313,11 +313,11 @@ begin
 
     when S_DURATION_MEAS =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= std_logic_vector(Dwell_measurement_duration);
+      w_fifo_partial_1_data   <= std_logic_vector(resize_up(Dwell_measurement_duration, 32));
 
     when S_DURATION_TOTAL =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= std_logic_vector(Dwell_total_duration);
+      w_fifo_partial_1_data   <= std_logic_vector(resize_up(Dwell_total_duration, 32));
 
     when S_TIMESTAMP_START_0 =>
       w_fifo_valid            <= '1';
@@ -329,7 +329,7 @@ begin
 
     when S_CHANNEL_CYCLES =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= std_logic_vector(r_read_cycles);
+      w_fifo_partial_1_data   <= std_logic_vector(resize_up(r_read_cycles, 32));
 
     when S_CHANNEL_ACCUM_0 =>
       w_fifo_valid            <= '1';

@@ -678,15 +678,15 @@ package body ecm_pkg is
 
     -- swapped by 32-bit word to match SV struct packing in TB
     r := (
-            std_logic_vector(resize_up(v.total_duration_max), 8),
+            std_logic_vector(resize_up(v.total_duration_max, 32)),
 
-            std_logic_vector(resize_up(v.measurement_duration), 8),
+            std_logic_vector(resize_up(v.measurement_duration, 32)),
 
             std_logic_vector(v.tag),
             std_logic_vector(v.frequency),
 
-            std_logic_vector(resize_up(v.pll_pre_lock_delay), 16),
-            std_logic_vector(resize_up(v.pll_post_lock_delay), 16),
+            std_logic_vector(resize_up(v.pll_pre_lock_delay, 16)),
+            std_logic_vector(resize_up(v.pll_post_lock_delay, 16)),
 
             v_flags,
             std_logic_vector(resize_up(v.repeat_count, 8)),
