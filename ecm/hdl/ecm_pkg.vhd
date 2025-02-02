@@ -189,10 +189,11 @@ package ecm_pkg is
     frequency                 : unsigned(ECM_DWELL_FREQUENCY_WIDTH - 1 downto 0);
 
     measurement_duration      : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
-
     total_duration_max        : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   end record;
-  constant ECM_DWELL_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 8 + 8 + 16*2 + 16 + 16 + 32*2;
+  constant ECM_DWELL_ENTRY_WIDTH          : natural := 6 + ECM_DWELL_REPEAT_COUNT_WIDTH + ECM_FAST_LOCK_PROFILE_INDEX_WIDTH + ECM_DWELL_ENTRY_INDEX_WIDTH +
+                                                        2 * ECM_DWELL_PLL_DELAY_WIDTH + ECM_DWELL_TAG_WIDTH + ECM_DWELL_FREQUENCY_WIDTH + 2 * ECM_DWELL_DURATION_WIDTH;
+  constant ECM_DWELL_ENTRY_ALIGNED_WIDTH  : natural := 8 + 8 + 8 + 8 + 16*2 + 16 + 16 + 32*2;
 
   type ecm_dwell_program_entry_t is record
     enable                    : std_logic;
@@ -365,6 +366,7 @@ package ecm_pkg is
   function unpack_aligned(v : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_entry_t;
   function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t;
   function unpack_aligned(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t;
+  function unpack(v : std_logic_vector(ECM_DWELL_ENTRY_WIDTH - 1 downto 0)) return ecm_dwell_entry_t;
   function unpack(v : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH - 1 downto 0)) return ecm_channel_tx_program_entry_t;
   function unpack(v : std_logic_vector(ECM_CHANNEL_CONTROL_ENTRY_WIDTH - 1 downto 0)) return ecm_channel_control_entry_t;
 
@@ -378,6 +380,7 @@ package ecm_pkg is
   function pack(v : ecm_status_reporter_errors_t) return std_logic_vector;
   function pack(v : ecm_status_flags_t) return std_logic_vector;
   function pack(v : ecm_config_data_t) return std_logic_vector;
+  function pack(v : ecm_dwell_entry_t) return std_logic_vector;
   function pack_aligned(v : ecm_dwell_entry_t) return std_logic_vector;
   function pack(v : ecm_channel_tx_program_entry_t) return std_logic_vector;
   function pack(v : ecm_channel_control_entry_t) return std_logic_vector;
@@ -511,6 +514,18 @@ package body ecm_pkg is
     for i in 0 to (ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES - 1) loop
       r.program_entries(i)  := unpack_aligned(v(96 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH * (i+1) - 1 downto 96 + ECM_CHANNEL_TX_PROGRAM_ENTRY_ALIGNED_WIDTH*i));
     end loop;
+
+    return r;
+  end function;
+
+  function unpack(v : std_logic_vector(ECM_DWELL_ENTRY_WIDTH - 1 downto 0)) return ecm_dwell_entry_t is
+    variable r : ecm_dwell_entry_t;
+  begin
+    (r.skip_pll_postlock_wait, r.skip_pll_lock_check, r.skip_pll_prelock_wait, r.global_counter_dec, r.global_counter_check, r.valid) := v(5 downto 0);
+
+    (r.total_duration_max, r.measurement_duration, r.frequency, r.tag,
+     r.pll_post_lock_delay, r.pll_pre_lock_delay, r.next_dwell_index, r.fast_lock_profile,
+     r.repeat_count) := unsigned(v(ECM_DWELL_ENTRY_WIDTH - 1 downto 6));
 
     return r;
   end function;
@@ -664,6 +679,30 @@ package body ecm_pkg is
 
     return r;
   end function;
+
+  function pack(v : ecm_dwell_entry_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_DWELL_ENTRY_WIDTH - 1 downto 0);
+  begin
+
+    r := (std_logic_vector(v.total_duration_max),
+          std_logic_vector(v.measurement_duration),
+          std_logic_vector(v.frequency),
+          std_logic_vector(v.tag),
+          std_logic_vector(v.pll_post_lock_delay),
+          std_logic_vector(v.pll_pre_lock_delay),
+          std_logic_vector(v.next_dwell_index),
+          std_logic_vector(v.fast_lock_profile),
+          std_logic_vector(v.repeat_count),
+          v.skip_pll_postlock_wait,
+          v.skip_pll_lock_check,
+          v.skip_pll_prelock_wait,
+          v.global_counter_dec,
+          v.global_counter_check,
+          v.valid);
+
+    return r;
+  end function;
+
 
   function pack_aligned(v : ecm_dwell_entry_t) return std_logic_vector is
     variable r        : std_logic_vector(ECM_DWELL_ENTRY_ALIGNED_WIDTH - 1 downto 0);

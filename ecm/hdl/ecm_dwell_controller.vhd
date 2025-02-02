@@ -74,8 +74,6 @@ architecture rtl of ecm_dwell_controller is
     S_DWELL_DONE
   );
 
-  type ecm_dwell_entry_array_t is array (natural range <>) of ecm_dwell_entry_t;
-
   constant MEAS_FLUSH_CYCLES            : natural := ECM_NUM_CHANNELS * 2 + 8;
 
   signal s_state                        : state_t;
@@ -109,12 +107,12 @@ architecture rtl of ecm_dwell_controller is
   signal r_dwell_program_data           : ecm_dwell_program_entry_t;
   signal r_dwell_program_valid          : std_logic;
 
-  signal m_dwell_entry                  : ecm_dwell_entry_array_t(ECM_NUM_DWELL_ENTRIES - 1 downto 0);
+  signal m_dwell_entry                  : std_logic_vector_array_t(ECM_NUM_DWELL_ENTRIES - 1 downto 0)(ECM_DWELL_ENTRY_WIDTH - 1 downto 0);
 
   signal r_dwell_entry_index            : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
   signal r_dwell_entry_index_d0         : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
   signal r_dwell_entry_index_d1         : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
-  signal r_dwell_entry_d0               : ecm_dwell_entry_t;
+  signal r_dwell_entry_d0               : std_logic_vector(ECM_DWELL_ENTRY_WIDTH -  1 downto 0);
   signal r_dwell_entry_d1               : ecm_dwell_entry_t;
 
   signal r_global_counter               : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
@@ -288,7 +286,7 @@ begin
   begin
     if rising_edge(Clk) then
       if (w_dwell_entry_valid = '1') then
-        m_dwell_entry(to_integer(w_dwell_entry_index)) <= w_dwell_entry_data;
+        m_dwell_entry(to_integer(w_dwell_entry_index)) <= pack(w_dwell_entry_data);
       end if;
     end if;
   end process;
@@ -410,7 +408,7 @@ begin
       r_dwell_entry_d0        <= m_dwell_entry(to_integer(r_dwell_entry_index));
       r_dwell_entry_index_d0  <= r_dwell_entry_index;
 
-      r_dwell_entry_d1        <= r_dwell_entry_d0;
+      r_dwell_entry_d1        <= unpack(r_dwell_entry_d0);
       r_dwell_entry_index_d1  <= r_dwell_entry_index_d0;
     end if;
   end process;
