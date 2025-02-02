@@ -83,44 +83,20 @@ interface channelizer_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
   endtask
 endinterface
 
-typedef struct {
-  ecm_dwell_entry_t                             data;
-  logic [ecm_dwell_sequence_num_width - 1 : 0]  seq_num;
-  logic                                         active;
-  logic                                         active_meas;
-  logic                                         active_tx;
-  logic                                         done;
-} dwell_state_t;
-
 interface dwell_rx_intf (input logic Clk);
   ecm_dwell_entry_t                             data;
   logic [ecm_dwell_sequence_num_width - 1 : 0]  seq_num;
   logic                                         active;
-  logic                                         active_meas;
-  logic                                         active_tx;
-  logic                                         done;
 
-  task read(output dwell_state_t d);
-    logic r_active, r_active_meas, r_active_tx, r_done;
-    logic v;
+  task read(output ecm_dwell_entry_t dwell_entry, output int dwell_seq_num);
+    logic r_active;
 
     do begin
-      r_active      = active;
-      r_active_meas = active_meas;
-      r_active_tx   = active_tx;
-      r_done        = done;
-
+      r_active      <= active;
       @(posedge Clk);
-
-      d.data        = data;
-      d.seq_num     = seq_num;
-      d.active      = active;
-      d.active_meas = active_meas;
-      d.active_tx   = active_tx;
-      d.done        = done;
-
-      v = (active !== r_active) || (active_meas !== r_active_meas) || (active_tx !== r_active_tx) || (done !== r_done);
-    end while (v !== 1);
+      dwell_entry   <= data;
+      dwell_seq_num <= seq_num;
+    end while ((active === 0) || (r_active === 1));
   endtask
 endinterface
 
@@ -189,8 +165,9 @@ module ecm_dwell_controller_tb;
 
   typedef struct
   {
-    ecm_dwell_entry_t data;
-  } expect_t;
+    int dwell_seq_num;
+    ecm_dwell_entry_t dwell_entry;
+  } expect_dwell_t;
 
   typedef struct {
     int                   dwell_seq_num;
@@ -257,8 +234,8 @@ module ecm_dwell_controller_tb;
   bit [31:0]                config_seq_num = 0;
   ecm_dwell_entry_t         dwell_entry_mem [ecm_num_dwell_entries - 1 : 0];
 
-  expect_t                  expected_data [$];
-  int                       num_received = 0;
+  expect_dwell_t            expected_data_dwell [$];
+  int                       num_received_dwell = 0;
 
   expect_drfm_t             expected_data_drfm [ecm_num_channels - 1 : 0] [$];
   int                       num_received_drfm = 0;
@@ -344,12 +321,9 @@ module ecm_dwell_controller_tb;
     .Error_program_fifo_underflow (w_error_program_fifo_underflow)
   );
 
-  assign dwell_intf.data         = w_dwell_data;
-  assign dwell_intf.seq_num      = w_dwell_seq_num;
-  assign dwell_intf.active       = w_dwell_active;
-  assign dwell_intf.active_meas  = w_dwell_active_meas;
-  assign dwell_intf.active_tx    = w_dwell_active_tx;
-  assign dwell_intf.done         = w_dwell_done;
+  assign dwell_intf.data            = w_dwell_data;
+  assign dwell_intf.seq_num         = w_dwell_seq_num;
+  assign dwell_intf.active          = w_dwell_active;
 
   assign drfm_intf.dwell_seq_num    = w_dwell_seq_num;
   assign exec_intf.dwell_seq_num    = w_dwell_seq_num;
@@ -1094,6 +1068,8 @@ module ecm_dwell_controller_tb;
         break;
       end
 
+      expected_data_dwell.push_back('{dwell_entry: dwell_entry, dwell_seq_num: dwell_seq_num});
+
       for (int i_channel = 0; i_channel < ecm_num_channels; i_channel++) begin
         ecm_channel_control_entry_t chan_entry = channel_mem[dwell_index][i_channel];
         int drfm_gain_offset  = chan_entry.drfm_gain ? 0 : (CHANNELIZER_DATA_WIDTH - ecm_drfm_data_width);
@@ -1385,6 +1361,51 @@ module ecm_dwell_controller_tb;
 
   endfunction
 
+  function automatic bit compare_data_dwell(expect_dwell_t a, expect_dwell_t b);
+    if (a.dwell_seq_num !== b.dwell_seq_num) begin
+      $display("dwell_seq_num mismatch: %p %p", a.dwell_seq_num, b.dwell_seq_num);
+      return 0;
+    end
+    if (a.dwell_entry !== b.dwell_entry) begin
+      $display("dwell_entry mismatch: %p %p", a.dwell_entry, b.dwell_entry);
+      return 0;
+    end
+
+    return 1;
+  endfunction
+
+  initial begin
+    automatic ecm_dwell_entry_t dwell_entry;
+    automatic int dwell_seq_num;
+    automatic expect_dwell_t dwell_rx;
+
+    wait_for_reset();
+
+    forever begin
+      dwell_intf.read(dwell_entry, dwell_seq_num);
+      dwell_rx.dwell_seq_num  = dwell_seq_num;
+      dwell_rx.dwell_entry    = dwell_entry;
+
+      if (compare_data_dwell(dwell_rx, expected_data_dwell[0])) begin
+        $display("%0t: dwell data match (remaining=%0d) - data=%p", $time, expected_data_dwell.size(), dwell_rx);
+      end else begin
+        $error("%0t: error -- dwell data mismatch: expected=%p  actual=%p", $time, expected_data_dwell[0], dwell_rx);
+      end
+      num_received_dwell++;
+      void'(expected_data_dwell.pop_front());
+    end
+  end
+
+  final begin
+    if ( expected_data_dwell.size() != 0 ) begin
+      $error("Unexpected data remaining in dwell queue:  size=%0d", expected_data_dwell.size());
+      /*while ( expected_data_dwell.size() != 0 ) begin
+        $display("%p", expected_data_dwell[0]);
+        void'(expected_data_dwell.pop_front());
+      end*/
+    end
+  end
+
   function automatic bit compare_data_drfm(expect_drfm_t a, expect_drfm_t b);
     if (a.dwell_seq_num !== b.dwell_seq_num) begin
       $display("dwell_seq_num mismatch: %p %p", a.dwell_seq_num, b.dwell_seq_num);
@@ -1666,7 +1687,7 @@ module ecm_dwell_controller_tb;
         end
       end
 
-      $display("%0t: Standard test finished: num_received=%0d  num_received_drfm=%0d num_received_exec=%0d num_dropped_exec=%0d", $time, num_received, num_received_drfm, num_received_exec, num_dropped_exec);
+      $display("%0t: Standard test finished: num_received_dwell=%0d  num_received_drfm=%0d num_received_exec=%0d num_dropped_exec=%0d", $time, num_received_dwell, num_received_drfm, num_received_exec, num_dropped_exec);
 
       Rst = 1;
       repeat(100) @(posedge Clk);
