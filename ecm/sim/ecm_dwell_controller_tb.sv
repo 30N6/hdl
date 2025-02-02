@@ -818,7 +818,6 @@ module ecm_dwell_controller_tb;
     r.skip_pll_prelock_wait   = $urandom;
     r.skip_pll_lock_check     = 0;
     r.skip_pll_postlock_wait  = 0;
-    r.force_full_duration     = 0; //TODO: remove
     r.repeat_count            = ($urandom_range(99) < 50) ? $urandom_range(2, 0) : 0;
     r.fast_lock_profile       = $urandom;
     r.next_dwell_index        = $urandom;
@@ -864,7 +863,6 @@ module ecm_dwell_controller_tb;
     packed_entry[3]         = data.entry.skip_pll_prelock_wait;
     packed_entry[4]         = data.entry.skip_pll_lock_check;
     packed_entry[5]         = data.entry.skip_pll_postlock_wait;
-    packed_entry[6]         = data.entry.force_full_duration;  //TODO: remove
 
     packed_entry[15:8]      = data.entry.repeat_count;
     packed_entry[23:16]     = data.entry.fast_lock_profile;

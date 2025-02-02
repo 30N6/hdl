@@ -63,7 +63,7 @@ package ecm_pkg is
   constant ECM_NUM_FAST_LOCK_PROFILES                     : natural := 8;
   constant ECM_FAST_LOCK_PROFILE_INDEX_WIDTH              : natural := clog2(ECM_NUM_FAST_LOCK_PROFILES);
 
-  constant ECM_NUM_DWELL_ENTRIES                          : natural := 16;
+  constant ECM_NUM_DWELL_ENTRIES                          : natural := 32;
   constant ECM_DWELL_ENTRY_INDEX_WIDTH                    : natural := clog2(ECM_NUM_DWELL_ENTRIES);
   constant ECM_NUM_CHANNEL_CONTROL_ENTRIES                : natural := ECM_NUM_CHANNELS * ECM_NUM_DWELL_ENTRIES;
   constant ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH    : natural := clog2(ECM_NUM_CHANNEL_CONTROL_ENTRIES);
@@ -84,14 +84,14 @@ package ecm_pkg is
   constant ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH              : natural := 2;
   constant ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT      : natural := 116;
 
-  constant ECM_DWELL_DURATION_WIDTH                       : natural := 32;
+  constant ECM_DWELL_DURATION_WIDTH                       : natural := 28;
   constant ECM_DWELL_SEQUENCE_NUM_WIDTH                   : natural := 32;
   constant ECM_DWELL_REPEAT_COUNT_WIDTH                   : natural := 4;
   constant ECM_DWELL_TAG_WIDTH                            : natural := 16;
   constant ECM_DWELL_FREQUENCY_WIDTH                      : natural := 16;
   constant ECM_DWELL_GLOBAL_COUNTER_WIDTH                 : natural := 16;
   constant ECM_DWELL_POWER_ACCUM_WIDTH                    : natural := 64;
-  constant ECM_DWELL_PLL_DELAY_WIDTH                      : natural := 16;
+  constant ECM_DWELL_PLL_DELAY_WIDTH                      : natural := 12;
 
   constant ECM_TIMESTAMP_WIDTH                            : natural := 48;
   constant ECM_DDS_DATA_WIDTH                             : natural := 16;
@@ -178,7 +178,6 @@ package ecm_pkg is
     skip_pll_prelock_wait     : std_logic;
     skip_pll_lock_check       : std_logic;
     skip_pll_postlock_wait    : std_logic;
-    force_full_duration       : std_logic; --TODO: remove
     repeat_count              : unsigned(ECM_DWELL_REPEAT_COUNT_WIDTH - 1 downto 0);
     fast_lock_profile         : unsigned(ECM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 0);
     next_dwell_index          : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
@@ -464,8 +463,8 @@ package body ecm_pkg is
     variable r : ecm_dwell_entry_t;
   begin
 
-    (r.force_full_duration, r.skip_pll_postlock_wait, r.skip_pll_lock_check,
-     r.skip_pll_prelock_wait, r.global_counter_dec, r.global_counter_check, r.valid) := v(6 downto 0);
+    (r.skip_pll_postlock_wait, r.skip_pll_lock_check,
+     r.skip_pll_prelock_wait, r.global_counter_dec, r.global_counter_check, r.valid) := v(5 downto 0);
 
     r.repeat_count          := unsigned(v(8 + ECM_DWELL_REPEAT_COUNT_WIDTH - 1 downto 8));
     r.fast_lock_profile     := unsigned(v(16 + ECM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 16));
@@ -674,7 +673,7 @@ package body ecm_pkg is
       report "ECM_DWELL_ENTRY_ALIGNED_WIDTH must be a multiple of 32."
       severity failure;
 
-    v_flags := ('0', v.force_full_duration, v.skip_pll_postlock_wait, v.skip_pll_lock_check,
+    v_flags := ('0', '0', v.skip_pll_postlock_wait, v.skip_pll_lock_check,
                 v.skip_pll_prelock_wait, v.global_counter_dec, v.global_counter_check, v.valid);
 
     -- swapped by 32-bit word to match SV struct packing in TB
