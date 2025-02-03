@@ -55,7 +55,7 @@ end entity ecm_top;
 
 architecture rtl of ecm_top is
   constant ENABLE_CHANNELIZER         : boolean := true;
-  constant ENABLE_SYNTHESIZER         : boolean := true;
+  constant ENABLE_SYNTHESIZER         : boolean := false;
   constant ENABLE_DWELL_STATS         : boolean := true;
   constant ENABLE_DRFM                : boolean := true;
   constant ENABLE_DEBUG               : boolean := false;
