@@ -269,7 +269,8 @@ package ecm_pkg is
   end record;
 
   type ecm_drfm_read_req_t is record
-    valid               : std_logic;
+    read_valid          : std_logic;
+    sync_valid          : std_logic;
     address             : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
     channel_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
     channel_last        : std_logic;

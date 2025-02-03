@@ -203,9 +203,9 @@ begin
   begin
     if rising_edge(Clk) then
       if (ENABLE_DDS and ENABLE_DRFM) then
-        Error_dds_drfm_sync <= (r1_dds_ctrl.valid or r1_drfm_ctrl.valid) and to_stdlogic((r1_dds_ctrl.valid       /= r1_drfm_ctrl.valid) or
-                                                                                         (r1_dds_ctrl.last        /= r1_drfm_ctrl.last) or
-                                                                                         (r1_dds_ctrl.data_index  /= r1_drfm_ctrl.data_index));
+        Error_dds_drfm_sync <= r1_dds_ctrl.valid and r1_drfm_ctrl.valid and to_stdlogic((r1_dds_ctrl.valid       /= r1_drfm_ctrl.valid) or
+                                                                                        (r1_dds_ctrl.last        /= r1_drfm_ctrl.last) or
+                                                                                        (r1_dds_ctrl.data_index  /= r1_drfm_ctrl.data_index));
       else
         Error_dds_drfm_sync <= '0';
       end if;

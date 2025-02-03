@@ -128,7 +128,7 @@ interface ecm_tx_execution_intf (input logic Clk);
       active_tx <= dwell_active_tx;
       dwell_seq <= dwell_seq_num;
       @(posedge Clk);
-    end while ((drfm.valid !== 1) && (dds.valid !== 1) && (oc.valid !== 1));
+    end while ((drfm.read_valid !== 1) && (dds.valid !== 1) && (oc.valid !== 1));
   endtask
 endinterface
 
@@ -1275,7 +1275,8 @@ module ecm_dwell_controller_tb;
             if (inst_playback.mode == 0) begin //number of segments
               for (int i = 0; i < inst_playback.base_count; i++) begin
                 for (int j = 0; j < trigger_length[i_channel]; j++) begin
-                  drfm_read_req.valid = 1;
+                  drfm_read_req.read_valid = 1;
+                  drfm_read_req.sync_valid = 1;
                   drfm_read_req.address = chan_entry.recording_address + j;
                   drfm_read_req.channel_index = i_channel;
                   drfm_read_req.channel_last = (i_channel == (ecm_num_channels - 1));
@@ -1284,7 +1285,8 @@ module ecm_dwell_controller_tb;
               end
             end else begin //number of samples
               for (int i = 0; i < inst_playback.base_count; i++) begin
-                drfm_read_req.valid = 1;
+                drfm_read_req.read_valid = 1;
+                drfm_read_req.sync_valid = 1;
                 drfm_read_req.address = chan_entry.recording_address + (i % trigger_length[i_channel]);
                 drfm_read_req.channel_index = i_channel;
                 drfm_read_req.channel_last = (i_channel == (ecm_num_channels - 1));
@@ -1461,10 +1463,10 @@ module ecm_dwell_controller_tb;
       return 0;
     end
 
-    if (a.dds_control.valid && a.output_control.valid && a.drfm_read_req.valid && !a.dwell_active_tx) begin
+    if (a.dds_control.valid && a.output_control.valid && a.drfm_read_req.read_valid && !a.dwell_active_tx) begin
       //$display("compare_data_exec: [end of dwell] skipping drfm_read_req check");
     end else begin
-      if (a.drfm_read_req.valid || b.drfm_read_req.valid) begin
+      if (a.drfm_read_req.read_valid || b.drfm_read_req.read_valid) begin
         if (a.drfm_read_req !== b.drfm_read_req) begin
           $display("drfm_read_req mismatch: %p %p", a.drfm_read_req, b.drfm_read_req);
           return 0;
@@ -1524,7 +1526,7 @@ module ecm_dwell_controller_tb;
       rx.dwell_seq_num = dwell_seq_num;
       rx.dwell_active_tx = dwell_active_tx;
 
-      if (drfm.valid) begin
+      if (drfm.read_valid) begin
         channel_index = drfm.channel_index;
       end else if (dds.valid) begin
         channel_index = dds.channel_index;
@@ -1532,7 +1534,7 @@ module ecm_dwell_controller_tb;
         channel_index = oc.channel_index;
       end
 
-      assert ((!drfm.valid || (channel_index == drfm.channel_index)) && (!dds.valid || (channel_index == dds.channel_index)) && (!oc.valid || (channel_index == oc.channel_index))) else $error("channel mismatch");
+      assert ((!drfm.read_valid || (channel_index == drfm.channel_index)) && (!dds.valid || (channel_index == dds.channel_index)) && (!oc.valid || (channel_index == oc.channel_index))) else $error("channel mismatch");
 
       // end of dwell -- drop any expected transactions that will be cut off
       if (!rx.dwell_active_tx) begin

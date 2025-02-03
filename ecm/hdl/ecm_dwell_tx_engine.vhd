@@ -261,8 +261,9 @@ begin
       r5_channel_state                    <= r4_channel_state;
       r5_channel_state.playback_addr_curr <= r4_playback_addr_next;
 
-      r5_drfm_read_req.valid          <= r4_sync_data.valid and to_stdlogic((r4_channel_state.program_state = S_EXECUTE) and
+      r5_drfm_read_req.read_valid     <= r4_sync_data.valid and to_stdlogic((r4_channel_state.program_state = S_EXECUTE) and
                                                                             (w4_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_PLAYBACK));
+      r5_drfm_read_req.sync_valid     <= r4_sync_data.valid;
       r5_drfm_read_req.address        <= r4_channel_state.playback_addr_curr;
       r5_drfm_read_req.channel_index  <= r4_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
       r5_drfm_read_req.channel_last   <= r4_sync_data.last;

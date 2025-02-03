@@ -66,7 +66,8 @@ interface dwell_tx_intf (input logic Clk);
     dwell_active        = 0;
     dwell_done          = 0;
     dwell_sequence_num  = 'x;
-    read_req.valid      = 0;
+    read_req.read_valid = 0;
+    read_req.sync_valid = 0;
     write_req.valid     = 0;
     @(posedge Clk);
   endtask
@@ -78,7 +79,8 @@ interface dwell_tx_intf (input logic Clk);
     dwell_active        = 1;
     dwell_done          = 0;
     dwell_sequence_num  = seq_num;
-    read_req.valid      = 0;
+    read_req.read_valid = 0;
+    read_req.sync_valid = 0;
     write_req.valid     = 0;
 
     repeat ($urandom_range(200, 20)) @(posedge Clk);
@@ -117,7 +119,8 @@ interface dwell_tx_intf (input logic Clk);
 
       read_req = read_req_data.pop_front();
       @(posedge Clk);
-      read_req.valid         = 0;
+      read_req.read_valid    = 0;
+      read_req.sync_valid    = 0;
       read_req.address       = 'x;
       read_req.channel_index = 'x;
       read_req.channel_last  = 'x;
@@ -142,6 +145,7 @@ typedef struct {
 } drfm_output_t;
 
 interface drfm_rx_intf (input logic Clk);
+  logic                                       read_valid;
   channelizer_control_t                       ctrl;
   logic signed [ecm_drfm_data_width - 1 : 0]  data [1:0];
 
@@ -151,7 +155,8 @@ interface drfm_rx_intf (input logic Clk);
       rx.data_i <= data[0];
       rx.data_q <= data[1];
       rx.index  <= ctrl.data_index;
-      v         <= ctrl.valid;
+      v         <= read_valid;
+      assert (!read_valid || ctrl.valid);
       @(posedge Clk);
     end while (v !== 1);
   endtask
@@ -311,6 +316,7 @@ module ecm_drfm_tb;
     .Write_req                (tx_intf.write_req),
     .Read_req                 (tx_intf.read_req),
 
+    .Output_read              (output_rx_intf.read_valid),
     .Output_ctrl              (output_rx_intf.ctrl),
     .Output_data              (output_rx_intf.data),
 
@@ -813,7 +819,8 @@ module ecm_drfm_tb;
         for (int j = 0; j < writes_by_channel[i].size(); j++) begin
           if ($urandom_range(99) < 50) begin
             ecm_drfm_read_req_t read_req;
-            read_req.valid          = 1;
+            read_req.read_valid     = 1;
+            read_req.sync_valid     = 1;
             read_req.address        = writes_by_channel[i][j].address;
             read_req.channel_index  = writes_by_channel[i][j].channel_index;
             read_req.channel_last   = (writes_by_channel[i][j].channel_index == (ecm_num_channels - 1));
