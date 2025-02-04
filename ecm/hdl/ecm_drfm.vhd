@@ -75,6 +75,7 @@ architecture rtl of ecm_drfm is
   signal r_dwell_active_tx                : std_logic;
   signal r_dwell_done                     : std_logic;
   signal r_dwell_sequence_num             : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal r_dwell_start                    : std_logic;
 
   signal r_timestamp                      : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
 
@@ -147,6 +148,7 @@ begin
     if rising_edge(Clk) then
       r_rst                 <= Rst;
       r_dwell_active        <= Dwell_active;
+      r_dwell_start         <= Dwell_active and not(r_dwell_active);
       r_dwell_active_tx     <= Dwell_active_transmit;
       r_dwell_done          <= Dwell_done;
       r_dwell_sequence_num  <= Dwell_sequence_num;
@@ -298,7 +300,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (r_dwell_active = '0') then
+      if (r_dwell_start = '1') then
         r_channel_was_written     <= (others => '0');
         r_channel_was_read        <= (others => '0');
         r_channel_report_pending  <= (others => '0');

@@ -127,12 +127,14 @@ interface dwell_tx_intf (input logic Clk);
       repeat(1) @(posedge Clk);
     end
 
+    repeat ($urandom_range(10, 5)) @(posedge Clk);
+
+    dwell_active = 0;
     dwell_done = 1;
-    repeat ($urandom_range(10)) @(posedge Clk);
+    @(posedge Clk);
     while (!dwell_reports_done) begin
       @(posedge Clk);
     end
-    dwell_active = 0;
     dwell_done = 0;
     repeat(4) @(posedge Clk);
   endtask
