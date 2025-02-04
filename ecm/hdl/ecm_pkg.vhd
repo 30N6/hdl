@@ -228,9 +228,10 @@ package ecm_pkg is
   --end record;
   constant ECM_COMMON_HEADER_WIDTH  : natural := 96;
 
-
+  --TODO: remove these -- out of date now
   --type ecm_report_dwell_stats_t is record
   --  dwell_entry               : ecm_dwell_entry_t;
+  --  dwell_global_counter      : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   --  dwell_sequence_num        : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   --  measurement_duration      : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   --  total_duration            : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);

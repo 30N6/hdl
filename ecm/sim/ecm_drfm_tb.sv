@@ -237,6 +237,10 @@ module ecm_drfm_tb;
 
     bit [15:0]  channel_was_written;
     bit [15:0]  channel_was_read;
+
+    bit [31:0]  report_delay_channel_write;
+    bit [31:0]  report_delay_summary_write;
+    bit [31:0]  report_delay_summary_start;
   } ecm_drfm_summary_report_header_t;
 
   typedef bit [$bits(ecm_common_report_header_t) - 1 : 0]       ecm_common_report_header_bits_t;
@@ -700,12 +704,15 @@ module ecm_drfm_tb;
       ecm_drfm_summary_report_header_bits_t report_header_packed;
       int                                   num_padding_words;
 
-      report_header.magic_num           = ecm_report_magic_num;
-      report_header.sequence_num        = report_seq_num;
-      report_header.module_id           = ecm_module_id_drfm;
-      report_header.message_type        = ecm_report_message_type_drfm_channel_data;
-      report_header.padding_0           = 0;
-      report_header.dwell_sequence_num  = dwell_seq_num;
+      report_header.magic_num                   = ecm_report_magic_num;
+      report_header.sequence_num                = report_seq_num;
+      report_header.module_id                   = ecm_module_id_drfm;
+      report_header.message_type                = ecm_report_message_type_drfm_channel_data;
+      report_header.padding_0                   = 0;
+      report_header.dwell_sequence_num          = dwell_seq_num;
+      report_header.report_delay_channel_write  = 0;
+      report_header.report_delay_summary_write  = 0;
+      report_header.report_delay_summary_start  = 0;
 
       for (int i_channel = 0; i_channel < ecm_num_channels; i_channel++) begin
         report_header.channel_was_written[i_channel] = writes_by_channel[i_channel].size() > 0;

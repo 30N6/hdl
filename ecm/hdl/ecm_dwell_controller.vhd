@@ -37,6 +37,7 @@ port (
   Dwell_done                    : out std_logic;
   Dwell_data                    : out ecm_dwell_entry_t;
   Dwell_sequence_num            : out unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  Dwell_global_counter          : out unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   Dwell_report_done_drfm        : in  std_logic;
   Dwell_report_done_stats       : in  std_logic;
 
@@ -534,8 +535,9 @@ begin
   Dwell_done                <= r_dwell_report_wait; --hold done for external modules until reports are sent
 
 
-  Dwell_data          <= r_dwell_entry_d1;
-  Dwell_sequence_num  <= r_dwell_sequence_num;
+  Dwell_data            <= r_dwell_entry_d1;
+  Dwell_sequence_num    <= r_dwell_sequence_num;
+  Dwell_global_counter  <= r_global_counter;
 
   process(Clk)
   begin

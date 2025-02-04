@@ -25,6 +25,7 @@ port (
   Dwell_done                  : in  std_logic;
   Dwell_data                  : in  ecm_dwell_entry_t;
   Dwell_sequence_num          : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  Dwell_global_counter        : in  unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   Dwell_measurement_duration  : in  unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   Dwell_total_duration        : in  unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   Timestamp_start             : in  unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
@@ -72,6 +73,7 @@ architecture rtl of ecm_dwell_stats_reporter is
     S_DWELL_ENTRY_4,
 
     S_SEQ_NUM,
+    S_GLOBAL_COUNTER,
     S_DURATION_MEAS,
     S_DURATION_TOTAL,
     S_TIMESTAMP_START_0,
@@ -164,6 +166,8 @@ begin
           s_state <= S_SEQ_NUM;
 
         when S_SEQ_NUM =>
+          s_state <= S_GLOBAL_COUNTER;
+        when S_GLOBAL_COUNTER =>
           s_state <= S_DURATION_MEAS;
         when S_DURATION_MEAS =>
           s_state <= S_DURATION_TOTAL;
@@ -310,6 +314,10 @@ begin
     when S_SEQ_NUM =>
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= std_logic_vector(Dwell_sequence_num);
+
+    when S_GLOBAL_COUNTER =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(resize_up(Dwell_global_counter, 32));
 
     when S_DURATION_MEAS =>
       w_fifo_valid            <= '1';

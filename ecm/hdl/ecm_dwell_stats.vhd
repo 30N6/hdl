@@ -28,6 +28,7 @@ port (
   Dwell_active_measurement  : in  std_logic;
   Dwell_data                : in  ecm_dwell_entry_t;
   Dwell_sequence_num        : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  Dwell_global_counter      : in  unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   Dwell_report_done         : out std_logic;
 
   Input_ctrl                : in  channelizer_control_t;
@@ -65,6 +66,7 @@ architecture rtl of ecm_dwell_stats is
   signal r_dwell_active_meas        : std_logic;
   signal r_dwell_data               : ecm_dwell_entry_t;
   signal r_dwell_sequence_num       : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal r_dwell_global_counter     : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
 
   signal r_input_ctrl               : channelizer_control_t;
   signal r_input_pwr                : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
@@ -124,14 +126,15 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_input_ctrl            <= Input_ctrl;
-      r_input_pwr             <= Input_pwr;
-      r_dwell_active          <= Dwell_active;
-      r_dwell_active_meas     <= Dwell_active_measurement;
+      r_input_ctrl        <= Input_ctrl;
+      r_input_pwr         <= Input_pwr;
+      r_dwell_active      <= Dwell_active;
+      r_dwell_active_meas <= Dwell_active_measurement;
 
       if (s_state = S_IDLE) then
-        r_dwell_data          <= Dwell_data;
-        r_dwell_sequence_num  <= Dwell_sequence_num;
+        r_dwell_data            <= Dwell_data;
+        r_dwell_sequence_num    <= Dwell_sequence_num;
+        r_dwell_global_counter  <= Dwell_global_counter;
       end if;
     end if;
   end process;
@@ -328,6 +331,7 @@ begin
     Dwell_done                  => w_dwell_done,
     Dwell_data                  => r_dwell_data,
     Dwell_sequence_num          => r_dwell_sequence_num,
+    Dwell_global_counter        => r_dwell_global_counter,
     Dwell_measurement_duration  => r_duration_measurement,
     Dwell_total_duration        => r_duration_total,
     Timestamp_start             => r_ts_dwell_start,

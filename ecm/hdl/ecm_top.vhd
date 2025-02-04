@@ -93,6 +93,7 @@ architecture rtl of ecm_top is
   signal w_dwell_done                 : std_logic;
   signal w_dwell_data                 : ecm_dwell_entry_t;
   signal w_dwell_sequence_num         : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal w_dwell_global_counter       : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   signal w_dwell_stats_report_done    : std_logic;
   signal w_dwell_drfm_reports_done    : std_logic;
 
@@ -244,6 +245,7 @@ begin
     Dwell_done                    => w_dwell_done,
     Dwell_data                    => w_dwell_data,
     Dwell_sequence_num            => w_dwell_sequence_num,
+    Dwell_global_counter          => w_dwell_global_counter,
     Dwell_report_done_drfm        => w_dwell_drfm_reports_done,
     Dwell_report_done_stats       => w_dwell_stats_report_done,
 
@@ -403,6 +405,7 @@ begin
       Dwell_active_measurement  => w_dwell_active_meas,
       Dwell_data                => w_dwell_data,
       Dwell_sequence_num        => w_dwell_sequence_num,
+      Dwell_global_counter      => w_dwell_global_counter,
       Dwell_report_done         => w_dwell_stats_report_done,
 
       Input_ctrl                => w_stretched_ctrl,

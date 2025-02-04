@@ -84,11 +84,12 @@ interface channelizer_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
 endinterface
 
 interface dwell_rx_intf (input logic Clk);
-  ecm_dwell_entry_t                             data;
-  logic [ecm_dwell_sequence_num_width - 1 : 0]  seq_num;
-  logic                                         active;
+  ecm_dwell_entry_t                               data;
+  logic [ecm_dwell_sequence_num_width - 1 : 0]    seq_num;
+  logic [ecm_dwell_global_counter_width - 1 : 0]  global_counter;
+  logic                                           active;
 
-  task read(output ecm_dwell_entry_t dwell_entry, output int dwell_seq_num);
+  task read(output ecm_dwell_entry_t dwell_entry, output int dwell_seq_num, output int dwell_global_counter);
     logic r_active;
 
     do begin
@@ -96,6 +97,7 @@ interface dwell_rx_intf (input logic Clk);
       @(posedge Clk);
       dwell_entry   <= data;
       dwell_seq_num <= seq_num;
+      dwell_global_counter <= global_counter;
     end while ((active === 0) || (r_active === 1));
   endtask
 endinterface
@@ -166,6 +168,7 @@ module ecm_dwell_controller_tb;
   typedef struct
   {
     int dwell_seq_num;
+    int dwell_global_counter;
     ecm_dwell_entry_t dwell_entry;
   } expect_dwell_t;
 
@@ -217,6 +220,7 @@ module ecm_dwell_controller_tb;
   logic                     w_dwell_done;
   ecm_dwell_entry_t         w_dwell_data;
   logic [31:0]              w_dwell_seq_num;
+  logic [15:0]              w_dwell_global_counter;
   logic                     r_dwell_report_done_drfm;
   logic                     r_dwell_report_done_stats;
   logic                     r_dwell_active_meas;
@@ -309,6 +313,7 @@ module ecm_dwell_controller_tb;
     .Dwell_done                   (w_dwell_done),
     .Dwell_data                   (w_dwell_data),
     .Dwell_sequence_num           (w_dwell_seq_num),
+    .Dwell_global_counter         (w_dwell_global_counter),
     .Dwell_report_done_drfm       (r_dwell_report_done_drfm),
     .Dwell_report_done_stats      (r_dwell_report_done_stats),
 
@@ -323,6 +328,7 @@ module ecm_dwell_controller_tb;
 
   assign dwell_intf.data            = w_dwell_data;
   assign dwell_intf.seq_num         = w_dwell_seq_num;
+  assign dwell_intf.global_counter  = w_dwell_global_counter;
   assign dwell_intf.active          = w_dwell_active;
 
   assign drfm_intf.dwell_seq_num    = w_dwell_seq_num;
@@ -1068,7 +1074,7 @@ module ecm_dwell_controller_tb;
         break;
       end
 
-      expected_data_dwell.push_back('{dwell_entry: dwell_entry, dwell_seq_num: dwell_seq_num});
+      expected_data_dwell.push_back('{dwell_entry: dwell_entry, dwell_seq_num: dwell_seq_num, dwell_global_counter: global_counter});
 
       for (int i_channel = 0; i_channel < ecm_num_channels; i_channel++) begin
         ecm_channel_control_entry_t chan_entry = channel_mem[dwell_index][i_channel];
@@ -1368,6 +1374,10 @@ module ecm_dwell_controller_tb;
       $display("dwell_seq_num mismatch: %p %p", a.dwell_seq_num, b.dwell_seq_num);
       return 0;
     end
+    if (a.dwell_global_counter !== b.dwell_global_counter) begin
+      $display("dwell_global_counter mismatch: %p %p", a.dwell_global_counter, b.dwell_global_counter);
+      return 0;
+    end
     if (a.dwell_entry !== b.dwell_entry) begin
       $display("dwell_entry mismatch: %p %p", a.dwell_entry, b.dwell_entry);
       return 0;
@@ -1379,14 +1389,16 @@ module ecm_dwell_controller_tb;
   initial begin
     automatic ecm_dwell_entry_t dwell_entry;
     automatic int dwell_seq_num;
+    automatic int dwell_global_counter;
     automatic expect_dwell_t dwell_rx;
 
     wait_for_reset();
 
     forever begin
-      dwell_intf.read(dwell_entry, dwell_seq_num);
-      dwell_rx.dwell_seq_num  = dwell_seq_num;
-      dwell_rx.dwell_entry    = dwell_entry;
+      dwell_intf.read(dwell_entry, dwell_seq_num, dwell_global_counter);
+      dwell_rx.dwell_seq_num        = dwell_seq_num;
+      dwell_rx.dwell_global_counter = dwell_global_counter;
+      dwell_rx.dwell_entry          = dwell_entry;
 
       if (compare_data_dwell(dwell_rx, expected_data_dwell[0])) begin
         $display("%0t: dwell data match (remaining=%0d) - data=%p", $time, expected_data_dwell.size(), dwell_rx);
