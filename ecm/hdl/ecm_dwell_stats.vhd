@@ -26,6 +26,7 @@ port (
 
   Dwell_active              : in  std_logic;
   Dwell_active_measurement  : in  std_logic;
+  Dwell_active_transmit     : in  std_logic;
   Dwell_data                : in  ecm_dwell_entry_t;
   Dwell_sequence_num        : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   Dwell_global_counter      : in  unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
@@ -64,6 +65,7 @@ architecture rtl of ecm_dwell_stats is
 
   signal r_dwell_active             : std_logic;
   signal r_dwell_active_meas        : std_logic;
+  signal r_dwell_active_tx          : std_logic;
   signal r_dwell_data               : ecm_dwell_entry_t;
   signal r_dwell_sequence_num       : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal r_dwell_global_counter     : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
@@ -102,6 +104,7 @@ architecture rtl of ecm_dwell_stats is
 
   signal r_clear_index              : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
 
+  signal r_tx_active                : std_logic;
   signal r_duration_measurement     : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   signal r_duration_total           : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   signal r_timestamp                : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
@@ -130,6 +133,7 @@ begin
       r_input_pwr         <= Input_pwr;
       r_dwell_active      <= Dwell_active;
       r_dwell_active_meas <= Dwell_active_measurement;
+      r_dwell_active_tx   <= Dwell_active_transmit;
 
       if (s_state = S_IDLE) then
         r_dwell_data            <= Dwell_data;
@@ -314,6 +318,12 @@ begin
       elsif ((s_state = S_ACTIVE) or (s_state = S_WAIT_DONE)) then
         r_duration_total <= r_duration_total + 1;
       end if;
+
+      if (s_state = S_IDLE) then
+        r_tx_active <= '0';
+      elsif (r_dwell_active_tx = '1') then
+        r_tx_active <= '1';
+      end if;
     end if;
   end process;
 
@@ -334,6 +344,7 @@ begin
     Dwell_global_counter        => r_dwell_global_counter,
     Dwell_measurement_duration  => r_duration_measurement,
     Dwell_total_duration        => r_duration_total,
+    Dwell_tx_active             => r_tx_active,
     Timestamp_start             => r_ts_dwell_start,
 
     Read_req                    => w_report_read_req,

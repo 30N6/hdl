@@ -28,6 +28,7 @@ port (
   Dwell_global_counter        : in  unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   Dwell_measurement_duration  : in  unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   Dwell_total_duration        : in  unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+  Dwell_tx_active             : in  std_logic;
   Timestamp_start             : in  unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
 
   Read_req                    : out std_logic;
@@ -325,7 +326,7 @@ begin
 
     when S_DURATION_TOTAL =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= std_logic_vector(resize_up(Dwell_total_duration, 32));
+      w_fifo_partial_1_data   <= Dwell_tx_active & std_logic_vector(resize_up(Dwell_total_duration, 31));
 
     when S_TIMESTAMP_START_0 =>
       w_fifo_valid            <= '1';

@@ -201,7 +201,7 @@ begin
     Rst_out       => w_config_rst,
     Enable_status => w_enable_status,
     Enable_chan   => w_enable_chan,
-    Enable_synth  => w_enable_synth,
+    Enable_synth  => w_enable_synth,  --TODO: use
 
     Module_config => w_module_config
   );
@@ -403,6 +403,7 @@ begin
 
       Dwell_active              => w_dwell_active,
       Dwell_active_measurement  => w_dwell_active_meas,
+      Dwell_active_transmit     => w_dwell_active_tx,
       Dwell_data                => w_dwell_data,
       Dwell_sequence_num        => w_dwell_sequence_num,
       Dwell_global_counter      => w_dwell_global_counter,
