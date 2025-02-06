@@ -38,6 +38,7 @@ port (
   Dwell_data                    : out ecm_dwell_entry_t;
   Dwell_sequence_num            : out unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   Dwell_global_counter          : out unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
+  Dwell_program_tag             : out unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
   Dwell_report_done_drfm        : in  std_logic;
   Dwell_report_done_stats       : in  std_logic;
 
@@ -107,6 +108,7 @@ architecture rtl of ecm_dwell_controller is
 
   signal r_dwell_program_data           : ecm_dwell_program_entry_t;
   signal r_dwell_program_valid          : std_logic;
+  signal r_dwell_program_tag            : unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
 
   signal m_dwell_entry                  : std_logic_vector_array_t(ECM_NUM_DWELL_ENTRIES - 1 downto 0)(ECM_DWELL_ENTRY_WIDTH - 1 downto 0);
 
@@ -529,15 +531,22 @@ begin
     end if;
   end process;
 
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_dwell_program_tag <= r_dwell_program_data.tag;
+    end if;
+  end process;
+
   Dwell_active              <= r_dwell_active;
   Dwell_active_measurement  <= r_dwell_active_meas;
   Dwell_active_transmit     <= r_dwell_active_tx;
   Dwell_done                <= r_dwell_report_wait; --hold done for external modules until reports are sent
 
-
   Dwell_data            <= r_dwell_entry_d1;
   Dwell_sequence_num    <= r_dwell_sequence_num;
   Dwell_global_counter  <= r_global_counter;
+  Dwell_program_tag     <= r_dwell_program_tag;
 
   process(Clk)
   begin

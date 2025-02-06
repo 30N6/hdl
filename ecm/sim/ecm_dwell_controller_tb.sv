@@ -221,6 +221,7 @@ module ecm_dwell_controller_tb;
   ecm_dwell_entry_t         w_dwell_data;
   logic [31:0]              w_dwell_seq_num;
   logic [15:0]              w_dwell_global_counter;
+  logic [15:0]              w_dwell_program_tag;
   logic                     r_dwell_report_done_drfm;
   logic                     r_dwell_report_done_stats;
   logic                     r_dwell_active_meas;
@@ -314,6 +315,7 @@ module ecm_dwell_controller_tb;
     .Dwell_data                   (w_dwell_data),
     .Dwell_sequence_num           (w_dwell_seq_num),
     .Dwell_global_counter         (w_dwell_global_counter),
+    .Dwell_program_tag            (w_dwell_program_tag),
     .Dwell_report_done_drfm       (r_dwell_report_done_drfm),
     .Dwell_report_done_stats      (r_dwell_report_done_stats),
 
@@ -867,7 +869,7 @@ module ecm_dwell_controller_tb;
   endtask
 
   task automatic send_dwell_program(ecm_dwell_program_entry_t data);
-    bit [ecm_dwell_program_entry_aligned_width + 32 - 1 : 0] packed_entry = '0; //one word of padding -- TODO: add software assert for min size
+    bit [ecm_dwell_program_entry_aligned_width + 16 - 1 : 0] packed_entry = '0; //16 bits of padding -- TODO: add software assert for min size
     bit [31:0] config_data [] = new[4 + $size(packed_entry)/32];
 
     $display("%0t: send_dwell_program = %p", $time, data);
@@ -875,6 +877,7 @@ module ecm_dwell_controller_tb;
     packed_entry[0]     = data.enable;
     packed_entry[15:8]  = data.initial_dwell_index;
     packed_entry[31:16] = data.global_counter_init;
+    packed_entry[47:32] = data.tag;
 
     config_data[0] = ecm_control_magic_num;
     config_data[1] = config_seq_num++;
@@ -1654,6 +1657,7 @@ module ecm_dwell_controller_tb;
       dwell_program.enable              = 1;
       dwell_program.initial_dwell_index = $urandom_range(2, 0);
       dwell_program.global_counter_init = num_dwells - dwell_program.initial_dwell_index + 1;
+      dwell_program.tag                 = $urandom;
 
       generate_channelizer_data(dwell_program, dwell_entries, channel_entries, dwell_seq_num);
       generate_expected_events(dwell_program, dwell_entries, channel_entries, tx_programs, dwell_seq_num);

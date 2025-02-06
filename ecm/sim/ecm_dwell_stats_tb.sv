@@ -19,12 +19,13 @@ interface dwell_stats_tx_intf (input logic Clk);
   ecm_dwell_entry_t                               dwell_data;
   logic [ecm_dwell_sequence_num_width - 1 : 0]    dwell_sequence_num;
   logic [ecm_dwell_global_counter_width - 1 : 0]  dwell_global_counter;
+  logic [ecm_dwell_tag_width - 1 : 0]             dwell_program_tag;
   logic                                           dwell_report_done;
 
   channelizer_control_t                           input_ctrl = '{valid:0, default:0};
   logic [chan_power_width - 1 : 0]                input_pwr;
 
-  task write(ecm_dwell_entry_t data, int unsigned seq_num, int unsigned global_counter, bit dwell_tx_active, dwell_channel_data_t input_data []);
+  task write(ecm_dwell_entry_t data, int unsigned seq_num, int unsigned global_counter, int unsigned program_tag, bit dwell_tx_active, dwell_channel_data_t input_data []);
     automatic dwell_channel_data_t d;
     automatic bit tx_active_sent = 0;
 
@@ -34,6 +35,7 @@ interface dwell_stats_tx_intf (input logic Clk);
     dwell_data                = data;
     dwell_sequence_num        = seq_num;
     dwell_global_counter      = global_counter;
+    dwell_program_tag         = program_tag;
 
     repeat (5) @(posedge Clk);
 
@@ -79,6 +81,7 @@ interface dwell_stats_tx_intf (input logic Clk);
     dwell_data            = '{default: 'x};
     dwell_sequence_num    = 'x;
     dwell_global_counter  = 'x;
+    dwell_program_tag     = 'x;
 
     while (!dwell_report_done) begin
       @(posedge Clk);
@@ -146,7 +149,8 @@ module ecm_dwell_stats_tb;
     bit [31:0]  dwell_measurement_duration;
     bit [31:0]  dwell_total_duration_max;
     bit [31:0]  dwell_sequence_num;
-    bit [31:0]  dwell_global_counter;
+    bit [15:0]  dwell_program_tag;
+    bit [15:0]  dwell_global_counter;
     bit [31:0]  dwell_actual_measurement_duration;
     bit         dwell_tx_active;
     bit [30:0]  dwell_actual_total_duration;
@@ -223,7 +227,8 @@ module ecm_dwell_stats_tb;
     .Dwell_active_transmit    (dwell_tx_intf.dwell_transmit_active),
     .Dwell_data               (dwell_tx_intf.dwell_data),
     .Dwell_sequence_num       (dwell_tx_intf.dwell_sequence_num),
-    .dwell_global_counter     (dwell_tx_intf.dwell_global_counter),
+    .Dwell_global_counter     (dwell_tx_intf.dwell_global_counter),
+    .Dwell_program_tag        (dwell_tx_intf.dwell_program_tag),
     .Dwell_report_done        (dwell_tx_intf.dwell_report_done),
 
     .Input_ctrl               (dwell_tx_intf.input_ctrl),
@@ -350,6 +355,11 @@ module ecm_dwell_stats_tb;
       return 0;
     end
 
+    if (report_a.dwell_program_tag !== report_b.dwell_program_tag) begin
+      $display("dwell_program_tag mismatch: %X %X", report_a.dwell_program_tag, report_b.dwell_program_tag);
+      return 0;
+    end
+
     if (report_a.dwell_tx_active !== report_b.dwell_tx_active) begin
       $display("dwell_tx_active mismatch: %X %X", report_a.dwell_tx_active, report_b.dwell_tx_active);
       return 0;
@@ -402,7 +412,8 @@ module ecm_dwell_stats_tb;
     end
   end
 
-  function automatic void expect_reports(ecm_dwell_entry_t dwell_data, int unsigned dwell_seq_num, int unsigned dwell_global_counter, bit dwell_tx_active, dwell_channel_data_t  dwell_input []);
+  function automatic void expect_reports(ecm_dwell_entry_t dwell_data, int unsigned dwell_seq_num, int unsigned dwell_global_counter, int unsigned dwell_program_tag,
+                                         bit dwell_tx_active, dwell_channel_data_t  dwell_input []);
     expect_t r;
     ecm_dwell_report_header_t   report_header;
     dwell_report_header_bits_t  report_header_packed;
@@ -437,6 +448,7 @@ module ecm_dwell_stats_tb;
     report_header.dwell_total_duration_max          = dwell_data.total_duration_max;
     report_header.dwell_sequence_num                = dwell_seq_num;
     report_header.dwell_global_counter              = dwell_global_counter;
+    report_header.dwell_program_tag                 = dwell_program_tag;
     report_header.dwell_actual_measurement_duration = 0;
     report_header.dwell_actual_total_duration       = 0;
     report_header.dwell_tx_active                   = dwell_tx_active;
@@ -518,12 +530,13 @@ module ecm_dwell_stats_tb;
       for (int i_dwell = 0; i_dwell < 100; i_dwell++) begin
         int unsigned          dwell_seq_num         = $urandom;
         int unsigned          dwell_global_counter  = $urandom_range(2**ecm_dwell_global_counter_width-1, 0);
+        int unsigned          dwell_program_tag     = $urandom_range(2**ecm_dwell_tag_width-1, 0);
         bit                   dwell_tx_active       = $urandom;
         ecm_dwell_entry_t     dwell_data            = randomize_dwell_entry();
         dwell_channel_data_t  dwell_input []        = randomize_dwell_input();
 
-        expect_reports(dwell_data, dwell_seq_num, dwell_global_counter, dwell_tx_active, dwell_input);
-        dwell_tx_intf.write(dwell_data, dwell_seq_num, dwell_global_counter, dwell_tx_active, dwell_input);
+        expect_reports(dwell_data, dwell_seq_num, dwell_global_counter, dwell_program_tag, dwell_tx_active, dwell_input);
+        dwell_tx_intf.write(dwell_data, dwell_seq_num, dwell_global_counter, dwell_program_tag, dwell_tx_active, dwell_input);
 
         repeat(1000) @(posedge Clk);
 

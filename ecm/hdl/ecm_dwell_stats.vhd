@@ -30,6 +30,7 @@ port (
   Dwell_data                : in  ecm_dwell_entry_t;
   Dwell_sequence_num        : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   Dwell_global_counter      : in  unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
+  Dwell_program_tag         : in  unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
   Dwell_report_done         : out std_logic;
 
   Input_ctrl                : in  channelizer_control_t;
@@ -69,6 +70,7 @@ architecture rtl of ecm_dwell_stats is
   signal r_dwell_data               : ecm_dwell_entry_t;
   signal r_dwell_sequence_num       : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal r_dwell_global_counter     : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
+  signal r_dwell_program_tag        : unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
 
   signal r_input_ctrl               : channelizer_control_t;
   signal r_input_pwr                : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
@@ -139,6 +141,7 @@ begin
         r_dwell_data            <= Dwell_data;
         r_dwell_sequence_num    <= Dwell_sequence_num;
         r_dwell_global_counter  <= Dwell_global_counter;
+        r_dwell_program_tag     <= Dwell_program_tag;
       end if;
     end if;
   end process;
@@ -342,6 +345,7 @@ begin
     Dwell_data                  => r_dwell_data,
     Dwell_sequence_num          => r_dwell_sequence_num,
     Dwell_global_counter        => r_dwell_global_counter,
+    Dwell_program_tag           => r_dwell_program_tag,
     Dwell_measurement_duration  => r_duration_measurement,
     Dwell_total_duration        => r_duration_total,
     Dwell_tx_active             => r_tx_active,

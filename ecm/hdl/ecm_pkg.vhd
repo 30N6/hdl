@@ -199,8 +199,9 @@ package ecm_pkg is
     enable                    : std_logic;
     initial_dwell_index       : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
     global_counter_init       : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
+    tag                       : unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
   end record;
-  constant ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + ECM_DWELL_GLOBAL_COUNTER_WIDTH;
+  constant ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 16 + 16 + 16; --16 bits of padding
 
   type ecm_hardware_control_entry_t is record
     reset                     : std_logic;
@@ -461,6 +462,7 @@ package body ecm_pkg is
     r.enable              := v(0);
     r.initial_dwell_index := unsigned(v(8 + ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 8));
     r.global_counter_init := unsigned(v(16 + ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 16));
+    r.tag                 := unsigned(v(32 + ECM_DWELL_TAG_WIDTH - 1 downto 32));
     return r;
   end function;
 
