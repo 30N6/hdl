@@ -245,7 +245,7 @@ begin
     Dwell_active_transmit         => w_dwell_active_tx,
     Dwell_done                    => w_dwell_done,
     Dwell_data                    => w_dwell_data,
-    Dwell_sequence_num            => w_dwell_sequence_num,
+    Dwell_sequence_num            => w_dwell_sequence_num,    --TODO: cleanup - wrap into metadata struct
     Dwell_global_counter          => w_dwell_global_counter,
     Dwell_program_tag             => w_dwell_program_tag,
     Dwell_report_done_drfm        => w_dwell_drfm_reports_done,

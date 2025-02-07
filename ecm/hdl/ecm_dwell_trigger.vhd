@@ -106,6 +106,7 @@ architecture rtl of ecm_dwell_trigger is
   signal r2_duration_finished           : std_logic;
   signal r2_duration_next               : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   signal r2_address_next                : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal r2_continued_threshold         : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
   signal r3_channel_control             : ecm_channel_control_entry_t;
   signal r3_channel_state_wr_en         : std_logic;
@@ -192,6 +193,12 @@ begin
       r2_duration_finished      <= to_stdlogic(r1_channel_state.recording_length = w1_channel_control.trigger_duration_max_minus_one);
       r2_duration_next          <= r1_channel_state.recording_length + 1;
       r2_address_next           <= r1_channel_state.recording_address + 1;
+
+      if (and_reduce(w1_channel_control.trigger_hyst_shift) = '1') then
+        r2_continued_threshold  <= (others => '0');
+      else
+        r2_continued_threshold  <= shift_right(w1_channel_control.trigger_threshold, to_integer(w1_channel_control.trigger_hyst_shift));
+      end if;
     end if;
   end process;
 
@@ -222,7 +229,7 @@ begin
         if ((r2_trigger_is_forced = '1') or ((r2_trigger_is_threshold = '1') and (r2_threshold_check_new = '1'))) then
           r3_channel_state_wr_en                        <= r2_channelizer_ctrl.valid;
           r3_channel_state_wr_data.trigger_state        <= S_ACTIVE;
-          r3_channel_state_wr_data.continued_threshold  <= shift_right(r2_channel_control.trigger_threshold, to_integer(r2_channel_control.trigger_hyst_shift));
+          r3_channel_state_wr_data.continued_threshold  <= r2_continued_threshold;
           r3_channel_state_wr_data.recording_length     <= to_unsigned(1, ECM_DRFM_SEGMENT_LENGTH_WIDTH);
           r3_channel_state_wr_data.recording_address    <= r2_channel_control.recording_address;
           r3_channel_state_wr_data.forced_trigger       <= r2_trigger_is_forced;

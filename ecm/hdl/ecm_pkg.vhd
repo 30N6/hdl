@@ -81,7 +81,7 @@ package ecm_pkg is
   constant ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH            : natural := 32;
   constant ECM_DRFM_SEGMENT_LENGTH_WIDTH                  : natural := 12;
   constant ECM_DRFM_SEGMENT_SLICE_LENGTH_WIDTH            : natural := 8;
-  constant ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH              : natural := 2;
+  constant ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH              : natural := 4;
   constant ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT      : natural := 116;
 
   constant ECM_DWELL_DURATION_WIDTH                       : natural := 28;
