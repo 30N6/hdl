@@ -33,6 +33,7 @@ port (
   Dwell_start_measurement     : in  std_logic;
   Dwell_active_measurement    : in  std_logic;
   Dwell_index                 : in  unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
+  Dwell_min_trigger_duration  : in  unsigned(ECM_DWELL_MIN_TRIGGER_DURATION_WIDTH - 1 downto 0);
   Dwell_immediate_tx          : out std_logic;
 
   Trigger_pending             : out std_logic;
@@ -210,11 +211,12 @@ begin
       r3_channel_state_wr_index       <= r2_channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
       r3_channel_state_wr_data        <= r2_channel_state;
 
-      r3_drfm_write_req.valid         <= '0';
-      r3_drfm_write_req.first         <= '-';
-      r3_drfm_write_req.last          <= '-';
-      r3_drfm_write_req.address       <= (others => '-');
-      r3_drfm_write_req.channel_index <= r2_channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+      r3_drfm_write_req.valid             <= '0';
+      r3_drfm_write_req.first             <= '-';
+      r3_drfm_write_req.last              <= '-';
+      r3_drfm_write_req.trigger_accepted  <= to_stdlogic(r2_duration_next >= Dwell_min_trigger_duration);
+      r3_drfm_write_req.address           <= (others => '-');
+      r3_drfm_write_req.channel_index     <= r2_channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
 
       --TODO: handle saturation in software
       if (r2_channel_control.drfm_gain = '1') then

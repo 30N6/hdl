@@ -314,7 +314,7 @@ begin
         end if;
 
         if ((r1_write_req.valid = '1') and (r1_write_req.last = '1')) then
-          r_channel_report_pending(to_integer(r1_write_req.channel_index)) <= '1';
+          r_channel_report_pending(to_integer(r1_write_req.channel_index)) <= r1_write_req.trigger_accepted;
         end if;
         if (w_channel_reports_done = '1') then
           r_channel_report_pending(to_integer(w_reporter_channel_index)) <= '0';

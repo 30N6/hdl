@@ -809,6 +809,7 @@ module ecm_dwell_controller_tb;
     r.frequency               = $urandom;
     r.measurement_duration    = $urandom_range(5000*ecm_num_channels, 100*ecm_num_channels);
     r.total_duration_max      = r.measurement_duration + $urandom_range(5000*ecm_num_channels, 1000*ecm_num_channels);
+    r.min_trigger_duration    = $urandom_range(1000);
 
     return r;
   endfunction
@@ -855,6 +856,7 @@ module ecm_dwell_controller_tb;
     packed_entry[95:80]     = data.entry.frequency;
     packed_entry[127:96]    = data.entry.measurement_duration;
     packed_entry[159:128]   = data.entry.total_duration_max;
+    packed_entry[175:160]   = data.entry.min_trigger_duration;
 
     config_data[0] = ecm_control_magic_num;
     config_data[1] = config_seq_num++;
@@ -1093,13 +1095,14 @@ module ecm_dwell_controller_tb;
         if (chan_entry.trigger_mode == ecm_channel_trigger_mode_force_trigger) begin
           for (int i = 0; (i < dwell_frame_queue.size()) && (i <= chan_entry.trigger_duration_max_minus_one); i++) begin
             expect_drfm_t e;
-            e.write_data.valid          = 1;
-            e.write_data.first          = (i == 0);
-            e.write_data.last           = (i == (dwell_frame_queue.size() - 1)) || (i == chan_entry.trigger_duration_max_minus_one);
-            e.write_data.channel_index  = i_channel;
-            e.write_data.address        = chan_entry.recording_address + i;
-            e.dwell_seq_num             = dwell_seq_num;
-            e.recording_length          = recording_length;
+            e.write_data.valid            = 1;
+            e.write_data.first            = (i == 0);
+            e.write_data.last             = (i == (dwell_frame_queue.size() - 1)) || (i == chan_entry.trigger_duration_max_minus_one);
+            e.write_data.trigger_accepted = ((recording_length+1) >= dwell_entry.min_trigger_duration);
+            e.write_data.channel_index    = i_channel;
+            e.write_data.address          = chan_entry.recording_address + i;
+            e.dwell_seq_num               = dwell_seq_num;
+            e.recording_length            = recording_length;
 
             for (int j = 0; j < ecm_drfm_data_width; j++) begin
               e.write_data.data[0][j] = dwell_frame_queue[i].data_i[i_channel][drfm_gain_offset + j];
@@ -1131,13 +1134,14 @@ module ecm_dwell_controller_tb;
 
               //TODO: immediate start
 
-              e.write_data.valid          = 1;
-              e.write_data.first          = 0;
-              e.write_data.last           = pulse_last;
-              e.write_data.channel_index  = i_channel;
-              e.write_data.address        = chan_entry.recording_address + pulse_addr;
-              e.dwell_seq_num             = dwell_seq_num;
-              e.recording_length          = recording_length;
+              e.write_data.valid            = 1;
+              e.write_data.first            = 0;
+              e.write_data.last             = pulse_last;
+              e.write_data.trigger_accepted = ((recording_length+1) >= dwell_entry.min_trigger_duration);
+              e.write_data.channel_index    = i_channel;
+              e.write_data.address          = chan_entry.recording_address + pulse_addr;
+              e.dwell_seq_num               = dwell_seq_num;
+              e.recording_length            = recording_length;
 
               for (int j = 0; j < ecm_drfm_data_width; j++) begin
                 e.write_data.data[0][j] = dwell_frame_queue[i].data_i[i_channel][drfm_gain_offset + j];
@@ -1158,12 +1162,13 @@ module ecm_dwell_controller_tb;
               end
 
             end else if (dwell_frame_queue[i].data_p[i_channel] >= threshold_new) begin
-              e.write_data.valid          = 1;
-              e.write_data.first          = 1;
-              e.write_data.last           = 0;
-              e.write_data.channel_index  = i_channel;
-              e.write_data.address        = chan_entry.recording_address + pulse_addr;
-              e.dwell_seq_num             = dwell_seq_num;
+              e.write_data.valid            = 1;
+              e.write_data.first            = 1;
+              e.write_data.last             = 0;
+              e.write_data.trigger_accepted = ((recording_length+1) >= dwell_entry.min_trigger_duration);
+              e.write_data.channel_index    = i_channel;
+              e.write_data.address          = chan_entry.recording_address + pulse_addr;
+              e.dwell_seq_num               = dwell_seq_num;
 
               for (int j = 0; j < ecm_drfm_data_width; j++) begin
                 e.write_data.data[0][j] = dwell_frame_queue[i].data_i[i_channel][drfm_gain_offset + j];

@@ -73,6 +73,7 @@ architecture rtl of ecm_dwell_stats_reporter is
     S_DWELL_ENTRY_2,
     S_DWELL_ENTRY_3,
     S_DWELL_ENTRY_4,
+    S_DWELL_ENTRY_5,
 
     S_SEQ_NUM,
     S_GLOBAL_COUNTER,
@@ -165,6 +166,8 @@ begin
         when S_DWELL_ENTRY_3 =>
           s_state <= S_DWELL_ENTRY_4;
         when S_DWELL_ENTRY_4 =>
+          s_state <= S_DWELL_ENTRY_5;
+        when S_DWELL_ENTRY_5 =>
           s_state <= S_SEQ_NUM;
 
         when S_SEQ_NUM =>
@@ -312,6 +315,10 @@ begin
     when S_DWELL_ENTRY_4 =>
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= w_dwell_data_packed(159 downto 128);
+
+    when S_DWELL_ENTRY_5 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= w_dwell_data_packed(191 downto 160);
 
     when S_SEQ_NUM =>
       w_fifo_valid            <= '1';

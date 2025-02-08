@@ -88,12 +88,13 @@ interface dwell_tx_intf (input logic Clk);
     while (write_req_data.size() > 0) begin
       write_req = write_req_data.pop_front();
       @(posedge Clk);
-      write_req.valid         = 0;
-      write_req.first         = 'x;
-      write_req.last          = 'x;
-      write_req.channel_index = 'x;
-      write_req.address       = 'x;
-      write_req.data          = '{default: 'x};
+      write_req.valid             = 0;
+      write_req.first             = 'x;
+      write_req.last              = 'x;
+      write_req.trigger_accepted  = 'x;
+      write_req.channel_index     = 'x;
+      write_req.address           = 'x;
+      write_req.data              = '{default: 'x};
       repeat ($urandom_range(1, 0)) @(posedge Clk);
     end
 
@@ -645,58 +646,62 @@ module ecm_drfm_tb;
       int slice_addr          = writes_by_channel[i_channel][0].address;
       int samples_remaining   = writes_by_channel[i_channel][writes_by_channel[i_channel].size() - 1].address - writes_by_channel[i_channel][0].address + 1;
       int sample_offset       = 0;
+      bit trigger_accepted    = writes_by_channel[i_channel][writes_by_channel[i_channel].size() - 1].trigger_accepted;
 
       if (num_channel_packets == 0) begin
         continue;
       end
 
-      for (int i_packet = 0; i_packet < num_channel_packets; i_packet++) begin
-        expect_report_t                       report_axi;
-        ecm_drfm_channel_report_header_t      report_header;
-        ecm_drfm_channel_report_header_bits_t report_header_packed;
-        int                                   num_padding_words;
+      if (trigger_accepted) begin
+        for (int i_packet = 0; i_packet < num_channel_packets; i_packet++) begin
+          expect_report_t                       report_axi;
+          ecm_drfm_channel_report_header_t      report_header;
+          ecm_drfm_channel_report_header_bits_t report_header_packed;
+          int                                   num_padding_words;
 
-        report_header.magic_num           = ecm_report_magic_num;
-        report_header.sequence_num        = report_seq_num;
-        report_header.module_id           = ecm_module_id_drfm;
-        report_header.message_type        = ecm_report_message_type_drfm_channel_data;
-        report_header.padding_0           = 0;
-        report_header.dwell_sequence_num  = dwell_seq_num;
-        report_header.channel_index       = i_channel;
-        report_header.max_iq_bits         = max_iq_bits[i_channel];
-        report_header.padding             = 0;
-        report_header.segment_seq_num     = segment_seq_num[i_channel];
-        report_header.segment_timestamp   = 0;
-        report_header.segment_addr_first  = writes_by_channel[i_channel][0].address;
-        report_header.segment_addr_last   = writes_by_channel[i_channel][writes_by_channel[i_channel].size() - 1].address;
-        report_header.slice_addr          = slice_addr;
-        report_header.slice_length        = (samples_remaining > ecm_drfm_max_packet_iq_samples_per_report) ? ecm_drfm_max_packet_iq_samples_per_report : samples_remaining;
+          report_header.magic_num           = ecm_report_magic_num;
+          report_header.sequence_num        = report_seq_num;
+          report_header.module_id           = ecm_module_id_drfm;
+          report_header.message_type        = ecm_report_message_type_drfm_channel_data;
+          report_header.padding_0           = 0;
+          report_header.dwell_sequence_num  = dwell_seq_num;
+          report_header.channel_index       = i_channel;
+          report_header.max_iq_bits         = max_iq_bits[i_channel];
+          report_header.padding             = 0;
+          report_header.segment_seq_num     = segment_seq_num[i_channel];
+          report_header.segment_timestamp   = 0;
+          report_header.segment_addr_first  = writes_by_channel[i_channel][0].address;
+          report_header.segment_addr_last   = writes_by_channel[i_channel][writes_by_channel[i_channel].size() - 1].address;
+          report_header.slice_addr          = slice_addr;
+          report_header.slice_length        = (samples_remaining > ecm_drfm_max_packet_iq_samples_per_report) ? ecm_drfm_max_packet_iq_samples_per_report : samples_remaining;
 
-        $display("expecting report: %p", report_header);
+          $display("expecting report: %p", report_header);
 
-        report_seq_num++;
-        slice_addr += report_header.slice_length;
-        samples_remaining -= report_header.slice_length;
+          report_seq_num++;
+          slice_addr += report_header.slice_length;
+          samples_remaining -= report_header.slice_length;
 
-        report_header_packed = ecm_drfm_channel_report_header_bits_t'(report_header);
-        for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
-          report_axi.data.push_back(report_header_packed[(NUM_CHANNEL_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
+          report_header_packed = ecm_drfm_channel_report_header_bits_t'(report_header);
+          for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
+            report_axi.data.push_back(report_header_packed[(NUM_CHANNEL_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
+          end
+
+          for (int i = 0; i < report_header.slice_length; i++) begin
+            iq_data_t iq = get_iq_data_from_write_req(writes_by_channel[i_channel][sample_offset + i]);
+            logic [31:0] w = {iq[1], iq[0]};
+            report_axi.data.push_back(w);
+          end
+          sample_offset += report_header.slice_length;
+
+          num_padding_words = ecm_words_per_dma_packet - report_axi.data.size();
+          for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
+            report_axi.data.push_back(0);
+          end
+
+          expected_channel_reports[i_channel].push_back(report_axi);
         end
-
-        for (int i = 0; i < report_header.slice_length; i++) begin
-          iq_data_t iq = get_iq_data_from_write_req(writes_by_channel[i_channel][sample_offset + i]);
-          logic [31:0] w = {iq[1], iq[0]};
-          report_axi.data.push_back(w);
-        end
-        sample_offset += report_header.slice_length;
-
-        num_padding_words = ecm_words_per_dma_packet - report_axi.data.size();
-        for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
-          report_axi.data.push_back(0);
-        end
-
-        expected_channel_reports[i_channel].push_back(report_axi);
       end
+
       segment_seq_num[i_channel]++;
     end
 
@@ -787,11 +792,12 @@ module ecm_drfm_tb;
         if(channel_valid[i] && (f >= channel_frame_start[i]) && (channel_data_index[i] < channel_duration[i])) begin
           channel_active  = 1;
 
-          d.valid         = 1;
-          d.first         = (channel_data_index[i] == 0);
-          d.last          = (channel_data_index[i] == (channel_duration[i] - 1));
-          d.channel_index = i;
-          d.address       = channel_addr_start[i] + channel_data_index[i];
+          d.valid             = 1;
+          d.first             = (channel_data_index[i] == 0);
+          d.last              = (channel_data_index[i] == (channel_duration[i] - 1));
+          d.trigger_accepted  = ($urandom_range(99) < 95);
+          d.channel_index     = i;
+          d.address           = channel_addr_start[i] + channel_data_index[i];
 
           for (int j = 0; j < 2; j++) begin
             iq[j] = ($urandom & iq_bit_mask);

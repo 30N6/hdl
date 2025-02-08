@@ -206,30 +206,31 @@ begin
     CHANNELIZER_DATA_WIDTH => CHANNELIZER_DATA_WIDTH
   )
   port map (
-    Clk                       => Clk,
-    Rst                       => r_rst,
+    Clk                         => Clk,
+    Rst                         => r_rst,
 
-    Channel_entry_valid       => w_channel_entry_valid,
-    Channel_entry_index       => w_channel_entry_index,
-    Channel_entry_data        => w_channel_entry_data,
+    Channel_entry_valid         => w_channel_entry_valid,
+    Channel_entry_index         => w_channel_entry_index,
+    Channel_entry_data          => w_channel_entry_data,
 
-    Channelizer_ctrl          => r_channelizer_ctrl,
-    Channelizer_data          => r_channelizer_data,
-    Channelizer_pwr           => r_channelizer_pwr,
+    Channelizer_ctrl            => r_channelizer_ctrl,
+    Channelizer_data            => r_channelizer_data,
+    Channelizer_pwr             => r_channelizer_pwr,
 
-    Dwell_channel_clear       => r_dwell_report_wait,
-    Dwell_start_measurement   => r_dwell_start_meas,
-    Dwell_active_measurement  => r_dwell_active_meas,
-    Dwell_index               => r_dwell_entry_index_d1,
-    Dwell_immediate_tx        => w_trigger_immediate_tx,
+    Dwell_channel_clear         => r_dwell_report_wait,
+    Dwell_start_measurement     => r_dwell_start_meas,
+    Dwell_active_measurement    => r_dwell_active_meas,
+    Dwell_index                 => r_dwell_entry_index_d1,
+    Dwell_min_trigger_duration  => r_dwell_entry_d1.min_trigger_duration,
+    Dwell_immediate_tx          => w_trigger_immediate_tx,
 
-    Trigger_pending           => w_trigger_pending,
+    Trigger_pending             => w_trigger_pending,
 
-    Tx_program_req_valid      => w_tx_program_req_valid,
-    Tx_program_req_channel    => w_tx_program_req_channel,
-    Tx_program_req_index      => w_tx_program_req_index,
+    Tx_program_req_valid        => w_tx_program_req_valid,
+    Tx_program_req_channel      => w_tx_program_req_channel,
+    Tx_program_req_index        => w_tx_program_req_index,
 
-    Drfm_write_req            => w_drfm_write_req
+    Drfm_write_req              => w_drfm_write_req
   );
 
   i_tx_engine : entity ecm_lib.ecm_dwell_tx_engine
