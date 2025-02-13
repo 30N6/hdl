@@ -57,7 +57,7 @@ architecture rtl of ecm_top is
   constant ENABLE_CHANNELIZER         : boolean := true;
   constant ENABLE_SYNTHESIZER         : boolean := false;
   constant ENABLE_DWELL_STATS         : boolean := true;
-  constant ENABLE_DRFM                : boolean := true;
+  constant ENABLE_DRFM                : boolean := false;
 
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
   constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + clog2(8) + clog2(ECM_NUM_CHANNELS); -- 8 taps per channel
@@ -164,40 +164,6 @@ architecture rtl of ecm_top is
   attribute ASYNC_REG : string;
   attribute ASYNC_REG of r_ad9361_status : signal is "TRUE";
 
-  attribute MARK_DEBUG : string;
-  attribute DONT_TOUCH : string;
-  
-  --attribute MARK_DEBUG of S_axis_ready : signal is "TRUE";
-  --attribute DONT_TOUCH of S_axis_ready : signal is "TRUE";
-  --attribute MARK_DEBUG of S_axis_valid : signal is "TRUE";
-  --attribute DONT_TOUCH of S_axis_valid : signal is "TRUE";
-  --attribute MARK_DEBUG of S_axis_data : signal is "TRUE";
-  --attribute DONT_TOUCH of S_axis_data : signal is "TRUE";
-  --attribute MARK_DEBUG of S_axis_last : signal is "TRUE";
-  --attribute DONT_TOUCH of S_axis_last : signal is "TRUE";
-  --
-  --attribute MARK_DEBUG of w_config_rst : signal is "TRUE";
-  --attribute DONT_TOUCH of w_config_rst : signal is "TRUE";
-  --attribute MARK_DEBUG of r_combined_rst : signal is "TRUE";
-  --attribute DONT_TOUCH of r_combined_rst : signal is "TRUE";
-  --attribute MARK_DEBUG of w_enable_status : signal is "TRUE";
-  --attribute DONT_TOUCH of w_enable_status : signal is "TRUE";
-  --attribute MARK_DEBUG of w_enable_chan : signal is "TRUE";
-  --attribute DONT_TOUCH of w_enable_chan : signal is "TRUE";
-  --attribute MARK_DEBUG of w_enable_synth : signal is "TRUE";
-  --attribute DONT_TOUCH of w_enable_synth : signal is "TRUE";
-  --attribute MARK_DEBUG of w_module_config : signal is "TRUE";
-  --attribute DONT_TOUCH of w_module_config : signal is "TRUE";
-
-  --attribute MARK_DEBUG of w_d2h_fifo_in_ready : signal is "TRUE";
-  --attribute DONT_TOUCH of w_d2h_fifo_in_ready : signal is "TRUE";
-  --attribute MARK_DEBUG of w_d2h_fifo_in_valid : signal is "TRUE";
-  --attribute DONT_TOUCH of w_d2h_fifo_in_valid : signal is "TRUE";
-  --attribute MARK_DEBUG of w_d2h_fifo_in_data : signal is "TRUE";
-  --attribute DONT_TOUCH of w_d2h_fifo_in_data : signal is "TRUE";
-  --attribute MARK_DEBUG of w_d2h_fifo_in_last : signal is "TRUE";
-  --attribute DONT_TOUCH of w_d2h_fifo_in_last : signal is "TRUE";
-  
 begin
 
   i_phase_marker : entity common_lib.clk_x4_phase_marker
