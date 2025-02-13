@@ -89,7 +89,7 @@ begin
                       r_debug_dwell_controller.r_dwell_start_meas or
                       r_debug_dwell_controller.w_trigger_immediate_tx or
                       r_debug_dwell_controller.w_tx_program_req_valid or
-                      (r_debug_dwell_trigger.r3_channel_state_wr_en;
+                      r_debug_dwell_trigger.r3_channel_state_wr_en;
 
       r_fifo_wr_data <= w_debug_dwell_trigger_packed & w_debug_dwell_controller_packed;
     end if;
