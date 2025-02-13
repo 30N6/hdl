@@ -162,6 +162,65 @@ architecture rtl of ecm_dwell_controller is
   signal w_error_program_fifo_overflow  : std_logic;
   signal w_error_program_fifo_underflow : std_logic;
 
+  attribute MARK_DEBUG : string;
+  attribute DONT_TOUCH : string;
+
+  attribute MARK_DEBUG of w_dwell_program_valid : signal is "TRUE";
+  attribute DONT_TOUCH of w_dwell_program_valid : signal is "TRUE";
+  attribute MARK_DEBUG of w_dwell_program_data : signal is "TRUE";
+  attribute DONT_TOUCH of w_dwell_program_data : signal is "TRUE";
+  attribute MARK_DEBUG of w_channel_entry_valid : signal is "TRUE";
+  attribute DONT_TOUCH of w_channel_entry_valid : signal is "TRUE";
+  attribute MARK_DEBUG of w_channel_entry_index : signal is "TRUE";
+  attribute DONT_TOUCH of w_channel_entry_index : signal is "TRUE";
+  attribute MARK_DEBUG of w_channel_entry_data : signal is "TRUE";
+  attribute DONT_TOUCH of w_channel_entry_data : signal is "TRUE";
+  attribute MARK_DEBUG of w_tx_instruction_valid : signal is "TRUE";
+  attribute DONT_TOUCH of w_tx_instruction_valid : signal is "TRUE";
+  attribute MARK_DEBUG of w_tx_instruction_index : signal is "TRUE";
+  attribute DONT_TOUCH of w_tx_instruction_index : signal is "TRUE";
+  attribute MARK_DEBUG of w_tx_instruction_data : signal is "TRUE";
+  attribute DONT_TOUCH of w_tx_instruction_data : signal is "TRUE";
+
+  attribute MARK_DEBUG of s_state : signal is "TRUE";
+  attribute DONT_TOUCH of s_state : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_done_meas : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_done_meas : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_done_total : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_done_total : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_meas_flush_done : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_meas_flush_done : signal is "TRUE";
+  attribute MARK_DEBUG of r_report_received_drfm : signal is "TRUE";
+  attribute DONT_TOUCH of r_report_received_drfm : signal is "TRUE";
+  attribute MARK_DEBUG of r_report_received_stats : signal is "TRUE";
+  attribute DONT_TOUCH of r_report_received_stats : signal is "TRUE";
+
+  attribute MARK_DEBUG of r_dwell_active : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_active : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_start_meas : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_start_meas : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_active_meas : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_active_meas : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_active_tx : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_active_tx : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_report_wait : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_report_wait : signal is "TRUE";
+  attribute MARK_DEBUG of w_trigger_immediate_tx : signal is "TRUE";
+  attribute DONT_TOUCH of w_trigger_immediate_tx : signal is "TRUE";
+
+  attribute MARK_DEBUG of w_trigger_pending : signal is "TRUE";
+  attribute DONT_TOUCH of w_trigger_pending : signal is "TRUE";
+  attribute MARK_DEBUG of w_tx_program_req_valid : signal is "TRUE";
+  attribute DONT_TOUCH of w_tx_program_req_valid : signal is "TRUE";
+  attribute MARK_DEBUG of w_tx_program_req_channel : signal is "TRUE";
+  attribute DONT_TOUCH of w_tx_program_req_channel : signal is "TRUE";
+  attribute MARK_DEBUG of w_tx_program_req_index : signal is "TRUE";
+  attribute DONT_TOUCH of w_tx_program_req_index : signal is "TRUE";
+  attribute MARK_DEBUG of w_tx_programs_done : signal is "TRUE";
+  attribute DONT_TOUCH of w_tx_programs_done : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_program_tag : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_program_tag : signal is "TRUE";
+
 begin
 
   process(Clk)

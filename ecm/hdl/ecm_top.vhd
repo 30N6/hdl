@@ -165,7 +165,6 @@ architecture rtl of ecm_top is
   attribute ASYNC_REG : string;
   attribute ASYNC_REG of r_ad9361_status : signal is "TRUE";
 
-  signal debug_wire : std_logic; 
   attribute MARK_DEBUG : string;
   attribute DONT_TOUCH : string;
   
@@ -189,16 +188,16 @@ architecture rtl of ecm_top is
   attribute MARK_DEBUG of w_enable_synth : signal is "TRUE";
   attribute DONT_TOUCH of w_enable_synth : signal is "TRUE";
   attribute MARK_DEBUG of w_module_config : signal is "TRUE";
-  attribute DONT_TOUCH of w_module_config : signal is "TRUE";  
+  attribute DONT_TOUCH of w_module_config : signal is "TRUE";
 
-  attribute MARK_DEBUG of w_d2h_fifo_in_ready : signal is "TRUE";
-  attribute DONT_TOUCH of w_d2h_fifo_in_ready : signal is "TRUE";
-  attribute MARK_DEBUG of w_d2h_fifo_in_valid : signal is "TRUE";
-  attribute DONT_TOUCH of w_d2h_fifo_in_valid : signal is "TRUE";
-  attribute MARK_DEBUG of w_d2h_fifo_in_data : signal is "TRUE";
-  attribute DONT_TOUCH of w_d2h_fifo_in_data : signal is "TRUE";
-  attribute MARK_DEBUG of w_d2h_fifo_in_last : signal is "TRUE";
-  attribute DONT_TOUCH of w_d2h_fifo_in_last : signal is "TRUE";
+  --attribute MARK_DEBUG of w_d2h_fifo_in_ready : signal is "TRUE";
+  --attribute DONT_TOUCH of w_d2h_fifo_in_ready : signal is "TRUE";
+  --attribute MARK_DEBUG of w_d2h_fifo_in_valid : signal is "TRUE";
+  --attribute DONT_TOUCH of w_d2h_fifo_in_valid : signal is "TRUE";
+  --attribute MARK_DEBUG of w_d2h_fifo_in_data : signal is "TRUE";
+  --attribute DONT_TOUCH of w_d2h_fifo_in_data : signal is "TRUE";
+  --attribute MARK_DEBUG of w_d2h_fifo_in_last : signal is "TRUE";
+  --attribute DONT_TOUCH of w_d2h_fifo_in_last : signal is "TRUE";
   
 begin
 

@@ -130,6 +130,25 @@ architecture rtl of ecm_dwell_trigger is
   signal w_channel_state_wr_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal w_channel_state_wr_en          : std_logic;
 
+  attribute MARK_DEBUG : string;
+  attribute DONT_TOUCH : string;
+
+  attribute MARK_DEBUG of r3_channel_state_wr_en : signal is "TRUE";
+  attribute DONT_TOUCH of r3_channel_state_wr_en : signal is "TRUE";
+  attribute MARK_DEBUG of r3_channel_state_wr_index : signal is "TRUE";
+  attribute DONT_TOUCH of r3_channel_state_wr_index : signal is "TRUE";
+  attribute MARK_DEBUG of r3_channel_state_wr_data : signal is "TRUE";
+  attribute DONT_TOUCH of r3_channel_state_wr_data : signal is "TRUE";
+  attribute MARK_DEBUG of r3_trigger_check_duration_min : signal is "TRUE";
+  attribute DONT_TOUCH of r3_trigger_check_duration_min : signal is "TRUE";
+  attribute MARK_DEBUG of r3_trigger_pending : signal is "TRUE";
+  attribute DONT_TOUCH of r3_trigger_pending : signal is "TRUE";
+  attribute MARK_DEBUG of r3_channel_control : signal is "TRUE";
+  attribute DONT_TOUCH of r3_channel_control : signal is "TRUE";
+  attribute MARK_DEBUG of r3_drfm_write_req : signal is "TRUE";
+  attribute DONT_TOUCH of r3_drfm_write_req : signal is "TRUE";
+
+
 begin
 
   w_channel_state_rd_index <= Channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
