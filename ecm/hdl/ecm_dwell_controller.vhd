@@ -165,16 +165,16 @@ architecture rtl of ecm_dwell_controller is
   attribute MARK_DEBUG : string;
   attribute DONT_TOUCH : string;
 
-  attribute MARK_DEBUG of w_dwell_program_valid : signal is "TRUE";
-  attribute DONT_TOUCH of w_dwell_program_valid : signal is "TRUE";
-  attribute MARK_DEBUG of w_dwell_program_data : signal is "TRUE";
-  attribute DONT_TOUCH of w_dwell_program_data : signal is "TRUE";
-  attribute MARK_DEBUG of w_channel_entry_valid : signal is "TRUE";
-  attribute DONT_TOUCH of w_channel_entry_valid : signal is "TRUE";
-  attribute MARK_DEBUG of w_channel_entry_index : signal is "TRUE";
-  attribute DONT_TOUCH of w_channel_entry_index : signal is "TRUE";
-  attribute MARK_DEBUG of w_channel_entry_data : signal is "TRUE";
-  attribute DONT_TOUCH of w_channel_entry_data : signal is "TRUE";
+  --attribute MARK_DEBUG of w_dwell_program_valid : signal is "TRUE";
+  --attribute DONT_TOUCH of w_dwell_program_valid : signal is "TRUE";
+  --attribute MARK_DEBUG of w_dwell_program_data : signal is "TRUE";
+  --attribute DONT_TOUCH of w_dwell_program_data : signal is "TRUE";
+  --attribute MARK_DEBUG of w_channel_entry_valid : signal is "TRUE";
+  --attribute DONT_TOUCH of w_channel_entry_valid : signal is "TRUE";
+  --attribute MARK_DEBUG of w_channel_entry_index : signal is "TRUE";
+  --attribute DONT_TOUCH of w_channel_entry_index : signal is "TRUE";
+  --attribute MARK_DEBUG of w_channel_entry_data : signal is "TRUE";
+  --attribute DONT_TOUCH of w_channel_entry_data : signal is "TRUE";
   attribute MARK_DEBUG of w_tx_instruction_valid : signal is "TRUE";
   attribute DONT_TOUCH of w_tx_instruction_valid : signal is "TRUE";
   attribute MARK_DEBUG of w_tx_instruction_index : signal is "TRUE";
