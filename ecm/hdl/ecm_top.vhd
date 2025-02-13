@@ -259,6 +259,7 @@ begin
     CHANNELIZER_DATA_WIDTH    => CHANNELIZER16_DATA_WIDTH
   )
   port map (
+    Clk_axi                       => M_axis_clk,
     Clk                           => Adc_clk_x4,
     Rst                           => r_combined_rst,
 
