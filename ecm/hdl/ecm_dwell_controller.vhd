@@ -7,6 +7,7 @@ library common_lib;
 
 library ecm_lib;
   use ecm_lib.ecm_pkg.all;
+  use ecm_lib.ecm_debug_pkg.all;
 
 library dsp_lib;
   use dsp_lib.dsp_pkg.all;
@@ -17,6 +18,7 @@ generic (
   CHANNELIZER_DATA_WIDTH    : natural
 );
 port (
+  Clk_axi                       : in  std_logic;
   Clk                           : in  std_logic;
   Rst                           : in  std_logic;
 
@@ -77,6 +79,7 @@ architecture rtl of ecm_dwell_controller is
   );
 
   constant MEAS_FLUSH_CYCLES            : natural := ECM_NUM_CHANNELS * 2 + 8;
+  constant ENABLE_DEBUG                 : boolean := true;
 
   signal s_state                        : state_t;
 
@@ -162,7 +165,68 @@ architecture rtl of ecm_dwell_controller is
   signal w_error_program_fifo_overflow  : std_logic;
   signal w_error_program_fifo_underflow : std_logic;
 
+  signal w_debug_dwell_controller       : ecm_dwell_controller_debug_t;
+  signal w_debug_dwell_trigger          : ecm_dwell_trigger_debug_t;
+
 begin
+
+  g_debug : if (ENABLE_DEBUG) generate
+    w_debug_dwell_controller.s_state                      <= x"0" when (s_state = S_IDLE) else
+                                                            x"1" when (s_state = S_LOAD_DWELL_ENTRY_0) else
+                                                            x"2" when (s_state = S_LOAD_DWELL_ENTRY_1) else
+                                                            x"3" when (s_state = S_LOAD_DWELL_ENTRY_2) else
+                                                            x"4" when (s_state = S_CHECK_DWELL_ENTRY) else
+                                                            x"5" when (s_state = S_PLL_WAIT_PRE_LOCK) else
+                                                            x"6" when (s_state = S_PLL_WAIT_POST_LOCK) else
+                                                            x"7" when (s_state = S_DWELL_START_MEAS) else
+                                                            x"8" when (s_state = S_DWELL_ACTIVE_MEAS) else
+                                                            x"9" when (s_state = S_DWELL_FLUSH_MEAS) else
+                                                            x"A" when (s_state = S_DWELL_START_TX) else
+                                                            x"B" when (s_state = S_DWELL_ACTIVE_TX) else
+                                                            x"C" when (s_state = S_DWELL_REPORT_WAIT) else
+                                                            x"D" when (s_state = S_DWELL_DONE) else
+                                                            x"E";
+
+    w_debug_dwell_controller.w_channel_entry_valid        <= w_channel_entry_valid;
+    w_debug_dwell_controller.w_channel_entry_index        <= std_logic_vector(w_channel_entry_index);
+    w_debug_dwell_controller.w_channel_entry_data         <= pack(w_channel_entry_data);
+    w_debug_dwell_controller.w_tx_instruction_valid       <= w_tx_instruction_valid;
+    w_debug_dwell_controller.w_tx_instruction_index       <= std_logic_vector(w_tx_instruction_index);
+    w_debug_dwell_controller.w_tx_instruction_data        <= w_tx_instruction_data;
+
+    w_debug_dwell_controller.r_dwell_program_valid        <= r_dwell_program_valid;
+    w_debug_dwell_controller.r_dwell_program_tag          <= std_logic_vector(r_dwell_program_tag);
+
+    w_debug_dwell_controller.r_dwell_cycles               <= std_logic_vector(r_dwell_cycles);
+    w_debug_dwell_controller.r_dwell_done_meas            <= r_dwell_done_meas;
+    w_debug_dwell_controller.r_dwell_done_total           <= r_dwell_done_total;
+    w_debug_dwell_controller.r_dwell_meas_flush_done      <= r_dwell_meas_flush_done;
+    w_debug_dwell_controller.r_report_received_drfm       <= r_report_received_drfm;
+    w_debug_dwell_controller.r_report_received_stats      <= r_report_received_stats;
+
+    w_debug_dwell_controller.r_dwell_active               <= r_dwell_active;
+    w_debug_dwell_controller.r_dwell_start_meas           <= r_dwell_start_meas;
+    w_debug_dwell_controller.r_dwell_active_meas          <= r_dwell_active_meas;
+    w_debug_dwell_controller.r_dwell_active_tx            <= r_dwell_active_tx;
+    w_debug_dwell_controller.r_dwell_report_wait          <= r_dwell_report_wait;
+
+    w_debug_dwell_controller.w_trigger_immediate_tx       <= w_trigger_immediate_tx;
+    w_debug_dwell_controller.w_trigger_pending            <= w_trigger_pending;
+    w_debug_dwell_controller.w_tx_program_req_valid       <= w_tx_program_req_valid;
+    w_debug_dwell_controller.w_tx_program_req_channel     <= std_logic_vector(w_tx_program_req_channel);
+    w_debug_dwell_controller.w_tx_program_req_index       <= std_logic_vector(w_tx_program_req_index);
+    w_debug_dwell_controller.w_tx_programs_done           <= w_tx_programs_done;
+
+    i_debug : entity ecm_lib.ecm_dwell_controller_debug
+    port map (
+      Clk_axi                 => Clk_axi,
+      Clk                     => Clk,
+      Rst                     => r_rst,
+
+      Debug_dwell_controller  => w_debug_dwell_controller,
+      Debug_dwell_trigger     => w_debug_dwell_trigger
+    );
+  end generate g_debug;
 
   process(Clk)
   begin
@@ -203,7 +267,8 @@ begin
 
   i_trigger : entity ecm_lib.ecm_dwell_trigger
   generic map (
-    CHANNELIZER_DATA_WIDTH => CHANNELIZER_DATA_WIDTH
+    CHANNELIZER_DATA_WIDTH  => CHANNELIZER_DATA_WIDTH,
+    ENABLE_DEBUG            => ENABLE_DEBUG
   )
   port map (
     Clk                         => Clk,
@@ -230,7 +295,9 @@ begin
     Tx_program_req_channel      => w_tx_program_req_channel,
     Tx_program_req_index        => w_tx_program_req_index,
 
-    Drfm_write_req              => w_drfm_write_req
+    Drfm_write_req              => w_drfm_write_req,
+
+    Debug_out                   => w_debug_dwell_trigger
   );
 
   i_tx_engine : entity ecm_lib.ecm_dwell_tx_engine

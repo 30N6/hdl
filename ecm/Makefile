@@ -47,6 +47,8 @@ GENERIC_DEPS += ../dsp/hdl/channelized_dds_lut.vhd
 GENERIC_DEPS += ../dsp/hdl/channelized_dds.vhd
 
 GENERIC_DEPS += ./hdl/ecm_pkg.vhd
+GENERIC_DEPS += ./hdl/ecm_debug_pkg.vhd
+GENERIC_DEPS += ./hdl/ecm_dwell_controller_debug.vhd
 GENERIC_DEPS += ./hdl/ecm_config.vhd
 GENERIC_DEPS += ./hdl/ecm_dwell_config_decoder.vhd
 GENERIC_DEPS += ./hdl/ecm_dwell_trigger.vhd

@@ -27,6 +27,8 @@ set library_file_list [list \
     ] \
   ecm_lib [list \
     ./hdl/ecm_pkg.vhd \
+    ./hdl/ecm_debug_pkg.vhd \
+    ./hdl/ecm_dwell_controller_debug.vhd \
     ./hdl/ecm_config.vhd \
     ./hdl/ecm_dwell_config_decoder.vhd \
     ./hdl/ecm_dwell_trigger.vhd \
@@ -103,7 +105,7 @@ foreach {library file_list} $library_file_list {
 set last_compile_time $time_now
 
 #  -novopt
-vsim -suppress 12110 $top_level glbl.glbl
+vsim -suppress 12110 $top_level glbl.glbl -novopt
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all

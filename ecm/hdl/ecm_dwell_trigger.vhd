@@ -7,6 +7,7 @@ library common_lib;
 
 library ecm_lib;
   use ecm_lib.ecm_pkg.all;
+  use ecm_lib.ecm_debug_pkg.all;
 
 library dsp_lib;
   use dsp_lib.dsp_pkg.all;
@@ -15,7 +16,8 @@ library mem_lib;
 
 entity ecm_dwell_trigger is
 generic (
-  CHANNELIZER_DATA_WIDTH  : natural
+  CHANNELIZER_DATA_WIDTH  : natural;
+  ENABLE_DEBUG            : boolean
 );
 port (
   Clk                         : in  std_logic;
@@ -42,7 +44,9 @@ port (
   Tx_program_req_channel      : out unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   Tx_program_req_index        : out unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
 
-  Drfm_write_req              : out ecm_drfm_write_req_t
+  Drfm_write_req              : out ecm_drfm_write_req_t;
+
+  Debug_out                   : out ecm_dwell_trigger_debug_t
 );
 begin
   -- PSL default clock is rising_edge(Clk);
@@ -131,6 +135,28 @@ architecture rtl of ecm_dwell_trigger is
   signal w_channel_state_wr_en          : std_logic;
 
 begin
+
+  g_debug : if (ENABLE_DEBUG) generate
+    Debug_out.r3_channel_control                  <= pack(r3_channel_control);
+    Debug_out.r3_channel_state_wr_en              <= r3_channel_state_wr_en;
+    Debug_out.r3_channel_state_wr_index           <= std_logic_vector(r3_channel_state_wr_index);
+    Debug_out.r3_channel_state_wr_data_state      <=  x"0" when (r3_channel_state_wr_data.trigger_state = S_IDLE) else
+                                                      x"1" when (r3_channel_state_wr_data.trigger_state = S_ACTIVE) else
+                                                      x"2" when (r3_channel_state_wr_data.trigger_state = S_COMPLETE) else
+                                                      x"3";
+    Debug_out.r3_channel_state_wr_en_rec_len      <= std_logic_vector(r3_channel_state_wr_data.recording_length);
+
+    Debug_out.r3_drfm_write_req_valid             <= r3_drfm_write_req.valid;
+    Debug_out.r3_drfm_write_req_first             <= r3_drfm_write_req.first;
+    Debug_out.r3_drfm_write_req_last              <= r3_drfm_write_req.last;
+    Debug_out.r3_drfm_write_req_trigger_accepted  <= r3_drfm_write_req.trigger_accepted;
+    Debug_out.r3_drfm_write_req_address           <= std_logic_vector(r3_drfm_write_req.address);
+    Debug_out.r3_drfm_write_req_channel_index     <= std_logic_vector(r3_drfm_write_req.channel_index);
+
+    Debug_out.r3_trigger_check_duration_min       <= r3_trigger_check_duration_min;
+    Debug_out.r3_trigger_check_duration_max       <= r3_trigger_check_duration_max;
+    Debug_out.r3_trigger_pending                  <= r3_trigger_pending;
+  end generate g_debug;
 
   w_channel_state_rd_index <= Channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
 

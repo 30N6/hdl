@@ -58,7 +58,6 @@ architecture rtl of ecm_top is
   constant ENABLE_SYNTHESIZER         : boolean := true;
   constant ENABLE_DWELL_STATS         : boolean := true;
   constant ENABLE_DRFM                : boolean := true;
-  constant ENABLE_DEBUG               : boolean := false;
 
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
   constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + clog2(8) + clog2(ECM_NUM_CHANNELS); -- 8 taps per channel
