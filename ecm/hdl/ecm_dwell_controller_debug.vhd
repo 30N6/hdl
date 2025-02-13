@@ -25,7 +25,7 @@ end entity ecm_dwell_controller_debug;
 architecture rtl of ecm_dwell_controller_debug is
 
   constant FIFO_DEPTH                     : natural := 1024;
-  constant DEBUG_COMBINED_WIDTH           : natural := ECM_DWELL_TRIGGER_DEBUG_WIDTH + ECM_DWELL_CONTROLLER_DEBUG_WIDTH;
+  constant DEBUG_COMBINED_WIDTH           : natural := ECM_DWELL_CONTROLLER_DEBUG_WIDTH; --ECM_DWELL_TRIGGER_DEBUG_WIDTH + ECM_DWELL_CONTROLLER_DEBUG_WIDTH;
 
   signal r_debug_dwell_controller         : ecm_dwell_controller_debug_t;
   signal r_debug_dwell_controller_d       : ecm_dwell_controller_debug_t;
@@ -54,12 +54,12 @@ architecture rtl of ecm_dwell_controller_debug is
   attribute DONT_TOUCH of w_fifo_rd_en                                  : signal is "TRUE";
   attribute MARK_DEBUG of w_unpacked_dwell_controller                   : signal is "TRUE";
   attribute DONT_TOUCH of w_unpacked_dwell_controller                   : signal is "TRUE";
-  attribute MARK_DEBUG of w_unpacked_dwell_trigger                      : signal is "TRUE";
-  attribute DONT_TOUCH of w_unpacked_dwell_trigger                      : signal is "TRUE";
+  --attribute MARK_DEBUG of w_unpacked_dwell_trigger                      : signal is "TRUE";
+  --attribute DONT_TOUCH of w_unpacked_dwell_trigger                      : signal is "TRUE";
   attribute MARK_DEBUG of w_unpacked_dwell_controller_program_entry_0   : signal is "TRUE";
   attribute DONT_TOUCH of w_unpacked_dwell_controller_program_entry_0   : signal is "TRUE";
-  attribute MARK_DEBUG of w_unpacked_dwell_trigger_program_entry_0      : signal is "TRUE";
-  attribute DONT_TOUCH of w_unpacked_dwell_trigger_program_entry_0      : signal is "TRUE";
+  --attribute MARK_DEBUG of w_unpacked_dwell_trigger_program_entry_0      : signal is "TRUE";
+  --attribute DONT_TOUCH of w_unpacked_dwell_trigger_program_entry_0      : signal is "TRUE";
 
 begin
 
@@ -88,10 +88,11 @@ begin
                       r_debug_dwell_controller.r_dwell_meas_flush_done or
                       r_debug_dwell_controller.r_dwell_start_meas or
                       r_debug_dwell_controller.w_trigger_immediate_tx or
-                      r_debug_dwell_controller.w_tx_program_req_valid or
-                      r_debug_dwell_trigger.r3_channel_state_wr_en;
+                      r_debug_dwell_controller.w_tx_program_req_valid; --or
+                      --r_debug_dwell_trigger.r3_channel_state_wr_en;
 
-      r_fifo_wr_data <= w_debug_dwell_trigger_packed & w_debug_dwell_controller_packed;
+      --r_fifo_wr_data <= w_debug_dwell_trigger_packed & w_debug_dwell_controller_packed;
+      r_fifo_wr_data <= w_debug_dwell_controller_packed;
     end if;
   end process;
 
@@ -120,12 +121,13 @@ begin
     Underflow     => open
   );
 
-  (w_fifo_debug_dwell_trigger, w_fifo_debug_dwell_controller) <= w_fifo_rd_data;
+  --(w_fifo_debug_dwell_trigger, w_fifo_debug_dwell_controller) <= w_fifo_rd_data;
+  w_fifo_debug_dwell_controller <= w_fifo_rd_data;
 
   w_unpacked_dwell_controller <= unpack(w_fifo_debug_dwell_controller);
-  w_unpacked_dwell_trigger     <= unpack(w_fifo_debug_dwell_trigger);
+  --w_unpacked_dwell_trigger     <= unpack(w_fifo_debug_dwell_trigger);
 
   w_unpacked_dwell_controller_program_entry_0    <= unpack(w_unpacked_dwell_controller.w_channel_entry_program_entry_0);
-  w_unpacked_dwell_trigger_program_entry_0       <= unpack(w_unpacked_dwell_trigger.r3_channel_control_program_entry_0);
+  --w_unpacked_dwell_trigger_program_entry_0       <= unpack(w_unpacked_dwell_trigger.r3_channel_control_program_entry_0);
 
 end architecture rtl;
