@@ -43,23 +43,23 @@ architecture rtl of ecm_dwell_controller_debug is
   signal w_fifo_debug_dwell_controller    : std_logic_vector(ECM_DWELL_CONTROLLER_DEBUG_WIDTH - 1 downto 0);
   signal w_fifo_debug_dwell_trigger       : std_logic_vector(ECM_DWELL_TRIGGER_DEBUG_WIDTH - 1 downto 0);
 
-  signal w_unpacked_dwell_controller                    : ecm_dwell_controller_debug_t;
-  signal w_unpacked_dwell_trigger                       : ecm_dwell_trigger_debug_t;
-  signal w_unpacked_dwell_controller_channel_entry_data : ecm_channel_control_entry_t;
-  signal w_unpacked_dwell_trigger_channel_control       : ecm_channel_control_entry_t;
+  signal w_unpacked_dwell_controller                  : ecm_dwell_controller_debug_t;
+  signal w_unpacked_dwell_trigger                     : ecm_dwell_trigger_debug_t;
+  signal w_unpacked_dwell_controller_program_entry_0  : ecm_channel_tx_program_entry_t;
+  signal w_unpacked_dwell_trigger_program_entry_0     : ecm_channel_tx_program_entry_t;
 
-  attribute MARK_DEBUG                                                    : string;
-  attribute DONT_TOUCH                                                    : string;
-  attribute MARK_DEBUG of w_fifo_rd_en                                    : signal is "TRUE";
-  attribute DONT_TOUCH of w_fifo_rd_en                                    : signal is "TRUE";
-  attribute MARK_DEBUG of w_unpacked_dwell_controller                     : signal is "TRUE";
-  attribute DONT_TOUCH of w_unpacked_dwell_controller                     : signal is "TRUE";
-  attribute MARK_DEBUG of w_unpacked_dwell_trigger                        : signal is "TRUE";
-  attribute DONT_TOUCH of w_unpacked_dwell_trigger                        : signal is "TRUE";
-  attribute MARK_DEBUG of w_unpacked_dwell_controller_channel_entry_data  : signal is "TRUE";
-  attribute DONT_TOUCH of w_unpacked_dwell_controller_channel_entry_data  : signal is "TRUE";
-  attribute MARK_DEBUG of w_unpacked_dwell_trigger_channel_control        : signal is "TRUE";
-  attribute DONT_TOUCH of w_unpacked_dwell_trigger_channel_control        : signal is "TRUE";
+  attribute MARK_DEBUG                                                  : string;
+  attribute DONT_TOUCH                                                  : string;
+  attribute MARK_DEBUG of w_fifo_rd_en                                  : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_rd_en                                  : signal is "TRUE";
+  attribute MARK_DEBUG of w_unpacked_dwell_controller                   : signal is "TRUE";
+  attribute DONT_TOUCH of w_unpacked_dwell_controller                   : signal is "TRUE";
+  attribute MARK_DEBUG of w_unpacked_dwell_trigger                      : signal is "TRUE";
+  attribute DONT_TOUCH of w_unpacked_dwell_trigger                      : signal is "TRUE";
+  attribute MARK_DEBUG of w_unpacked_dwell_controller_program_entry_0   : signal is "TRUE";
+  attribute DONT_TOUCH of w_unpacked_dwell_controller_program_entry_0   : signal is "TRUE";
+  attribute MARK_DEBUG of w_unpacked_dwell_trigger_program_entry_0      : signal is "TRUE";
+  attribute DONT_TOUCH of w_unpacked_dwell_trigger_program_entry_0      : signal is "TRUE";
 
 begin
 
@@ -125,7 +125,7 @@ begin
   w_unpacked_dwell_controller <= unpack(w_fifo_debug_dwell_controller);
   w_unpacked_dwell_trigger     <= unpack(w_fifo_debug_dwell_trigger);
 
-  w_unpacked_dwell_controller_channel_entry_data <= unpack(w_unpacked_dwell_controller.w_channel_entry_data);
-  w_unpacked_dwell_trigger_channel_control       <= unpack(w_unpacked_dwell_trigger.r3_channel_control);
+  w_unpacked_dwell_controller_program_entry_0    <= unpack(w_unpacked_dwell_controller.w_channel_entry_program_entry_0);
+  w_unpacked_dwell_trigger_program_entry_0       <= unpack(w_unpacked_dwell_trigger.r3_channel_control_program_entry_0);
 
 end architecture rtl;
