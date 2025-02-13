@@ -133,18 +133,18 @@ architecture rtl of ecm_dwell_trigger is
   attribute MARK_DEBUG : string;
   attribute DONT_TOUCH : string;
 
-  attribute MARK_DEBUG of r3_channel_state_wr_en : signal is "TRUE";
-  attribute DONT_TOUCH of r3_channel_state_wr_en : signal is "TRUE";
-  attribute MARK_DEBUG of r3_channel_state_wr_index : signal is "TRUE";
-  attribute DONT_TOUCH of r3_channel_state_wr_index : signal is "TRUE";
-  attribute MARK_DEBUG of r3_channel_state_wr_data : signal is "TRUE";
-  attribute DONT_TOUCH of r3_channel_state_wr_data : signal is "TRUE";
-  attribute MARK_DEBUG of r3_trigger_check_duration_min : signal is "TRUE";
-  attribute DONT_TOUCH of r3_trigger_check_duration_min : signal is "TRUE";
-  attribute MARK_DEBUG of r3_trigger_pending : signal is "TRUE";
-  attribute DONT_TOUCH of r3_trigger_pending : signal is "TRUE";
-  attribute MARK_DEBUG of r3_channel_control : signal is "TRUE";
-  attribute DONT_TOUCH of r3_channel_control : signal is "TRUE";
+  --attribute MARK_DEBUG of r3_channel_state_wr_en : signal is "TRUE";
+  --attribute DONT_TOUCH of r3_channel_state_wr_en : signal is "TRUE";
+  --attribute MARK_DEBUG of r3_channel_state_wr_index : signal is "TRUE";
+  --attribute DONT_TOUCH of r3_channel_state_wr_index : signal is "TRUE";
+  --attribute MARK_DEBUG of r3_channel_state_wr_data : signal is "TRUE";
+  --attribute DONT_TOUCH of r3_channel_state_wr_data : signal is "TRUE";
+  --attribute MARK_DEBUG of r3_trigger_check_duration_min : signal is "TRUE";
+  --attribute DONT_TOUCH of r3_trigger_check_duration_min : signal is "TRUE";
+  --attribute MARK_DEBUG of r3_trigger_pending : signal is "TRUE";
+  --attribute DONT_TOUCH of r3_trigger_pending : signal is "TRUE";
+  --attribute MARK_DEBUG of r3_channel_control : signal is "TRUE";
+  --attribute DONT_TOUCH of r3_channel_control : signal is "TRUE";
   --attribute MARK_DEBUG of r3_drfm_write_req : signal is "TRUE";
   --attribute DONT_TOUCH of r3_drfm_write_req : signal is "TRUE";
 
