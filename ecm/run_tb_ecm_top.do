@@ -68,6 +68,8 @@ set library_file_list [list \
     ] \
   ecm_lib [list \
     ./hdl/ecm_pkg.vhd \
+    ./hdl/ecm_debug_pkg.vhd \
+    ./hdl/ecm_dwell_controller_debug.vhd \
     ./hdl/ecm_config.vhd \
     ./hdl/ecm_dwell_config_decoder.vhd \
     ./hdl/ecm_dwell_trigger.vhd \
