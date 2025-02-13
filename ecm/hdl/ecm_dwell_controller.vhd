@@ -187,12 +187,12 @@ begin
                                                             x"D" when (s_state = S_DWELL_DONE) else
                                                             x"E";
 
-    w_debug_dwell_controller.w_channel_entry_valid        <= w_channel_entry_valid;
-    w_debug_dwell_controller.w_channel_entry_index        <= std_logic_vector(w_channel_entry_index);
-    w_debug_dwell_controller.w_channel_entry_data         <= pack(w_channel_entry_data);
-    w_debug_dwell_controller.w_tx_instruction_valid       <= w_tx_instruction_valid;
-    w_debug_dwell_controller.w_tx_instruction_index       <= std_logic_vector(w_tx_instruction_index);
-    w_debug_dwell_controller.w_tx_instruction_data        <= w_tx_instruction_data;
+    w_debug_dwell_controller.w_channel_entry_valid            <= w_channel_entry_valid;
+    w_debug_dwell_controller.w_channel_entry_index            <= std_logic_vector(w_channel_entry_index);
+    w_debug_dwell_controller.w_channel_entry_program_entry_0  <= pack(w_channel_entry_data.program_entries(0));
+    w_debug_dwell_controller.w_tx_instruction_valid           <= w_tx_instruction_valid;
+    w_debug_dwell_controller.w_tx_instruction_index           <= std_logic_vector(w_tx_instruction_index);
+    w_debug_dwell_controller.w_tx_instruction_data            <= w_tx_instruction_data;
 
     w_debug_dwell_controller.r_dwell_program_valid        <= r_dwell_program_valid;
     w_debug_dwell_controller.r_dwell_program_tag          <= std_logic_vector(r_dwell_program_tag);
