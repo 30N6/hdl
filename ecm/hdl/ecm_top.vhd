@@ -59,6 +59,7 @@ architecture rtl of ecm_top is
   constant ENABLE_DWELL_STATS         : boolean := true;
   constant ENABLE_DRFM                : boolean := true;
   constant ENABLE_DDS                 : boolean := true;
+  constant ENABLE_STATUS_REPORTER     : boolean := true;
 
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
   constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + clog2(8) + clog2(ECM_NUM_CHANNELS); -- 8 taps per channel
@@ -524,33 +525,39 @@ begin
     Error_dds_drfm_sync       => w_output_block_errors.dds_drfm_sync_mismatch
   );
 
-  i_status_reporter : entity ecm_lib.ecm_status_reporter
-  generic map (
-    AXI_DATA_WIDTH      => AXI_DATA_WIDTH,
-    HEARTBEAT_INTERVAL  => HEARTBEAT_INTERVAL
-  )
-  port map (
-    Clk_axi                 => M_axis_clk,
-    Clk                     => Adc_clk_x4,
-    Rst                     => r_combined_rst,
+  g_status_reporter : if (ENABLE_STATUS_REPORTER) generate
+    i_status_reporter : entity ecm_lib.ecm_status_reporter
+    generic map (
+      AXI_DATA_WIDTH      => AXI_DATA_WIDTH,
+      HEARTBEAT_INTERVAL  => HEARTBEAT_INTERVAL
+    )
+    port map (
+      Clk_axi                 => M_axis_clk,
+      Clk                     => Adc_clk_x4,
+      Rst                     => r_combined_rst,
 
-    Enable_status           => w_enable_status,
-    Enable_channelizer      => w_enable_chan,
-    Enable_synthesizer      => w_enable_synth,
+      Enable_status           => w_enable_status,
+      Enable_channelizer      => w_enable_chan,
+      Enable_synthesizer      => w_enable_synth,
 
-    Channelizer_warnings    => w_channelizer_warnings,
-    Channelizer_errors      => w_channelizer_errors,
-    Synthesizer_errors      => w_synthesizer_errors,
-    Dwell_stats_errors      => w_dwell_stats_errors,
-    Drfm_errors             => w_drfm_errors,
-    Output_block_errors     => w_output_block_errors,
-    Dwell_controller_errors => w_dwell_controller_errors,
+      Channelizer_warnings    => w_channelizer_warnings,
+      Channelizer_errors      => w_channelizer_errors,
+      Synthesizer_errors      => w_synthesizer_errors,
+      Dwell_stats_errors      => w_dwell_stats_errors,
+      Drfm_errors             => w_drfm_errors,
+      Output_block_errors     => w_output_block_errors,
+      Dwell_controller_errors => w_dwell_controller_errors,
 
-    Axis_ready              => w_d2h_fifo_in_ready(2),
-    Axis_valid              => w_d2h_fifo_in_valid(2),
-    Axis_data               => w_d2h_fifo_in_data(2),
-    Axis_last               => w_d2h_fifo_in_last(2)
-  );
+      Axis_ready              => w_d2h_fifo_in_ready(2),
+      Axis_valid              => w_d2h_fifo_in_valid(2),
+      Axis_data               => w_d2h_fifo_in_data(2),
+      Axis_last               => w_d2h_fifo_in_last(2)
+    );
+  else generate
+    w_d2h_fifo_in_valid(2)  <= '0';
+    w_d2h_fifo_in_data(2)   <= (others => '0');
+    w_d2h_fifo_in_last(2)   <= '0';
+  end generate g_status_reporter;
 
   g_d2h_fifo : for i in 0 to (NUM_D2H_MUX_INPUTS - 1) generate
     i_fifo : entity axi_lib.axis_minififo
