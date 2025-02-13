@@ -145,8 +145,8 @@ architecture rtl of ecm_dwell_trigger is
   attribute DONT_TOUCH of r3_trigger_pending : signal is "TRUE";
   attribute MARK_DEBUG of r3_channel_control : signal is "TRUE";
   attribute DONT_TOUCH of r3_channel_control : signal is "TRUE";
-  attribute MARK_DEBUG of r3_drfm_write_req : signal is "TRUE";
-  attribute DONT_TOUCH of r3_drfm_write_req : signal is "TRUE";
+  --attribute MARK_DEBUG of r3_drfm_write_req : signal is "TRUE";
+  --attribute DONT_TOUCH of r3_drfm_write_req : signal is "TRUE";
 
 
 begin
