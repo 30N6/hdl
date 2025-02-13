@@ -58,6 +58,7 @@ architecture rtl of ecm_top is
   constant ENABLE_SYNTHESIZER         : boolean := true;
   constant ENABLE_DWELL_STATS         : boolean := true;
   constant ENABLE_DRFM                : boolean := true;
+  constant ENABLE_DDS                 : boolean := true;
 
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
   constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + clog2(8) + clog2(ECM_NUM_CHANNELS); -- 8 taps per channel
@@ -475,28 +476,33 @@ begin
     w_drfm_errors             <= (others => '0');
   end generate g_drfm;
 
-  i_dds : entity dsp_lib.channelized_dds
-  generic map (
-    OUTPUT_DATA_WIDTH   => ECM_DDS_DATA_WIDTH,
-    NUM_CHANNELS        => ECM_NUM_CHANNELS,
-    CHANNEL_INDEX_WIDTH => ECM_CHANNEL_INDEX_WIDTH,
-    LATENCY             => DDS_LATENCY
-  )
-  port map (
-    Clk                   => Adc_clk_x4,
-    Rst                   => r_combined_rst,
+  g_dds : if (ENABLE_DDS) generate
+    i_dds : entity dsp_lib.channelized_dds
+    generic map (
+      OUTPUT_DATA_WIDTH   => ECM_DDS_DATA_WIDTH,
+      NUM_CHANNELS        => ECM_NUM_CHANNELS,
+      CHANNEL_INDEX_WIDTH => ECM_CHANNEL_INDEX_WIDTH,
+      LATENCY             => DDS_LATENCY
+    )
+    port map (
+      Clk                   => Adc_clk_x4,
+      Rst                   => r_combined_rst,
 
-    Dwell_active_transmit => w_dwell_active_tx,
-    Control_data          => w_dds_command,
-    Sync_data             => w_sync_to_dds,
+      Dwell_active_transmit => w_dwell_active_tx,
+      Control_data          => w_dds_command,
+      Sync_data             => w_sync_to_dds,
 
-    Output_ctrl           => w_dds_ctrl,
-    Output_data           => w_dds_data
-  );
+      Output_ctrl           => w_dds_ctrl,
+      Output_data           => w_dds_data
+    );
+  else generate
+    w_dds_ctrl <= (valid => '0', last => '0', data_index => (others => '0'));
+    w_dds_data <= (others => (others => '0'));
+  end generate g_dds;
 
   i_output : entity ecm_lib.ecm_output_block
   generic map (
-    ENABLE_DDS  => true,
+    ENABLE_DDS  => ENABLE_DDS,
     ENABLE_DRFM => ENABLE_DRFM
   )
   port map (
