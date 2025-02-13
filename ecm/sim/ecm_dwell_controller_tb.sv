@@ -84,11 +84,12 @@ interface channelizer_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
 endinterface
 
 interface dwell_rx_intf (input logic Clk);
-  ecm_dwell_entry_t                             data;
-  logic [ecm_dwell_sequence_num_width - 1 : 0]  seq_num;
-  logic                                         active;
+  ecm_dwell_entry_t                               data;
+  logic [ecm_dwell_sequence_num_width - 1 : 0]    seq_num;
+  logic [ecm_dwell_global_counter_width - 1 : 0]  global_counter;
+  logic                                           active;
 
-  task read(output ecm_dwell_entry_t dwell_entry, output int dwell_seq_num);
+  task read(output ecm_dwell_entry_t dwell_entry, output int dwell_seq_num, output int dwell_global_counter);
     logic r_active;
 
     do begin
@@ -96,6 +97,7 @@ interface dwell_rx_intf (input logic Clk);
       @(posedge Clk);
       dwell_entry   <= data;
       dwell_seq_num <= seq_num;
+      dwell_global_counter <= global_counter;
     end while ((active === 0) || (r_active === 1));
   endtask
 endinterface
@@ -128,7 +130,7 @@ interface ecm_tx_execution_intf (input logic Clk);
       active_tx <= dwell_active_tx;
       dwell_seq <= dwell_seq_num;
       @(posedge Clk);
-    end while ((drfm.valid !== 1) && (dds.valid !== 1) && (oc.valid !== 1));
+    end while ((drfm.read_valid !== 1) && (dds.valid !== 1) && (oc.valid !== 1));
   endtask
 endinterface
 
@@ -166,6 +168,7 @@ module ecm_dwell_controller_tb;
   typedef struct
   {
     int dwell_seq_num;
+    int dwell_global_counter;
     ecm_dwell_entry_t dwell_entry;
   } expect_dwell_t;
 
@@ -217,6 +220,8 @@ module ecm_dwell_controller_tb;
   logic                     w_dwell_done;
   ecm_dwell_entry_t         w_dwell_data;
   logic [31:0]              w_dwell_seq_num;
+  logic [15:0]              w_dwell_global_counter;
+  logic [15:0]              w_dwell_program_tag;
   logic                     r_dwell_report_done_drfm;
   logic                     r_dwell_report_done_stats;
   logic                     r_dwell_active_meas;
@@ -309,6 +314,8 @@ module ecm_dwell_controller_tb;
     .Dwell_done                   (w_dwell_done),
     .Dwell_data                   (w_dwell_data),
     .Dwell_sequence_num           (w_dwell_seq_num),
+    .Dwell_global_counter         (w_dwell_global_counter),
+    .Dwell_program_tag            (w_dwell_program_tag),
     .Dwell_report_done_drfm       (r_dwell_report_done_drfm),
     .Dwell_report_done_stats      (r_dwell_report_done_stats),
 
@@ -323,6 +330,7 @@ module ecm_dwell_controller_tb;
 
   assign dwell_intf.data            = w_dwell_data;
   assign dwell_intf.seq_num         = w_dwell_seq_num;
+  assign dwell_intf.global_counter  = w_dwell_global_counter;
   assign dwell_intf.active          = w_dwell_active;
 
   assign drfm_intf.dwell_seq_num    = w_dwell_seq_num;
@@ -801,6 +809,7 @@ module ecm_dwell_controller_tb;
     r.frequency               = $urandom;
     r.measurement_duration    = $urandom_range(5000*ecm_num_channels, 100*ecm_num_channels);
     r.total_duration_max      = r.measurement_duration + $urandom_range(5000*ecm_num_channels, 1000*ecm_num_channels);
+    r.min_trigger_duration    = $urandom_range(1000);
 
     return r;
   endfunction
@@ -847,6 +856,7 @@ module ecm_dwell_controller_tb;
     packed_entry[95:80]     = data.entry.frequency;
     packed_entry[127:96]    = data.entry.measurement_duration;
     packed_entry[159:128]   = data.entry.total_duration_max;
+    packed_entry[175:160]   = data.entry.min_trigger_duration;
 
     config_data[0] = ecm_control_magic_num;
     config_data[1] = config_seq_num++;
@@ -861,7 +871,7 @@ module ecm_dwell_controller_tb;
   endtask
 
   task automatic send_dwell_program(ecm_dwell_program_entry_t data);
-    bit [ecm_dwell_program_entry_aligned_width + 32 - 1 : 0] packed_entry = '0; //one word of padding -- TODO: add software assert for min size
+    bit [ecm_dwell_program_entry_aligned_width + 16 - 1 : 0] packed_entry = '0; //16 bits of padding -- TODO: add software assert for min size
     bit [31:0] config_data [] = new[4 + $size(packed_entry)/32];
 
     $display("%0t: send_dwell_program = %p", $time, data);
@@ -869,6 +879,7 @@ module ecm_dwell_controller_tb;
     packed_entry[0]     = data.enable;
     packed_entry[15:8]  = data.initial_dwell_index;
     packed_entry[31:16] = data.global_counter_init;
+    packed_entry[47:32] = data.tag;
 
     config_data[0] = ecm_control_magic_num;
     config_data[1] = config_seq_num++;
@@ -1068,7 +1079,7 @@ module ecm_dwell_controller_tb;
         break;
       end
 
-      expected_data_dwell.push_back('{dwell_entry: dwell_entry, dwell_seq_num: dwell_seq_num});
+      expected_data_dwell.push_back('{dwell_entry: dwell_entry, dwell_seq_num: dwell_seq_num, dwell_global_counter: global_counter});
 
       for (int i_channel = 0; i_channel < ecm_num_channels; i_channel++) begin
         ecm_channel_control_entry_t chan_entry = channel_mem[dwell_index][i_channel];
@@ -1084,13 +1095,14 @@ module ecm_dwell_controller_tb;
         if (chan_entry.trigger_mode == ecm_channel_trigger_mode_force_trigger) begin
           for (int i = 0; (i < dwell_frame_queue.size()) && (i <= chan_entry.trigger_duration_max_minus_one); i++) begin
             expect_drfm_t e;
-            e.write_data.valid          = 1;
-            e.write_data.first          = (i == 0);
-            e.write_data.last           = (i == (dwell_frame_queue.size() - 1)) || (i == chan_entry.trigger_duration_max_minus_one);
-            e.write_data.channel_index  = i_channel;
-            e.write_data.address        = chan_entry.recording_address + i;
-            e.dwell_seq_num             = dwell_seq_num;
-            e.recording_length          = recording_length;
+            e.write_data.valid            = 1;
+            e.write_data.first            = (i == 0);
+            e.write_data.last             = (i == (dwell_frame_queue.size() - 1)) || (i == chan_entry.trigger_duration_max_minus_one);
+            e.write_data.trigger_accepted = ((recording_length+1) >= dwell_entry.min_trigger_duration);
+            e.write_data.channel_index    = i_channel;
+            e.write_data.address          = chan_entry.recording_address + i;
+            e.dwell_seq_num               = dwell_seq_num;
+            e.recording_length            = recording_length;
 
             for (int j = 0; j < ecm_drfm_data_width; j++) begin
               e.write_data.data[0][j] = dwell_frame_queue[i].data_i[i_channel][drfm_gain_offset + j];
@@ -1122,13 +1134,14 @@ module ecm_dwell_controller_tb;
 
               //TODO: immediate start
 
-              e.write_data.valid          = 1;
-              e.write_data.first          = 0;
-              e.write_data.last           = pulse_last;
-              e.write_data.channel_index  = i_channel;
-              e.write_data.address        = chan_entry.recording_address + pulse_addr;
-              e.dwell_seq_num             = dwell_seq_num;
-              e.recording_length          = recording_length;
+              e.write_data.valid            = 1;
+              e.write_data.first            = 0;
+              e.write_data.last             = pulse_last;
+              e.write_data.trigger_accepted = ((recording_length+1) >= dwell_entry.min_trigger_duration);
+              e.write_data.channel_index    = i_channel;
+              e.write_data.address          = chan_entry.recording_address + pulse_addr;
+              e.dwell_seq_num               = dwell_seq_num;
+              e.recording_length            = recording_length;
 
               for (int j = 0; j < ecm_drfm_data_width; j++) begin
                 e.write_data.data[0][j] = dwell_frame_queue[i].data_i[i_channel][drfm_gain_offset + j];
@@ -1149,12 +1162,13 @@ module ecm_dwell_controller_tb;
               end
 
             end else if (dwell_frame_queue[i].data_p[i_channel] >= threshold_new) begin
-              e.write_data.valid          = 1;
-              e.write_data.first          = 1;
-              e.write_data.last           = 0;
-              e.write_data.channel_index  = i_channel;
-              e.write_data.address        = chan_entry.recording_address + pulse_addr;
-              e.dwell_seq_num             = dwell_seq_num;
+              e.write_data.valid            = 1;
+              e.write_data.first            = 1;
+              e.write_data.last             = 0;
+              e.write_data.trigger_accepted = ((recording_length+1) >= dwell_entry.min_trigger_duration);
+              e.write_data.channel_index    = i_channel;
+              e.write_data.address          = chan_entry.recording_address + pulse_addr;
+              e.dwell_seq_num               = dwell_seq_num;
 
               for (int j = 0; j < ecm_drfm_data_width; j++) begin
                 e.write_data.data[0][j] = dwell_frame_queue[i].data_i[i_channel][drfm_gain_offset + j];
@@ -1275,7 +1289,8 @@ module ecm_dwell_controller_tb;
             if (inst_playback.mode == 0) begin //number of segments
               for (int i = 0; i < inst_playback.base_count; i++) begin
                 for (int j = 0; j < trigger_length[i_channel]; j++) begin
-                  drfm_read_req.valid = 1;
+                  drfm_read_req.read_valid = 1;
+                  drfm_read_req.sync_valid = 1;
                   drfm_read_req.address = chan_entry.recording_address + j;
                   drfm_read_req.channel_index = i_channel;
                   drfm_read_req.channel_last = (i_channel == (ecm_num_channels - 1));
@@ -1284,7 +1299,8 @@ module ecm_dwell_controller_tb;
               end
             end else begin //number of samples
               for (int i = 0; i < inst_playback.base_count; i++) begin
-                drfm_read_req.valid = 1;
+                drfm_read_req.read_valid = 1;
+                drfm_read_req.sync_valid = 1;
                 drfm_read_req.address = chan_entry.recording_address + (i % trigger_length[i_channel]);
                 drfm_read_req.channel_index = i_channel;
                 drfm_read_req.channel_last = (i_channel == (ecm_num_channels - 1));
@@ -1366,6 +1382,10 @@ module ecm_dwell_controller_tb;
       $display("dwell_seq_num mismatch: %p %p", a.dwell_seq_num, b.dwell_seq_num);
       return 0;
     end
+    if (a.dwell_global_counter !== b.dwell_global_counter) begin
+      $display("dwell_global_counter mismatch: %p %p", a.dwell_global_counter, b.dwell_global_counter);
+      return 0;
+    end
     if (a.dwell_entry !== b.dwell_entry) begin
       $display("dwell_entry mismatch: %p %p", a.dwell_entry, b.dwell_entry);
       return 0;
@@ -1377,14 +1397,16 @@ module ecm_dwell_controller_tb;
   initial begin
     automatic ecm_dwell_entry_t dwell_entry;
     automatic int dwell_seq_num;
+    automatic int dwell_global_counter;
     automatic expect_dwell_t dwell_rx;
 
     wait_for_reset();
 
     forever begin
-      dwell_intf.read(dwell_entry, dwell_seq_num);
-      dwell_rx.dwell_seq_num  = dwell_seq_num;
-      dwell_rx.dwell_entry    = dwell_entry;
+      dwell_intf.read(dwell_entry, dwell_seq_num, dwell_global_counter);
+      dwell_rx.dwell_seq_num        = dwell_seq_num;
+      dwell_rx.dwell_global_counter = dwell_global_counter;
+      dwell_rx.dwell_entry          = dwell_entry;
 
       if (compare_data_dwell(dwell_rx, expected_data_dwell[0])) begin
         $display("%0t: dwell data match (remaining=%0d) - data=%p", $time, expected_data_dwell.size(), dwell_rx);
@@ -1461,10 +1483,10 @@ module ecm_dwell_controller_tb;
       return 0;
     end
 
-    if (a.dds_control.valid && a.output_control.valid && a.drfm_read_req.valid && !a.dwell_active_tx) begin
+    if (a.dds_control.valid && a.output_control.valid && a.drfm_read_req.read_valid && !a.dwell_active_tx) begin
       //$display("compare_data_exec: [end of dwell] skipping drfm_read_req check");
     end else begin
-      if (a.drfm_read_req.valid || b.drfm_read_req.valid) begin
+      if (a.drfm_read_req.read_valid || b.drfm_read_req.read_valid) begin
         if (a.drfm_read_req !== b.drfm_read_req) begin
           $display("drfm_read_req mismatch: %p %p", a.drfm_read_req, b.drfm_read_req);
           return 0;
@@ -1524,7 +1546,7 @@ module ecm_dwell_controller_tb;
       rx.dwell_seq_num = dwell_seq_num;
       rx.dwell_active_tx = dwell_active_tx;
 
-      if (drfm.valid) begin
+      if (drfm.read_valid) begin
         channel_index = drfm.channel_index;
       end else if (dds.valid) begin
         channel_index = dds.channel_index;
@@ -1532,7 +1554,7 @@ module ecm_dwell_controller_tb;
         channel_index = oc.channel_index;
       end
 
-      assert ((!drfm.valid || (channel_index == drfm.channel_index)) && (!dds.valid || (channel_index == dds.channel_index)) && (!oc.valid || (channel_index == oc.channel_index))) else $error("channel mismatch");
+      assert ((!drfm.read_valid || (channel_index == drfm.channel_index)) && (!dds.valid || (channel_index == dds.channel_index)) && (!oc.valid || (channel_index == oc.channel_index))) else $error("channel mismatch");
 
       // end of dwell -- drop any expected transactions that will be cut off
       if (!rx.dwell_active_tx) begin
@@ -1640,6 +1662,7 @@ module ecm_dwell_controller_tb;
       dwell_program.enable              = 1;
       dwell_program.initial_dwell_index = $urandom_range(2, 0);
       dwell_program.global_counter_init = num_dwells - dwell_program.initial_dwell_index + 1;
+      dwell_program.tag                 = $urandom;
 
       generate_channelizer_data(dwell_program, dwell_entries, channel_entries, dwell_seq_num);
       generate_expected_events(dwell_program, dwell_entries, channel_entries, tx_programs, dwell_seq_num);

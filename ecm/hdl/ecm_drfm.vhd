@@ -33,6 +33,7 @@ port (
   Write_req               : in  ecm_drfm_write_req_t;
   Read_req                : in  ecm_drfm_read_req_t;
 
+  Output_read             : out std_logic;
   Output_ctrl             : out channelizer_control_t;
   Output_data             : out signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
 
@@ -74,6 +75,7 @@ architecture rtl of ecm_drfm is
   signal r_dwell_active_tx                : std_logic;
   signal r_dwell_done                     : std_logic;
   signal r_dwell_sequence_num             : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal r_dwell_start                    : std_logic;
 
   signal r_timestamp                      : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
 
@@ -108,6 +110,7 @@ architecture rtl of ecm_drfm is
 
   signal r4_read_data_scaled              : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
   signal r4_read_req                      : ecm_drfm_read_req_t;
+  signal r4_read_valid                    : std_logic;
 
   signal r_channel_was_written            : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
   signal r_channel_was_read               : std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
@@ -145,6 +148,7 @@ begin
     if rising_edge(Clk) then
       r_rst                 <= Rst;
       r_dwell_active        <= Dwell_active;
+      r_dwell_start         <= Dwell_active and not(r_dwell_active);
       r_dwell_active_tx     <= Dwell_active_transmit;
       r_dwell_done          <= Dwell_done;
       r_dwell_sequence_num  <= Dwell_sequence_num;
@@ -170,7 +174,7 @@ begin
     if rising_edge(Clk) then
       if (w_reporter_mem_read_valid = '1') then
         r_reporter_mem_read_valid <= '1';
-      elsif (r0_read_req.valid = '0') then
+      elsif (r0_read_req.read_valid = '0') then
         r_reporter_mem_read_valid <= '0';
       end if;
 
@@ -182,7 +186,7 @@ begin
 
   process(all)
   begin
-    if (r0_read_req.valid = '1') then
+    if (r0_read_req.read_valid = '1') then
       w0_mem_rd_addr  <= r0_read_req.address;
       w0_read_valid   <= '1';
     else
@@ -277,15 +281,17 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      r4_read_valid           <= r3_read_req.read_valid or r3_read_req.sync_valid;
       r4_read_req             <= r3_read_req;
-      r4_read_data_scaled(0)  <= shift_left(w3_read_data(0), to_integer(r3_iq_shift)) when (r_dwell_active_tx = '1') else (others => '0');
-      r4_read_data_scaled(1)  <= shift_left(w3_read_data(1), to_integer(r3_iq_shift)) when (r_dwell_active_tx = '1') else (others => '0');
+      r4_read_data_scaled(0)  <= shift_left(w3_read_data(0), to_integer(r3_iq_shift)) when ((r_dwell_active_tx = '1') and (r3_read_req.read_valid = '1')) else (others => '0');
+      r4_read_data_scaled(1)  <= shift_left(w3_read_data(1), to_integer(r3_iq_shift)) when ((r_dwell_active_tx = '1') and (r3_read_req.read_valid = '1')) else (others => '0');
     end if;
   end process;
 
   process(all)
   begin
-    Output_ctrl.valid       <= r4_read_req.valid;
+    Output_read             <= r4_read_req.read_valid;
+    Output_ctrl.valid       <= r4_read_valid;
     Output_ctrl.last        <= r4_read_req.channel_last;
     Output_ctrl.data_index  <= resize_up(r4_read_req.channel_index, Output_ctrl.data_index'length);
     Output_data             <= r4_read_data_scaled;
@@ -294,7 +300,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (r_dwell_active = '0') then
+      if (r_dwell_start = '1') then
         r_channel_was_written     <= (others => '0');
         r_channel_was_read        <= (others => '0');
         r_channel_report_pending  <= (others => '0');
@@ -303,12 +309,12 @@ begin
           r_channel_was_written(to_integer(r1_write_req.channel_index)) <= '1';
         end if;
 
-        if (r1_read_req.valid = '1') then
+        if (r1_read_req.read_valid = '1') then
           r_channel_was_read(to_integer(r1_read_req.channel_index)) <= '1';
         end if;
 
         if ((r1_write_req.valid = '1') and (r1_write_req.last = '1')) then
-          r_channel_report_pending(to_integer(r1_write_req.channel_index)) <= '1';
+          r_channel_report_pending(to_integer(r1_write_req.channel_index)) <= r1_write_req.trigger_accepted;
         end if;
         if (w_channel_reports_done = '1') then
           r_channel_report_pending(to_integer(w_reporter_channel_index)) <= '0';
@@ -345,7 +351,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_reporter_mem_result_valid <= r3_read_valid and not(r3_read_req.valid);
+      r_reporter_mem_result_valid <= r3_read_valid and not(r3_read_req.read_valid);
       r_reporter_mem_result_data  <= w3_mem_rd_data;
     end if;
   end process;
@@ -396,9 +402,9 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Error_ext_read_overflow <= r0_read_req.valid and Read_req.valid;
-      Error_int_read_overflow <= w_reporter_mem_read_valid and r_reporter_mem_read_valid and r0_read_req.valid;
-      Error_invalid_read      <= r0_read_req.valid and not(r_channel_was_written(to_integer(r0_read_req.channel_index)));
+      Error_ext_read_overflow <= r0_read_req.read_valid and Read_req.read_valid;
+      Error_int_read_overflow <= w_reporter_mem_read_valid and r_reporter_mem_read_valid and r0_read_req.read_valid;
+      Error_invalid_read      <= r0_read_req.read_valid and not(r_channel_was_written(to_integer(r0_read_req.channel_index)));
     end if;
   end process;
 

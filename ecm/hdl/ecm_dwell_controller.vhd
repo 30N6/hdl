@@ -37,6 +37,8 @@ port (
   Dwell_done                    : out std_logic;
   Dwell_data                    : out ecm_dwell_entry_t;
   Dwell_sequence_num            : out unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  Dwell_global_counter          : out unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
+  Dwell_program_tag             : out unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
   Dwell_report_done_drfm        : in  std_logic;
   Dwell_report_done_stats       : in  std_logic;
 
@@ -106,6 +108,7 @@ architecture rtl of ecm_dwell_controller is
 
   signal r_dwell_program_data           : ecm_dwell_program_entry_t;
   signal r_dwell_program_valid          : std_logic;
+  signal r_dwell_program_tag            : unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
 
   signal m_dwell_entry                  : std_logic_vector_array_t(ECM_NUM_DWELL_ENTRIES - 1 downto 0)(ECM_DWELL_ENTRY_WIDTH - 1 downto 0);
 
@@ -203,30 +206,31 @@ begin
     CHANNELIZER_DATA_WIDTH => CHANNELIZER_DATA_WIDTH
   )
   port map (
-    Clk                       => Clk,
-    Rst                       => r_rst,
+    Clk                         => Clk,
+    Rst                         => r_rst,
 
-    Channel_entry_valid       => w_channel_entry_valid,
-    Channel_entry_index       => w_channel_entry_index,
-    Channel_entry_data        => w_channel_entry_data,
+    Channel_entry_valid         => w_channel_entry_valid,
+    Channel_entry_index         => w_channel_entry_index,
+    Channel_entry_data          => w_channel_entry_data,
 
-    Channelizer_ctrl          => r_channelizer_ctrl,
-    Channelizer_data          => r_channelizer_data,
-    Channelizer_pwr           => r_channelizer_pwr,
+    Channelizer_ctrl            => r_channelizer_ctrl,
+    Channelizer_data            => r_channelizer_data,
+    Channelizer_pwr             => r_channelizer_pwr,
 
-    Dwell_channel_clear       => r_dwell_report_wait,
-    Dwell_start_measurement   => r_dwell_start_meas,
-    Dwell_active_measurement  => r_dwell_active_meas,
-    Dwell_index               => r_dwell_entry_index_d1,
-    Dwell_immediate_tx        => w_trigger_immediate_tx,
+    Dwell_channel_clear         => r_dwell_report_wait,
+    Dwell_start_measurement     => r_dwell_start_meas,
+    Dwell_active_measurement    => r_dwell_active_meas,
+    Dwell_index                 => r_dwell_entry_index_d1,
+    Dwell_min_trigger_duration  => r_dwell_entry_d1.min_trigger_duration,
+    Dwell_immediate_tx          => w_trigger_immediate_tx,
 
-    Trigger_pending           => w_trigger_pending,
+    Trigger_pending             => w_trigger_pending,
 
-    Tx_program_req_valid      => w_tx_program_req_valid,
-    Tx_program_req_channel    => w_tx_program_req_channel,
-    Tx_program_req_index      => w_tx_program_req_index,
+    Tx_program_req_valid        => w_tx_program_req_valid,
+    Tx_program_req_channel      => w_tx_program_req_channel,
+    Tx_program_req_index        => w_tx_program_req_index,
 
-    Drfm_write_req            => w_drfm_write_req
+    Drfm_write_req              => w_drfm_write_req
   );
 
   i_tx_engine : entity ecm_lib.ecm_dwell_tx_engine
@@ -528,14 +532,22 @@ begin
     end if;
   end process;
 
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_dwell_program_tag <= r_dwell_program_data.tag;
+    end if;
+  end process;
+
   Dwell_active              <= r_dwell_active;
   Dwell_active_measurement  <= r_dwell_active_meas;
   Dwell_active_transmit     <= r_dwell_active_tx;
   Dwell_done                <= r_dwell_report_wait; --hold done for external modules until reports are sent
 
-
-  Dwell_data          <= r_dwell_entry_d1;
-  Dwell_sequence_num  <= r_dwell_sequence_num;
+  Dwell_data            <= r_dwell_entry_d1;
+  Dwell_sequence_num    <= r_dwell_sequence_num;
+  Dwell_global_counter  <= r_global_counter;
+  Dwell_program_tag     <= r_dwell_program_tag;
 
   process(Clk)
   begin

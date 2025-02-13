@@ -93,6 +93,9 @@ architecture rtl of ecm_drfm_reporter is
     S_SUMMARY_HEADER_2,
     S_SUMMARY_DWELL_SEQ_NUM,
     S_SUMMARY_CHANNEL_STATE,
+    S_SUMMARY_REPORT_DELAY_CHANNEL_WRITE,
+    S_SUMMARY_REPORT_DELAY_SUMMARY_WRITE,
+    S_SUMMARY_REPORT_DELAY_SUMMARY_START,
     S_SUMMARY_PAD,
     S_SUMMARY_DONE,
 
@@ -104,6 +107,10 @@ architecture rtl of ecm_drfm_reporter is
   signal r_packet_seq_num             : unsigned(31 downto 0);
   signal r_channel_index              : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r_words_in_msg               : unsigned(clog2(ECM_WORDS_PER_DMA_PACKET) - 1 downto 0);
+
+  signal r_report_delay_channel_write : unsigned(31 downto 0);
+  signal r_report_delay_summary_write : unsigned(31 downto 0);
+  signal r_report_delay_summary_start : unsigned(31 downto 0);
 
   signal r_channel_samples_remaining  : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
 
@@ -239,7 +246,6 @@ begin
             s_state <= S_START_WAIT;
           end if;
 
-
         when S_START_SUMMARY =>
           if (r1_fifo_almost_full = '0') then
             s_state <= S_SUMMARY_HEADER_0;
@@ -256,6 +262,12 @@ begin
         when S_SUMMARY_DWELL_SEQ_NUM =>
           s_state <= S_SUMMARY_CHANNEL_STATE;
         when S_SUMMARY_CHANNEL_STATE =>
+          s_state <= S_SUMMARY_REPORT_DELAY_CHANNEL_WRITE;
+        when S_SUMMARY_REPORT_DELAY_CHANNEL_WRITE =>
+          s_state <= S_SUMMARY_REPORT_DELAY_SUMMARY_WRITE;
+        when S_SUMMARY_REPORT_DELAY_SUMMARY_WRITE =>
+          s_state <= S_SUMMARY_REPORT_DELAY_SUMMARY_START;
+        when S_SUMMARY_REPORT_DELAY_SUMMARY_START =>
           s_state <= S_SUMMARY_PAD;
 
         when S_SUMMARY_PAD =>
@@ -282,6 +294,29 @@ begin
   begin
     if rising_edge(Clk) then
       Dwell_reports_done <= to_stdlogic(s_state = S_SUMMARY_DONE);
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (s_state = S_IDLE) then
+        r_report_delay_channel_write <= (others => '0');
+      elsif (((s_state = S_START_CHANNEL) or (s_state = S_CONTINUE_CHANNEL)) and (r1_fifo_almost_full = '1')) then
+        r_report_delay_channel_write <= r_report_delay_channel_write + 1;
+      end if;
+
+      if (s_state = S_IDLE) then
+        r_report_delay_summary_write <= (others => '0');
+      elsif ((s_state = S_START_SUMMARY) and (r1_fifo_almost_full = '1')) then
+        r_report_delay_summary_write <= r_report_delay_summary_write + 1;
+      end if;
+
+      if (s_state = S_IDLE) then
+        r_report_delay_summary_start <= (others => '0');
+      elsif ((s_state = S_START_WAIT) and (or_reduce(Channel_report_pending) = '1') and (Dwell_done = '1')) then
+        r_report_delay_summary_start <= r_report_delay_summary_start + 1;
+      end if;
     end if;
   end process;
 
@@ -454,6 +489,18 @@ begin
     when S_SUMMARY_CHANNEL_STATE =>
       w_fifo_valid            <= '1';
       w_fifo_partial_1_data   <= Channel_was_written & Channel_was_read;
+
+    when S_SUMMARY_REPORT_DELAY_CHANNEL_WRITE =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(r_report_delay_channel_write);
+
+    when S_SUMMARY_REPORT_DELAY_SUMMARY_WRITE =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(r_report_delay_summary_write);
+
+    when S_SUMMARY_REPORT_DELAY_SUMMARY_START =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(r_report_delay_summary_start);
 
     when S_CHANNEL_PAD | S_SUMMARY_PAD =>
       w_fifo_valid            <= '1';

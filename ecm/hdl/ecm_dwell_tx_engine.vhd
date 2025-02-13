@@ -132,6 +132,13 @@ architecture rtl of ecm_dwell_tx_engine is
   signal r5_drfm_read_req               : ecm_drfm_read_req_t;
   signal r5_dds_control                 : dds_control_t;
   signal r5_output_control              : ecm_output_control_t;
+  signal w5_channel_state_wr_data        : channel_state_t;
+  signal w5_channel_state_wr_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal w5_channel_state_wr_en          : std_logic;
+
+  signal r6_channel_state_wr_data        : channel_state_t;
+  signal r6_channel_state_wr_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r6_channel_state_wr_en          : std_logic;
 
   signal r_tx_program_req_valid         : std_logic;
   signal r_tx_program_req_data          : std_logic_vector(TX_PROGRAM_FIFO_WIDTH - 1 downto 0);
@@ -142,9 +149,6 @@ architecture rtl of ecm_dwell_tx_engine is
   signal w_tx_program_fifo_rd_index     : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
 
   signal r_channel_clear_index          : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
-  signal w_channel_state_wr_data        : channel_state_t;
-  signal w_channel_state_wr_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal w_channel_state_wr_en          : std_logic;
 
   signal r_drfm_write_req               : ecm_drfm_write_req_t;
   signal w_drfm_state_wr_data           : drfm_state_t;
@@ -261,8 +265,9 @@ begin
       r5_channel_state                    <= r4_channel_state;
       r5_channel_state.playback_addr_curr <= r4_playback_addr_next;
 
-      r5_drfm_read_req.valid          <= r4_sync_data.valid and to_stdlogic((r4_channel_state.program_state = S_EXECUTE) and
+      r5_drfm_read_req.read_valid     <= r4_sync_data.valid and to_stdlogic((r4_channel_state.program_state = S_EXECUTE) and
                                                                             (w4_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_PLAYBACK));
+      r5_drfm_read_req.sync_valid     <= r4_sync_data.valid;
       r5_drfm_read_req.address        <= r4_channel_state.playback_addr_curr;
       r5_drfm_read_req.channel_index  <= r4_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
       r5_drfm_read_req.channel_last   <= r4_sync_data.last;
@@ -434,24 +439,33 @@ begin
 
   process(all)
   begin
-    w_channel_state_wr_index <= r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-    w_channel_state_wr_en    <= r5_sync_data.valid;
+    w5_channel_state_wr_index <= r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+    w5_channel_state_wr_en    <= r5_sync_data.valid;
 
     if ((w_tx_program_fifo_empty = '0') and (r5_sync_data.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) = w_tx_program_fifo_rd_channel)) then
-      w_channel_state_wr_data <= (program_state => S_START, instruction_index => w_tx_program_fifo_rd_index, others => (others => '0'));
-      w_tx_program_fifo_rd_en <= r5_sync_data.valid;
+      w5_channel_state_wr_data  <= (program_state => S_START, instruction_index => w_tx_program_fifo_rd_index, others => (others => '0'));
+      w_tx_program_fifo_rd_en   <= r5_sync_data.valid;
     else
-      w_channel_state_wr_data <= r5_channel_state;
-      w_tx_program_fifo_rd_en <= '0';
+      w5_channel_state_wr_data  <= r5_channel_state;
+      w_tx_program_fifo_rd_en   <= '0';
     end if;
   end process;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (w_channel_state_wr_en = '1') then
-        m_channel_state(to_integer(w_channel_state_wr_index))     <= w_channel_state_wr_data;
-        r_transmit_pending(to_integer(w_channel_state_wr_index))  <= to_stdlogic(w_channel_state_wr_data.program_state /= S_IDLE);
+      r6_channel_state_wr_index <= w5_channel_state_wr_index;
+      r6_channel_state_wr_en    <= w5_channel_state_wr_en;
+      r6_channel_state_wr_data  <= w5_channel_state_wr_data;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (r6_channel_state_wr_en = '1') then
+        m_channel_state(to_integer(r6_channel_state_wr_index))     <= r6_channel_state_wr_data;
+        r_transmit_pending(to_integer(r6_channel_state_wr_index))  <= to_stdlogic(r6_channel_state_wr_data.program_state /= S_IDLE);
       end if;
     end if;
   end process;

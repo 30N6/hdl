@@ -25,8 +25,11 @@ port (
   Dwell_done                  : in  std_logic;
   Dwell_data                  : in  ecm_dwell_entry_t;
   Dwell_sequence_num          : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  Dwell_global_counter        : in  unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
+  Dwell_program_tag           : in  unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
   Dwell_measurement_duration  : in  unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   Dwell_total_duration        : in  unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+  Dwell_tx_active             : in  std_logic;
   Timestamp_start             : in  unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
 
   Read_req                    : out std_logic;
@@ -70,8 +73,10 @@ architecture rtl of ecm_dwell_stats_reporter is
     S_DWELL_ENTRY_2,
     S_DWELL_ENTRY_3,
     S_DWELL_ENTRY_4,
+    S_DWELL_ENTRY_5,
 
     S_SEQ_NUM,
+    S_GLOBAL_COUNTER,
     S_DURATION_MEAS,
     S_DURATION_TOTAL,
     S_TIMESTAMP_START_0,
@@ -161,9 +166,13 @@ begin
         when S_DWELL_ENTRY_3 =>
           s_state <= S_DWELL_ENTRY_4;
         when S_DWELL_ENTRY_4 =>
+          s_state <= S_DWELL_ENTRY_5;
+        when S_DWELL_ENTRY_5 =>
           s_state <= S_SEQ_NUM;
 
         when S_SEQ_NUM =>
+          s_state <= S_GLOBAL_COUNTER;
+        when S_GLOBAL_COUNTER =>
           s_state <= S_DURATION_MEAS;
         when S_DURATION_MEAS =>
           s_state <= S_DURATION_TOTAL;
@@ -307,9 +316,17 @@ begin
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= w_dwell_data_packed(159 downto 128);
 
+    when S_DWELL_ENTRY_5 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= w_dwell_data_packed(191 downto 160);
+
     when S_SEQ_NUM =>
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= std_logic_vector(Dwell_sequence_num);
+
+    when S_GLOBAL_COUNTER =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_program_tag) & std_logic_vector(Dwell_global_counter);
 
     when S_DURATION_MEAS =>
       w_fifo_valid            <= '1';
@@ -317,7 +334,7 @@ begin
 
     when S_DURATION_TOTAL =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= std_logic_vector(resize_up(Dwell_total_duration, 32));
+      w_fifo_partial_1_data   <= Dwell_tx_active & std_logic_vector(resize_up(Dwell_total_duration, 31));
 
     when S_TIMESTAMP_START_0 =>
       w_fifo_valid            <= '1';

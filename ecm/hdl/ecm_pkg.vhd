@@ -81,7 +81,7 @@ package ecm_pkg is
   constant ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH            : natural := 32;
   constant ECM_DRFM_SEGMENT_LENGTH_WIDTH                  : natural := 12;
   constant ECM_DRFM_SEGMENT_SLICE_LENGTH_WIDTH            : natural := 8;
-  constant ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH              : natural := 2;
+  constant ECM_DRFM_SEGMENT_HYST_SHIFT_WIDTH              : natural := 4;
   constant ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT      : natural := 116;
 
   constant ECM_DWELL_DURATION_WIDTH                       : natural := 28;
@@ -92,6 +92,7 @@ package ecm_pkg is
   constant ECM_DWELL_GLOBAL_COUNTER_WIDTH                 : natural := 16;
   constant ECM_DWELL_POWER_ACCUM_WIDTH                    : natural := 64;
   constant ECM_DWELL_PLL_DELAY_WIDTH                      : natural := 12;
+  constant ECM_DWELL_MIN_TRIGGER_DURATION_WIDTH           : natural := 11;
 
   constant ECM_TIMESTAMP_WIDTH                            : natural := 48;
   constant ECM_DDS_DATA_WIDTH                             : natural := 16;
@@ -190,17 +191,21 @@ package ecm_pkg is
 
     measurement_duration      : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
     total_duration_max        : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
+
+    min_trigger_duration      : unsigned(ECM_DWELL_MIN_TRIGGER_DURATION_WIDTH - 1 downto 0);
   end record;
   constant ECM_DWELL_ENTRY_WIDTH          : natural := 6 + ECM_DWELL_REPEAT_COUNT_WIDTH + ECM_FAST_LOCK_PROFILE_INDEX_WIDTH + ECM_DWELL_ENTRY_INDEX_WIDTH +
-                                                        2 * ECM_DWELL_PLL_DELAY_WIDTH + ECM_DWELL_TAG_WIDTH + ECM_DWELL_FREQUENCY_WIDTH + 2 * ECM_DWELL_DURATION_WIDTH;
-  constant ECM_DWELL_ENTRY_ALIGNED_WIDTH  : natural := 8 + 8 + 8 + 8 + 16*2 + 16 + 16 + 32*2;
+                                                        2 * ECM_DWELL_PLL_DELAY_WIDTH + ECM_DWELL_TAG_WIDTH + ECM_DWELL_FREQUENCY_WIDTH + 2 * ECM_DWELL_DURATION_WIDTH +
+                                                        ECM_DWELL_MIN_TRIGGER_DURATION_WIDTH;
+  constant ECM_DWELL_ENTRY_ALIGNED_WIDTH  : natural := 8 + 8 + 8 + 8 + 16*2 + 16 + 16 + 32*2 + 16 + 16; --16 bits of padding
 
   type ecm_dwell_program_entry_t is record
     enable                    : std_logic;
     initial_dwell_index       : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
     global_counter_init       : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
+    tag                       : unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
   end record;
-  constant ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + ECM_DWELL_GLOBAL_COUNTER_WIDTH;
+  constant ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 16 + 16 + 16; --16 bits of padding
 
   type ecm_hardware_control_entry_t is record
     reset                     : std_logic;
@@ -228,9 +233,10 @@ package ecm_pkg is
   --end record;
   constant ECM_COMMON_HEADER_WIDTH  : natural := 96;
 
-
+  --TODO: remove these -- out of date now
   --type ecm_report_dwell_stats_t is record
   --  dwell_entry               : ecm_dwell_entry_t;
+  --  dwell_global_counter      : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   --  dwell_sequence_num        : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   --  measurement_duration      : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   --  total_duration            : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
@@ -263,13 +269,15 @@ package ecm_pkg is
     valid               : std_logic;
     first               : std_logic;
     last                : std_logic;
+    trigger_accepted    : std_logic;
     channel_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
     address             : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
     data                : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
   end record;
 
   type ecm_drfm_read_req_t is record
-    valid               : std_logic;
+    read_valid          : std_logic;
+    sync_valid          : std_logic;
     address             : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
     channel_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
     channel_last        : std_logic;
@@ -459,6 +467,7 @@ package body ecm_pkg is
     r.enable              := v(0);
     r.initial_dwell_index := unsigned(v(8 + ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 8));
     r.global_counter_init := unsigned(v(16 + ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 16));
+    r.tag                 := unsigned(v(32 + ECM_DWELL_TAG_WIDTH - 1 downto 32));
     return r;
   end function;
 
@@ -481,6 +490,8 @@ package body ecm_pkg is
 
     r.measurement_duration  := unsigned(v(96 + ECM_DWELL_DURATION_WIDTH - 1 downto 96));
     r.total_duration_max    := unsigned(v(128 + ECM_DWELL_DURATION_WIDTH - 1 downto 128));
+
+    r.min_trigger_duration  := unsigned(v(160 + ECM_DWELL_MIN_TRIGGER_DURATION_WIDTH - 1 downto 160));
 
     return r;
   end function;
@@ -523,7 +534,7 @@ package body ecm_pkg is
   begin
     (r.skip_pll_postlock_wait, r.skip_pll_lock_check, r.skip_pll_prelock_wait, r.global_counter_dec, r.global_counter_check, r.valid) := v(5 downto 0);
 
-    (r.total_duration_max, r.measurement_duration, r.frequency, r.tag,
+    (r.min_trigger_duration, r.total_duration_max, r.measurement_duration, r.frequency, r.tag,
      r.pll_post_lock_delay, r.pll_pre_lock_delay, r.next_dwell_index, r.fast_lock_profile,
      r.repeat_count) := unsigned(v(ECM_DWELL_ENTRY_WIDTH - 1 downto 6));
 
@@ -684,7 +695,8 @@ package body ecm_pkg is
     variable r : std_logic_vector(ECM_DWELL_ENTRY_WIDTH - 1 downto 0);
   begin
 
-    r := (std_logic_vector(v.total_duration_max),
+    r := (std_logic_vector(v.min_trigger_duration),
+          std_logic_vector(v.total_duration_max),
           std_logic_vector(v.measurement_duration),
           std_logic_vector(v.frequency),
           std_logic_vector(v.tag),
@@ -716,7 +728,9 @@ package body ecm_pkg is
                 v.skip_pll_prelock_wait, v.global_counter_dec, v.global_counter_check, v.valid);
 
     -- swapped by 32-bit word to match SV struct packing in TB
-    r := (
+    r := (  x"0000",
+            std_logic_vector(resize_up(v.min_trigger_duration, 16)),
+
             std_logic_vector(resize_up(v.total_duration_max, 32)),
 
             std_logic_vector(resize_up(v.measurement_duration, 32)),

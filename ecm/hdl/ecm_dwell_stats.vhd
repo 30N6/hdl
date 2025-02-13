@@ -26,8 +26,11 @@ port (
 
   Dwell_active              : in  std_logic;
   Dwell_active_measurement  : in  std_logic;
+  Dwell_active_transmit     : in  std_logic;
   Dwell_data                : in  ecm_dwell_entry_t;
   Dwell_sequence_num        : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  Dwell_global_counter      : in  unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
+  Dwell_program_tag         : in  unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
   Dwell_report_done         : out std_logic;
 
   Input_ctrl                : in  channelizer_control_t;
@@ -63,8 +66,11 @@ architecture rtl of ecm_dwell_stats is
 
   signal r_dwell_active             : std_logic;
   signal r_dwell_active_meas        : std_logic;
+  signal r_dwell_active_tx          : std_logic;
   signal r_dwell_data               : ecm_dwell_entry_t;
   signal r_dwell_sequence_num       : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal r_dwell_global_counter     : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
+  signal r_dwell_program_tag        : unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
 
   signal r_input_ctrl               : channelizer_control_t;
   signal r_input_pwr                : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
@@ -100,6 +106,7 @@ architecture rtl of ecm_dwell_stats is
 
   signal r_clear_index              : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
 
+  signal r_tx_active                : std_logic;
   signal r_duration_measurement     : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   signal r_duration_total           : unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   signal r_timestamp                : unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
@@ -124,14 +131,17 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_input_ctrl            <= Input_ctrl;
-      r_input_pwr             <= Input_pwr;
-      r_dwell_active          <= Dwell_active;
-      r_dwell_active_meas     <= Dwell_active_measurement;
+      r_input_ctrl        <= Input_ctrl;
+      r_input_pwr         <= Input_pwr;
+      r_dwell_active      <= Dwell_active;
+      r_dwell_active_meas <= Dwell_active_measurement;
+      r_dwell_active_tx   <= Dwell_active_transmit;
 
       if (s_state = S_IDLE) then
-        r_dwell_data          <= Dwell_data;
-        r_dwell_sequence_num  <= Dwell_sequence_num;
+        r_dwell_data            <= Dwell_data;
+        r_dwell_sequence_num    <= Dwell_sequence_num;
+        r_dwell_global_counter  <= Dwell_global_counter;
+        r_dwell_program_tag     <= Dwell_program_tag;
       end if;
     end if;
   end process;
@@ -311,6 +321,12 @@ begin
       elsif ((s_state = S_ACTIVE) or (s_state = S_WAIT_DONE)) then
         r_duration_total <= r_duration_total + 1;
       end if;
+
+      if (s_state = S_IDLE) then
+        r_tx_active <= '0';
+      elsif (r_dwell_active_tx = '1') then
+        r_tx_active <= '1';
+      end if;
     end if;
   end process;
 
@@ -328,8 +344,11 @@ begin
     Dwell_done                  => w_dwell_done,
     Dwell_data                  => r_dwell_data,
     Dwell_sequence_num          => r_dwell_sequence_num,
+    Dwell_global_counter        => r_dwell_global_counter,
+    Dwell_program_tag           => r_dwell_program_tag,
     Dwell_measurement_duration  => r_duration_measurement,
     Dwell_total_duration        => r_duration_total,
+    Dwell_tx_active             => r_tx_active,
     Timestamp_start             => r_ts_dwell_start,
 
     Read_req                    => w_report_read_req,
