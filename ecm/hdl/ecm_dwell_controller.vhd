@@ -187,9 +187,9 @@ begin
                                                             x"D" when (s_state = S_DWELL_DONE) else
                                                             x"E";
 
-    w_debug_dwell_controller.w_channel_entry_valid            <= w_channel_entry_valid;
-    w_debug_dwell_controller.w_channel_entry_index            <= std_logic_vector(w_channel_entry_index);
-    w_debug_dwell_controller.w_channel_entry_program_entry_0  <= pack(w_channel_entry_data.program_entries(0));
+    --w_debug_dwell_controller.w_channel_entry_valid            <= w_channel_entry_valid;
+    --w_debug_dwell_controller.w_channel_entry_index            <= std_logic_vector(w_channel_entry_index);
+    --w_debug_dwell_controller.w_channel_entry_program_entry_0  <= pack(w_channel_entry_data.program_entries(0));
     w_debug_dwell_controller.w_tx_instruction_valid           <= w_tx_instruction_valid;
     w_debug_dwell_controller.w_tx_instruction_index           <= std_logic_vector(w_tx_instruction_index);
     w_debug_dwell_controller.w_tx_instruction_data            <= w_tx_instruction_data;
@@ -203,6 +203,8 @@ begin
     w_debug_dwell_controller.r_dwell_meas_flush_done      <= r_dwell_meas_flush_done;
     w_debug_dwell_controller.r_report_received_drfm       <= r_report_received_drfm;
     w_debug_dwell_controller.r_report_received_stats      <= r_report_received_stats;
+    w_debug_dwell_controller.r_dwell_report_done_drfm     <= r_dwell_report_done_drfm;
+    w_debug_dwell_controller.r_dwell_report_done_stats    <= r_dwell_report_done_stats;
 
     w_debug_dwell_controller.r_dwell_active               <= r_dwell_active;
     w_debug_dwell_controller.r_dwell_start_meas           <= r_dwell_start_meas;
