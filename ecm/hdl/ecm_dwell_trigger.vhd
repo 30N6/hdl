@@ -137,7 +137,7 @@ architecture rtl of ecm_dwell_trigger is
 begin
 
   g_debug : if (ENABLE_DEBUG) generate
-    Debug_out.r3_channel_control_program_entry_0  <= pack(r3_channel_control.program_entries(0));
+    --Debug_out.r3_channel_control_program_entry_0  <= pack(r3_channel_control.program_entries(0));
     Debug_out.r3_channel_state_wr_en              <= r3_channel_state_wr_en;
     Debug_out.r3_channel_state_wr_index           <= std_logic_vector(r3_channel_state_wr_index);
     Debug_out.r3_channel_state_wr_data_state      <=  x"0" when (r3_channel_state_wr_data.trigger_state = S_IDLE) else

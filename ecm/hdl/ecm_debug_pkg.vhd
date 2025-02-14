@@ -14,7 +14,7 @@ library dsp_lib;
 package ecm_debug_pkg is
 
   type ecm_dwell_trigger_debug_t is record
-    r3_channel_control_program_entry_0  : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH - 1 downto 0);
+    --r3_channel_control_program_entry_0  : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH - 1 downto 0);
     r3_channel_state_wr_en              : std_logic;
     r3_channel_state_wr_index           : std_logic_vector(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
     r3_channel_state_wr_data_state      : std_logic_vector(3 downto 0);
@@ -30,7 +30,8 @@ package ecm_debug_pkg is
     r3_trigger_pending                  : std_logic;
   end record;
 
-  constant ECM_DWELL_TRIGGER_DEBUG_WIDTH : natural := ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH + 1 + ECM_CHANNEL_INDEX_WIDTH + 4 +
+  constant ECM_DWELL_TRIGGER_DEBUG_WIDTH : natural := --ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH +
+                                                      1 + ECM_CHANNEL_INDEX_WIDTH + 4 +
                                                       ECM_DRFM_SEGMENT_LENGTH_WIDTH + 4 + ECM_DRFM_ADDR_WIDTH + ECM_CHANNEL_INDEX_WIDTH +
                                                       ECM_NUM_CHANNEL_TX_PROGRAM_ENTRIES * 2 + 1;
 
@@ -84,7 +85,7 @@ package body ecm_debug_pkg is
     variable r : ecm_dwell_trigger_debug_t;
   begin
     (
-      r.r3_channel_control_program_entry_0  ,
+      --r.r3_channel_control_program_entry_0  ,
       r.r3_channel_state_wr_en              ,
       r.r3_channel_state_wr_index           ,
       r.r3_channel_state_wr_data_state      ,
@@ -145,7 +146,7 @@ package body ecm_debug_pkg is
   begin
 
     r := (
-            v.r3_channel_control_program_entry_0  ,
+            --v.r3_channel_control_program_entry_0  ,
             v.r3_channel_state_wr_en              ,
             v.r3_channel_state_wr_index           ,
             v.r3_channel_state_wr_data_state      ,
