@@ -1594,54 +1594,12 @@ module ecm_dwell_controller_tb;
     end
   end
 
-/*
-  function automatic void expect_dwell_program(esm_message_dwell_program_t dwell_program);
-    int global_counter = dwell_program.global_counter_init;
-    int inst_index = 0;
-    bit done = 0;
-
-    while (1) begin
-      esm_dwell_instruction_t inst = dwell_program.instructions[inst_index];
-      expect_t e;
-
-      //$display("%0t: expect_dwell_program - initial: inst[%0d]=%p", $time, inst_index, inst);
-
-      if (!inst.valid) begin
-        break;
-      end
-
-      for (int i = 0; i < inst.repeat_count + 1; i++) begin
-        if (inst.global_counter_check && (global_counter <= 0)) begin
-          done = 1;
-          break;
-        end
-
-        //$display("%0t: expecting dwell: inst_index=%0d  entry_index=%0d  next_instruction_index=%0d  global_counter=%0d", $time, inst_index, inst.entry_index, inst.next_instruction_index, global_counter);
-        e.data = dwell_entry_mem[inst.entry_index];
-        $display("%0t: expecting dwell: inst_index=%0d  dwell_entry=%p", $time, inst_index, e.data);
-
-        expected_data.push_back(e);
-        if (inst.global_counter_dec) begin
-          global_counter--;
-        end
-      end
-
-      if (done) begin
-        break;
-      end
-
-      inst_index = inst.next_instruction_index;
-      //$display("%0t: expect_dwell_program - final: inst_index=%0d", $time, inst_index);
-    end
-  endfunction
-*/
   task automatic standard_tests();
     parameter NUM_TESTS = 20;
 
     send_initial_config();
 
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
-      int wait_cycles;
       int num_programs = $urandom_range(16, 4);
       int num_dwells = $urandom_range(16, 4);
       int channel_mem_depth = $urandom_range(300, 100);
