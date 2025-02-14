@@ -56,8 +56,8 @@ architecture rtl of ecm_dwell_controller_debug is
   attribute DONT_TOUCH of w_unpacked_dwell_controller                   : signal is "TRUE";
   --attribute MARK_DEBUG of w_unpacked_dwell_trigger                      : signal is "TRUE";
   --attribute DONT_TOUCH of w_unpacked_dwell_trigger                      : signal is "TRUE";
-  attribute MARK_DEBUG of w_unpacked_dwell_controller_program_entry_0   : signal is "TRUE";
-  attribute DONT_TOUCH of w_unpacked_dwell_controller_program_entry_0   : signal is "TRUE";
+  --attribute MARK_DEBUG of w_unpacked_dwell_controller_program_entry_0   : signal is "TRUE";
+  --attribute DONT_TOUCH of w_unpacked_dwell_controller_program_entry_0   : signal is "TRUE";
   --attribute MARK_DEBUG of w_unpacked_dwell_trigger_program_entry_0      : signal is "TRUE";
   --attribute DONT_TOUCH of w_unpacked_dwell_trigger_program_entry_0      : signal is "TRUE";
 
@@ -80,7 +80,7 @@ begin
   begin
     if rising_edge(Clk) then
       r_fifo_wr_en <= to_stdlogic(r_debug_dwell_controller.s_state /= r_debug_dwell_controller_d.s_state) or
-                      r_debug_dwell_controller.w_channel_entry_valid or
+                      --r_debug_dwell_controller.w_channel_entry_valid or
                       r_debug_dwell_controller.w_tx_instruction_valid or
                       r_debug_dwell_controller.r_dwell_program_valid or
                       r_debug_dwell_controller.r_dwell_done_meas or
@@ -88,8 +88,12 @@ begin
                       r_debug_dwell_controller.r_dwell_meas_flush_done or
                       r_debug_dwell_controller.r_dwell_start_meas or
                       r_debug_dwell_controller.w_trigger_immediate_tx or
-                      r_debug_dwell_controller.w_tx_program_req_valid; --or
-                      --r_debug_dwell_trigger.r3_channel_state_wr_en;
+                      r_debug_dwell_controller.w_tx_program_req_valid or
+                      r_debug_dwell_controller.r_dwell_report_done_drfm or
+                      r_debug_dwell_controller.r_dwell_report_done_stats or
+                      (r_debug_dwell_controller.r_dwell_active xor r_debug_dwell_controller_d.r_dwell_active) or
+                      (r_debug_dwell_controller.r_dwell_active_tx xor r_debug_dwell_controller_d.r_dwell_active_tx) or
+                      (r_debug_dwell_controller.r_dwell_report_wait xor r_debug_dwell_controller_d.r_dwell_report_wait);
 
       --r_fifo_wr_data <= w_debug_dwell_trigger_packed & w_debug_dwell_controller_packed;
       r_fifo_wr_data <= w_debug_dwell_controller_packed;
@@ -127,7 +131,7 @@ begin
   w_unpacked_dwell_controller <= unpack(w_fifo_debug_dwell_controller);
   --w_unpacked_dwell_trigger     <= unpack(w_fifo_debug_dwell_trigger);
 
-  w_unpacked_dwell_controller_program_entry_0    <= unpack(w_unpacked_dwell_controller.w_channel_entry_program_entry_0);
+  --w_unpacked_dwell_controller_program_entry_0    <= unpack(w_unpacked_dwell_controller.w_channel_entry_program_entry_0);
   --w_unpacked_dwell_trigger_program_entry_0       <= unpack(w_unpacked_dwell_trigger.r3_channel_control_program_entry_0);
 
 end architecture rtl;

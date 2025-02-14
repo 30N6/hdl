@@ -36,9 +36,9 @@ package ecm_debug_pkg is
 
   type ecm_dwell_controller_debug_t is record
     s_state                         : std_logic_vector(3 downto 0);
-    w_channel_entry_valid           : std_logic;
-    w_channel_entry_index           : std_logic_vector(ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH - 1 downto 0);
-    w_channel_entry_program_entry_0 : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH - 1 downto 0);
+    --w_channel_entry_valid           : std_logic;
+    --w_channel_entry_index           : std_logic_vector(ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH - 1 downto 0);
+    --w_channel_entry_program_entry_0 : std_logic_vector(ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH - 1 downto 0);
     w_tx_instruction_valid          : std_logic;
     w_tx_instruction_index          : std_logic_vector(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
     w_tx_instruction_data           : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
@@ -50,6 +50,8 @@ package ecm_debug_pkg is
     r_dwell_meas_flush_done         : std_logic;
     r_report_received_drfm          : std_logic;
     r_report_received_stats         : std_logic;
+    r_dwell_report_done_drfm        : std_logic;
+    r_dwell_report_done_stats       : std_logic;
     r_dwell_active                  : std_logic;
     r_dwell_start_meas              : std_logic;
     r_dwell_active_meas             : std_logic;
@@ -63,9 +65,9 @@ package ecm_debug_pkg is
     w_tx_programs_done              : std_logic;
   end record;
 
-  constant ECM_DWELL_CONTROLLER_DEBUG_WIDTH : natural := 4 + 1 + ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH + ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH +
+  constant ECM_DWELL_CONTROLLER_DEBUG_WIDTH : natural := 4 + -- 1 + ECM_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH + ECM_CHANNEL_TX_PROGRAM_ENTRY_WIDTH +
                                                          1 + ECM_TX_INSTRUCTION_INDEX_WIDTH + ECM_TX_INSTRUCTION_DATA_WIDTH + 1 +
-                                                         ECM_DWELL_TAG_WIDTH + ECM_DWELL_DURATION_WIDTH + 13 + ECM_CHANNEL_INDEX_WIDTH +
+                                                         ECM_DWELL_TAG_WIDTH + ECM_DWELL_DURATION_WIDTH + 15 + ECM_CHANNEL_INDEX_WIDTH +
                                                          ECM_TX_INSTRUCTION_INDEX_WIDTH + 1;
 
   function unpack(v : std_logic_vector(ECM_DWELL_TRIGGER_DEBUG_WIDTH - 1 downto 0)) return ecm_dwell_trigger_debug_t;
@@ -106,9 +108,9 @@ package body ecm_debug_pkg is
   begin
     (
       r.s_state                         ,
-      r.w_channel_entry_valid           ,
-      r.w_channel_entry_index           ,
-      r.w_channel_entry_program_entry_0 ,
+      --r.w_channel_entry_valid           ,
+      --r.w_channel_entry_index           ,
+      --r.w_channel_entry_program_entry_0 ,
       r.w_tx_instruction_valid          ,
       r.w_tx_instruction_index          ,
       r.w_tx_instruction_data           ,
@@ -120,6 +122,8 @@ package body ecm_debug_pkg is
       r.r_dwell_meas_flush_done         ,
       r.r_report_received_drfm          ,
       r.r_report_received_stats         ,
+      r.r_dwell_report_done_drfm        ,
+      r.r_dwell_report_done_stats       ,
       r.r_dwell_active                  ,
       r.r_dwell_start_meas              ,
       r.r_dwell_active_meas             ,
@@ -165,9 +169,9 @@ package body ecm_debug_pkg is
 
     r := (
             v.s_state                         ,
-            v.w_channel_entry_valid           ,
-            v.w_channel_entry_index           ,
-            v.w_channel_entry_program_entry_0 ,
+            --v.w_channel_entry_valid           ,
+            --v.w_channel_entry_index           ,
+            --v.w_channel_entry_program_entry_0 ,
             v.w_tx_instruction_valid          ,
             v.w_tx_instruction_index          ,
             v.w_tx_instruction_data           ,
@@ -179,6 +183,8 @@ package body ecm_debug_pkg is
             v.r_dwell_meas_flush_done         ,
             v.r_report_received_drfm          ,
             v.r_report_received_stats         ,
+            v.r_dwell_report_done_drfm        ,
+            v.r_dwell_report_done_stats       ,
             v.r_dwell_active                  ,
             v.r_dwell_start_meas              ,
             v.r_dwell_active_meas             ,
