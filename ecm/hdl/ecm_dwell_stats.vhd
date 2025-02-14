@@ -196,7 +196,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Dwell_report_done <= to_stdlogic(s_state <= S_REPORT_ACK);
+      Dwell_report_done <= to_stdlogic(s_state = S_REPORT_ACK);
     end if;
   end process;
 
