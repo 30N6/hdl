@@ -22,6 +22,7 @@ port (
   Input_data                : in  signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
   Output_valid              : out std_logic;
+  Output_active             : out std_logic;
   Output_data               : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
   Error_stretcher_overflow  : out std_logic;
@@ -73,6 +74,7 @@ begin
     Input_data                => Input_data,
 
     Output_valid              => Output_valid,
+    Output_active             => Output_active,
     Output_data               => Output_data,
 
     Error_stretcher_overflow  => Error_stretcher_overflow,

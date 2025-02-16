@@ -26,6 +26,7 @@ port (
   Input_data                : in  signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
   Output_valid              : out std_logic;
+  Output_active             : out std_logic;
   Output_data               : out signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
   Error_stretcher_overflow  : out std_logic;
@@ -72,6 +73,7 @@ architecture rtl of synthesizer_common is
   signal w_mux_data             : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
   signal r_output_valid         : std_logic;
+  signal r_output_active        : std_logic;
   signal r_output_data          : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
   signal w_mux_input_overflow   : std_logic;
@@ -213,6 +215,7 @@ begin
   begin
     if rising_edge(Clk) then
       r_output_valid    <= w_mux_valid;
+      r_output_active   <= w_mux_transmit_active;
 
       if (w_mux_transmit_active = '1') then
         r_output_data(0)  <= shift_left(w_mux_data(0), (OUTPUT_DATA_WIDTH - INPUT_DATA_WIDTH) - SYNTHESIZER_SHIFT_MAP(to_integer(w_mux_shift_code)));
@@ -228,6 +231,7 @@ begin
   begin
     if rising_edge(Clk) then
       Output_valid  <= r_output_valid;
+      Output_active <= r_output_active;
       Output_data   <= r_output_data;
     end if;
   end process;

@@ -71,10 +71,27 @@ package ecm_debug_pkg is
                                                          ECM_DWELL_TAG_WIDTH + ECM_DWELL_DURATION_WIDTH + 15 + ECM_CHANNEL_INDEX_WIDTH +
                                                          ECM_TX_INSTRUCTION_INDEX_WIDTH + 1;
 
+
+  type ecm_synthesizer_debug_t is record
+    w_synthesizer16_input_ctrl_valid      : std_logic;
+    w_synthesizer16_input_ctrl_last       : std_logic;
+    w_synthesizer16_input_ctrl_index      : std_logic_vector(5 downto 0);
+    w_synthesizer16_input_ctrl_tx_active  : std_logic;
+    w_synthesizer16_input_ctrl_chan_count : std_logic_vector(SYNTHESIZER_CHANNEL_COUNT_WIDTH - 1 downto 0);
+    w_synthesizer16_input_data_i          : std_logic_vector(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
+
+    w_synthesizer16_output_valid          : std_logic;
+    w_synthesizer16_output_active         : std_logic;
+    w_synthesizer16_output_data_i         : std_logic_vector(23 downto 0);
+  end record;
+  constant ECM_SYNTHESIZER_DEBUG_WIDTH : natural := 9 + SYNTHESIZER_CHANNEL_COUNT_WIDTH + ECM_SYNTHESIZER_DATA_WIDTH + 26;
+
   function unpack(v : std_logic_vector(ECM_DWELL_TRIGGER_DEBUG_WIDTH - 1 downto 0)) return ecm_dwell_trigger_debug_t;
   function pack(v : ecm_dwell_trigger_debug_t) return std_logic_vector;
   function unpack(v : std_logic_vector(ECM_DWELL_CONTROLLER_DEBUG_WIDTH - 1 downto 0)) return ecm_dwell_controller_debug_t;
   function pack(v : ecm_dwell_controller_debug_t) return std_logic_vector;
+  function unpack(v : std_logic_vector(ECM_SYNTHESIZER_DEBUG_WIDTH - 1 downto 0)) return ecm_synthesizer_debug_t;
+  function pack(v : ecm_synthesizer_debug_t) return std_logic_vector;
 
 end package ecm_debug_pkg;
 
@@ -141,6 +158,23 @@ package body ecm_debug_pkg is
     return r;
   end function;
 
+  function unpack(v : std_logic_vector(ECM_SYNTHESIZER_DEBUG_WIDTH - 1 downto 0)) return ecm_synthesizer_debug_t is
+    variable r : ecm_synthesizer_debug_t;
+  begin
+    (
+      r.w_synthesizer16_input_ctrl_valid,
+      r.w_synthesizer16_input_ctrl_last,
+      r.w_synthesizer16_input_ctrl_index,
+      r.w_synthesizer16_input_ctrl_tx_active,
+      r.w_synthesizer16_input_ctrl_chan_count,
+      r.w_synthesizer16_input_data_i,
+      r.w_synthesizer16_output_valid,
+      r.w_synthesizer16_output_active,
+      r.w_synthesizer16_output_data_i
+    ) := v;
+    return r;
+  end function;
+
   function pack(v : ecm_dwell_trigger_debug_t) return std_logic_vector is
     variable r : std_logic_vector(ECM_DWELL_TRIGGER_DEBUG_WIDTH - 1 downto 0);
   begin
@@ -197,6 +231,23 @@ package body ecm_debug_pkg is
             v.w_tx_program_req_channel        ,
             v.w_tx_program_req_index          ,
             v.w_tx_programs_done
+          );
+    return r;
+  end function;
+
+  function pack(v : ecm_synthesizer_debug_t) return std_logic_vector is
+    variable r : std_logic_vector(ECM_SYNTHESIZER_DEBUG_WIDTH - 1 downto 0);
+  begin
+    r := (
+            v.w_synthesizer16_input_ctrl_valid,
+            v.w_synthesizer16_input_ctrl_last,
+            v.w_synthesizer16_input_ctrl_index,
+            v.w_synthesizer16_input_ctrl_tx_active,
+            v.w_synthesizer16_input_ctrl_chan_count,
+            v.w_synthesizer16_input_data_i,
+            v.w_synthesizer16_output_valid,
+            v.w_synthesizer16_output_active,
+            v.w_synthesizer16_output_data_i
           );
     return r;
   end function;

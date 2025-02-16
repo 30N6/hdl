@@ -14,6 +14,7 @@ library dsp_lib;
 
 library ecm_lib;
   use ecm_lib.ecm_pkg.all;
+  use ecm_lib.ecm_debug_pkg.all;
 
 entity ecm_top is
 generic (
@@ -59,8 +60,9 @@ architecture rtl of ecm_top is
   constant ENABLE_DWELL_STATS             : boolean := true;
   constant ENABLE_DRFM                    : boolean := true;
   constant ENABLE_DDS                     : boolean := true;
-  constant ENABLE_STATUS_REPORTER         : boolean := true;
+  constant ENABLE_STATUS_REPORTER         : boolean := false;
   constant ENABLE_DWELL_CONTROLLER_DEBUG  : boolean := false;
+  constant ENABLE_SYNTH_DEBUG             : boolean := true;
 
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
   constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + clog2(8) + clog2(ECM_NUM_CHANNELS); -- 8 taps per channel
@@ -127,7 +129,10 @@ architecture rtl of ecm_top is
   signal w_synthesizer16_input_ctrl   : synthesizer_control_t;
   signal w_synthesizer16_input_data   : signed_array_t(1 downto 0)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
   signal w_synthesizer16_output_valid : std_logic;
+  signal w_synthesizer16_output_active: std_logic;
   signal w_synthesizer16_output_data  : signed_array_t(1 downto 0)(SYNTHESIZER16_OUTPUT_WIDTH - 1 downto 0);
+
+  signal w_debug_synthesizer          : ecm_synthesizer_debug_t;
 
   signal w_drfm_write_req             : ecm_drfm_write_req_t;
   signal w_drfm_read_req              : ecm_drfm_read_req_t;
@@ -378,6 +383,7 @@ begin
       Input_data                => w_synthesizer16_input_data,
 
       Output_valid              => w_synthesizer16_output_valid,
+      Output_active             => w_synthesizer16_output_active,
       Output_data               => w_synthesizer16_output_data,
 
       Error_stretcher_overflow  => w_synthesizer_errors.stretcher_overflow,
@@ -391,6 +397,28 @@ begin
     w_dac_valid_out   <= w_synthesizer16_output_valid;
     w_dac_data_out(0) <= w_synthesizer16_output_data(0)(SYNTHESIZER16_OUTPUT_WIDTH - 1 downto (SYNTHESIZER16_OUTPUT_WIDTH - IQ_WIDTH));
     w_dac_data_out(1) <= w_synthesizer16_output_data(1)(SYNTHESIZER16_OUTPUT_WIDTH - 1 downto (SYNTHESIZER16_OUTPUT_WIDTH - IQ_WIDTH));
+
+    g_synthesizer_debug : if (ENABLE_SYNTH_DEBUG) generate
+      w_debug_synthesizer.w_synthesizer16_input_ctrl_valid      <= w_synthesizer16_input_ctrl.valid;
+      w_debug_synthesizer.w_synthesizer16_input_ctrl_last       <= w_synthesizer16_input_ctrl.last;
+      w_debug_synthesizer.w_synthesizer16_input_ctrl_index      <= std_logic_vector(w_synthesizer16_input_ctrl.data_index);
+      w_debug_synthesizer.w_synthesizer16_input_ctrl_tx_active  <= w_synthesizer16_input_ctrl.transmit_active;
+      w_debug_synthesizer.w_synthesizer16_input_ctrl_chan_count <= std_logic_vector(w_synthesizer16_input_ctrl.active_channel_count);
+      w_debug_synthesizer.w_synthesizer16_input_data_i          <= std_logic_vector(w_synthesizer16_input_data(0));
+      w_debug_synthesizer.w_synthesizer16_output_valid          <= w_synthesizer16_output_valid;
+      w_debug_synthesizer.w_synthesizer16_output_active         <= w_synthesizer16_output_active;
+      w_debug_synthesizer.w_synthesizer16_output_data_i         <= std_logic_vector(w_synthesizer16_output_data(0));
+
+      i_debug : entity ecm_lib.ecm_synthesizer_debug
+      port map (
+        Clk_axi           => M_axis_clk,
+        Clk               => Adc_clk_x4,
+        Rst               => r_combined_rst,
+
+        Debug_synthesizer => w_debug_synthesizer
+      );
+    end generate g_synthesizer_debug;
+
   else generate
     w_synthesizer_errors  <= (others => '0');
     w_dac_valid_out       <= '1';
