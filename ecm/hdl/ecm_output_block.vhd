@@ -21,6 +21,7 @@ port (
   Rst                   : in  std_logic;
 
   Dwell_active_transmit : in  std_logic;
+  Dwell_transmit_count  : in unsigned(ECM_CHANNEL_COUNT_WIDTH - 1 downto 0);
   Output_control        : in  ecm_output_control_t;
 
   Dds_ctrl              : in  channelizer_control_t;
@@ -29,7 +30,7 @@ port (
   Drfm_ctrl             : in  channelizer_control_t;
   Drfm_data             : in  signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
 
-  Synthesizer_ctrl      : out channelizer_control_t;
+  Synthesizer_ctrl      : out synthesizer_control_t;
   Synthesizer_data      : out signed_array_t(1 downto 0)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
 
   Error_dds_drfm_sync   : out std_logic
@@ -42,6 +43,7 @@ architecture rtl of ecm_output_block is
 
   signal r_rst                    : std_logic;
   signal r_dwell_active_transmit  : std_logic;
+  signal r_dwell_transmit_count   : unsigned(ECM_CHANNEL_COUNT_WIDTH - 1 downto 0);
   signal r_output_control         : ecm_output_control_t;
   signal r_clear_index            : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0) := (others => '0');
   signal w_output_control         : ecm_output_control_t;
@@ -71,8 +73,8 @@ architecture rtl of ecm_output_block is
   signal r3_product_data          : signed_array_t(1 downto 0)(PRODUCT_WIDTH downto 0);
   signal r3_output_control        : unsigned(ECM_TX_OUTPUT_CONTROL_WIDTH - 1 downto 0);
 
-  signal r4_output_ctrl           : channelizer_control_t;
-  signal r4_output_data     : signed_array_t(1 downto 0)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
+  signal r4_output_ctrl           : synthesizer_control_t;
+  signal r4_output_data           : signed_array_t(1 downto 0)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
 
 begin
 
@@ -93,6 +95,7 @@ begin
     if rising_edge(Clk) then
       r_rst                   <= Rst;
       r_dwell_active_transmit <= Dwell_active_transmit;
+      r_dwell_transmit_count  <= Dwell_transmit_count;
       r_output_control        <= Output_control;
     end if;
   end process;
@@ -177,7 +180,11 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r4_output_ctrl <= r3_shared_ctrl;
+      r4_output_ctrl.valid                <= r3_shared_ctrl.valid;
+      r4_output_ctrl.last                 <= r3_shared_ctrl.last;
+      r4_output_ctrl.data_index           <= r3_shared_ctrl.data_index;
+      r4_output_ctrl.transmit_active      <= r_dwell_active_transmit;
+      r4_output_ctrl.active_channel_count <= resize_up(r_dwell_transmit_count, SYNTHESIZER_CHANNEL_COUNT_WIDTH);
 
       if (r_dwell_active_transmit = '0') then
         r4_output_data <= (others => (others => '0'));

@@ -37,6 +37,7 @@ package ecm_pkg is
 
   constant ECM_NUM_CHANNELS                               : natural := 16;
   constant ECM_CHANNEL_INDEX_WIDTH                        : natural := clog2(ECM_NUM_CHANNELS);
+  constant ECM_CHANNEL_COUNT_WIDTH                        : natural := clog2(ECM_NUM_CHANNELS + 1);
 
   constant ECM_NUM_TX_INSTRUCTIONS                        : natural := 512;
   constant ECM_TX_INSTRUCTION_INDEX_WIDTH                 : natural := clog2(ECM_NUM_TX_INSTRUCTIONS);

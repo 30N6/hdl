@@ -35,8 +35,8 @@ interface channelizer_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
   endtask
 endinterface
 
-interface channelizer_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
-  channelizer_control_t             ctrl;
+interface synthesizer_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
+  synthesizer_control_t             ctrl;
   logic signed [DATA_WIDTH - 1 : 0] data [1:0];
 
   task read(output channelizer_transaction_t rx);
@@ -82,7 +82,7 @@ module ecm_output_block_tb;
   control_intf                                                    ctrl_intf   (.*);
   channelizer_tx_intf #(.DATA_WIDTH(ecm_dds_data_width))          dds_intf    (.*);
   channelizer_tx_intf #(.DATA_WIDTH(ecm_drfm_data_width))         drfm_intf   (.*);
-  channelizer_rx_intf #(.DATA_WIDTH(ecm_synthesizer_data_width))  output_intf (.*);
+  synthesizer_rx_intf #(.DATA_WIDTH(ecm_synthesizer_data_width))  output_intf (.*);
 
   expect_t                                          expected_data [$];
   int                                               num_received = 0;
@@ -90,8 +90,9 @@ module ecm_output_block_tb;
   channelizer_transaction_t                         dds_tx [$];
   channelizer_transaction_t                         drfm_tx [$];
 
+  logic [ecm_channel_count_width - 1 : 0]           w_dwell_transmit_count;
   logic                                             w_error_dds_drfm_sync;
-  channelizer_control_t                             w_output_ctrl;
+  synthesizer_control_t                             w_output_ctrl;
   logic signed [ecm_synthesizer_data_width - 1 : 0] w_output_data [1 : 0];
   logic [ecm_synthesizer_data_width - 1 : 0]        r_output_i [ecm_num_channels - 1 : 0];
   logic [ecm_synthesizer_data_width - 1 : 0]        r_output_q [ecm_num_channels - 1 : 0];
@@ -116,6 +117,7 @@ module ecm_output_block_tb;
   .Rst                    (Rst),
 
   .Dwell_active_transmit  (1'b1),
+  .Dwell_transmit_count   (w_dwell_transmit_count),
   .Output_control         (ctrl_intf.data),
 
   .Dds_ctrl               (dds_intf.ctrl),
@@ -256,6 +258,8 @@ module ecm_output_block_tb;
 
     for (int i_test = 0; i_test < 20; i_test++) begin
       int data_length = $urandom_range(1000, 100);
+
+      w_dwell_transmit_count <= $urandom_range(ecm_num_channels);
 
       for (int i = 0; i < ecm_num_channels; i++) begin
         ecm_output_control_t control;

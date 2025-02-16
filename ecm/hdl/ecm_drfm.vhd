@@ -82,9 +82,9 @@ architecture rtl of ecm_drfm is
   signal r0_write_req                     : ecm_drfm_write_req_t;
   signal r0_read_req                      : ecm_drfm_read_req_t;
   signal r0_write_prev_seq_num            : unsigned(ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  signal r0_mem_rd_addr                   : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal r0_read_valid                    : std_logic;
   signal w0_mem_wr_data                   : std_logic_vector(MEM_WIDTH - 1 downto 0);
-  signal w0_mem_rd_addr                   : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
-  signal w0_read_valid                    : std_logic;
 
   signal r1_write_req                     : ecm_drfm_write_req_t;
   signal r1_read_req                      : ecm_drfm_read_req_t;
@@ -155,6 +155,14 @@ begin
       r0_write_req          <= Write_req;
       r0_read_req           <= Read_req;
       r0_write_prev_seq_num <= m_seq_num(to_integer(Write_req.channel_index));
+
+      if (Read_req.read_valid = '1') then
+        r0_mem_rd_addr  <= Read_req.address;
+        r0_read_valid   <= '1';
+      else
+        r0_mem_rd_addr  <= r_reporter_mem_read_addr;
+        r0_read_valid   <= r_reporter_mem_read_valid;
+      end if;
     end if;
   end process;
 
@@ -174,24 +182,13 @@ begin
     if rising_edge(Clk) then
       if (w_reporter_mem_read_valid = '1') then
         r_reporter_mem_read_valid <= '1';
-      elsif (r0_read_req.read_valid = '0') then
+      elsif (Read_req.read_valid = '0') then
         r_reporter_mem_read_valid <= '0';
       end if;
 
       if (w_reporter_mem_read_valid = '1') then
         r_reporter_mem_read_addr <= w_reporter_mem_read_addr;
       end if;
-    end if;
-  end process;
-
-  process(all)
-  begin
-    if (r0_read_req.read_valid = '1') then
-      w0_mem_rd_addr  <= r0_read_req.address;
-      w0_read_valid   <= '1';
-    else
-      w0_mem_rd_addr  <= r_reporter_mem_read_addr;
-      w0_read_valid   <= r_reporter_mem_read_valid;
     end if;
   end process;
 
@@ -209,7 +206,7 @@ begin
     Wr_addr   => r0_write_req.address,
     Wr_data   => w0_mem_wr_data,
 
-    Rd_addr   => w0_mem_rd_addr,
+    Rd_addr   => r0_mem_rd_addr,
     Rd_data   => w3_mem_rd_data
   );
 
@@ -217,7 +214,7 @@ begin
   begin
     if rising_edge(Clk) then
       r1_read_req           <= r0_read_req;
-      r1_read_valid         <= w0_read_valid;
+      r1_read_valid         <= r0_read_valid;
       r1_read_max_iq_bits   <= m_max_iq_bits(to_integer(r0_read_req.channel_index));
 
       r1_write_req          <= r0_write_req;

@@ -137,6 +137,7 @@ begin
     CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
     INPUT_DATA_WIDTH    => INPUT_DATA_WIDTH,
     OUTPUT_DATA_WIDTH   => FILTER_DATA_WIDTH,
+    TAG_WIDTH           => 1,
     COEF_WIDTH          => COEF_WIDTH,
     NUM_COEFS           => NUM_COEFS,
     COEF_DATA           => COEF_DATA,
@@ -149,12 +150,14 @@ begin
     Input_valid           => w_demux_valid,
     Input_index           => w_demux_index,
     Input_last            => w_demux_last,
+    Input_tag             => (others => '0'),
     Input_i               => w_demux_data(0),
     Input_q               => w_demux_data(1),
 
     Output_valid          => w_filter_valid,
     Output_index          => w_filter_index,
     Output_last           => w_filter_last,
+    Output_tag            => open,
     Output_i              => w_filter_data(0),
     Output_q              => w_filter_data(1),
 
