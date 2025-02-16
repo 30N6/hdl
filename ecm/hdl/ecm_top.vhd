@@ -249,6 +249,7 @@ begin
     Dwell_sequence_num            => w_dwell_sequence_num,    --TODO: cleanup - wrap into metadata struct
     Dwell_global_counter          => w_dwell_global_counter,
     Dwell_program_tag             => w_dwell_program_tag,
+    Dwell_transmit_count          => w_dwell_transmit_count,
     Dwell_report_done_drfm        => w_dwell_drfm_reports_done,
     Dwell_report_done_stats       => w_dwell_stats_report_done,
 

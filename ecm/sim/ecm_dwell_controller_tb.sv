@@ -316,6 +316,7 @@ module ecm_dwell_controller_tb;
     .Dwell_sequence_num           (w_dwell_seq_num),
     .Dwell_global_counter         (w_dwell_global_counter),
     .Dwell_program_tag            (w_dwell_program_tag),
+    .Dwell_transmit_count         (),
     .Dwell_report_done_drfm       (r_dwell_report_done_drfm),
     .Dwell_report_done_stats      (r_dwell_report_done_stats),
 
