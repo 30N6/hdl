@@ -48,6 +48,7 @@ custom_ip_files ecm_receiver [list \
   {"./hdl/ecm_pkg.vhd"                      "ecm_lib"}      \
   {"./hdl/ecm_debug_pkg.vhd"                "ecm_lib"}      \
   {"./hdl/ecm_dwell_controller_debug.vhd"   "ecm_lib"}      \
+  {"./hdl/ecm_synthesizer_debug.vhd"        "ecm_lib"}      \
   {"./hdl/ecm_config.vhd"                   "ecm_lib"}      \
   {"./hdl/ecm_dwell_config_decoder.vhd"     "ecm_lib"}      \
   {"./hdl/ecm_dwell_trigger.vhd"            "ecm_lib"}      \
