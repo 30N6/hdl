@@ -292,7 +292,7 @@ module ecm_dwell_controller_tb;
     .Module_config  (w_module_config)
   );
 
-  ecm_dwell_controller #(.SYNC_TO_DRFM_READ_LATENCY(SYNC_TO_DRFM_READ_LATENCY), .CHANNELIZER_DATA_WIDTH(CHANNELIZER_DATA_WIDTH)) dut
+  ecm_dwell_controller #(.SYNC_TO_DRFM_READ_LATENCY(SYNC_TO_DRFM_READ_LATENCY), .CHANNELIZER_DATA_WIDTH(CHANNELIZER_DATA_WIDTH), .ENABLE_DEBUG(0)) dut
   (
     .Clk_axi                      (Clk_axi),
     .Clk                          (Clk),

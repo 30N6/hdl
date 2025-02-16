@@ -54,12 +54,13 @@ port (
 end entity ecm_top;
 
 architecture rtl of ecm_top is
-  constant ENABLE_CHANNELIZER         : boolean := true;
-  constant ENABLE_SYNTHESIZER         : boolean := true;
-  constant ENABLE_DWELL_STATS         : boolean := true;
-  constant ENABLE_DRFM                : boolean := true;
-  constant ENABLE_DDS                 : boolean := true;
-  constant ENABLE_STATUS_REPORTER     : boolean := true;
+  constant ENABLE_CHANNELIZER             : boolean := true;
+  constant ENABLE_SYNTHESIZER             : boolean := true;
+  constant ENABLE_DWELL_STATS             : boolean := true;
+  constant ENABLE_DRFM                    : boolean := true;
+  constant ENABLE_DDS                     : boolean := true;
+  constant ENABLE_STATUS_REPORTER         : boolean := true;
+  constant ENABLE_DWELL_CONTROLLER_DEBUG  : boolean := false;
 
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
   constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + clog2(8) + clog2(ECM_NUM_CHANNELS); -- 8 taps per channel
@@ -225,7 +226,8 @@ begin
   i_dwell_controller : entity ecm_lib.ecm_dwell_controller
   generic map (
     SYNC_TO_DRFM_READ_LATENCY => SYNC_TO_DRFM_READ_LATENCY,
-    CHANNELIZER_DATA_WIDTH    => CHANNELIZER16_DATA_WIDTH
+    CHANNELIZER_DATA_WIDTH    => CHANNELIZER16_DATA_WIDTH,
+    ENABLE_DEBUG              => ENABLE_DWELL_CONTROLLER_DEBUG
   )
   port map (
     Clk_axi                       => M_axis_clk,

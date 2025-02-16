@@ -15,7 +15,8 @@ library dsp_lib;
 entity ecm_dwell_controller is
 generic (
   SYNC_TO_DRFM_READ_LATENCY : natural;
-  CHANNELIZER_DATA_WIDTH    : natural
+  CHANNELIZER_DATA_WIDTH    : natural;
+  ENABLE_DEBUG              : boolean
 );
 port (
   Clk_axi                       : in  std_logic;
@@ -80,7 +81,6 @@ architecture rtl of ecm_dwell_controller is
   );
 
   constant MEAS_FLUSH_CYCLES            : natural := ECM_NUM_CHANNELS * 2 + 8;
-  constant ENABLE_DEBUG                 : boolean := true;
 
   signal s_state                        : state_t;
 
