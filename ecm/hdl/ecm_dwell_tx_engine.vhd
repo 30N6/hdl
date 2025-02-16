@@ -60,7 +60,6 @@ architecture rtl of ecm_dwell_tx_engine is
     loop_count          : unsigned(ECM_TX_INSTRUCTION_LOOP_COUNTER_WIDTH - 1 downto 0);
     playback_count      : unsigned(ECM_TX_INSTRUCTION_PLAYBACK_COUNTER_WIDTH - 1 downto 0);
     playback_addr_curr  : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
-    playback_addr_last  : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   end record;
 
   type drfm_state_t is record
@@ -110,7 +109,6 @@ architecture rtl of ecm_dwell_tx_engine is
   signal r4_sync_data                   : channelizer_control_t;
   signal r4_channel_state               : channel_state_t;
   signal r4_drfm_state_first            : drfm_state_t;
-  signal r4_drfm_state_last             : drfm_state_t;
   signal r4_instruction_data            : std_logic_vector(ECM_TX_INSTRUCTION_DATA_WIDTH - 1 downto 0);
   signal r4_playback_update             : std_logic;
   signal r4_instruction_index_next      : unsigned(ECM_TX_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
@@ -234,8 +232,7 @@ begin
       r4_channel_state          <= r3_channel_state;
       r4_instruction_data       <= r3_instruction_data;
       r4_drfm_state_first       <= r3_drfm_state_first;
-      r4_drfm_state_last        <= r3_drfm_state_last;
-      r4_playback_update        <= w3_instruction_playback.mode or to_stdlogic(r3_channel_state.playback_addr_curr = r3_channel_state.playback_addr_last);
+      r4_playback_update        <= w3_instruction_playback.mode or to_stdlogic(r3_channel_state.playback_addr_curr = r3_drfm_state_last.addr);  --TODO: get rid of last, use drfm state
 
       r4_instruction_index_next <= r3_channel_state.instruction_index + 1;
       r4_wait_count_next        <= r3_channel_state.wait_count - 1;
@@ -247,7 +244,7 @@ begin
       r4_playback_done          <= to_stdlogic(r3_channel_state.playback_count <= 1);
       r4_jump_valid             <= not(w3_instruction_jump.counter_check) or to_stdlogic(r3_channel_state.loop_count /= w3_instruction_jump.counter_value);
 
-      r4_playback_addr_restart  <= to_stdlogic(r3_channel_state.playback_addr_curr = r3_channel_state.playback_addr_last);
+      r4_playback_addr_restart  <= to_stdlogic(r3_channel_state.playback_addr_curr = r3_drfm_state_last.addr);
       r4_playback_addr_next     <= r3_channel_state.playback_addr_curr + 1;
     end if;
   end process;
@@ -292,7 +289,6 @@ begin
         r5_channel_state.wait_count           <= r4_wait_count_start;
         r5_channel_state.playback_count       <= r4_playback_count_start;
         r5_channel_state.playback_addr_curr   <= r4_drfm_state_first.addr;
-        r5_channel_state.playback_addr_last   <= r4_drfm_state_last.addr;
 
         if ((Dwell_transmit_active = '0') or (w4_instruction_header.valid = '0')) then
           r5_channel_state.program_state              <= S_IDLE;
