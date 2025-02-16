@@ -232,7 +232,7 @@ begin
       r4_channel_state          <= r3_channel_state;
       r4_instruction_data       <= r3_instruction_data;
       r4_drfm_state_first       <= r3_drfm_state_first;
-      r4_playback_update        <= w3_instruction_playback.mode or to_stdlogic(r3_channel_state.playback_addr_curr = r3_drfm_state_last.addr);  --TODO: get rid of last, use drfm state
+      r4_playback_update        <= w3_instruction_playback.mode or to_stdlogic(r3_channel_state.playback_addr_curr = r3_drfm_state_last.addr);
 
       r4_instruction_index_next <= r3_channel_state.instruction_index + 1;
       r4_wait_count_next        <= r3_channel_state.wait_count - 1;
