@@ -166,6 +166,9 @@ architecture rtl of ecm_dwell_controller is
   signal w_error_program_fifo_overflow  : std_logic;
   signal w_error_program_fifo_underflow : std_logic;
 
+  attribute DONT_TOUCH                      : string;
+  attribute DONT_TOUCH of r_transmit_count  : signal is "TRUE";
+
 begin
 
   process(Clk)
