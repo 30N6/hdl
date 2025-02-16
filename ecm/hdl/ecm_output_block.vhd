@@ -183,6 +183,7 @@ begin
       r4_output_ctrl.valid                <= r3_shared_ctrl.valid;
       r4_output_ctrl.last                 <= r3_shared_ctrl.last;
       r4_output_ctrl.data_index           <= r3_shared_ctrl.data_index;
+      r4_output_ctrl.transmit_active      <= r_dwell_active_transmit;
       r4_output_ctrl.active_channel_count <= resize_up(r_dwell_transmit_count, SYNTHESIZER_CHANNEL_COUNT_WIDTH);
 
       if (r_dwell_active_transmit = '0') then

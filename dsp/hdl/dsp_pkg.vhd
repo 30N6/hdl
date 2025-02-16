@@ -56,6 +56,7 @@ package dsp_pkg is
     valid                 : std_logic;
     last                  : std_logic;
     data_index            : unsigned(5 downto 0);
+    transmit_active       : std_logic;
     active_channel_count  : unsigned(SYNTHESIZER_CHANNEL_COUNT_WIDTH - 1 downto 0);
   end record;
 

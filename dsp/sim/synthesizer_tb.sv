@@ -114,6 +114,7 @@ module synthesizer_tb;
       assign w_synth_input_control.valid                = w_chan_output_control.valid;
       assign w_synth_input_control.last                 = w_chan_output_control.last;
       assign w_synth_input_control.data_index           = w_chan_output_control.data_index;
+      assign w_synth_input_control.transmit_active      = 1'b1;
       assign w_synth_input_control.active_channel_count = 5'd1;
 
       synthesizer_16 #(.INPUT_DATA_WIDTH(CHAN_OUTPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(SYNTH_OUTPUT_DATA_WIDTH)) synth_16
