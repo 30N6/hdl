@@ -24,6 +24,7 @@ port (
   Rst                     : in  std_logic;
 
   Dwell_active            : in  std_logic;
+  Dwell_start             : in  std_logic;
   Dwell_done              : in  std_logic;
   Dwell_sequence_num      : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
@@ -86,7 +87,8 @@ architecture rtl of ecm_drfm_reporter is
     S_CHANNEL_IQ_READ_START,
     S_CHANNEL_IQ_RESULT,
     S_CHANNEL_PAD,
-    S_CHANNEL_DONE,
+    S_CHANNEL_DONE_0,
+    S_CHANNEL_DONE_1,
 
     S_SUMMARY_HEADER_0,
     S_SUMMARY_HEADER_1,
@@ -103,6 +105,8 @@ architecture rtl of ecm_drfm_reporter is
   );
 
   signal s_state                      : state_t;
+
+  signal r_channel_report_pending_any : std_logic;
 
   signal r_packet_seq_num             : unsigned(31 downto 0);
   signal r_channel_index              : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
@@ -158,6 +162,13 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      r_channel_report_pending_any <= not(Dwell_start) and or_reduce(Channel_report_pending);
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
       if (Rst = '1') then
         s_state <= S_IDLE;
       else
@@ -170,7 +181,7 @@ begin
           end if;
 
         when S_START_WAIT =>
-          if (or_reduce(Channel_report_pending) = '1') then
+          if (r_channel_report_pending_any = '1') then
             s_state <= S_READ_CHANNEL_0;
           elsif (Dwell_done = '1') then
             s_state <= S_START_SUMMARY;
@@ -234,12 +245,15 @@ begin
 
         when S_CHANNEL_PAD =>
           if (r_words_in_msg = (ECM_WORDS_PER_DMA_PACKET - 1)) then
-            s_state <= S_CHANNEL_DONE;
+            s_state <= S_CHANNEL_DONE_0;
           else
             s_state <= S_CHANNEL_PAD;
           end if;
 
-        when S_CHANNEL_DONE =>
+        when S_CHANNEL_DONE_0 => --extra state for Channel_report_pending propagation
+          s_state <= S_CHANNEL_DONE_1;
+
+        when S_CHANNEL_DONE_1 =>
           if (r_segment_samples_remaining > 0) then
             s_state <= S_CONTINUE_CHANNEL;
           else
@@ -288,7 +302,7 @@ begin
     end if;
   end process;
 
-  Channel_reports_done  <= to_stdlogic((s_state = S_CHANNEL_DONE) and (r_segment_samples_remaining = 0));
+  Channel_reports_done  <= to_stdlogic((s_state = S_CHANNEL_DONE_0) and (r_segment_samples_remaining = 0));
 
   process(Clk)
   begin
@@ -314,7 +328,7 @@ begin
 
       if (s_state = S_IDLE) then
         r_report_delay_summary_start <= (others => '0');
-      elsif ((s_state = S_START_WAIT) and (or_reduce(Channel_report_pending) = '1') and (Dwell_done = '1')) then
+      elsif ((s_state = S_START_WAIT) and (r_channel_report_pending_any = '1') and (Dwell_done = '1')) then
         r_report_delay_summary_start <= r_report_delay_summary_start + 1;
       end if;
     end if;
@@ -326,7 +340,7 @@ begin
       if (Rst = '1') then
         r_packet_seq_num <= (others => '0');
       else
-        if ((s_state = S_CHANNEL_DONE) or (s_state = S_SUMMARY_DONE)) then
+        if ((s_state = S_CHANNEL_DONE_0) or (s_state = S_SUMMARY_DONE)) then
           r_packet_seq_num <= r_packet_seq_num + 1;
         end if;
       end if;
@@ -524,7 +538,8 @@ begin
     when S_START_SUMMARY          =>  w_fifo_valid_opt <= '0';
     when S_CHANNEL_IQ_READ_START  =>  w_fifo_valid_opt <= '0';
     when S_CHANNEL_IQ_RESULT      =>  w_fifo_valid_opt <= Read_result_valid;
-    when S_CHANNEL_DONE           =>  w_fifo_valid_opt <= '0';
+    when S_CHANNEL_DONE_0         =>  w_fifo_valid_opt <= '0';
+    when S_CHANNEL_DONE_1         =>  w_fifo_valid_opt <= '0';
     when S_SUMMARY_DONE           =>  w_fifo_valid_opt <= '0';
     when S_WAIT_IDLE              =>  w_fifo_valid_opt <= '0';
     when others => null;

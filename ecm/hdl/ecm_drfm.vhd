@@ -364,6 +364,7 @@ begin
     Rst                     => r_rst,
 
     Dwell_active            => r_dwell_active,
+    Dwell_start             => r_dwell_start,
     Dwell_done              => r_dwell_done,
     Dwell_sequence_num      => r_dwell_sequence_num,
 
