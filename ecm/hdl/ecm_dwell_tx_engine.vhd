@@ -33,6 +33,7 @@ port (
   Dwell_channel_clear           : in  std_logic;
   Dwell_transmit_active         : in  std_logic;
   Dwell_transmit_done           : out std_logic;
+  Dwell_transmit_count          : out unsigned(ECM_CHANNEL_COUNT_WIDTH - 1 downto 0);
 
   Sync_data                     : in  channelizer_control_t;
 
@@ -473,7 +474,8 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Dwell_transmit_done <= not(or_reduce(r_transmit_pending));
+      Dwell_transmit_done   <= not(or_reduce(r_transmit_pending));
+      Dwell_transmit_count  <= count_ones(r_transmit_pending);
     end if;
   end process;
 

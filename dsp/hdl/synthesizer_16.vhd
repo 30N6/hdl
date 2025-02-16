@@ -18,7 +18,7 @@ port (
   Clk                       : in  std_logic;
   Rst                       : in  std_logic;
 
-  Input_ctrl                : in  channelizer_control_t;
+  Input_ctrl                : in  synthesizer_control_t;
   Input_data                : in  signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
   Output_valid              : out std_logic;

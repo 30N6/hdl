@@ -7,20 +7,23 @@ typedef struct {
   int data_i;
   int data_q;
   int index;
+  int tag;
   bit last;
 } pfb_transaction_t;
 
-interface pfb_intf #(parameter DATA_WIDTH, parameter INDEX_WIDTH) (input logic Clk);
+interface pfb_intf #(parameter DATA_WIDTH, parameter INDEX_WIDTH, parameter TAG_WIDTH) (input logic Clk);
   logic                             valid = 0;
   logic [INDEX_WIDTH - 1 : 0]       index = 0;
   logic                             last = 0;
   logic signed [DATA_WIDTH - 1 : 0] data_i = 0;
   logic signed [DATA_WIDTH - 1 : 0] data_q = 0;
+  logic [TAG_WIDTH - 1 : 0]         tag = 0;
 
   task write(input pfb_transaction_t tx);
     data_i  <= tx.data_i;
     data_q  <= tx.data_q;
     index   <= tx.index;
+    tag     <= tx.tag;
     last    <= tx.last;
     valid   <= 1;
     @(posedge Clk);
@@ -37,6 +40,7 @@ interface pfb_intf #(parameter DATA_WIDTH, parameter INDEX_WIDTH) (input logic C
       rx.data_q <= data_q;
       rx.index  <= index;
       rx.last   <= last;
+      rx.tag    <= tag;
       v         <= valid;
       @(posedge Clk);
     end while (v !== 1);
@@ -52,6 +56,7 @@ module pfb_filter_tb;
   parameter NUM_COEFS_PER_CHANNEL = NUM_COEFS / NUM_CHANNELS;
   parameter INPUT_DATA_WIDTH      = 12;
   parameter OUTPUT_DATA_WIDTH     = 12 + $clog2(NUM_COEFS_PER_CHANNEL);
+  parameter TAG_WIDTH             = 8;
 
   parameter bit signed  [COEF_WIDTH - 1 : 0] COEF_DATA [NUM_COEFS - 1 : 0] = {
           0: 18'h00000,   1: 18'hFFFFE,   2: 18'hFFFFB,   3: 18'hFFFF7,   4: 18'hFFFF3,   5: 18'hFFFEE,   6: 18'hFFFE9,   7: 18'hFFFE3,
@@ -112,8 +117,8 @@ module pfb_filter_tb;
   logic Clk;
   logic Rst;
 
-  pfb_intf #(.DATA_WIDTH(INPUT_DATA_WIDTH),   .INDEX_WIDTH(CHANNEL_INDEX_WIDTH))  tx_intf (.*);
-  pfb_intf #(.DATA_WIDTH(OUTPUT_DATA_WIDTH),  .INDEX_WIDTH(CHANNEL_INDEX_WIDTH))  rx_intf (.*);
+  pfb_intf #(.DATA_WIDTH(INPUT_DATA_WIDTH),   .INDEX_WIDTH(CHANNEL_INDEX_WIDTH), .TAG_WIDTH(TAG_WIDTH))  tx_intf (.*);
+  pfb_intf #(.DATA_WIDTH(OUTPUT_DATA_WIDTH),  .INDEX_WIDTH(CHANNEL_INDEX_WIDTH), .TAG_WIDTH(TAG_WIDTH))  rx_intf (.*);
 
   bit signed [INPUT_DATA_WIDTH - 1 : 0] filter_data_i [NUM_CHANNELS - 1 : 0][2*NUM_COEFS_PER_CHANNEL - 1 : 0];
   bit signed [INPUT_DATA_WIDTH - 1 : 0] filter_data_q [NUM_CHANNELS - 1 : 0][2*NUM_COEFS_PER_CHANNEL - 1 : 0];
@@ -142,6 +147,7 @@ module pfb_filter_tb;
     .CHANNEL_INDEX_WIDTH  ($clog2(NUM_CHANNELS)),
     .INPUT_DATA_WIDTH     (INPUT_DATA_WIDTH),
     .OUTPUT_DATA_WIDTH    (OUTPUT_DATA_WIDTH),
+    .TAG_WIDTH            (TAG_WIDTH),
     .COEF_WIDTH           (COEF_WIDTH),
     .NUM_COEFS            (NUM_COEFS),
     .COEF_DATA            (COEF_DATA),
@@ -155,12 +161,14 @@ module pfb_filter_tb;
     .Input_valid    (tx_intf.valid),
     .Input_index    (tx_intf.index),
     .Input_last     (tx_intf.last),
+    .Input_tag      (tx_intf.tag),
     .Input_i        (tx_intf.data_i),
     .Input_q        (tx_intf.data_q),
 
     .Output_valid   (rx_intf.valid),
     .Output_index   (rx_intf.index),
     .Output_last    (rx_intf.last),
+    .Output_tag     (rx_intf.tag),
     .Output_i       (rx_intf.data_i),
     .Output_q       (rx_intf.data_q),
 
@@ -183,6 +191,7 @@ module pfb_filter_tb;
       tx.data_q = 0;
       tx.index  = channel_index;
       tx.last   = (channel_index == 0);
+      tx.tag    = 0;
       channel_index--;
       tx_intf.write(tx);
 
@@ -207,6 +216,9 @@ module pfb_filter_tb;
       return 0;
     end
     if (e.data_q !== r.data_q) begin
+      return 0;
+    end
+    if (e.tag !== r.tag) begin
       return 0;
     end
     return 1;
@@ -276,6 +288,7 @@ module pfb_filter_tb;
 
     r.index   = d.index;
     r.last    = d.last;
+    r.tag     = d.tag;
     r.data_i  = accum_i;
     r.data_q  = accum_q;
 
@@ -306,6 +319,7 @@ module pfb_filter_tb;
         tx.data_q = $urandom_range(2**INPUT_DATA_WIDTH - 1, 0);
         tx.index  = channel_index;
         tx.last   = (channel_index == 0);
+        tx.tag    = $urandom_range(2**TAG_WIDTH - 1, 0);
         channel_index--;
 
         rx = process_filter_sample(tx);

@@ -90,6 +90,7 @@ architecture rtl of ecm_top is
   signal w_dwell_active               : std_logic;
   signal w_dwell_active_meas          : std_logic;
   signal w_dwell_active_tx            : std_logic;
+  signal w_dwell_transmit_count       : unsigned(ECM_CHANNEL_COUNT_WIDTH - 1 downto 0);
   signal w_dwell_done                 : std_logic;
   signal w_dwell_data                 : ecm_dwell_entry_t;
   signal w_dwell_sequence_num         : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
@@ -121,7 +122,7 @@ architecture rtl of ecm_top is
   signal w_stretched_data             : signed_array_t(1 downto 0)(CHANNELIZER16_DATA_WIDTH - 1 downto 0);
   signal w_stretched_pwr              : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  signal w_synthesizer16_input_ctrl   : channelizer_control_t;
+  signal w_synthesizer16_input_ctrl   : synthesizer_control_t;
   signal w_synthesizer16_input_data   : signed_array_t(1 downto 0)(ECM_SYNTHESIZER_DATA_WIDTH - 1 downto 0);
   signal w_synthesizer16_output_valid : std_logic;
   signal w_synthesizer16_output_data  : signed_array_t(1 downto 0)(SYNTHESIZER16_OUTPUT_WIDTH - 1 downto 0);
@@ -504,6 +505,7 @@ begin
     Rst                       => r_combined_rst,
 
     Dwell_active_transmit     => w_dwell_active_tx,
+    Dwell_transmit_count      => w_dwell_transmit_count,
     Output_control            => w_output_control,
 
     Dds_ctrl                  => w_dds_ctrl,

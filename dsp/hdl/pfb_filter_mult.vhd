@@ -22,6 +22,7 @@ generic (
   INPUT_B_FRAC_WIDTH  : natural;
   INPUT_C_DATA_WIDTH  : natural;
   OUTPUT_DATA_WIDTH   : natural;
+  TAG_WIDTH           : natural;
   LATENCY             : natural
 );
 port (
@@ -31,6 +32,7 @@ port (
   Input_index       : in  unsigned(INDEX_WIDTH - 1 downto 0);
   Input_sub_index   : in  unsigned(SUB_INDEX_WIDTH - 1 downto 0);
   Input_last        : in  std_logic;
+  Input_tag         : in  unsigned(TAG_WIDTH - 1 downto 0);
   Input_a           : in  signed(INPUT_A_DATA_WIDTH - 1 downto 0);
   Input_b           : in  signed(INPUT_B_DATA_WIDTH - 1 downto 0);
   Input_c           : in  signed(INPUT_C_DATA_WIDTH - 1 downto 0);
@@ -39,6 +41,7 @@ port (
   Output_index      : out unsigned(INDEX_WIDTH - 1 downto 0);
   Output_sub_index  : out unsigned(SUB_INDEX_WIDTH - 1 downto 0);
   Output_last       : out std_logic;
+  Output_tag        : out unsigned(TAG_WIDTH - 1 downto 0);
   Output_data       : out signed(OUTPUT_DATA_WIDTH - 1 downto 0)
 );
 end entity pfb_filter_mult;
@@ -52,6 +55,7 @@ architecture rtl of pfb_filter_mult is
   signal r0_input_index       : unsigned(INDEX_WIDTH - 1 downto 0);
   signal r0_input_sub_index   : unsigned(SUB_INDEX_WIDTH - 1 downto 0);
   signal r0_input_last        : std_logic;
+  signal r0_input_tag         : unsigned(TAG_WIDTH - 1 downto 0);
   signal r0_input_a           : signed(INPUT_A_DATA_WIDTH - 1 downto 0);
   signal r0_input_b           : signed(INPUT_B_DATA_WIDTH - 1 downto 0);
   signal r0_input_c           : signed(INPUT_C_DATA_WIDTH - 1 downto 0);
@@ -62,12 +66,14 @@ architecture rtl of pfb_filter_mult is
   signal r1_last              : std_logic;
   signal r1_mult_result       : signed(MULT_RESULT_WIDTH - 1 downto 0);
   signal r1_input_c           : signed(INPUT_C_DATA_WIDTH - 1 downto 0);
+  signal r1_tag               : unsigned(TAG_WIDTH - 1 downto 0);
   signal w1_mult_scaled       : signed(MULT_SCALED_WIDTH - 1 downto 0);
 
   signal r2_valid             : std_logic;
   signal r2_index             : unsigned(INDEX_WIDTH - 1 downto 0);
   signal r2_sub_index         : unsigned(SUB_INDEX_WIDTH - 1 downto 0);
   signal r2_last              : std_logic;
+  signal r2_tag               : unsigned(TAG_WIDTH - 1 downto 0);
   signal r2_sum               : signed(OUTPUT_DATA_WIDTH - 1 downto 0);
   signal r2_mult_result       : signed(MULT_RESULT_WIDTH - 1 downto 0);
   signal r2_input_c           : signed(INPUT_C_DATA_WIDTH - 1 downto 0);
@@ -77,6 +83,7 @@ architecture rtl of pfb_filter_mult is
   signal r3_index             : unsigned(INDEX_WIDTH - 1 downto 0);
   signal r3_sub_index         : unsigned(SUB_INDEX_WIDTH - 1 downto 0);
   signal r3_last              : std_logic;
+  signal r3_tag               : unsigned(TAG_WIDTH - 1 downto 0);
   signal r3_sum               : signed(OUTPUT_DATA_WIDTH - 1 downto 0);
 
 begin
@@ -92,6 +99,7 @@ begin
       r0_input_index      <= Input_index;
       r0_input_sub_index  <= Input_sub_index;
       r0_input_last       <= Input_last;
+      r0_input_tag        <= Input_tag;
       r0_input_a          <= Input_a;
       r0_input_b          <= Input_b;
       r0_input_c          <= Input_c;
@@ -105,6 +113,7 @@ begin
       r1_index        <= r0_input_index;
       r1_sub_index    <= r0_input_sub_index;
       r1_last         <= r0_input_last;
+      r1_tag          <= r0_input_tag;
       r1_mult_result  <= r0_input_b * r0_input_a;
       r1_input_c      <= r0_input_c;
     end if;
@@ -121,6 +130,7 @@ begin
         r2_index      <= r1_index;
         r2_sub_index  <= r1_sub_index;
         r2_last       <= r1_last;
+        r2_tag        <= r1_tag;
         r2_sum        <= resize_up(w1_mult_scaled, OUTPUT_DATA_WIDTH) + r1_input_c;
       end if;
     end process;
@@ -129,6 +139,7 @@ begin
     Output_index      <= r2_index;
     Output_sub_index  <= r2_sub_index;
     Output_last       <= r2_last;
+    Output_tag        <= r2_tag;
     Output_data       <= r2_sum;
 
   else generate
@@ -140,6 +151,7 @@ begin
         r2_index        <= r1_index;
         r2_sub_index    <= r1_sub_index;
         r2_last         <= r1_last;
+        r2_tag          <= r1_tag;
         r2_mult_result  <= r1_mult_result;
         r2_input_c      <= r1_input_c;
       end if;
@@ -154,6 +166,7 @@ begin
         r3_index      <= r2_index;
         r3_sub_index  <= r2_sub_index;
         r3_last       <= r2_last;
+        r3_tag        <= r2_tag;
         r3_sum        <= resize_up(w2_mult_scaled, OUTPUT_DATA_WIDTH) + r2_input_c;
       end if;
     end process;
@@ -162,6 +175,7 @@ begin
     Output_index      <= r3_index;
     Output_sub_index  <= r3_sub_index;
     Output_last       <= r3_last;
+    Output_tag        <= r3_tag;
     Output_data       <= r3_sum;
 
   end generate g_output;

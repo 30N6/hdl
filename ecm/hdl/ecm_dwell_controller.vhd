@@ -39,6 +39,7 @@ port (
   Dwell_sequence_num            : out unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   Dwell_global_counter          : out unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   Dwell_program_tag             : out unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
+  Dwell_transmit_count          : out unsigned(ECM_CHANNEL_COUNT_WIDTH - 1 downto 0);
   Dwell_report_done_drfm        : in  std_logic;
   Dwell_report_done_stats       : in  std_logic;
 
@@ -151,6 +152,9 @@ architecture rtl of ecm_dwell_controller is
   signal r_dwell_active_tx              : std_logic;
   signal r_dwell_report_wait            : std_logic;
 
+  signal w_transmit_count               : unsigned(ECM_CHANNEL_COUNT_WIDTH - 1 downto 0);
+  signal r_transmit_count               : unsigned(ECM_CHANNEL_COUNT_WIDTH - 1 downto 0);
+
   signal w_trigger_immediate_tx         : std_logic;
   signal w_trigger_pending              : std_logic;
   signal w_tx_program_req_valid         : std_logic;
@@ -253,6 +257,7 @@ begin
     Dwell_channel_clear           => r_dwell_report_wait,
     Dwell_transmit_active         => r_dwell_active_tx,
     Dwell_transmit_done           => w_tx_programs_done,
+    Dwell_transmit_count          => w_transmit_count,
 
     Sync_data                     => r_sync_data,
 
@@ -536,6 +541,7 @@ begin
   begin
     if rising_edge(Clk) then
       r_dwell_program_tag <= r_dwell_program_data.tag;
+      r_transmit_count    <= w_transmit_count;
     end if;
   end process;
 
@@ -548,6 +554,7 @@ begin
   Dwell_sequence_num    <= r_dwell_sequence_num;
   Dwell_global_counter  <= r_global_counter;
   Dwell_program_tag     <= r_dwell_program_tag;
+  Dwell_transmit_count  <= r_transmit_count;
 
   process(Clk)
   begin

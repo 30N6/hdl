@@ -22,7 +22,7 @@ port (
   Clk                       : in  std_logic;
   Rst                       : in  std_logic;
 
-  Input_ctrl                : in  channelizer_control_t;
+  Input_ctrl                : in  synthesizer_control_t;
   Input_data                : in  signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
   Output_valid              : out std_logic;
@@ -45,6 +45,8 @@ architecture rtl of synthesizer_common is
 
   signal r_rst                  : std_logic;
 
+  signal w_input_shift_code     : unsigned(SYNTHESIZER_SHIFT_CODE_WIDTH - 1 downto 0);
+
   signal r_fft_input_control    : fft_control_t;
   signal r_fft_input_data       : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
@@ -59,11 +61,16 @@ architecture rtl of synthesizer_common is
   signal w_filter_valid         : std_logic;
   signal w_filter_index         : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal w_filter_last          : std_logic;
+  signal w_filter_tag           : unsigned(SYNTHESIZER_SHIFT_CODE_WIDTH - 1 downto 0);
   signal w_filter_data          : signed_array_t(1 downto 0)(FILTER_DATA_WIDTH - 1 downto 0);
   signal w_filter_overflow      : std_logic;
 
   signal w_mux_valid            : std_logic;
+  signal w_mux_tag              : unsigned(SYNTHESIZER_SHIFT_CODE_WIDTH - 1 downto 0);
   signal w_mux_data             : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
+
+  signal r_output_valid         : std_logic;
+  signal r_output_data          : signed_array_t(1 downto 0)(OUTPUT_DATA_WIDTH - 1 downto 0);
 
   signal w_mux_input_overflow   : std_logic;
   signal w_mux_fifo_overflow    : std_logic;
@@ -82,13 +89,15 @@ begin
     end if;
   end process;
 
+  w_input_shift_code <= to_unsigned(SYNTHESIZER_COUNT_TO_SHIFT_CODE(to_integer(Input_ctrl.active_channel_count)), SYNTHESIZER_SHIFT_CODE_WIDTH);
+
   process(Clk)
   begin
     if rising_edge(Clk) then
       r_fft_input_control.valid       <= Input_ctrl.valid;
       r_fft_input_control.last        <= Input_ctrl.last;
       r_fft_input_control.data_index  <= Input_ctrl.data_index;
-      r_fft_input_control.tag         <= (others => '0');
+      r_fft_input_control.tag         <= resize_up(std_logic_vector(w_input_shift_code), FFT_TAG_WIDTH);
       r_fft_input_control.reverse     <= '0';
       r_fft_input_data                <= Input_data;
     end if;
@@ -140,6 +149,7 @@ begin
     CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
     INPUT_DATA_WIDTH    => FFT_DATA_WIDTH,
     OUTPUT_DATA_WIDTH   => FILTER_DATA_WIDTH,
+    TAG_WIDTH           => SYNTHESIZER_SHIFT_CODE_WIDTH,
     COEF_WIDTH          => COEF_WIDTH,
     NUM_COEFS           => NUM_COEFS,
     COEF_DATA           => COEF_DATA,
@@ -152,12 +162,14 @@ begin
     Input_valid           => w_stretched_control.valid,
     Input_index           => w_stretched_control.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0),
     Input_last            => w_stretched_control.last,
+    Input_tag             => unsigned(w_stretched_control.tag(SYNTHESIZER_SHIFT_CODE_WIDTH - 1 downto 0)),
     Input_i               => w_stretched_data(0),
     Input_q               => w_stretched_data(1),
 
     Output_valid          => w_filter_valid,
     Output_index          => w_filter_index,
     Output_last           => w_filter_last,
+    Output_tag            => w_filter_tag,
     Output_i              => w_filter_data(0),
     Output_q              => w_filter_data(1),
 
@@ -168,7 +180,8 @@ begin
   generic map (
     NUM_CHANNELS        => NUM_CHANNELS,
     CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
-    INPUT_WIDTH         => FILTER_DATA_WIDTH
+    INPUT_WIDTH         => FILTER_DATA_WIDTH,
+    TAG_WIDTH           => SYNTHESIZER_SHIFT_CODE_WIDTH
   )
   port map (
     Clk                   => Clk,
@@ -177,10 +190,12 @@ begin
     Input_valid           => w_filter_valid,
     Input_channel         => w_filter_index,
     Input_last            => w_filter_last,
+    Input_tag             => w_filter_tag,
     Input_i               => w_filter_data(0),
     Input_q               => w_filter_data(1),
 
     Output_valid          => w_mux_valid,
+    Output_tag            => w_mux_tag,
     Output_i              => w_mux_data(0),
     Output_q              => w_mux_data(1),
 
@@ -192,10 +207,15 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Output_valid  <= w_mux_valid;
-      Output_data   <= w_mux_data;
+      r_output_valid    <= w_mux_valid;
+
+      r_output_data(0)  <= shift_left(w_mux_data(0), (OUTPUT_DATA_WIDTH - INPUT_DATA_WIDTH) - SYNTHESIZER_SHIFT_MAP(to_integer(w_mux_tag)));
+      r_output_data(1)  <= shift_left(w_mux_data(1), (OUTPUT_DATA_WIDTH - INPUT_DATA_WIDTH) - SYNTHESIZER_SHIFT_MAP(to_integer(w_mux_tag)));
     end if;
   end process;
+
+  Output_valid  <= r_output_valid;
+  Output_data   <= r_output_data;
 
   process(Clk)
   begin
