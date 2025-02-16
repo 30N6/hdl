@@ -60,7 +60,6 @@ architecture rtl of ecm_dwell_tx_engine is
     loop_count          : unsigned(ECM_TX_INSTRUCTION_LOOP_COUNTER_WIDTH - 1 downto 0);
     playback_count      : unsigned(ECM_TX_INSTRUCTION_PLAYBACK_COUNTER_WIDTH - 1 downto 0);
     playback_addr_curr  : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
-    playback_addr_first : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
     playback_addr_last  : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   end record;
 
@@ -121,6 +120,7 @@ architecture rtl of ecm_dwell_tx_engine is
   signal r4_playback_count_next         : unsigned(ECM_TX_INSTRUCTION_PLAYBACK_COUNTER_WIDTH - 1 downto 0);
   signal r4_playback_count_start        : unsigned(ECM_TX_INSTRUCTION_PLAYBACK_COUNTER_WIDTH - 1 downto 0);
   signal r4_playback_addr_next          : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal r4_playback_addr_restart       : std_logic;
   signal r4_wait_done                   : std_logic;
   signal r4_playback_done               : std_logic;
   signal r4_jump_valid                  : std_logic;
@@ -247,11 +247,8 @@ begin
       r4_playback_done          <= to_stdlogic(r3_channel_state.playback_count <= 1);
       r4_jump_valid             <= not(w3_instruction_jump.counter_check) or to_stdlogic(r3_channel_state.loop_count /= w3_instruction_jump.counter_value);
 
-      if (r3_channel_state.playback_addr_curr = r3_channel_state.playback_addr_last) then
-        r4_playback_addr_next   <= r3_channel_state.playback_addr_first;
-      else
-        r4_playback_addr_next   <= r3_channel_state.playback_addr_curr + 1;
-      end if;
+      r4_playback_addr_restart  <= to_stdlogic(r3_channel_state.playback_addr_curr = r3_channel_state.playback_addr_last);
+      r4_playback_addr_next     <= r3_channel_state.playback_addr_curr + 1;
     end if;
   end process;
 
@@ -264,7 +261,12 @@ begin
     if rising_edge(Clk) then
       r5_sync_data                        <= r4_sync_data;
       r5_channel_state                    <= r4_channel_state;
-      r5_channel_state.playback_addr_curr <= r4_playback_addr_next;
+
+      if (r4_playback_addr_restart = '1') then
+        r5_channel_state.playback_addr_curr <= r4_drfm_state_first.addr;
+      else
+        r5_channel_state.playback_addr_curr <= r4_playback_addr_next;
+      end if;
 
       r5_drfm_read_req.read_valid     <= r4_sync_data.valid and to_stdlogic((r4_channel_state.program_state = S_EXECUTE) and
                                                                             (w4_instruction_header.instruction_type = ECM_TX_INSTRUCTION_TYPE_PLAYBACK));
@@ -290,7 +292,6 @@ begin
         r5_channel_state.wait_count           <= r4_wait_count_start;
         r5_channel_state.playback_count       <= r4_playback_count_start;
         r5_channel_state.playback_addr_curr   <= r4_drfm_state_first.addr;
-        r5_channel_state.playback_addr_first  <= r4_drfm_state_first.addr;
         r5_channel_state.playback_addr_last   <= r4_drfm_state_last.addr;
 
         if ((Dwell_transmit_active = '0') or (w4_instruction_header.valid = '0')) then
