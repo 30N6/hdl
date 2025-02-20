@@ -26,6 +26,7 @@ package common_pkg is
   function shift_right(v : std_logic_vector; n : natural) return std_logic_vector;
   function byteswap(v : std_logic_vector; w : natural) return std_logic_vector;
   function first_bit_index(v : std_logic_vector) return unsigned;
+  function count_ones(v : std_logic_vector) return unsigned;
 
 end package common_pkg;
 
@@ -156,6 +157,21 @@ package body common_pkg is
       end if;
     end loop;
 
+    return r;
+  end function;
+
+  function count_ones(v : std_logic_vector) return unsigned is
+    variable r : unsigned(clog2(v'length + 1) - 1 downto 0);
+    variable c : natural range 0 to v'length;
+  begin
+    c := 0;
+    for i in 0 to (v'length - 1) loop
+      if (v(i) = '1') then
+        c := c + 1;
+      end if;
+    end loop;
+
+    r := to_unsigned(c, r'length);
     return r;
   end function;
 

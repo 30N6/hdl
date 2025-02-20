@@ -26,6 +26,14 @@ package dsp_pkg is
   constant DDS_CONTROL_TYPE_SIN_SWEEP : natural := 2;
   constant DDS_CONTROL_TYPE_SIN_STEP  : natural := 3;
 
+  constant SYNTHESIZER_SHIFT_CODE_WIDTH     : natural := 2;
+  constant SYNTHESIZER_SHIFT_MAP            : natural_array_t(2**SYNTHESIZER_SHIFT_CODE_WIDTH - 1 downto 0) := (5, 4, 3, 2);
+  constant SYNTHESIZER_COUNT_TO_SHIFT_CODE  : natural_array_t(31 downto 0) := (11 => 2, 10 => 2, 9 => 2, 8 => 2, 7 => 2, 6 => 2, 5 => 2, 4 => 2,
+                                                                               3 => 1, 2 => 1,
+                                                                               1 => 0, 0 => 0,
+                                                                               others => 3);
+  constant SYNTHESIZER_CHANNEL_COUNT_WIDTH  : natural := clog2(16 + 1);
+
   type fft_control_t is record
     valid       : std_logic;
     last        : std_logic;
@@ -43,6 +51,17 @@ package dsp_pkg is
   end record;
 
   type channelizer_control_array_t is array (natural range <>) of channelizer_control_t;
+
+  type synthesizer_control_t is record
+    valid                 : std_logic;
+    last                  : std_logic;
+    data_index            : unsigned(5 downto 0);
+    transmit_active       : std_logic;
+    active_channel_count  : unsigned(SYNTHESIZER_CHANNEL_COUNT_WIDTH - 1 downto 0);
+  end record;
+
+  type synthesizer_control_array_t is array (natural range <>) of synthesizer_control_t;
+
 
   type dds_control_setup_entry_t is record
     dds_sin_phase_inc_select  : std_logic;  -- 0=sweep, 1=step

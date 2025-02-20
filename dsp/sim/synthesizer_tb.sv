@@ -28,7 +28,7 @@ endinterface
 
 module synthesizer_tb;
   parameter time CLK_HALF_PERIOD        = 4ns;
-  parameter NUM_CHANNELS                = 32;
+  parameter NUM_CHANNELS                = 16;
   parameter CHANNEL_INDEX_WIDTH         = $clog2(NUM_CHANNELS);
   parameter NUM_COEFS_PER_CHANNEL_CHAN  = 8;
   parameter NUM_COEFS_PER_CHANNEL_SYNTH = 6;
@@ -62,6 +62,7 @@ module synthesizer_tb;
 
   channelizer_control_t                           w_chan_output_control;
   logic signed [CHAN_OUTPUT_DATA_WIDTH - 1 : 0]   w_chan_output_iq [1 : 0];
+  synthesizer_control_t                           w_synth_input_control;
 
   logic                                           w_synth_output_valid;
   logic signed [SYNTH_OUTPUT_DATA_WIDTH - 1 : 0]  w_synth_output_iq [1 : 0];
@@ -110,12 +111,18 @@ module synthesizer_tb;
         .Error_mux_collision    (w_error_chan_mux_collision)
       );
 
+      assign w_synth_input_control.valid                = w_chan_output_control.valid;
+      assign w_synth_input_control.last                 = w_chan_output_control.last;
+      assign w_synth_input_control.data_index           = w_chan_output_control.data_index;
+      assign w_synth_input_control.transmit_active      = 1'b1;
+      assign w_synth_input_control.active_channel_count = 5'd1;
+
       synthesizer_16 #(.INPUT_DATA_WIDTH(CHAN_OUTPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(SYNTH_OUTPUT_DATA_WIDTH)) synth_16
       (
         .Clk                       (Clk),
         .Rst                       (Rst),
 
-        .Input_ctrl                (w_chan_output_control),
+        .Input_ctrl                (w_synth_input_control),
         .Input_data                (w_chan_output_iq),
 
         .Output_valid              (w_synth_output_valid),

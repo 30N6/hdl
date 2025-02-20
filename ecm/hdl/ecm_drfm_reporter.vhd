@@ -24,6 +24,7 @@ port (
   Rst                     : in  std_logic;
 
   Dwell_active            : in  std_logic;
+  Dwell_start             : in  std_logic;
   Dwell_done              : in  std_logic;
   Dwell_sequence_num      : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
@@ -86,67 +87,89 @@ architecture rtl of ecm_drfm_reporter is
     S_CHANNEL_IQ_READ_START,
     S_CHANNEL_IQ_RESULT,
     S_CHANNEL_PAD,
-    S_CHANNEL_DONE,
+    S_CHANNEL_DONE_0,
+    S_CHANNEL_DONE_1,
 
     S_SUMMARY_HEADER_0,
     S_SUMMARY_HEADER_1,
     S_SUMMARY_HEADER_2,
     S_SUMMARY_DWELL_SEQ_NUM,
     S_SUMMARY_CHANNEL_STATE,
+    S_SUMMARY_REPORT_DELAY_CHANNEL_WRITE,
+    S_SUMMARY_REPORT_DELAY_SUMMARY_WRITE,
+    S_SUMMARY_REPORT_DELAY_SUMMARY_START,
     S_SUMMARY_PAD,
     S_SUMMARY_DONE,
 
     S_WAIT_IDLE
   );
 
-  signal s_state                      : state_t;
+  signal s_state                          : state_t;
 
-  signal r_packet_seq_num             : unsigned(31 downto 0);
-  signal r_channel_index              : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal r_words_in_msg               : unsigned(clog2(ECM_WORDS_PER_DMA_PACKET) - 1 downto 0);
+  signal r_channel_report_pending_any     : std_logic;
 
-  signal r_channel_samples_remaining  : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_packet_seq_num                 : unsigned(31 downto 0);
+  signal r_channel_index                  : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r_words_in_msg                   : unsigned(clog2(ECM_WORDS_PER_DMA_PACKET) - 1 downto 0);
 
-  signal r_segment_first_addr         : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
-  signal r_segment_last_addr          : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
-  signal r_segment_addr               : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
-  signal r_slice_samples_remaining    : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  signal r_segment_samples_remaining  : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_report_delay_channel_write     : unsigned(31 downto 0);
+  signal r_report_delay_summary_write     : unsigned(31 downto 0);
+  signal r_report_delay_summary_start     : unsigned(31 downto 0);
 
-  signal r_read_samples_remaining     : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  signal r_read_delay                 : std_logic;
-  signal r_read_addr                  : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
-  signal r_read_valid                 : std_logic;
+  signal r_channel_samples_remaining      : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
 
-  signal w_fifo_almost_full           : std_logic;
-  signal w_fifo_ready                 : std_logic;
+  signal r_segment_first_addr             : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal r_segment_last_addr              : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal r_segment_addr                   : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal r_segment_addr_next              : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal r_slice_samples_remaining        : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_slice_samples_remaining_next   : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_segment_samples_remaining      : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_segment_samples_remaining_next : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
 
-  signal r_fifo_almost_full           : std_logic;
+  signal r_read_samples_remaining         : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_read_samples_remaining_next    : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_read_delay                     : std_logic;
+  signal r_read_addr                      : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal r_read_addr_next                 : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+  signal r_read_valid                     : std_logic;
 
-  signal w_fifo_valid                 : std_logic;
-  signal w_fifo_valid_opt             : std_logic;
-  signal w_fifo_last                  : std_logic;
-  signal w_fifo_partial_0_data        : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal w_fifo_partial_1_data        : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_fifo_almost_full               : std_logic;
+  signal w_fifo_ready                     : std_logic;
 
-  signal r0_fifo_valid                : std_logic;
-  signal r0_fifo_last                 : std_logic;
-  signal r0_fifo_partial_0_data       : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal r0_fifo_partial_1_data       : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal r0_fifo_almost_full          : std_logic;
+  signal r_fifo_almost_full               : std_logic;
 
-  signal r1_fifo_valid                : std_logic;
-  signal r1_fifo_last                 : std_logic;
-  signal r1_fifo_data                 : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal r1_fifo_almost_full          : std_logic;
+  signal w_fifo_valid                     : std_logic;
+  signal w_fifo_valid_opt                 : std_logic;
+  signal w_fifo_last                      : std_logic;
+  signal w_fifo_partial_0_data            : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_fifo_partial_1_data            : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
 
-  signal r_timeout                    : unsigned(clog2(TIMEOUT_CYCLES) - 1 downto 0);
+  signal r0_fifo_valid                    : std_logic;
+  signal r0_fifo_last                     : std_logic;
+  signal r0_fifo_partial_0_data           : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal r0_fifo_partial_1_data           : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal r0_fifo_almost_full              : std_logic;
+
+  signal r1_fifo_valid                    : std_logic;
+  signal r1_fifo_last                     : std_logic;
+  signal r1_fifo_data                     : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal r1_fifo_almost_full              : std_logic;
+
+  signal r_timeout                        : unsigned(clog2(TIMEOUT_CYCLES) - 1 downto 0);
 
 begin
 
   assert (AXI_DATA_WIDTH = 32)
     report "AXI_DATA_WIDTH expected to be 32."
     severity failure;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r_channel_report_pending_any <= not(Dwell_start) and or_reduce(Channel_report_pending);
+    end if;
+  end process;
 
   process(Clk)
   begin
@@ -163,7 +186,7 @@ begin
           end if;
 
         when S_START_WAIT =>
-          if (or_reduce(Channel_report_pending) = '1') then
+          if (r_channel_report_pending_any = '1') then
             s_state <= S_READ_CHANNEL_0;
           elsif (Dwell_done = '1') then
             s_state <= S_START_SUMMARY;
@@ -227,18 +250,20 @@ begin
 
         when S_CHANNEL_PAD =>
           if (r_words_in_msg = (ECM_WORDS_PER_DMA_PACKET - 1)) then
-            s_state <= S_CHANNEL_DONE;
+            s_state <= S_CHANNEL_DONE_0;
           else
             s_state <= S_CHANNEL_PAD;
           end if;
 
-        when S_CHANNEL_DONE =>
+        when S_CHANNEL_DONE_0 => --extra state for Channel_report_pending propagation
+          s_state <= S_CHANNEL_DONE_1;
+
+        when S_CHANNEL_DONE_1 =>
           if (r_segment_samples_remaining > 0) then
             s_state <= S_CONTINUE_CHANNEL;
           else
             s_state <= S_START_WAIT;
           end if;
-
 
         when S_START_SUMMARY =>
           if (r1_fifo_almost_full = '0') then
@@ -256,6 +281,12 @@ begin
         when S_SUMMARY_DWELL_SEQ_NUM =>
           s_state <= S_SUMMARY_CHANNEL_STATE;
         when S_SUMMARY_CHANNEL_STATE =>
+          s_state <= S_SUMMARY_REPORT_DELAY_CHANNEL_WRITE;
+        when S_SUMMARY_REPORT_DELAY_CHANNEL_WRITE =>
+          s_state <= S_SUMMARY_REPORT_DELAY_SUMMARY_WRITE;
+        when S_SUMMARY_REPORT_DELAY_SUMMARY_WRITE =>
+          s_state <= S_SUMMARY_REPORT_DELAY_SUMMARY_START;
+        when S_SUMMARY_REPORT_DELAY_SUMMARY_START =>
           s_state <= S_SUMMARY_PAD;
 
         when S_SUMMARY_PAD =>
@@ -276,7 +307,7 @@ begin
     end if;
   end process;
 
-  Channel_reports_done  <= to_stdlogic((s_state = S_CHANNEL_DONE) and (r_segment_samples_remaining = 0));
+  Channel_reports_done  <= to_stdlogic((s_state = S_CHANNEL_DONE_0) and (r_segment_samples_remaining = 0));
 
   process(Clk)
   begin
@@ -288,10 +319,33 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      if (s_state = S_IDLE) then
+        r_report_delay_channel_write <= (others => '0');
+      elsif (((s_state = S_START_CHANNEL) or (s_state = S_CONTINUE_CHANNEL)) and (r1_fifo_almost_full = '1')) then
+        r_report_delay_channel_write <= r_report_delay_channel_write + 1;
+      end if;
+
+      if (s_state = S_IDLE) then
+        r_report_delay_summary_write <= (others => '0');
+      elsif ((s_state = S_START_SUMMARY) and (r1_fifo_almost_full = '1')) then
+        r_report_delay_summary_write <= r_report_delay_summary_write + 1;
+      end if;
+
+      if (s_state = S_IDLE) then
+        r_report_delay_summary_start <= (others => '0');
+      elsif ((s_state = S_START_WAIT) and (r_channel_report_pending_any = '1') and (Dwell_done = '1')) then
+        r_report_delay_summary_start <= r_report_delay_summary_start + 1;
+      end if;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
       if (Rst = '1') then
         r_packet_seq_num <= (others => '0');
       else
-        if ((s_state = S_CHANNEL_DONE) or (s_state = S_SUMMARY_DONE)) then
+        if ((s_state = S_CHANNEL_DONE_0) or (s_state = S_SUMMARY_DONE)) then
           r_packet_seq_num <= r_packet_seq_num + 1;
         end if;
       end if;
@@ -330,20 +384,31 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      r_segment_addr_next               <= r_segment_addr + 1;
+      r_segment_samples_remaining_next  <= r_segment_samples_remaining - 1;
+      r_slice_samples_remaining_next    <= r_slice_samples_remaining - 1;
+      r_read_addr_next                  <= r_read_addr + 1;
+      r_read_samples_remaining_next     <= r_read_samples_remaining - 1;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
       if (s_state = S_START_CHANNEL) then
         r_segment_first_addr        <= Channel_addr_first;
         r_segment_last_addr         <= Channel_addr_last;
         r_segment_addr              <= Channel_addr_first;
         r_segment_samples_remaining <= r_channel_samples_remaining;
       elsif ((s_state = S_CHANNEL_IQ_RESULT) and (Read_result_valid = '1')) then
-        r_segment_addr              <= r_segment_addr + 1;
-        r_segment_samples_remaining <= r_segment_samples_remaining - 1;
+        r_segment_addr              <= r_segment_addr_next;
+        r_segment_samples_remaining <= r_segment_samples_remaining_next;
       end if;
 
       if (s_state = S_CHANNEL_HEADER_0) then
         r_slice_samples_remaining   <= minimum(r_segment_samples_remaining, ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT);
       elsif ((s_state = S_CHANNEL_IQ_RESULT) and (Read_result_valid = '1')) then
-        r_slice_samples_remaining   <= r_slice_samples_remaining - 1;
+        r_slice_samples_remaining   <= r_slice_samples_remaining_next;
       end if;
     end if;
   end process;
@@ -367,8 +432,8 @@ begin
           r_read_samples_remaining  <= minimum(r_segment_samples_remaining, ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT);
           r_read_addr               <= r_segment_addr;
         elsif ((r_read_valid = '1') and (r_read_delay = '1')) then
-          r_read_samples_remaining  <= r_read_samples_remaining - 1;
-          r_read_addr               <= r_read_addr + 1;
+          r_read_samples_remaining  <= r_read_samples_remaining_next;
+          r_read_addr               <= r_read_addr_next;
         end if;
 
         if (s_state = S_CHANNEL_IQ_READ_START) then
@@ -455,6 +520,18 @@ begin
       w_fifo_valid            <= '1';
       w_fifo_partial_1_data   <= Channel_was_written & Channel_was_read;
 
+    when S_SUMMARY_REPORT_DELAY_CHANNEL_WRITE =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(r_report_delay_channel_write);
+
+    when S_SUMMARY_REPORT_DELAY_SUMMARY_WRITE =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(r_report_delay_summary_write);
+
+    when S_SUMMARY_REPORT_DELAY_SUMMARY_START =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(r_report_delay_summary_start);
+
     when S_CHANNEL_PAD | S_SUMMARY_PAD =>
       w_fifo_valid            <= '1';
       w_fifo_partial_1_data   <= (others => '0');
@@ -477,7 +554,8 @@ begin
     when S_START_SUMMARY          =>  w_fifo_valid_opt <= '0';
     when S_CHANNEL_IQ_READ_START  =>  w_fifo_valid_opt <= '0';
     when S_CHANNEL_IQ_RESULT      =>  w_fifo_valid_opt <= Read_result_valid;
-    when S_CHANNEL_DONE           =>  w_fifo_valid_opt <= '0';
+    when S_CHANNEL_DONE_0         =>  w_fifo_valid_opt <= '0';
+    when S_CHANNEL_DONE_1         =>  w_fifo_valid_opt <= '0';
     when S_SUMMARY_DONE           =>  w_fifo_valid_opt <= '0';
     when S_WAIT_IDLE              =>  w_fifo_valid_opt <= '0';
     when others => null;

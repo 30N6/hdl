@@ -15,7 +15,8 @@ entity pfb_mux_2x is
 generic (
   NUM_CHANNELS        : natural;
   CHANNEL_INDEX_WIDTH : natural;
-  INPUT_WIDTH         : natural
+  INPUT_WIDTH         : natural;
+  TAG_WIDTH           : natural
 );
 port (
   Clk                   : in  std_logic;
@@ -24,10 +25,12 @@ port (
   Input_valid           : in  std_logic;  -- 1/2 rate
   Input_channel         : in  unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   Input_last            : in  std_logic;
+  Input_tag             : in  unsigned(TAG_WIDTH - 1 downto 0);
   Input_i               : in  signed(INPUT_WIDTH - 1 downto 0);
   Input_q               : in  signed(INPUT_WIDTH - 1 downto 0);
 
   Output_valid          : out std_logic;  -- 1/4 rate
+  Output_tag            : out unsigned(TAG_WIDTH - 1 downto 0);
   Output_i              : out signed(INPUT_WIDTH downto 0);
   Output_q              : out signed(INPUT_WIDTH downto 0);
 
@@ -40,6 +43,7 @@ end entity pfb_mux_2x;
 architecture rtl of pfb_mux_2x is
 
   constant OUTPUT_WIDTH         : natural := INPUT_WIDTH + 1;
+  constant FIFO_WIDTH           : natural := 2*OUTPUT_WIDTH + TAG_WIDTH;
 
   type input_array_t is array (natural range <>) of signed(INPUT_WIDTH - 1 downto 0);
   type output_array_t is array (natural range <>) of signed(OUTPUT_WIDTH - 1 downto 0);
@@ -50,10 +54,12 @@ architecture rtl of pfb_mux_2x is
   signal m_buffer_1_q           : input_array_t(NUM_CHANNELS/2 - 1 downto 0) := (others => (others => '0'));
   signal m_summed_i             : output_array_t(NUM_CHANNELS/2 - 1 downto 0) := (others => (others => '0'));
   signal m_summed_q             : output_array_t(NUM_CHANNELS/2 - 1 downto 0) := (others => (others => '0'));
+  signal m_summed_tag           : unsigned_array_t(NUM_CHANNELS/2 - 1 downto 0)(TAG_WIDTH - 1 downto 0) := (others => (others => '0'));
 
   signal r0_input_valid         : std_logic;
   signal r0_input_last          : std_logic;
   signal r0_input_channel       : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
+  signal r0_input_tag           : unsigned(TAG_WIDTH - 1 downto 0);
   signal r0_input_i             : signed(INPUT_WIDTH - 1 downto 0);
   signal r0_input_q             : signed(INPUT_WIDTH - 1 downto 0);
   signal r0_buffer_valid        : std_logic;
@@ -65,6 +71,7 @@ architecture rtl of pfb_mux_2x is
   signal r1_summed_valid        : std_logic;
   signal r1_summed_last         : std_logic;
   signal r1_summed_channel      : unsigned(CHANNEL_INDEX_WIDTH - 2 downto 0);
+  signal r1_summed_tag          : unsigned(TAG_WIDTH - 1 downto 0);
   signal r1_summed_i            : signed(OUTPUT_WIDTH - 1 downto 0);
   signal r1_summed_q            : signed(OUTPUT_WIDTH - 1 downto 0);
 
@@ -75,12 +82,13 @@ architecture rtl of pfb_mux_2x is
 
   signal w_summed_i             : signed(OUTPUT_WIDTH - 1 downto 0);
   signal w_summed_q             : signed(OUTPUT_WIDTH - 1 downto 0);
+  signal w_summed_tag           : unsigned(TAG_WIDTH - 1 downto 0);
   signal r_fifo_write_valid     : std_logic;
-  signal r_fifo_write_data      : std_logic_vector(OUTPUT_WIDTH * 2 - 1 downto 0);
+  signal r_fifo_write_data      : std_logic_vector(FIFO_WIDTH - 1 downto 0);
 
   signal r_read_cycle           : unsigned(1 downto 0);
   signal w_fifo_rd_en           : std_logic;
-  signal w_fifo_rd_data         : std_logic_vector(OUTPUT_WIDTH * 2 - 1 downto 0);
+  signal w_fifo_rd_data         : std_logic_vector(FIFO_WIDTH - 1 downto 0);
   signal w_fifo_empty           : std_logic;
 
   signal w_error_input_overflow : std_logic;
@@ -95,6 +103,7 @@ begin
       r0_input_valid    <= Input_valid;
       r0_input_last     <= Input_last;
       r0_input_channel  <= Input_channel;
+      r0_input_tag      <= Input_tag;
       r0_input_i        <= Input_i;
       r0_input_q        <= Input_q;
 
@@ -124,6 +133,7 @@ begin
       r1_summed_valid   <= r0_input_valid and to_stdlogic(r0_input_channel >= (NUM_CHANNELS/2));
       r1_summed_last    <= r0_input_last;
       r1_summed_channel <= r0_input_channel(CHANNEL_INDEX_WIDTH - 2 downto 0);
+      r1_summed_tag     <= r0_input_tag;
       r1_summed_i       <= resize_up(r0_input_i, OUTPUT_WIDTH) + resize_up(r0_buffer_1_i, OUTPUT_WIDTH);
       r1_summed_q       <= resize_up(r0_input_q, OUTPUT_WIDTH) + resize_up(r0_buffer_1_q, OUTPUT_WIDTH);
     end if;
@@ -133,8 +143,9 @@ begin
   begin
     if rising_edge(Clk) then
       if (r1_summed_valid = '1') then
-        m_summed_i(to_integer(r1_summed_channel)) <= r1_summed_i;
-        m_summed_q(to_integer(r1_summed_channel)) <= r1_summed_q;
+        m_summed_i(to_integer(r1_summed_channel))   <= r1_summed_i;
+        m_summed_q(to_integer(r1_summed_channel))   <= r1_summed_q;
+        m_summed_tag(to_integer(r1_summed_channel)) <= r1_summed_tag;
       end if;
     end if;
   end process;
@@ -168,13 +179,14 @@ begin
 
   w_error_input_overflow <= r2_last_valid and r_fifo_write_active;
 
-  w_summed_i <= m_summed_i(to_integer(r_fifo_write_index));
-  w_summed_q <= m_summed_q(to_integer(r_fifo_write_index));
+  w_summed_i    <= m_summed_i(to_integer(r_fifo_write_index));
+  w_summed_q    <= m_summed_q(to_integer(r_fifo_write_index));
+  w_summed_tag  <= m_summed_tag(to_integer(r_fifo_write_index));
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_fifo_write_data   <= std_logic_vector(w_summed_i) & std_logic_vector(w_summed_q);
+      r_fifo_write_data   <= std_logic_vector(w_summed_tag) & std_logic_vector(w_summed_i) & std_logic_vector(w_summed_q);
       r_fifo_write_valid  <= r_fifo_write_active;
     end if;
   end process;
@@ -182,7 +194,7 @@ begin
   i_fifo : entity mem_lib.xpm_fallthrough_fifo
   generic map (
     FIFO_DEPTH  => maximum(NUM_CHANNELS / 2, 16),
-    FIFO_WIDTH  => OUTPUT_WIDTH * 2
+    FIFO_WIDTH  => FIFO_WIDTH
   )
   port map (
     Clk           => Clk,
@@ -218,6 +230,7 @@ begin
   begin
     if rising_edge(Clk) then
       Output_valid <= w_fifo_rd_en;
+      Output_tag   <= unsigned(w_fifo_rd_data(OUTPUT_WIDTH * 2 + TAG_WIDTH - 1 downto OUTPUT_WIDTH * 2));
       Output_i     <= signed(w_fifo_rd_data(OUTPUT_WIDTH * 2 - 1 downto OUTPUT_WIDTH));
       Output_q     <= signed(w_fifo_rd_data(OUTPUT_WIDTH - 1 downto 0));
     end if;

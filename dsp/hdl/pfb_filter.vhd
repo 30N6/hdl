@@ -15,6 +15,7 @@ generic (
   CHANNEL_INDEX_WIDTH : natural;
   INPUT_DATA_WIDTH    : natural;
   OUTPUT_DATA_WIDTH   : natural;
+  TAG_WIDTH           : natural;
   COEF_WIDTH          : natural;
   NUM_COEFS           : natural;
   COEF_DATA           : signed_array_t(NUM_COEFS - 1 downto 0)(COEF_WIDTH - 1 downto 0);
@@ -27,12 +28,14 @@ port (
   Input_valid           : in  std_logic;
   Input_index           : in  unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   Input_last            : in  std_logic;
+  Input_tag             : in  unsigned(TAG_WIDTH - 1 downto 0);
   Input_i               : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
   Input_q               : in  signed(INPUT_DATA_WIDTH - 1 downto 0);
 
   Output_valid          : out std_logic;
   Output_index          : out unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   Output_last           : out std_logic;
+  Output_tag            : out unsigned(TAG_WIDTH - 1 downto 0);
   Output_i              : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
   Output_q              : out signed(OUTPUT_DATA_WIDTH - 1 downto 0);
 
@@ -70,12 +73,14 @@ architecture rtl of pfb_filter is
   signal r_input_valid        : std_logic;
   signal r_input_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal r_input_last         : std_logic;
+  signal r_input_tag          : unsigned(TAG_WIDTH - 1 downto 0);
   signal r_input_iq           : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
 
   signal w_stage_prev_iq      : stage_iq_array_t(NUM_COEFS_PER_CHANNEL - 1 downto 0);
   signal w_stage_output_valid : std_logic_vector(NUM_COEFS_PER_CHANNEL - 1 downto 0);
   signal w_stage_output_index : unsigned_array_t(NUM_COEFS_PER_CHANNEL - 1 downto 0)(CHANNEL_INDEX_WIDTH - 1 downto 0);
   signal w_stage_output_last  : std_logic_vector(NUM_COEFS_PER_CHANNEL - 1 downto 0);
+  signal w_stage_output_tag   : unsigned_array_t(NUM_COEFS_PER_CHANNEL - 1 downto 0)(TAG_WIDTH - 1 downto 0);
   signal w_stage_output_iq    : stage_iq_array_t(NUM_COEFS_PER_CHANNEL - 1 downto 0);
   signal w_stage_overflow     : std_logic_vector(NUM_COEFS_PER_CHANNEL - 1 downto 0);
 
@@ -87,6 +92,7 @@ begin
       r_input_valid <= Input_valid;
       r_input_index <= Input_index;
       r_input_last  <= Input_last;
+      r_input_tag   <= Input_tag;
       r_input_iq    <= Input_i & Input_q;
     end if;
   end process;
@@ -100,6 +106,7 @@ begin
       COEF_DATA           => get_coefs_for_stage(i),
       INPUT_DATA_WIDTH    => INPUT_DATA_WIDTH,
       OUTPUT_DATA_WIDTH   => OUTPUT_DATA_WIDTH,
+      TAG_WIDTH           => TAG_WIDTH,
       ANALYSIS_MODE       => ANALYSIS_MODE
     )
     port map (
@@ -108,12 +115,14 @@ begin
       Input_valid           => r_input_valid,
       Input_index           => r_input_index,
       Input_last            => r_input_last,
+      Input_tag             => r_input_tag,
       Input_curr_iq         => r_input_iq,
       Input_prev_iq         => w_stage_prev_iq(i),
 
       Output_valid          => w_stage_output_valid(i),
       Output_index          => w_stage_output_index(i),
       Output_last           => w_stage_output_last(i),
+      Output_tag            => w_stage_output_tag(i),
       Output_iq             => w_stage_output_iq(i),
 
       Error_input_overflow  => w_stage_overflow(i)
@@ -147,6 +156,7 @@ begin
   Output_valid          <= w_stage_output_valid(0);
   Output_index          <= w_stage_output_index(0);
   Output_last           <= w_stage_output_last(0);
+  Output_tag            <= w_stage_output_tag(0);
   (Output_i, Output_q)  <= w_stage_output_iq(0);
 
   process(Clk)
