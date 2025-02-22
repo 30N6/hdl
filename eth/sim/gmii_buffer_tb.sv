@@ -214,7 +214,7 @@ module gmii_buffer_tb;
 
         $display("%0t: writing data: %p", $time, tx_data.data);
         tx_intf.write(tx_data.data, tx_data.error);
-        @(posedge Clk);
+        repeat(3) @(posedge Clk);
         input_accepted = tx_intf.accepted;
 
         if (!error && input_accepted) begin

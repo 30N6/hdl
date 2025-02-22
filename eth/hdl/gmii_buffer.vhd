@@ -23,6 +23,7 @@ port (
   Input_valid     : in  std_logic;
   Input_error     : in  std_logic;
   Input_accepted  : out std_logic;
+  Input_dropped   : out std_logic;
 
   Output_data     : out std_logic_vector(7 downto 0);
   Output_valid    : out std_logic;
@@ -30,6 +31,9 @@ port (
   Output_ready    : in  std_logic
 
 );
+begin
+  -- PSL default clock is rising_edge(Clk);
+  -- PSL output_accepted_or_dropped : assert always (rose(Input_valid)) -> eventually! ((Input_accepted = '1') or (Input_dropped = '1'));
 end entity gmii_buffer;
 
 architecture rtl of gmii_buffer is
@@ -41,6 +45,20 @@ architecture rtl of gmii_buffer is
   constant FRAME_FIFO_WIDTH             : natural := 2*BUFFER_ADDR_WIDTH;
   constant FRAME_FIFO_ALMOST_FULL_LEVEL : natural := FRAME_DEPTH - 5;
 
+  type state_t is (S_IDLE, S_ACTIVE, S_ERROR, S_STORE, S_DROP);
+
+  signal r0_input_data                  : std_logic_vector(7 downto 0);
+  signal r0_input_valid                 : std_logic;
+  signal r0_input_error                 : std_logic;
+
+  signal r1_input_data                  : std_logic_vector(7 downto 0);
+  signal r1_input_valid                 : std_logic;
+  signal r1_input_error                 : std_logic;
+  signal w1_input_last                  : std_logic;
+
+  signal s_state                        : state_t;
+
+  signal w_buffer_write_valid           : std_logic;
   signal r_write_index_prev             : unsigned(BUFFER_ADDR_WIDTH - 1 downto 0);
   signal r_write_index_next             : unsigned(BUFFER_ADDR_WIDTH - 1 downto 0);
   signal r_write_index_first            : unsigned(BUFFER_ADDR_WIDTH - 1 downto 0);
@@ -53,7 +71,6 @@ architecture rtl of gmii_buffer is
   signal w_buffer_rd_data               : std_logic_vector(7 downto 0);
 
   signal r_frame_fifo_wr_data           : std_logic_vector(FRAME_FIFO_WIDTH - 1 downto 0);
-  signal w_frame_fifo_wr_en             : std_logic;
   signal r_frame_fifo_wr_en             : std_logic;
   signal w_frame_fifo_almost_full       : std_logic;
   signal w_frame_fifo_rd_data           : std_logic_vector(FRAME_FIFO_WIDTH - 1 downto 0);
@@ -74,33 +91,102 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      r0_input_data   <= Input_data;
+      r0_input_valid  <= Input_valid;
+      r0_input_error  <= Input_error;
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r1_input_data   <= r0_input_data;
+      r1_input_valid  <= r0_input_valid;
+      r1_input_error  <= r0_input_error;
+    end if;
+  end process;
+
+  w1_input_last <= r1_input_valid and not(r0_input_valid);
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
       if (Rst = '1') then
-        r_write_index_next  <= (others => '0');
-        r_write_active      <= '0';
-        r_write_error       <= '0';
+        s_state <= S_IDLE;
       else
-        if (r_write_active = '0') then
-          r_write_active      <= Input_valid;
-          r_write_error       <= Input_error;
-          if (Input_valid = '1') then
-            r_write_index_next <= r_write_index_next + 1;
-          end if;
-        else
-          if (Input_valid = '1') then
-            r_write_index_next <= r_write_index_next + 1;
-            if ((Input_error = '1') or ((w_frame_fifo_empty = '0') and ((r_write_index_next + 1) = w_read_index_first))) then
-              r_write_error <= '1';
+        case s_state is
+        when S_IDLE =>
+          if (r1_input_valid = '1') then
+            if (r1_input_error = '1') then
+              if (w1_input_last = '1') then
+                s_state <= S_DROP;
+              else
+                s_state <= S_ERROR;
+              end if;
+            else
+              s_state <= S_ACTIVE;
             end if;
           else
-            if ((r_write_error = '1') or (w_frame_fifo_almost_full = '1')) then
-              r_write_index_next <= r_write_index_first;
-            else
-              --r_write_index_next <= r_write_index_next + 1;
-            end if;
-
-            r_write_active  <= '0';
-            r_write_error   <= '0';
+            s_state <= S_IDLE;
           end if;
+
+        when S_ACTIVE =>
+          if (r1_input_valid = '1') then
+            if ((r1_input_error = '1') or ((w_frame_fifo_empty = '0') and ((r_write_index_next + 1) = w_read_index_first))) then
+              if (w1_input_last = '1') then
+                s_state <= S_DROP;
+              else
+                s_state <= S_ERROR;
+              end if;
+            else
+              if (w1_input_last = '1') then
+                if (w_frame_fifo_almost_full = '1') then
+                  s_state <= S_DROP;
+                else
+                  s_state <= S_STORE;
+                end if;
+              else
+                s_state <= S_ACTIVE;
+              end if;
+            end if;
+          else
+            s_state <= S_IDLE;
+          end if;
+
+        when S_ERROR =>
+          if (r1_input_valid = '1') then
+            if (w1_input_last = '1') then
+              s_state <= S_DROP;
+            else
+              s_state <= S_ERROR;
+            end if;
+          else
+            s_state <= S_IDLE;
+          end if;
+
+        when S_STORE =>
+          s_state <= S_IDLE;
+
+        when S_DROP =>
+          s_state <= S_IDLE;
+
+        end case;
+      end if;
+    end if;
+  end process;
+
+  w_buffer_write_valid <= r1_input_valid and to_stdlogic((s_state = S_IDLE) or (s_state = S_ACTIVE));
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (Rst = '1') then
+        r_write_index_next <= (others => '0');
+      else
+        if (w_buffer_write_valid = '1') then
+          r_write_index_next <= r_write_index_next + 1;
+        elsif (s_state = S_DROP) then
+          r_write_index_next <= r_write_index_first;
         end if;
       end if;
     end if;
@@ -109,7 +195,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (r_write_active = '0') then
+      if (s_state = S_IDLE) then
         r_write_index_first <= r_write_index_next;
       end if;
 
@@ -117,18 +203,18 @@ begin
     end if;
   end process;
 
-  w_frame_fifo_wr_en  <= r_write_active and not(Input_valid) and not(r_write_error) and not(w_frame_fifo_almost_full);
-  Input_accepted      <= w_frame_fifo_wr_en;
+  Input_accepted  <= to_stdlogic(s_state = S_STORE);
+  Input_dropped   <= to_stdlogic(s_state = S_DROP);
 
   process(Clk)
   begin
     if rising_edge(Clk) then
       r_buffer_wr_addr      <= r_write_index_next;
-      r_buffer_wr_data      <= Input_data;
-      r_buffer_wr_en        <= Input_valid and not(Input_error) and (not(r_write_active) or not(r_write_error));
+      r_buffer_wr_data      <= r1_input_data;
+      r_buffer_wr_en        <= w_buffer_write_valid;
 
       r_frame_fifo_wr_data  <= std_logic_vector(r_write_index_prev) & std_logic_vector(r_write_index_first);
-      r_frame_fifo_wr_en    <= w_frame_fifo_wr_en;
+      r_frame_fifo_wr_en    <= to_stdlogic(s_state = S_STORE);
     end if;
   end process;
 
