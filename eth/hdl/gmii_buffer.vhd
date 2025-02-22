@@ -38,14 +38,14 @@ end entity gmii_buffer;
 
 architecture rtl of gmii_buffer is
 
+  type state_t is (S_IDLE, S_ACTIVE, S_ERROR, S_STORE, S_DROP);
+
   constant BUFFER_ADDR_WIDTH            : natural := clog2(DATA_DEPTH);
   constant BUFFER_DATA_WIDTH            : natural := 8;
   constant BUFFER_LATENCY               : natural := 2;
 
   constant FRAME_FIFO_WIDTH             : natural := 2*BUFFER_ADDR_WIDTH;
   constant FRAME_FIFO_ALMOST_FULL_LEVEL : natural := FRAME_DEPTH - 5;
-
-  type state_t is (S_IDLE, S_ACTIVE, S_ERROR, S_STORE, S_DROP);
 
   signal r0_input_data                  : std_logic_vector(7 downto 0);
   signal r0_input_valid                 : std_logic;
