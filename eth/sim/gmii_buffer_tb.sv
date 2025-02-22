@@ -119,6 +119,7 @@ module gmii_buffer_tb;
     for (int i = 0; i < a.size(); i++) begin
       if (a[i] !== b[i]) begin
         $display("%0t: data mismatch [%0d]: %X %X", $time, i, a[i], b[i]);
+        return 0;
       end
     end
 
