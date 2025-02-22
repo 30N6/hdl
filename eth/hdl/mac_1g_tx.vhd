@@ -153,7 +153,7 @@ begin
 
           when S_PAYLOAD =>
             if ((w_input_valid = '1') and (w_input_last = '1')) then
-              if (r_frame_size < MIN_FRAME_SIZE_TO_PAD) then
+              if (r_frame_size < (MIN_FRAME_SIZE_TO_PAD - 1)) then
                 s_state <= S_PAD;
               else
                 s_state <= S_FCS;
@@ -163,10 +163,10 @@ begin
             end if;
 
           when S_PAD =>
-            if (r_frame_size < MIN_FRAME_SIZE_TO_PAD) then
-              s_state <= S_FCS;
-            else
+            if (r_frame_size < (MIN_FRAME_SIZE_TO_PAD - 1)) then
               s_state <= S_PAD;
+            else
+              s_state <= S_FCS;
             end if;
 
           when S_FCS =>

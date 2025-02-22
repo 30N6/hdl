@@ -132,6 +132,7 @@ module mac_1g_tx_tb;
     for (int i = 0; i < a.size(); i++) begin
       if (a[i] !== b[i]) begin
         $display("%0t: data mismatch [%0d]: %X %X", $time, i, a[i], b[i]);
+        return 0;
       end
     end
 
@@ -179,10 +180,26 @@ module mac_1g_tx_tb;
     end
   end
 
+
+  function automatic logic [31:0] get_fcs(logic [7:0] data [$]);
+    logic [31:0] crc = '1;
+
+    for (int i = 0; i < data.size(); i++) begin
+      crc[7:0] ^= data[i];
+
+      for (int k = 0; k < 8; k++) begin
+        crc = (crc & 1) ? ((crc >> 1) ^ 32'hEDB88320) : (crc >> 1);
+      end
+    end
+
+    return crc ^ 32'hFFFFFFFF;
+  endfunction
+
   function automatic expect_t get_expected_data(logic [47:0] src_mac, logic [47:0] dst_mac, tx_data_t tx_data);
     expect_t e;
     int padding_bytes = (eth_min_frame_size - eth_fcs_length) - (2*eth_mac_length + eth_type_length + tx_data.data.size());
     logic [31:0] fcs = '1;
+    logic [7:0] fcs_data [$];
 
     for (int i = 0; i < eth_preamble_length; i++) begin
       e.data.push_back(eth_preamble_byte);
@@ -191,23 +208,31 @@ module mac_1g_tx_tb;
 
     for (int i = 0; i < eth_mac_length; i++) begin
       e.data.push_back(dst_mac[i*8+:8]);
+      fcs_data.push_back(dst_mac[i*8+:8]);
     end
 
     for (int i = 0; i < eth_mac_length; i++) begin
       e.data.push_back(src_mac[i*8+:8]);
+      fcs_data.push_back(src_mac[i*8+:8]);
     end
 
     for (int i = 0; i < eth_type_length; i++) begin
       e.data.push_back(eth_type_ip[i*8+:8]);
+      fcs_data.push_back(eth_type_ip[i*8+:8]);
     end
 
     for (int i = 0; i < tx_data.data.size(); i++) begin
       e.data.push_back(tx_data.data[i]);
+      fcs_data.push_back(tx_data.data[i]);
     end
 
     for (int i = 0; i < padding_bytes; i++) begin
       e.data.push_back(0);
+      fcs_data.push_back(0);
     end
+
+    fcs = get_fcs(fcs_data);
+    $display("%0t: get_fcs: %08X", $time, fcs);
 
     for (int i = 0; i < eth_fcs_length; i++) begin
       e.data.push_back(fcs[i*8+:8]);
@@ -264,6 +289,10 @@ module mac_1g_tx_tb;
       end
 
       $display("%0t: Test finished: num_received = %0d", $time, num_received);
+      Rst = 1;
+      repeat(10) @(posedge Clk);
+      Rst = 0;
+      repeat(10) @(posedge Clk);
     end
   endtask
 
