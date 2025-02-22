@@ -58,6 +58,8 @@ architecture rtl of gmii_buffer is
 
   signal s_state                        : state_t;
 
+  signal w_buffer_full                  : std_logic;
+
   signal w_buffer_write_valid           : std_logic;
   signal r_write_index_prev             : unsigned(BUFFER_ADDR_WIDTH - 1 downto 0);
   signal r_write_index_next             : unsigned(BUFFER_ADDR_WIDTH - 1 downto 0);
@@ -107,6 +109,7 @@ begin
   end process;
 
   w1_input_last <= r1_input_valid and not(r0_input_valid);
+  w_buffer_full <= not(w_frame_fifo_empty) and to_stdlogic((r_write_index_next + 1) = w_read_index_first);
 
   process(Clk)
   begin
@@ -117,7 +120,7 @@ begin
         case s_state is
         when S_IDLE =>
           if (r1_input_valid = '1') then
-            if (r1_input_error = '1') then
+            if ((r1_input_error = '1') or (w_buffer_full = '1')) then
               if (w1_input_last = '1') then
                 s_state <= S_DROP;
               else
@@ -132,7 +135,7 @@ begin
 
         when S_ACTIVE =>
           if (r1_input_valid = '1') then
-            if ((r1_input_error = '1') or ((w_frame_fifo_empty = '0') and ((r_write_index_next + 1) = w_read_index_first))) then
+            if ((r1_input_error = '1') or (w_buffer_full = '1')) then
               if (w1_input_last = '1') then
                 s_state <= S_DROP;
               else
