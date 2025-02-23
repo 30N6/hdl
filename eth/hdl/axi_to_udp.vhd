@@ -150,7 +150,7 @@ begin
         if (s_state = S_IDLE) then
           r_byte_index  <= (others => '0');
           r_data_length <= to_unsigned(1, ETH_UDP_LENGTH_WIDTH);
-        else
+        elsif (w_input_valid = '1') then
           r_byte_index  <= r_byte_index + 1;
           r_data_length <= r_data_length + 1;
         end if;

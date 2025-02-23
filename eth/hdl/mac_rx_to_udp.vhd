@@ -227,7 +227,7 @@ begin
       if (r_rst = '1') then
         r_state_sub_count <= (others => '0');
       else
-        if (w_output_fifo_almost_full = '0') then
+        if ((w_output_fifo_almost_full = '0') and (w_mac_valid = '1')) then
           case s_state is
           when S_DST_MAC | S_SRC_MAC =>
             if (r_state_sub_count = (ETH_MAC_LENGTH - 1)) then
@@ -269,7 +269,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (w_output_fifo_almost_full = '0') then
+      if ((w_output_fifo_almost_full = '0') and (w_mac_valid = '1')) then
         if (s_state = S_UDP_PAYLOAD) then
           r_udp_count <= r_udp_count + 1;
         else

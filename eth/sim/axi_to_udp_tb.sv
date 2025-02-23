@@ -11,7 +11,7 @@ interface axi_tx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
   task write(input logic [AXI_DATA_WIDTH - 1 : 0] d []);
     for (int i = 0; i < d.size(); i++) begin
       if ($urandom_range(99) < 10) begin
-        @(posedge Clk);
+        repeat($urandom_range(10, 1)) @(posedge Clk);
       end
       valid <= 1;
       data  <= d[i];
