@@ -10,6 +10,7 @@ package eth_pkg is
   constant ETH_MIN_FRAME_SIZE             : natural := 64;
   constant ETH_MAX_FRAME_SIZE             : natural := 1522;
 
+  constant ETH_MAC_HEADER_LENGTH          : natural := 14;
   constant ETH_IPV4_HEADER_LENGTH         : natural := 20;
   constant ETH_UDP_HEADER_LENGTH          : natural := 8;
   constant ETH_UDP_MAX_PAYLOAD_LENGTH     : natural := 1500 - ETH_IPV4_HEADER_LENGTH - ETH_UDP_HEADER_LENGTH;
@@ -28,6 +29,8 @@ package eth_pkg is
   constant ETH_PREAMBLE_BYTE          : std_logic_vector(7 downto 0)  := x"AA"; --TODO: swap?
   constant ETH_SFD_BYTE               : std_logic_vector(7 downto 0)  := x"AB"; --TODO: swap?
   constant ETH_TYPE_IP                : std_logic_vector(15 downto 0) := x"0008";
+  constant ETH_IP_VER_IHL             : std_logic_vector(7 downto 0)  := x"45";
+  constant ETH_IP_PROTO_UDP           : std_logic_vector(7 downto 0)  := x"11";
 
 end package eth_pkg;
 

@@ -202,14 +202,7 @@ begin
           when S_PREAMBLE =>
             r_state_sub_count <= r_state_sub_count + 1;
 
-          when S_DST_MAC =>
-            if (r_state_sub_count = (ETH_MAC_LENGTH - 1)) then
-              r_state_sub_count <= (others => '0');
-            else
-              r_state_sub_count <= r_state_sub_count + 1;
-            end if;
-
-          when S_SRC_MAC =>
+          when S_DST_MAC | S_SRC_MAC =>
             if (r_state_sub_count = (ETH_MAC_LENGTH - 1)) then
               r_state_sub_count <= (others => '0');
             else

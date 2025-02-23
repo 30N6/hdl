@@ -88,6 +88,8 @@ architecture rtl of gmii_buffer is
   signal r_read_valid                   : std_logic_vector(BUFFER_LATENCY - 1 downto 0);
   signal r_read_last                    : std_logic_vector(BUFFER_LATENCY - 1 downto 0);
 
+  signal w_output_ready                 : std_logic;
+
 begin
 
   process(Clk)
@@ -231,14 +233,14 @@ begin
         r_read_index_last <= (others => '-');
       else
         if (r_read_active = '0') then
-          if ((Output_ready = '1') and (w_frame_fifo_empty = '0')) then
+          if ((w_output_ready = '1') and (w_frame_fifo_empty = '0')) then
             r_read_active <= '1';
             r_read_index_curr <= unsigned(w_frame_fifo_rd_data(BUFFER_ADDR_WIDTH - 1 downto 0));
             r_read_index_last <= unsigned(w_frame_fifo_rd_data(2*BUFFER_ADDR_WIDTH - 1 downto BUFFER_ADDR_WIDTH));
             r_read_done       <= to_stdlogic(w_frame_fifo_rd_data(BUFFER_ADDR_WIDTH - 1 downto 0) = w_frame_fifo_rd_data(2*BUFFER_ADDR_WIDTH - 1 downto BUFFER_ADDR_WIDTH));
           end if;
         else
-          if (Output_ready = '1') then
+          if (w_output_ready = '1') then
             r_read_done <= to_stdlogic(r_read_index_curr = (r_read_index_last - 1));
 
             if (r_read_index_curr /= r_read_index_last) then
@@ -254,14 +256,19 @@ begin
   end process;
 
   w_read_index_first <= unsigned(w_frame_fifo_rd_data(BUFFER_ADDR_WIDTH - 1 downto 0));
-  w_frame_fifo_rd_en <= Output_ready and r_read_active and to_stdlogic(r_read_index_curr = r_read_index_last);
+  w_frame_fifo_rd_en <= w_output_ready and r_read_active and to_stdlogic(r_read_index_curr = r_read_index_last);
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      if (Output_ready = '1') then
-        r_read_valid  <= r_read_valid(0)  & r_read_active;
-        r_read_last   <= r_read_last(0)   & r_read_done;
+      if (Rst = '1') then
+        r_read_valid  <= (others => '0');
+        r_read_last   <= (others => '0');
+      else
+        if (w_output_ready = '1') then
+          r_read_valid  <= r_read_valid(0)  & r_read_active;
+          r_read_last   <= r_read_last(0)   & r_read_done;
+        end if;
       end if;
     end if;
   end process;
@@ -302,8 +309,8 @@ begin
     Wr_addr   => r_buffer_wr_addr,
     Wr_data   => r_buffer_wr_data,
 
-    Rd_en     => Output_ready,
-    Rd_reg_ce => Output_ready,
+    Rd_en     => w_output_ready,
+    Rd_reg_ce => w_output_ready,
     Rd_addr   => r_read_index_curr,
     Rd_data   => w_buffer_rd_data
   );
@@ -311,5 +318,7 @@ begin
   Output_data   <= w_buffer_rd_data;
   Output_valid  <= r_read_valid(1);
   Output_last   <= r_read_last(1);
+
+  w_output_ready <= Output_ready or not(r_read_valid(1));
 
 end architecture rtl;
