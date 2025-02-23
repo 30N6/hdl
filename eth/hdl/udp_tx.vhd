@@ -66,7 +66,7 @@ architecture rtl of udp_tx is
   signal r_ip_total_length                : unsigned(15 downto 0);
   signal w_ip_header_partial_checksum     : unsigned(15 downto 0);
   signal w_ip_header_partial_checksum_s   : unsigned(15 downto 0);
-  signal r_ip_header_checksum_unfolded    : unsigned(17 downto 0);  --three terms = two extra bits
+  signal r_ip_header_checksum_unfolded    : unsigned(16 downto 0);  --two terms = one extra bit
   signal r_ip_header_checksum             : unsigned(15 downto 0);
 
   signal s_state                          : state_t;
@@ -194,8 +194,8 @@ begin
       end if;
 
       r_ip_total_length             <= r_udp_length + ETH_IPV4_HEADER_LENGTH;
-      r_ip_header_checksum_unfolded <= ("00" & w_ip_header_partial_checksum_s) + ("00" & r_ip_total_length) + ("00" & r_udp_length);
-      r_ip_header_checksum          <= r_ip_header_checksum_unfolded(15 downto 0) + r_ip_header_checksum_unfolded(17 downto 16);
+      r_ip_header_checksum_unfolded <= ('0' & w_ip_header_partial_checksum_s) + ('0' & r_ip_total_length);
+      r_ip_header_checksum          <= r_ip_header_checksum_unfolded(15 downto 0) + ('0' & r_ip_header_checksum_unfolded(16));
     end if;
   end process;
 

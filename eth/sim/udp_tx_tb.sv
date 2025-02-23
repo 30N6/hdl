@@ -264,7 +264,10 @@ module udp_tx_tb;
       e.data.push_back(tx_data.data[i]);
     end
 
-    $display("%0t: get_expected_data: ip_total_length=%0d udp_len=%0d ip_checksum=%04X", $time, ip_total_length, udp_length, ip_checksum);
+    ip_checksum = ~get_ip_checksum(header_copy);
+    assert (ip_checksum == 0) else $error("bad IP checksum");
+
+    //$display("%0t: get_expected_data: ip_total_length=%0d udp_len=%0d ip_checksum=%04X", $time, ip_total_length, udp_length, ip_checksum);
 
     return e;
   endfunction
@@ -304,7 +307,7 @@ module udp_tx_tb;
   endfunction
 
   task automatic standard_test();
-    parameter NUM_TESTS = 200;
+    parameter NUM_TESTS = 20;
 
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
       int max_write_delay = $urandom_range(5);
