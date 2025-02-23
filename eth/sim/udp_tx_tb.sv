@@ -2,13 +2,36 @@
 
 import eth_pkg::*;
 
-interface axi_tx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
-  logic                           valid = 0;
-  logic                           last;
-  logic [AXI_DATA_WIDTH - 1 : 0]  data;
-  logic                           ready;
+interface header_tx_intf (input logic Clk);
+  logic                                         wr_en = 0;
+  logic [31:0]                                  wr_data;
+  logic [eth_ip_udp_header_addr_width - 1 : 0]  wr_addr;
 
-  task write(input logic [AXI_DATA_WIDTH - 1 : 0] d []);
+  task write(input logic [31:0] d []);
+    for (int i = 0; i < d.size(); i++) begin
+      wr_en     <= 1;
+      wr_data   <= d[i];
+      wr_addr   <= i;
+      @(posedge Clk);
+    end
+
+    wr_en     <= 0;
+    wr_data   <= 'x;
+    wr_addr   <= 'x;
+
+  endtask
+endinterface
+
+interface udp_tx_intf (input logic Clk);
+  logic                                 valid = 0;
+  logic                                 last;
+  logic [7:0]                           data;
+  logic [eth_udp_length_width - 1 : 0]  length;
+  logic                                 ready;
+
+  task write(input logic [7:0] d []);
+    automatic bit length_sent = 0;
+
     for (int i = 0; i < d.size(); i++) begin
       if ($urandom_range(99) < 10) begin
         @(posedge Clk);
@@ -16,6 +39,12 @@ interface axi_tx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
       valid <= 1;
       data  <= d[i];
       last  <= (i == (d.size() - 1));
+      if (!length_sent) begin
+        length <= d.size();
+        length_sent = 1;
+      end else begin
+        length <= 'x;
+      end
 
       do begin
         @(posedge Clk);
@@ -47,7 +76,7 @@ interface axi_rx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
   endtask
 endinterface
 
-module mac_1g_tx_tb;
+module udp_tx_tb;
   parameter time CLK_HALF_PERIOD  = 5ns;
   parameter AXI_DATA_WIDTH        = 8;
 
@@ -62,10 +91,15 @@ module mac_1g_tx_tb;
     int post_packet_delay;
   } tx_data_t;
 
+  typedef struct {
+    logic [31:0] data [];
+  } header_data_t;
+
   logic Clk;
   logic Rst;
 
-  axi_tx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  tx_intf (.*);
+  header_tx_intf                                  header_intf (.*);
+  udp_tx_intf                                     tx_intf (.*);
   axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rx_intf (.*);
 
   tx_data_t   tx_queue[$];
@@ -74,9 +108,6 @@ module mac_1g_tx_tb;
   int   num_received = 0;
   logic r_axi_rx_ready;
   logic w_axi_rx_valid;
-
-  logic [47:0] r_source_mac;
-  logic [47:0] r_dest_mac;
 
   initial begin
     Clk = 0;
@@ -96,23 +127,25 @@ module mac_1g_tx_tb;
     r_axi_rx_ready <= $urandom_range(99) < 80;
   end
 
-  mac_1g_tx dut
+  udp_tx dut
   (
-    .Clk            (Clk),
-    .Rst            (Rst),
+    .Clk                (Clk),
+    .Rst                (Rst),
 
-    .Source_mac     (r_source_mac),
-    .Dest_mac       (r_dest_mac),
+    .Header_wr_en       (header_intf.wr_en),
+    .Header_wr_addr     (header_intf.wr_addr),
+    .Header_wr_data     (header_intf.wr_data),
 
-    .Payload_ready  (tx_intf.ready),
-    .Payload_valid  (tx_intf.valid),
-    .Payload_data   (tx_intf.data),
-    .Payload_last   (tx_intf.last),
+    .Udp_length         (tx_intf.length),
+    .Udp_data           (tx_intf.data),
+    .Udp_valid          (tx_intf.valid),
+    .Udp_last           (tx_intf.last),
+    .Udp_ready          (tx_intf.ready),
 
-    .Mac_data       (rx_intf.data),
-    .Mac_valid      (w_axi_rx_valid),
-    .Mac_last       (rx_intf.last),
-    .Mac_ready      (r_axi_rx_ready)
+    .Mac_payload_data   (rx_intf.data),
+    .Mac_payload_valid  (w_axi_rx_valid),
+    .Mac_payload_last   (rx_intf.last),
+    .Mac_payload_ready  (r_axi_rx_ready)
   );
 
   assign rx_intf.valid = w_axi_rx_valid && r_axi_rx_ready;
@@ -180,65 +213,94 @@ module mac_1g_tx_tb;
     end
   end
 
+  function automatic logic [15:0] get_ip_checksum(logic [31:0] header []);
+    logic [31:0] ip_checksum;
 
-  function automatic logic [31:0] get_fcs(logic [7:0] data [$]);
-    logic [31:0] crc = '1;
-
-    for (int i = 0; i < data.size(); i++) begin
-      crc[7:0] ^= data[i];
-
-      for (int k = 0; k < 8; k++) begin
-        crc = (crc & 1) ? ((crc >> 1) ^ 32'hEDB88320) : (crc >> 1);
+    ip_checksum = 0;
+    for (int i = 0; i < 5; i++) begin
+      for (int j = 0; j < 2; j++) begin
+        logic [15:0] raw_word = header[i][16*j +: 16];
+        logic [15:0] swapped_word = {raw_word[7:0], raw_word[15:8]};
+        ip_checksum += swapped_word;
       end
     end
 
-    return crc ^ 32'hFFFFFFFF;
+    while (ip_checksum > 16'hFFFF) begin
+      logic [31:0] new_checksum = ip_checksum[15:0] + ip_checksum[31:16];
+      ip_checksum = new_checksum;
+    end
+
+    return ip_checksum[15:0];
   endfunction
 
-  function automatic expect_t get_expected_data(logic [47:0] src_mac, logic [47:0] dst_mac, tx_data_t tx_data);
+  function automatic expect_t get_expected_data(header_data_t header_data, tx_data_t tx_data);
     expect_t e;
-    int padding_bytes = (eth_min_frame_size - eth_fcs_length) - (2*eth_mac_length + eth_type_length + tx_data.data.size());
-    logic [31:0] fcs = '1;
-    logic [7:0] fcs_data [$];
+    logic [31:0] header_copy [] = new[header_data.data.size()];
+    logic [15:0] ip_total_length;
+    logic [15:0] udp_length;
+    logic [15:0] ip_checksum;
 
-    for (int i = 0; i < eth_preamble_length; i++) begin
-      e.data.push_back(eth_preamble_byte);
-    end
-    e.data.push_back(eth_sfd_byte);
-
-    for (int i = 0; i < eth_mac_length; i++) begin
-      e.data.push_back(dst_mac[i*8+:8]);
-      fcs_data.push_back(dst_mac[i*8+:8]);
+    for (int i = 0; i < header_copy.size(); i++) begin
+      header_copy[i] = header_data.data[i];
     end
 
-    for (int i = 0; i < eth_mac_length; i++) begin
-      e.data.push_back(src_mac[i*8+:8]);
-      fcs_data.push_back(src_mac[i*8+:8]);
-    end
+    ip_total_length = eth_ipv4_header_length + eth_udp_header_length + tx_data.data.size();
+    udp_length = eth_udp_header_length + tx_data.data.size();
 
-    for (int i = 0; i < eth_type_length; i++) begin
-      e.data.push_back(eth_type_ip[i*8+:8]);
-      fcs_data.push_back(eth_type_ip[i*8+:8]);
+    header_copy[0][31:16] = {ip_total_length[7:0], ip_total_length[15:8]};
+    header_copy[6][15:0] = {udp_length[7:0], udp_length[15:8]};
+
+    header_copy[2][31:16] = 0;
+    ip_checksum = ~get_ip_checksum(header_copy);
+    header_copy[2][31:16] = {ip_checksum[7:0], ip_checksum[15:8]};
+
+    for (int i = 0; i < header_copy.size(); i++) begin
+      for (int j = 0; j < 4; j++) begin
+        e.data.push_back(header_copy[i][j*8 +: 8]);
+      end
     end
 
     for (int i = 0; i < tx_data.data.size(); i++) begin
       e.data.push_back(tx_data.data[i]);
-      fcs_data.push_back(tx_data.data[i]);
     end
 
-    for (int i = 0; i < padding_bytes; i++) begin
-      e.data.push_back(0);
-      fcs_data.push_back(0);
-    end
-
-    fcs = get_fcs(fcs_data);
-    $display("%0t: get_fcs: %08X", $time, fcs);
-
-    for (int i = 0; i < eth_fcs_length; i++) begin
-      e.data.push_back(fcs[i*8+:8]);
-    end
+    $display("%0t: get_expected_data: ip_total_length=%0d udp_len=%0d ip_checksum=%04X", $time, ip_total_length, udp_length, ip_checksum);
 
     return e;
+  endfunction
+
+
+  function automatic header_data_t randomize_header();
+    header_data_t r;
+    logic [15:0] ip_partial_checksum;
+
+    r.data = new[7];
+
+    r.data[0][7:0]    = 8'h45;    // ver, IHL
+    r.data[0][15:8]   = 0;        // DSCP, ECN
+    r.data[0][31:16]  = 0;        // total length
+
+    r.data[1][15:0]   = $urandom; // ID
+    r.data[1][31:29]  = 3'h2;     // flags - don't fragment
+    r.data[1][28:16]  = $urandom; // fragment offset
+
+    r.data[2][7:0]    = 64;       // TTL
+    r.data[2][15:8]   = 17;       // protocol = Udp_data
+    r.data[2][31:16]  = 0;        // header checksum
+
+    r.data[3]         = $urandom; // source address
+    r.data[4]         = $urandom; // dest address
+
+    r.data[5][15:0]   = $urandom; // source port
+    r.data[5][31:16]  = $urandom; // dest port
+
+    r.data[6][15:0]   = 0;        // UDP length
+    r.data[6][31:16]  = 0;        // UDP checksum
+
+    ip_partial_checksum = get_ip_checksum(r.data);
+    r.data[2][31:16] = {ip_partial_checksum[7:0], ip_partial_checksum[15:8]};
+
+    return r;
   endfunction
 
   task automatic standard_test();
@@ -247,13 +309,13 @@ module mac_1g_tx_tb;
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
       int max_write_delay = $urandom_range(5);
       int num_packets = $urandom_range(200, 100);
+      header_data_t header_data;
       tx_data_t tx_data;
       expect_t e;
 
       $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
-
-      r_source_mac  = {$urandom, $urandom};
-      r_dest_mac    = {$urandom, $urandom};
+      header_data = randomize_header();
+      header_intf.write(header_data.data);
 
       for (int i = 0; i < num_packets; i++) begin
         int r = $urandom_range(99);
@@ -262,7 +324,7 @@ module mac_1g_tx_tb;
         if (r < 25) begin
           packet_len = $urandom_range(45, 1);
         end else begin
-          packet_len = $urandom_range(1500, 1);
+          packet_len = $urandom_range(1400, 1);
         end
 
         tx_data.post_packet_delay = $urandom_range(max_write_delay);
@@ -271,7 +333,7 @@ module mac_1g_tx_tb;
         tx_queue.push_back(tx_data);
         $display("%0t: expecting: %p", $time, tx_data);
 
-        e = get_expected_data(r_source_mac, r_dest_mac, tx_data);
+        e = get_expected_data(header_data, tx_data);
         expected_data.push_back(e);
       end
 

@@ -20,10 +20,10 @@ port (
   Source_mac    : in  std_logic_vector(47 downto 0);
   Dest_mac      : in  std_logic_vector(47 downto 0);
 
-  S_axis_data   : in  std_logic_vector(7 downto 0);
-  S_axis_valid  : in  std_logic;
-  S_axis_last   : in  std_logic;
-  S_axis_ready  : out std_logic;
+  Payload_data  : in  std_logic_vector(7 downto 0);
+  Payload_valid : in  std_logic;
+  Payload_last  : in  std_logic;
+  Payload_ready : out std_logic;
 
   Mac_data      : out std_logic_vector(7 downto 0);
   Mac_valid     : out std_logic;
@@ -66,9 +66,11 @@ architecture rtl of mac_1g_tx is
   signal w_output_fifo_wr_en              : std_logic;
   signal w_output_fifo_wr_last            : std_logic;
   signal w_output_fifo_wr_data            : std_logic_vector(7 downto 0);
+
   signal r_output_fifo_wr_en              : std_logic;
   signal r_output_fifo_wr_data            : std_logic_vector(OUTPUT_FIFO_WIDTH - 1 downto 0);
   signal w_output_fifo_almost_full        : std_logic;
+
   signal w_output_fifo_rd_en              : std_logic;
   signal w_output_fifo_rd_data            : std_logic_vector(OUTPUT_FIFO_WIDTH - 1 downto 0);
   signal w_output_fifo_empty              : std_logic;
@@ -94,10 +96,10 @@ begin
     Clk           => Clk,
     Rst           => r_rst,
 
-    S_axis_ready  => S_axis_ready,
-    S_axis_valid  => S_axis_valid,
-    S_axis_data   => S_axis_data,
-    S_axis_last   => S_axis_last,
+    S_axis_ready  => Payload_ready,
+    S_axis_valid  => Payload_valid,
+    S_axis_data   => Payload_data,
+    S_axis_last   => Payload_last,
 
     M_axis_ready  => w_input_ready,
     M_axis_valid  => w_input_valid,
