@@ -53,7 +53,7 @@ port (
   S_axis_valid          : in  std_logic;
   S_axis_data           : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   S_axis_last           : in  std_logic;
-  S_axis_ready          : out std_logic
+  S_axis_ready          : out std_logic;
 
   M_axis_valid          : out std_logic;
   M_axis_data           : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
@@ -85,12 +85,17 @@ architecture rtl of udp_intf is
   signal w_from_axi_to_udp_data       : std_logic_vector(7 downto 0);
   signal w_from_axi_to_udp_valid      : std_logic;
   signal w_from_axi_to_udp_last       : std_logic;
-  signal w_from_axi_to_udp_ready      : std_logic
+  signal w_from_axi_to_udp_ready      : std_logic;
 
   signal w_from_udp_tx_payload_data   : std_logic_vector(7 downto 0);
   signal w_from_udp_tx_payload_valid  : std_logic;
   signal w_from_udp_tx_payload_last   : std_logic;
-  signal w_from_udp_tx_payload_ready  : std_logic
+  signal w_from_udp_tx_payload_ready  : std_logic;
+
+  signal w_from_mac_data              : std_logic_vector(7 downto 0);
+  signal w_from_mac_valid             : std_logic;
+  signal w_from_mac_last              : std_logic;
+  signal w_from_mac_ready             : std_logic;
 
   signal w_to_tx_buffer_accepted      : std_logic;
   signal w_to_tx_buffer_dropped       : std_logic;
@@ -116,7 +121,17 @@ architecture rtl of udp_intf is
   signal w_m_axis_valid               : std_logic;
   signal w_m_axis_data                : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   signal w_m_axis_last                : std_logic;
-  signal w_m_axis_ready               : std_logic
+  signal w_m_axis_ready               : std_logic;
+
+  --TODO: remove
+  attribute MARK_DEBUG                          : string;
+  attribute DONT_TOUCH                          : string;
+  attribute MARK_DEBUG of w_gmii_from_arb_data  : signal is "TRUE";
+  attribute DONT_TOUCH of w_gmii_from_arb_data  : signal is "TRUE";
+  attribute MARK_DEBUG of w_gmii_from_arb_valid : signal is "TRUE";
+  attribute DONT_TOUCH of w_gmii_from_arb_valid : signal is "TRUE";
+  attribute MARK_DEBUG of w_gmii_from_arb_last  : signal is "TRUE";
+  attribute DONT_TOUCH of w_gmii_from_arb_last  : signal is "TRUE";
 
 begin
 
@@ -174,7 +189,7 @@ begin
     Header_wr_addr    => r_udp_tx_header_wr_addr,
     Header_wr_data    => r_udp_tx_header_wr_data,
 
-    Udp_length        => w_from_axi_to_udp_length
+    Udp_length        => w_from_axi_to_udp_length,
     Udp_data          => w_from_axi_to_udp_data,
     Udp_valid         => w_from_axi_to_udp_valid,
     Udp_last          => w_from_axi_to_udp_last,
@@ -299,11 +314,10 @@ begin
     M_axis_ready  => w_m_axis_ready
   );
 
-  M_axis_valid  <= w_m_axis_valid;
-  M_axis_data   <= w_m_axis_data;
-  M_axis_last   <= w_m_axis_last;
-  M_axis_ready  <= w_m_axis_ready;
-
+  M_axis_valid    <= w_m_axis_valid;
+  M_axis_data     <= w_m_axis_data;
+  M_axis_last     <= w_m_axis_last;
+  w_m_axis_ready  <= M_axis_ready;
 
   Ps_gmii_rx_clk  <= Clk_gmii_rx;
   Ps_gmii_tx_clk  <= Clk_gmii_tx;
