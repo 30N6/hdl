@@ -25,7 +25,7 @@ port (
   Rst_gmii_tx           : in  std_logic;
 
   Udp_tx_header_wr_en   : in  std_logic;
-  Udp_tx_header_wr_addr : in  unsigned(ETH_IP_UDP_HEADER_ADDR_WIDTH - 1 downto 0);
+  Udp_tx_header_wr_addr : in  unsigned(2 downto 0);
   Udp_tx_header_wr_data : in  std_logic_vector(31 downto 0);
   Mac_tx_src_mac        : in  std_logic_vector(47 downto 0);
   Mac_tx_dst_mac        : in  std_logic_vector(47 downto 0);
