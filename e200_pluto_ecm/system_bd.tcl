@@ -146,7 +146,7 @@ ad_connect  sys_cpu_clk sys_rstgen/slowest_sync_clk
 ad_connect  sys_rstgen/ext_reset_in sys_ps7/FCLK_RESET0_N
 ad_connect  sys_rgmii/tx_reset sys_rstgen/peripheral_reset
 ad_connect  sys_rgmii/rx_reset sys_rstgen/peripheral_reset
-ad_connect  sys_rgmii/clkin sys_ps7/FCLK_CLK1 
+ad_connect  sys_rgmii/clkin sys_ps7/FCLK_CLK1
 ad_connect  sys_ps7/MDIO_ETHERNET_0 sys_rgmii/MDIO_GEM
 ad_connect  sys_ps7/GMII_ETHERNET_0 sys_rgmii/GMII
 ad_connect  sys_rgmii/MDIO_PHY MDIO_PHY
@@ -212,10 +212,13 @@ create_bd_port -dir I up_txnrx
 # ad9361 core(s)
 
 ad_ip_instance axi_ad9361 axi_ad9361
-ad_ip_parameter axi_ad9361 CONFIG.ID 0
-ad_ip_parameter axi_ad9361 CONFIG.CMOS_OR_LVDS_N 1
-ad_ip_parameter axi_ad9361 CONFIG.MODE_1R1T 0
-ad_ip_parameter axi_ad9361 CONFIG.ADC_INIT_DELAY 21
+ad_ip_parameter axi_ad9361 CONFIG.ID                        0
+ad_ip_parameter axi_ad9361 CONFIG.CMOS_OR_LVDS_N            1
+ad_ip_parameter axi_ad9361 CONFIG.MODE_1R1T                 1
+ad_ip_parameter axi_ad9361 CONFIG.ADC_INIT_DELAY            21
+#TODO: IQ correction necessary?
+ad_ip_parameter axi_ad9361 CONFIG.DAC_IQCORRECTION_DISABLE  0
+ad_ip_parameter axi_ad9361 CONFIG.DAC_DDS_DISABLE           1
 
 ad_ip_instance axi_dmac axi_ad9361_dac_dma
 ad_ip_parameter axi_ad9361_dac_dma CONFIG.DMA_TYPE_SRC 0
@@ -225,11 +228,6 @@ ad_ip_parameter axi_ad9361_dac_dma CONFIG.AXI_SLICE_SRC 0
 ad_ip_parameter axi_ad9361_dac_dma CONFIG.AXI_SLICE_DEST 0
 ad_ip_parameter axi_ad9361_dac_dma CONFIG.DMA_2D_TRANSFER 0
 ad_ip_parameter axi_ad9361_dac_dma CONFIG.DMA_DATA_WIDTH_DEST 64
-
-ad_add_interpolation_filter "tx_fir_interpolator" 8 2 1 {61.44} {7.68} \
-                             "$ad_hdl_dir/library/util_fir_int/coefile_int.coe"
-ad_ip_instance xlslice interp_slice
-ad_ip_instance util_upack2 tx_upack
 
 ad_ip_instance axi_dmac axi_ad9361_adc_dma
 ad_ip_parameter axi_ad9361_adc_dma CONFIG.DMA_TYPE_SRC 2
@@ -291,40 +289,15 @@ ad_connect axi_ad9361_adc_dma/fifo_wr cpack/packed_fifo_wr
 ad_connect axi_ad9361/up_adc_gpio_out decim_slice/Din
 ad_connect rx_fir_decimator/active decim_slice/Dout
 
-ad_connect axi_ad9361/l_clk tx_fir_interpolator/aclk
-
-ad_connect axi_ad9361/dac_enable_i0 tx_fir_interpolator/dac_enable_0
-ad_connect axi_ad9361/dac_valid_i0 tx_fir_interpolator/dac_valid_0
-ad_connect axi_ad9361/dac_data_i0 tx_fir_interpolator/data_out_0
-ad_connect axi_ad9361/dac_enable_q0 tx_fir_interpolator/dac_enable_1
-ad_connect axi_ad9361/dac_valid_q0 tx_fir_interpolator/dac_valid_1
-ad_connect axi_ad9361/dac_data_q0 tx_fir_interpolator/data_out_1
-
-ad_connect  axi_ad9361/l_clk tx_upack/clk
-
-ad_connect  tx_upack/fifo_rd_data_0  tx_fir_interpolator/data_in_0
-ad_connect  tx_upack/enable_0  tx_fir_interpolator/enable_out_0
-ad_connect  tx_upack/fifo_rd_data_1  tx_fir_interpolator/data_in_1
-ad_connect  tx_upack/enable_1  tx_fir_interpolator/enable_out_1
-
-ad_connect axi_ad9361/dac_enable_i1 tx_upack/enable_2
-ad_connect axi_ad9361/dac_data_i1 tx_upack/fifo_rd_data_2
-ad_connect axi_ad9361/dac_enable_q1 tx_upack/enable_3
-ad_connect axi_ad9361/dac_data_q1 tx_upack/fifo_rd_data_3
-
-ad_connect tx_upack/s_axis  axi_ad9361_dac_dma/m_axis
+#TODO
+ad_connect axi_ad9361/dac_data_i0 GND
+ad_connect axi_ad9361/dac_data_q0 GND
+ad_connect axi_ad9361/dac_data_i1 GND
+ad_connect axi_ad9361/dac_data_q1 GND
 
 ad_ip_instance util_vector_logic logic_or [list \
   C_OPERATION {or} \
   C_SIZE 1]
-
-ad_connect  logic_or/Op1  tx_fir_interpolator/valid_out_0
-ad_connect  logic_or/Op2  axi_ad9361/dac_valid_i1
-ad_connect  logic_or/Res  tx_upack/fifo_rd_en
-ad_connect  tx_upack/fifo_rd_underflow axi_ad9361/dac_dunf
-
-ad_connect axi_ad9361/up_dac_gpio_out interp_slice/Din
-ad_connect  tx_fir_interpolator/active interp_slice/Dout
 
 ad_connect  axi_ad9361/l_clk axi_ad9361_adc_dma/fifo_wr_clk
 ad_connect  axi_ad9361/l_clk axi_ad9361_dac_dma/m_axis_aclk
@@ -362,10 +335,6 @@ ad_connect axi_ad9361/l_clk axi_tdd_0/clk
 ad_connect axi_tdd_0/sync_in tdd_ext_sync
 ad_connect axi_tdd_0/tdd_channel_0 txdata_o
 ad_connect axi_tdd_0/tdd_channel_1 axi_ad9361_adc_dma/sync
-
-ad_connect  logic_or_1/Op1  axi_ad9361/rst
-ad_connect  logic_or_1/Op2  axi_tdd_0/tdd_channel_2
-ad_connect  logic_or_1/Res  tx_upack/reset
 
 # interconnects
 
