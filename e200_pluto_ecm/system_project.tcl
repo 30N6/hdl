@@ -10,7 +10,7 @@ adi_project_files e200_pluto_ecm [list \
   "system_top.v" \
   "system_constr.xdc" \
   "$ad_hdl_dir/library/hdl/ecm/xdc/ecm_top.xdc" \
-  "$ad_hdl_dir/library/hdl/eth/xdc/udp_intf.xdc" \
+  "$ad_hdl_dir/library/hdl/udp_intf/xdc/udp_intf.xdc" \
   "$ad_hdl_dir/library/common/ad_iobuf.v"]
 
 set_property is_enabled false [get_files  *system_sys_ps7_0.xdc]

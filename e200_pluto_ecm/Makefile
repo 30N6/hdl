@@ -21,7 +21,7 @@ LIB_DEPS += axi_tdd
 LIB_DEPS += util_pack/util_cpack2
 LIB_DEPS += util_pack/util_upack2
 LIB_DEPS += hdl/esm_clocks
-LIB_DEPS += hdl/eth
+LIB_DEPS += hdl/udp_intf
 LIB_DEPS += hdl/ecm
 
 include ../scripts/project-xilinx.mk
