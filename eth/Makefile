@@ -17,6 +17,6 @@ GENERIC_DEPS += ./hdl/udp_to_axi.vhd
 GENERIC_DEPS += ./hdl/udp_tx.vhd
 GENERIC_DEPS += ./hdl/udp_intf.vhd
 
-XILINX_DEPS += udp_intf.tcl
+XILINX_DEPS += udp_intf_ip.tcl
 
 include ../../scripts/library.mk
