@@ -10,16 +10,16 @@ custom_ip_files udp_intf [list \
   {"../axi/hdl/axis_minififo.vhd"           "axi_lib"}      \
   {"../mem/hdl/ram_sdp.vhd"                 "mem_lib"}      \
   {"../mem/hdl/xpm_fallthrough_fifo.vhd"    "mem_lib"}      \
-  {"./hdl/eth_pkg.vhd"                      "eth_lib"}      \
-  {"./hdl/axi_to_udp.vhd"                   "eth_lib"}      \
-  {"./hdl/ethernet_fcs.vhd"                 "eth_lib"}      \
-  {"./hdl/gmii_arb.vhd"                     "eth_lib"}      \
-  {"./hdl/gmii_buffer.vhd"                  "eth_lib"}      \
-  {"./hdl/mac_1g_tx.vhd"                    "eth_lib"}      \
-  {"./hdl/mac_rx_to_udp.vhd"                "eth_lib"}      \
-  {"./hdl/udp_to_axi.vhd"                   "eth_lib"}      \
-  {"./hdl/udp_tx.vhd"                       "eth_lib"}      \
-  {"./hdl/udp_intf.vhd"                     "eth_lib"}      \
+  {"../eth/hdl/eth_pkg.vhd"                 "eth_lib"}      \
+  {"../eth/hdl/axi_to_udp.vhd"              "eth_lib"}      \
+  {"../eth/hdl/ethernet_fcs.vhd"            "eth_lib"}      \
+  {"../eth/hdl/gmii_arb.vhd"                "eth_lib"}      \
+  {"../eth/hdl/gmii_buffer.vhd"             "eth_lib"}      \
+  {"../eth/hdl/mac_1g_tx.vhd"               "eth_lib"}      \
+  {"../eth/hdl/mac_rx_to_udp.vhd"           "eth_lib"}      \
+  {"../eth/hdl/udp_to_axi.vhd"              "eth_lib"}      \
+  {"../eth/hdl/udp_tx.vhd"                  "eth_lib"}      \
+  {"./hdl/udp_intf.vhd"                     "udp_intf_lib"} \
 ]
 
 adi_ip_properties_lite udp_intf

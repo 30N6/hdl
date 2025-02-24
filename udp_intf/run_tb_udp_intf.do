@@ -2,7 +2,7 @@
 # for each new project. There should be no need to
 # modify the rest of the script.
 
-set tb_lib      eth_lib
+set tb_lib      udp_intf_lib
 set tb_name     udp_intf_tb
 set top_level   $tb_lib.$tb_name
 
@@ -24,15 +24,17 @@ set library_file_list [list \
     ../mem/hdl/ram_sdp.vhd \
     ] \
   eth_lib [list \
-    ./hdl/eth_pkg.vhd \
-    ./hdl/axi_to_udp.vhd \
-    ./hdl/ethernet_fcs.vhd \
-    ./hdl/gmii_arb.vhd \
-    ./hdl/gmii_buffer.vhd \
-    ./hdl/mac_1g_tx.vhd \
-    ./hdl/mac_rx_to_udp.vhd \
-    ./hdl/udp_to_axi.vhd \
-    ./hdl/udp_tx.vhd \
+    ../eth/hdl/eth_pkg.vhd \
+    ../eth/hdl/axi_to_udp.vhd \
+    ../eth/hdl/ethernet_fcs.vhd \
+    ../eth/hdl/gmii_arb.vhd \
+    ../eth/hdl/gmii_buffer.vhd \
+    ../eth/hdl/mac_1g_tx.vhd \
+    ../eth/hdl/mac_rx_to_udp.vhd \
+    ../eth/hdl/udp_to_axi.vhd \
+    ../eth/hdl/udp_tx.vhd \
+    ] \
+  udp_intf_lib [list \
     ./hdl/udp_intf.vhd \
     ./sim/udp_intf_tb.sv \
     ] \
@@ -45,6 +47,7 @@ set incdir_list [list \
   ../common/sim \
   ../axi/hdl \
   ../mem/hdl \
+  ../eth/hdl \
   $xilinx_dir \
 ]
 
