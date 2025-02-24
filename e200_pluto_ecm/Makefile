@@ -4,7 +4,7 @@
 ## Auto-generated, do not modify!
 ####################################################################################
 #vivado2023.2
-PROJECT_NAME := e200
+PROJECT_NAME := e200_pluto_ecm
 
 M_DEPS += ../common/xilinx/adi_fir_filter_constr.xdc
 M_DEPS += ../common/xilinx/adi_fir_filter_bd.tcl
@@ -20,6 +20,8 @@ LIB_DEPS += axi_dmac
 LIB_DEPS += axi_tdd
 LIB_DEPS += util_pack/util_cpack2
 LIB_DEPS += util_pack/util_upack2
-
+LIB_DEPS += hdl/esm_clocks
+LIB_DEPS += hdl/udp_intf
+LIB_DEPS += hdl/ecm
 
 include ../scripts/project-xilinx.mk
