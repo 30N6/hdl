@@ -29,7 +29,6 @@ port (
   Output_valid    : out std_logic;
   Output_last     : out std_logic;
   Output_ready    : in  std_logic
-
 );
 begin
   -- PSL default clock is rising_edge(Clk);

@@ -1,0 +1,319 @@
+library ieee;
+  use ieee.std_logic_1164.all;
+  use ieee.numeric_std.all;
+
+library common_lib;
+  use common_lib.common_pkg.all;
+
+library axi_lib;
+
+library mem_lib;
+
+library eth_lib;
+  use eth_lib.eth_pkg.all;
+
+entity udp_intf is
+generic (
+  AXI_DATA_WIDTH    : natural;
+  OUTPUT_FIFO_DEPTH : natural;
+  UDP_FILTER_PORT   : unsigned(15 downto 0)
+);
+port (
+  Clk_gmii_rx           : in  std_logic;
+  Clk_gmii_tx           : in  std_logic;
+  Rst_gmii_rx           : in  std_logic;
+  Rst_gmii_tx           : in  std_logic;
+
+  Udp_tx_header_wr_en   : in  std_logic;
+  Udp_tx_header_wr_addr : in  unsigned(ETH_IP_UDP_HEADER_ADDR_WIDTH - 1 downto 0);
+  Udp_tx_header_wr_data : in  std_logic_vector(31 downto 0);
+  Mac_tx_src_mac        : in  std_logic_vector(47 downto 0);
+  Mac_tx_dst_mac        : in  std_logic_vector(47 downto 0);
+
+  Ps_gmii_rx_clk        : out std_logic;
+  Ps_gmii_tx_clk        : out std_logic;
+  Ps_gmii_col           : out std_logic;
+  Ps_gmii_crs           : out std_logic;
+  Ps_gmii_rx_dv         : out std_logic;
+  Ps_gmii_rx_er         : out std_logic;
+  Ps_gmii_rxd           : out std_logic_vector(7 downto 0);
+  Ps_gmii_tx_en         : in  std_logic;
+  Ps_gmii_tx_er         : in  std_logic;
+  Ps_gmii_txd           : in  std_logic_vector(7 downto 0);
+
+  Hw_gmii_col           : in  std_logic;
+  Hw_gmii_crs           : in  std_logic;
+  Hw_gmii_rx_dv         : in  std_logic;
+  Hw_gmii_rx_er         : in  std_logic;
+  Hw_gmii_rxd           : in  std_logic_vector(7 downto 0);
+  Hw_gmii_tx_en         : out std_logic;
+  Hw_gmii_tx_er         : out std_logic;
+  Hw_gmii_txd           : out std_logic_vector(7 downto 0);
+
+  S_axis_valid          : in  std_logic;
+  S_axis_data           : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  S_axis_last           : in  std_logic;
+  S_axis_ready          : out std_logic
+
+  M_axis_valid          : out std_logic;
+  M_axis_data           : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  M_axis_last           : out std_logic;
+  M_axis_ready          : in  std_logic
+);
+end entity udp_intf;
+
+architecture rtl of udp_intf is
+
+  constant TX_AXI_TO_UDP_DATA_DEPTH   : natural := 4096;
+  constant TX_AXI_TO_UDP_FRAME_DEPTH  : natural := 64;
+  constant TX_BUFFER_DATA_DEPTH       : natural := 4096;
+  constant TX_BUFFER_FRAME_DEPTH      : natural := 64;
+  constant RX_TO_UDP_DATA_DEPTH       : natural := 2048;
+  constant RX_TO_UDP_FRAME_DEPTH      : natural := 32;
+  constant RX_UDP_TO_AXI_FIFO_DEPTH   : natural := 32;
+
+  signal r_rst_gmii_rx                : std_logic;
+  signal r_rst_gmii_tx                : std_logic;
+
+  signal r_udp_tx_header_wr_en        : std_logic;
+  signal r_udp_tx_header_wr_addr      : unsigned(ETH_IP_UDP_HEADER_ADDR_WIDTH - 1 downto 0);
+  signal r_udp_tx_header_wr_data      : std_logic_vector(31 downto 0);
+  signal r_mac_tx_src_mac             : std_logic_vector(47 downto 0);
+  signal r_mac_tx_dst_mac             : std_logic_vector(47 downto 0);
+
+  signal w_from_axi_to_udp_length     : unsigned(ETH_UDP_LENGTH_WIDTH - 1 downto 0);
+  signal w_from_axi_to_udp_data       : std_logic_vector(7 downto 0);
+  signal w_from_axi_to_udp_valid      : std_logic;
+  signal w_from_axi_to_udp_last       : std_logic;
+  signal w_from_axi_to_udp_ready      : std_logic
+
+  signal w_from_udp_tx_payload_data   : std_logic_vector(7 downto 0);
+  signal w_from_udp_tx_payload_valid  : std_logic;
+  signal w_from_udp_tx_payload_last   : std_logic;
+  signal w_from_udp_tx_payload_ready  : std_logic
+
+  signal w_to_tx_buffer_accepted      : std_logic;
+  signal w_to_tx_buffer_dropped       : std_logic;
+  signal w_from_tx_buffer_data        : std_logic_vector(7 downto 0);
+  signal w_from_tx_buffer_valid       : std_logic;
+  signal w_from_tx_buffer_last        : std_logic;
+  signal w_from_tx_buffer_ready       : std_logic;
+
+  signal w_gmii_to_arb_data           : std_logic_vector_array_t(1 downto 0)(7 downto 0);
+  signal w_gmii_to_arb_valid          : std_logic_vector(1 downto 0);
+  signal w_gmii_to_arb_last           : std_logic_vector(1 downto 0);
+  signal w_gmii_to_arb_ready          : std_logic_vector(1 downto 0);
+  signal w_gmii_from_arb_data         : std_logic_vector(7 downto 0);
+  signal w_gmii_from_arb_valid        : std_logic;
+  signal w_gmii_from_arb_last         : std_logic; --unused
+
+  signal w_rx_to_udp_accepted         : std_logic;
+  signal w_from_rx_to_udp_data        : std_logic_vector(7 downto 0);
+  signal w_from_rx_to_udp_valid       : std_logic;
+  signal w_from_rx_to_udp_last        : std_logic;
+  signal w_from_rx_to_udp_ready       : std_logic;
+
+  signal w_m_axis_valid               : std_logic;
+  signal w_m_axis_data                : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_m_axis_last                : std_logic;
+  signal w_m_axis_ready               : std_logic
+
+begin
+
+  assert (AXI_DATA_WIDTH = 32)
+    report "Unexpected AXI_DATA_WIDTH"
+    severity failure;
+
+  process(Clk_gmii_rx)
+  begin
+    if rising_edge(Clk_gmii_rx) then
+      r_rst_gmii_rx <= Rst_gmii_rx;
+    end if;
+  end process;
+
+  process(Clk_gmii_tx)
+  begin
+    if rising_edge(Clk_gmii_tx) then
+      r_rst_gmii_tx           <= Rst_gmii_tx;
+      r_udp_tx_header_wr_en   <= Udp_tx_header_wr_en;
+      r_udp_tx_header_wr_addr <= Udp_tx_header_wr_addr;
+      r_udp_tx_header_wr_data <= Udp_tx_header_wr_data;
+      r_mac_tx_src_mac        <= Mac_tx_src_mac;
+      r_mac_tx_dst_mac        <= Mac_tx_dst_mac;
+    end if;
+  end process;
+
+  i_tx_axi_to_udp : entity eth_lib.axi_to_udp
+  generic map (
+    AXI_DATA_WIDTH    => AXI_DATA_WIDTH,
+    DATA_FIFO_DEPTH   => TX_AXI_TO_UDP_DATA_DEPTH,
+    FRAME_FIFO_DEPTH  => TX_AXI_TO_UDP_FRAME_DEPTH
+  )
+  port map (
+    Clk           => Clk_gmii_tx,
+    Rst           => r_rst_gmii_tx,
+
+    S_axis_valid  => S_axis_valid,
+    S_axis_data   => S_axis_data,
+    S_axis_last   => S_axis_last,
+    S_axis_ready  => S_axis_ready,
+
+    Udp_length    => w_from_axi_to_udp_length,
+    Udp_data      => w_from_axi_to_udp_data,
+    Udp_valid     => w_from_axi_to_udp_valid,
+    Udp_last      => w_from_axi_to_udp_last,
+    Udp_ready     => w_from_axi_to_udp_ready
+  );
+
+  i_tx_udp_tx : entity eth_lib.udp_tx
+  port map (
+    Clk               => Clk_gmii_tx,
+    Rst               => r_rst_gmii_tx,
+
+    Header_wr_en      => r_udp_tx_header_wr_en,
+    Header_wr_addr    => r_udp_tx_header_wr_addr,
+    Header_wr_data    => r_udp_tx_header_wr_data,
+
+    Udp_length        => w_from_axi_to_udp_length
+    Udp_data          => w_from_axi_to_udp_data,
+    Udp_valid         => w_from_axi_to_udp_valid,
+    Udp_last          => w_from_axi_to_udp_last,
+    Udp_ready         => w_from_axi_to_udp_ready,
+
+    Mac_payload_data  => w_from_udp_tx_payload_data,
+    Mac_payload_valid => w_from_udp_tx_payload_valid,
+    Mac_payload_last  => w_from_udp_tx_payload_last,
+    Mac_payload_ready => w_from_udp_tx_payload_ready
+  );
+
+  i_tx_mac : entity eth_lib.mac_1g_tx
+  port map (
+    Clk           => Clk_gmii_tx,
+    Rst           => r_rst_gmii_tx,
+
+    Source_mac    => r_mac_tx_src_mac,
+    Dest_mac      => r_mac_tx_dst_mac,
+
+    Payload_data  => w_from_udp_tx_payload_data,
+    Payload_valid => w_from_udp_tx_payload_valid,
+    Payload_last  => w_from_udp_tx_payload_last,
+    Payload_ready => w_from_udp_tx_payload_ready,
+
+    Mac_data      => w_from_mac_data,
+    Mac_valid     => w_from_mac_valid,
+    Mac_last      => w_from_mac_last,
+    Mac_ready     => w_from_mac_ready
+  );
+
+  w_gmii_to_arb_data(0)   <= w_from_mac_data;
+  w_gmii_to_arb_valid(0)  <= w_from_mac_valid;
+  w_gmii_to_arb_last(0)   <= w_from_mac_last;
+  w_from_mac_ready        <= w_gmii_to_arb_ready(0);
+
+  i_tx_buffer : entity eth_lib.gmii_buffer
+  generic map (
+    DATA_DEPTH    => TX_BUFFER_DATA_DEPTH,
+    FRAME_DEPTH   => TX_BUFFER_FRAME_DEPTH
+  )
+  port map (
+    Clk             => Clk_gmii_tx,
+    Rst             => r_rst_gmii_tx,
+
+    Input_data      => Ps_gmii_txd,
+    Input_valid     => Ps_gmii_tx_en,
+    Input_error     => Ps_gmii_tx_er,
+    Input_accepted  => w_to_tx_buffer_accepted,
+    Input_dropped   => w_to_tx_buffer_dropped,
+
+    Output_data     => w_from_tx_buffer_data,
+    Output_valid    => w_from_tx_buffer_valid,
+    Output_last     => w_from_tx_buffer_last,
+    Output_ready    => w_from_tx_buffer_ready
+  );
+
+  w_gmii_to_arb_data(1)   <= w_from_tx_buffer_data;
+  w_gmii_to_arb_valid(1)  <= w_from_tx_buffer_valid;
+  w_gmii_to_arb_last(1)   <= w_from_tx_buffer_last;
+  w_from_tx_buffer_ready  <= w_gmii_to_arb_ready(1);
+
+  i_tx_arb : entity eth_lib.gmii_arb
+  generic map (
+    NUM_INPUTS      => 2,
+    INTERFRAME_GAP  => ETH_IFG_LENGTH + 1
+  )
+  port map (
+    Clk           => Clk_gmii_tx,
+    Rst           => r_rst_gmii_tx,
+
+    Input_data    => w_gmii_to_arb_data,
+    Input_valid   => w_gmii_to_arb_valid,
+    Input_last    => w_gmii_to_arb_last,
+    Input_ready   => w_gmii_to_arb_ready,
+
+    Output_data   => w_gmii_from_arb_data,
+    Output_valid  => w_gmii_from_arb_valid,
+    Output_last   => w_gmii_from_arb_last
+  );
+
+  ------- RX -------
+
+  i_rx_to_udp : entity eth_lib.mac_rx_to_udp
+  generic map (
+    INPUT_BUFFER_DATA_DEPTH   => RX_TO_UDP_DATA_DEPTH,
+    INPUT_BUFFER_FRAME_DEPTH  => RX_TO_UDP_FRAME_DEPTH
+  )
+  port map (
+    Clk             => Clk_gmii_rx,
+    Rst             => r_rst_gmii_rx,
+
+    Udp_filter_port => UDP_FILTER_PORT,
+
+    Mac_data        => Hw_gmii_rxd,
+    Mac_valid       => Hw_gmii_rx_dv,
+    Mac_error       => Hw_gmii_rx_er,
+    Mac_accepted    => w_rx_to_udp_accepted,
+
+    Udp_data        => w_from_rx_to_udp_data,
+    Udp_valid       => w_from_rx_to_udp_valid,
+    Udp_last        => w_from_rx_to_udp_last,
+    Udp_ready       => w_from_rx_to_udp_ready
+  );
+
+  i_rx_udp_to_axi : entity eth_lib.udp_to_axi
+  generic map (
+    AXI_DATA_WIDTH    => AXI_DATA_WIDTH,
+    OUTPUT_FIFO_DEPTH => RX_UDP_TO_AXI_FIFO_DEPTH
+  )
+  port map (
+    Clk           => Clk_gmii_rx,
+    Rst           => r_rst_gmii_rx,
+
+    Udp_data      => w_from_rx_to_udp_data,
+    Udp_valid     => w_from_rx_to_udp_valid,
+    Udp_last      => w_from_rx_to_udp_last,
+    Udp_ready     => w_from_rx_to_udp_ready,
+
+    M_axis_valid  => w_m_axis_valid,
+    M_axis_data   => w_m_axis_data,
+    M_axis_last   => w_m_axis_last,
+    M_axis_ready  => w_m_axis_ready
+  );
+
+  M_axis_valid  <= w_m_axis_valid;
+  M_axis_data   <= w_m_axis_data;
+  M_axis_last   <= w_m_axis_last;
+  M_axis_ready  <= w_m_axis_ready;
+
+
+  Ps_gmii_rx_clk  <= Clk_gmii_rx;
+  Ps_gmii_tx_clk  <= Clk_gmii_tx;
+  Ps_gmii_col     <= Hw_gmii_col;
+  Ps_gmii_crs     <= Hw_gmii_crs;
+  Ps_gmii_rx_dv   <= Hw_gmii_rx_dv;
+  Ps_gmii_rx_er   <= Hw_gmii_rx_er;
+  Ps_gmii_rxd     <= Hw_gmii_rxd;
+  Hw_gmii_tx_en   <= Ps_gmii_tx_en;
+  Hw_gmii_tx_er   <= Ps_gmii_tx_er;
+  Hw_gmii_txd     <= Ps_gmii_txd;
+
+end architecture rtl;
