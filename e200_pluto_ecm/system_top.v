@@ -124,7 +124,7 @@ module system_top (
   wire            pl_txdata;
 
   wire    [3:0]   w_ad9361_ctl;
-  wire    [7:0]   w_ad9361_status;
+  wire    [7:0]   w_ad9361_status = '1;
 
   // instantiations
 
