@@ -376,7 +376,9 @@ ad_connect ecm_clocks/Adc_rst   axi_ad9361/rst
 
 
 ad_ip_instance udp_intf udp_intf
-ad_ip_parameter udp_intf  CONFIG.UDP_FILTER_PORT   65200
+ad_ip_parameter udp_intf  CONFIG.UDP_FILTER_PORT    65200
+ad_ip_parameter udp_intf  CONFIG.AXI_DATA_WIDTH     32
+ad_ip_parameter udp_intf  CONFIG.OUTPUT_FIFO_DEPTH  1024
 
 #ad_connect udp_intf/Clk_gmii_rx             sys_rgmii/gmii_rx_clk
 #ad_connect udp_intf/Clk_gmii_tx             sys_rgmii/gmii_tx_clk
