@@ -19,10 +19,7 @@ generic (
   UDP_FILTER_PORT   : natural
 );
 port (
-  Clk_gmii_rx           : in  std_logic;
-  Clk_gmii_tx           : in  std_logic;
-  Rst_gmii_rx           : in  std_logic;
-  Rst_gmii_tx           : in  std_logic;
+  Sys_rst               : in  std_logic;
 
   Udp_tx_header_wr_en   : in  std_logic;
   Udp_tx_header_wr_addr : in  unsigned(2 downto 0);
@@ -41,6 +38,8 @@ port (
   Ps_gmii_tx_er         : in  std_logic;
   Ps_gmii_txd           : in  std_logic_vector(7 downto 0);
 
+  Hw_gmii_rx_clk        : in  std_logic;
+  Hw_gmii_tx_clk        : in  std_logic;
   Hw_gmii_col           : in  std_logic;
   Hw_gmii_crs           : in  std_logic;
   Hw_gmii_rx_dv         : in  std_logic;
@@ -50,11 +49,14 @@ port (
   Hw_gmii_tx_er         : out std_logic;
   Hw_gmii_txd           : out std_logic_vector(7 downto 0);
 
+  S_axis_clk            : in  std_logic;
+  S_axis_resetn         : in  std_logic;
   S_axis_valid          : in  std_logic;
   S_axis_data           : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   S_axis_last           : in  std_logic;
   S_axis_ready          : out std_logic;
 
+  M_axis_clk            : in  std_logic;
   M_axis_valid          : out std_logic;
   M_axis_data           : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   M_axis_last           : out std_logic;
@@ -64,6 +66,8 @@ end entity udp_intf;
 
 architecture rtl of udp_intf is
 
+  constant SLAVE_FIFO_DEPTH           : natural := 1024;
+  constant MASTER_FIFO_DEPTH          : natural := 1024;
   constant TX_AXI_TO_UDP_DATA_DEPTH   : natural := 4096;
   constant TX_AXI_TO_UDP_FRAME_DEPTH  : natural := 64;
   constant TX_BUFFER_DATA_DEPTH       : natural := 4096;
@@ -71,15 +75,21 @@ architecture rtl of udp_intf is
   constant RX_TO_UDP_DATA_DEPTH       : natural := 2048;
   constant RX_TO_UDP_FRAME_DEPTH      : natural := 32;
   constant RX_UDP_TO_AXI_FIFO_DEPTH   : natural := 32;
+  constant CDC_PIPE_STAGES            : natural := 3;
 
-  signal r_rst_gmii_rx                : std_logic;
-  signal r_rst_gmii_tx                : std_logic;
+  signal r_rst_gmii_rx                : std_logic_vector(CDC_PIPE_STAGES - 1 downto 0);
+  signal r_rst_gmii_tx                : std_logic_vector(CDC_PIPE_STAGES - 1 downto 0);
 
   signal r_udp_tx_header_wr_en        : std_logic;
   signal r_udp_tx_header_wr_addr      : unsigned(ETH_IP_UDP_HEADER_ADDR_WIDTH - 1 downto 0);
   signal r_udp_tx_header_wr_data      : std_logic_vector(31 downto 0);
   signal r_mac_tx_src_mac             : std_logic_vector(47 downto 0);
   signal r_mac_tx_dst_mac             : std_logic_vector(47 downto 0);
+
+  signal w_s_axis_ready               : std_logic;
+  signal w_s_axis_valid               : std_logic;
+  signal w_s_axis_data                : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_s_axis_last                : std_logic;
 
   signal w_from_axi_to_udp_length     : unsigned(ETH_UDP_LENGTH_WIDTH - 1 downto 0);
   signal w_from_axi_to_udp_data       : std_logic_vector(7 downto 0);
@@ -123,6 +133,10 @@ architecture rtl of udp_intf is
   signal w_m_axis_last                : std_logic;
   signal w_m_axis_ready               : std_logic;
 
+  attribute ASYNC_REG                   : string;
+  attribute ASYNC_REG of r_rst_gmii_rx  : signal is "TRUE";
+  attribute ASYNC_REG of r_rst_gmii_tx  : signal is "TRUE";
+
   --TODO: remove
   attribute MARK_DEBUG                          : string;
   attribute DONT_TOUCH                          : string;
@@ -139,17 +153,17 @@ begin
     report "Unexpected AXI_DATA_WIDTH"
     severity failure;
 
-  process(Clk_gmii_rx)
+  process(Hw_gmii_rx_clk)
   begin
-    if rising_edge(Clk_gmii_rx) then
-      r_rst_gmii_rx <= Rst_gmii_rx;
+    if rising_edge(Hw_gmii_rx_clk) then
+      r_rst_gmii_rx <= r_rst_gmii_rx(CDC_PIPE_STAGES - 2 downto 0) & Sys_rst;
     end if;
   end process;
 
-  process(Clk_gmii_tx)
+  process(Hw_gmii_tx_clk)
   begin
-    if rising_edge(Clk_gmii_tx) then
-      r_rst_gmii_tx           <= Rst_gmii_tx;
+    if rising_edge(Hw_gmii_tx_clk) then
+      r_rst_gmii_tx           <= r_rst_gmii_tx(CDC_PIPE_STAGES - 2 downto 0) & Sys_rst;
       r_udp_tx_header_wr_en   <= Udp_tx_header_wr_en;
       r_udp_tx_header_wr_addr <= Udp_tx_header_wr_addr;
       r_udp_tx_header_wr_data <= Udp_tx_header_wr_data;
@@ -158,6 +172,28 @@ begin
     end if;
   end process;
 
+  i_tx_axi_fifo : entity axi_lib.axis_async_fifo
+  generic map (
+    FIFO_DEPTH        => SLAVE_FIFO_DEPTH,
+    ALMOST_FULL_LEVEL => SLAVE_FIFO_DEPTH - 5,
+    AXI_DATA_WIDTH    => AXI_DATA_WIDTH
+  )
+  port map (
+    S_axis_clk          => S_axis_clk,
+    S_axis_resetn       => S_axis_resetn,
+    S_axis_ready        => S_axis_ready,
+    S_axis_valid        => S_axis_valid,
+    S_axis_data         => S_axis_data,
+    S_axis_last         => S_axis_last,
+    S_axis_almost_full  => open,
+
+    M_axis_clk          => Hw_gmii_tx_clk,
+    M_axis_ready        => w_s_axis_ready,
+    M_axis_valid        => w_s_axis_valid,
+    M_axis_data         => w_s_axis_data,
+    M_axis_last         => w_s_axis_last
+  );
+
   i_tx_axi_to_udp : entity eth_lib.axi_to_udp
   generic map (
     AXI_DATA_WIDTH    => AXI_DATA_WIDTH,
@@ -165,13 +201,13 @@ begin
     FRAME_FIFO_DEPTH  => TX_AXI_TO_UDP_FRAME_DEPTH
   )
   port map (
-    Clk           => Clk_gmii_tx,
-    Rst           => r_rst_gmii_tx,
+    Clk           => Hw_gmii_tx_clk,
+    Rst           => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
 
-    S_axis_valid  => S_axis_valid,
-    S_axis_data   => S_axis_data,
-    S_axis_last   => S_axis_last,
-    S_axis_ready  => S_axis_ready,
+    S_axis_valid  => w_s_axis_valid,
+    S_axis_data   => w_s_axis_data,
+    S_axis_last   => w_s_axis_last,
+    S_axis_ready  => w_s_axis_ready,
 
     Udp_length    => w_from_axi_to_udp_length,
     Udp_data      => w_from_axi_to_udp_data,
@@ -182,8 +218,8 @@ begin
 
   i_tx_udp_tx : entity eth_lib.udp_tx
   port map (
-    Clk               => Clk_gmii_tx,
-    Rst               => r_rst_gmii_tx,
+    Clk               => Hw_gmii_tx_clk,
+    Rst               => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
 
     Header_wr_en      => r_udp_tx_header_wr_en,
     Header_wr_addr    => r_udp_tx_header_wr_addr,
@@ -203,8 +239,8 @@ begin
 
   i_tx_mac : entity eth_lib.mac_1g_tx
   port map (
-    Clk           => Clk_gmii_tx,
-    Rst           => r_rst_gmii_tx,
+    Clk           => Hw_gmii_tx_clk,
+    Rst           => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
 
     Source_mac    => r_mac_tx_src_mac,
     Dest_mac      => r_mac_tx_dst_mac,
@@ -231,8 +267,8 @@ begin
     FRAME_DEPTH   => TX_BUFFER_FRAME_DEPTH
   )
   port map (
-    Clk             => Clk_gmii_tx,
-    Rst             => r_rst_gmii_tx,
+    Clk             => Hw_gmii_tx_clk,
+    Rst             => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
 
     Input_data      => Ps_gmii_txd,
     Input_valid     => Ps_gmii_tx_en,
@@ -257,8 +293,8 @@ begin
     INTERFRAME_GAP  => ETH_IFG_LENGTH + 1
   )
   port map (
-    Clk           => Clk_gmii_tx,
-    Rst           => r_rst_gmii_tx,
+    Clk           => Hw_gmii_tx_clk,
+    Rst           => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
 
     Input_data    => w_gmii_to_arb_data,
     Input_valid   => w_gmii_to_arb_valid,
@@ -278,8 +314,8 @@ begin
     INPUT_BUFFER_FRAME_DEPTH  => RX_TO_UDP_FRAME_DEPTH
   )
   port map (
-    Clk             => Clk_gmii_rx,
-    Rst             => r_rst_gmii_rx,
+    Clk             => Hw_gmii_rx_clk,
+    Rst             => r_rst_gmii_rx(CDC_PIPE_STAGES - 1),
 
     Udp_filter_port => to_unsigned(UDP_FILTER_PORT, 16),
 
@@ -300,8 +336,8 @@ begin
     OUTPUT_FIFO_DEPTH => RX_UDP_TO_AXI_FIFO_DEPTH
   )
   port map (
-    Clk           => Clk_gmii_rx,
-    Rst           => r_rst_gmii_rx,
+    Clk           => Hw_gmii_rx_clk,
+    Rst           => r_rst_gmii_rx(CDC_PIPE_STAGES - 1),
 
     Udp_data      => w_from_rx_to_udp_data,
     Udp_valid     => w_from_rx_to_udp_valid,
@@ -314,13 +350,30 @@ begin
     M_axis_ready  => w_m_axis_ready
   );
 
-  M_axis_valid    <= w_m_axis_valid;
-  M_axis_data     <= w_m_axis_data;
-  M_axis_last     <= w_m_axis_last;
-  w_m_axis_ready  <= M_axis_ready;
+  i_rx_axi_fifo : entity axi_lib.axis_async_fifo
+  generic map (
+    FIFO_DEPTH        => MASTER_FIFO_DEPTH,
+    ALMOST_FULL_LEVEL => MASTER_FIFO_DEPTH - 5,
+    AXI_DATA_WIDTH    => AXI_DATA_WIDTH
+  )
+  port map (
+    S_axis_clk          => Hw_gmii_rx_clk,
+    S_axis_resetn       => not(r_rst_gmii_rx(CDC_PIPE_STAGES - 1)),
+    S_axis_ready        => w_m_axis_ready,
+    S_axis_valid        => w_m_axis_valid,
+    S_axis_data         => w_m_axis_data,
+    S_axis_last         => w_m_axis_last,
+    S_axis_almost_full  => open,
 
-  Ps_gmii_rx_clk  <= Clk_gmii_rx;
-  Ps_gmii_tx_clk  <= Clk_gmii_tx;
+    M_axis_clk          => M_axis_clk,
+    M_axis_ready        => M_axis_ready,
+    M_axis_valid        => M_axis_valid,
+    M_axis_data         => M_axis_data,
+    M_axis_last         => M_axis_last
+  );
+
+  Ps_gmii_rx_clk  <= Hw_gmii_rx_clk;
+  Ps_gmii_tx_clk  <= Hw_gmii_tx_clk;
   Ps_gmii_col     <= Hw_gmii_col;
   Ps_gmii_crs     <= Hw_gmii_crs;
   Ps_gmii_rx_dv   <= Hw_gmii_rx_dv;

@@ -36,8 +36,7 @@ adi_add_bus "S_axis" "slave"          \
         {"S_axis_data"  "TDATA"}      \
         {"S_axis_last"  "TLAST"}      \
   ]
-#adi_add_bus_clock "S_axis_clk" "S_axis" "S_axis_resetn"
-adi_add_bus_clock "Clk_gmii_tx" "S_axis"
+adi_add_bus_clock "S_axis_clk" "S_axis" "S_axis_resetn"
 
 adi_add_bus "M_axis" "master"         \
   "xilinx.com:interface:axis_rtl:1.0" \
@@ -47,15 +46,15 @@ adi_add_bus "M_axis" "master"         \
         {"M_axis_data" "TDATA"}       \
         {"M_axis_last" "TLAST"}       \
   ]
-#adi_add_bus_clock "M_axis_clk" "M_axis" "M_axis_resetn"
-adi_add_bus_clock "Clk_gmii_rx" "M_axis"
+#no m_axis reset
+adi_add_bus_clock "M_axis_clk" "M_axis"
 
 #ipx::infer_bus_interface Adc_clk xilinx.com:signal:clock_rtl:1.0 $cc
 #set reset_intf      [ipx::infer_bus_interface Adc_rst xilinx.com:signal:reset_rtl:1.0 $cc]
 #set reset_polarity  [ipx::add_bus_parameter "POLARITY" $reset_intf]
 #set_property value "ACTIVE_HIGH" $reset_polarity
 
-ipx::infer_bus_interface {Clk_gmii_tx Hw_gmii_txd Hw_gmii_tx_en Hw_gmii_tx_er Hw_gmii_crs Hw_gmii_col Clk_gmii_rx Hw_gmii_rxd Hw_gmii_rx_dv Hw_gmii_rx_er} xilinx.com:interface:gmii_rtl:1.0 [ipx::current_core]
+ipx::infer_bus_interface {Hw_gmii_tx_clk Hw_gmii_txd Hw_gmii_tx_en Hw_gmii_tx_er Hw_gmii_crs Hw_gmii_col Hw_gmii_rx_clk Hw_gmii_rxd Hw_gmii_rx_dv Hw_gmii_rx_er} xilinx.com:interface:gmii_rtl:1.0 [ipx::current_core]
 ipx::infer_bus_interface {Ps_gmii_tx_clk Ps_gmii_txd Ps_gmii_tx_en Ps_gmii_tx_er Ps_gmii_crs Ps_gmii_col Ps_gmii_rx_clk Ps_gmii_rxd Ps_gmii_rx_dv Ps_gmii_rx_er} xilinx.com:interface:gmii_rtl:1.0 [ipx::current_core]
 
 ipx::save_core $cc

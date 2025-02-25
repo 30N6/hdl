@@ -378,10 +378,15 @@ ad_connect ecm_clocks/Adc_rst   axi_ad9361/rst
 ad_ip_instance udp_intf udp_intf
 ad_ip_parameter udp_intf  CONFIG.UDP_FILTER_PORT   65200
 
-ad_connect udp_intf/Clk_gmii_rx             sys_rgmii/gmii_rx_clk
-ad_connect udp_intf/Clk_gmii_tx             sys_rgmii/gmii_tx_clk
-ad_connect udp_intf/Rst_gmii_rx             axi_ad9361/rst
-ad_connect udp_intf/Rst_gmii_tx             axi_ad9361/rst
+#ad_connect udp_intf/Clk_gmii_rx             sys_rgmii/gmii_rx_clk
+#ad_connect udp_intf/Clk_gmii_tx             sys_rgmii/gmii_tx_clk
+#ad_connect udp_intf/Rst_gmii_rx             axi_ad9361/rst
+#ad_connect udp_intf/Rst_gmii_tx             axi_ad9361/rst
+ad_connect udp_intf/Sys_rst                 sys_cpu_reset
 ad_connect udp_intf/Hw_gmii                 sys_rgmii/GMII
 ad_connect udp_intf/Ps_gmii                 sys_ps7/GMII_ETHERNET_0
-#ad_connect udp_intf/m_axis_aclk   axi_ad9361/l_clk
+ad_connect udp_intf/S_axis_clk              sys_cpu_clk
+ad_connect udp_intf/S_axis_resetn           sys_cpu_resetn
+ad_connect udp_intf/M_axis_clk              sys_cpu_clk
+
+#TODO: separate axi clocks

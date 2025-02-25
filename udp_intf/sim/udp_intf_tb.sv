@@ -98,10 +98,7 @@ module udp_intf_tb;
 
   udp_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH), .OUTPUT_FIFO_DEPTH(OUTPUT_FIFO_DEPTH), .UDP_FILTER_PORT(UDP_FILTER_PORT)) dut
   (
-    .Clk_gmii_rx            (Clk),
-    .Clk_gmii_tx            (Clk),
-    .Rst_gmii_rx            (Rst),
-    .Rst_gmii_tx            (Rst),
+    .Sys_rst                (Rst),
 
     .Udp_tx_header_wr_en    (1'b0),
     .Udp_tx_header_wr_addr  (),
@@ -120,6 +117,8 @@ module udp_intf_tb;
     .Ps_gmii_tx_er          (1'b0),
     .Ps_gmii_txd            (8'h0),
 
+    .Hw_gmii_rx_clk         (Clk),
+    .Hw_gmii_tx_clk         (Clk),
     .Hw_gmii_col            (1'b0),
     .Hw_gmii_crs            (1'b0),
     .Hw_gmii_rx_dv          (1'b0),
@@ -129,11 +128,14 @@ module udp_intf_tb;
     .Hw_gmii_tx_er          (),
     .Hw_gmii_txd            (),
 
+    .S_axis_clk             (Clk),
+    .S_axis_resetn          (!Rst),
     .S_axis_valid           (tx_axi_intf.valid),
     .S_axis_data            (tx_axi_intf.data),
     .S_axis_last            (tx_axi_intf.last),
     .S_axis_ready           (tx_axi_intf.ready),
 
+    .M_axis_clk             (Clk),
     .M_axis_valid           (w_axi_rx_valid),
     .M_axis_data            (rx_intf.data),
     .M_axis_last            (rx_intf.last),
