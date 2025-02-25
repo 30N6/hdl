@@ -98,6 +98,7 @@ module udp_intf_tb;
 
   udp_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH), .OUTPUT_FIFO_DEPTH(OUTPUT_FIFO_DEPTH), .UDP_FILTER_PORT(UDP_FILTER_PORT)) dut
   (
+    .Sys_clk        (Clk),
     .Sys_rst        (Rst),
 
     .Ps_gmii_rx_clk (),

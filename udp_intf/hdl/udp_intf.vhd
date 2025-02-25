@@ -21,6 +21,7 @@ generic (
   UDP_FILTER_PORT   : natural
 );
 port (
+  Sys_clk         : in  std_logic;
   Sys_rst         : in  std_logic;
 
   Ps_gmii_rx_clk  : out std_logic;
@@ -73,6 +74,7 @@ architecture rtl of udp_intf is
   constant RX_UDP_TO_AXI_FIFO_DEPTH   : natural := 32;
   constant CDC_PIPE_STAGES            : natural := 3;
 
+  signal r_sys_rst                    : std_logic;
   signal r_rst_gmii_rx                : std_logic_vector(CDC_PIPE_STAGES - 1 downto 0);
   signal r_rst_gmii_tx                : std_logic_vector(CDC_PIPE_STAGES - 1 downto 0);
 
@@ -147,17 +149,24 @@ begin
     report "Unexpected AXI_DATA_WIDTH"
     severity failure;
 
+  process(Sys_clk)
+  begin
+    if rising_edge(Sys_clk) then
+      r_sys_rst <= Sys_rst;
+    end if;
+  end process;
+
   process(Hw_gmii_rx_clk)
   begin
     if rising_edge(Hw_gmii_rx_clk) then
-      r_rst_gmii_rx <= r_rst_gmii_rx(CDC_PIPE_STAGES - 2 downto 0) & Sys_rst;
+      r_rst_gmii_rx <= r_rst_gmii_rx(CDC_PIPE_STAGES - 2 downto 0) & r_sys_rst;
     end if;
   end process;
 
   process(Hw_gmii_tx_clk)
   begin
     if rising_edge(Hw_gmii_tx_clk) then
-      r_rst_gmii_tx <= r_rst_gmii_tx(CDC_PIPE_STAGES - 2 downto 0) & Sys_rst;
+      r_rst_gmii_tx <= r_rst_gmii_tx(CDC_PIPE_STAGES - 2 downto 0) & r_sys_rst;
     end if;
   end process;
 

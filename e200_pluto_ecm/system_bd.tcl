@@ -378,6 +378,7 @@ ad_ip_parameter udp_intf  CONFIG.UDP_FILTER_PORT    65200
 ad_ip_parameter udp_intf  CONFIG.AXI_DATA_WIDTH     32
 ad_ip_parameter udp_intf  CONFIG.OUTPUT_FIFO_DEPTH  1024
 
+ad_connect udp_intf/Sys_clk       sys_cpu_clk
 ad_connect udp_intf/Sys_rst       sys_cpu_reset
 ad_connect udp_intf/Hw_gmii       sys_rgmii/GMII
 ad_connect udp_intf/Ps_gmii       sys_ps7/GMII_ETHERNET_0
