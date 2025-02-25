@@ -50,6 +50,7 @@ architecture rtl of udp_tx is
   signal r_header_wr_en                   : std_logic;
   signal r_header_wr_addr                 : unsigned(ETH_TX_HEADER_ADDR_WIDTH - 1 downto 0);
   signal r_header_wr_data                 : std_logic_vector(31 downto 0);
+  signal r_header_valid                   : std_logic;
 
   signal w_input_wr_data                  : std_logic_vector(INPUT_FIFO_WIDTH - 1 downto 0);
   signal w_input_rd_data                  : std_logic_vector(INPUT_FIFO_WIDTH - 1 downto 0);
@@ -107,6 +108,19 @@ begin
     end if;
   end process;
 
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (r_rst = '1') then
+        r_header_valid <= '0';
+      else
+        if ((r_header_wr_en = '1') and (r_header_wr_addr = (ETH_TX_HEADER_WORD_LENGTH - 1))) then
+          r_header_valid <= '1';
+        end if;
+      end if;
+    end if;
+  end process;
+
   w_input_wr_data <= std_logic_vector(Udp_length) & Udp_data;
   w_input_ready   <= not(w_output_fifo_almost_full) and to_stdlogic(s_state = S_PAYLOAD);
 
@@ -141,7 +155,7 @@ begin
         if (w_output_fifo_almost_full = '0') then
           case s_state is
           when S_IDLE =>
-            if (w_input_valid = '1') then
+            if ((w_input_valid = '1') and (r_header_valid = '1')) then
               s_state <= S_HEADER;
             else
               s_state <= S_IDLE;

@@ -30,8 +30,8 @@ package eth_pkg is
   constant ETH_FCS_LENGTH                 : natural := 4;
   constant ETH_IFG_LENGTH                 : natural := 12;
 
-  constant ETH_PREAMBLE_BYTE              : std_logic_vector(7 downto 0)  := x"AA"; --TODO: swap?
-  constant ETH_SFD_BYTE                   : std_logic_vector(7 downto 0)  := x"AB"; --TODO: swap?
+  constant ETH_PREAMBLE_BYTE              : std_logic_vector(7 downto 0)  := x"55";
+  constant ETH_SFD_BYTE                   : std_logic_vector(7 downto 0)  := x"D5";
   constant ETH_TYPE_IP                    : std_logic_vector(15 downto 0) := x"0008";
   constant ETH_IP_VER_IHL                 : std_logic_vector(7 downto 0)  := x"45";
   constant ETH_IP_PROTO_UDP               : std_logic_vector(7 downto 0)  := x"11";

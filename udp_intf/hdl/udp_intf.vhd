@@ -13,12 +13,12 @@ library eth_lib;
   use eth_lib.eth_pkg.all;
 
 library udp_intf_lib;
+  use udp_intf_lib.udp_intf_pkg.all;
 
 entity udp_intf is
 generic (
   AXI_DATA_WIDTH    : natural;
-  OUTPUT_FIFO_DEPTH : natural;
-  UDP_FILTER_PORT   : natural
+  OUTPUT_FIFO_DEPTH : natural
 );
 port (
   Sys_clk         : in  std_logic;
@@ -336,7 +336,7 @@ begin
     Clk             => Hw_gmii_rx_clk,
     Rst             => r_rst_gmii_rx(CDC_PIPE_STAGES - 1),
 
-    Udp_filter_port => to_unsigned(UDP_FILTER_PORT, 16),
+    Udp_filter_port => UDP_FILTER_PORT,
 
     Mac_data        => Hw_gmii_rxd,
     Mac_valid       => Hw_gmii_rx_dv,

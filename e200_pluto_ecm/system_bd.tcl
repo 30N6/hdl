@@ -374,7 +374,6 @@ ad_ip_parameter ecm_top   CONFIG.AXI_DATA_WIDTH     32
 ad_ip_parameter ecm_top   CONFIG.ADC_WIDTH          16
 ad_ip_parameter ecm_top   CONFIG.DAC_WIDTH          16
 ad_ip_parameter ecm_top   CONFIG.IQ_WIDTH           12
-ad_ip_parameter udp_intf  CONFIG.UDP_FILTER_PORT    65200
 ad_ip_parameter udp_intf  CONFIG.AXI_DATA_WIDTH     32
 ad_ip_parameter udp_intf  CONFIG.OUTPUT_FIFO_DEPTH  1024
 

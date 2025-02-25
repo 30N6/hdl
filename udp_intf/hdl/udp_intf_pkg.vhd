@@ -7,8 +7,10 @@ library common_lib;
 
 package udp_intf_pkg is
 
-  constant UDP_SETUP_MAGIC_NUM_0  : std_logic_vector(31 downto 0) := x"53504455";
-  constant UDP_SETUP_MAGIC_NUM_1  : std_logic_vector(31 downto 0) := x"50555445";
+  constant UDP_FILTER_PORT        : unsigned(15 downto 0) := to_unsigned(65200, 16);
+
+  constant UDP_SETUP_MAGIC_NUM_0  : std_logic_vector(31 downto 0) := x"55445053"; --x"53504455";
+  constant UDP_SETUP_MAGIC_NUM_1  : std_logic_vector(31 downto 0) := x"45545550"; --x"50555445";
 
 end package udp_intf_pkg;
 
