@@ -19,6 +19,8 @@ custom_ip_files udp_intf [list \
   {"../eth/hdl/mac_rx_to_udp.vhd"           "eth_lib"}      \
   {"../eth/hdl/udp_to_axi.vhd"              "eth_lib"}      \
   {"../eth/hdl/udp_tx.vhd"                  "eth_lib"}      \
+  {"./hdl/udp_intf_pkg.vhd"                 "udp_intf_lib"} \
+  {"./hdl/udp_setup.vhd"                    "udp_intf_lib"} \
   {"./hdl/udp_intf.vhd"                     "udp_intf_lib"} \
 ]
 

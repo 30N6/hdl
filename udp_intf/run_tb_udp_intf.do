@@ -35,6 +35,8 @@ set library_file_list [list \
     ../eth/hdl/udp_tx.vhd \
     ] \
   udp_intf_lib [list \
+    ./hdl/udp_intf_pkg.vhd \
+    ./hdl/udp_setup.vhd \
     ./hdl/udp_intf.vhd \
     ./sim/udp_intf_tb.sv \
     ] \

@@ -12,6 +12,8 @@ library mem_lib;
 library eth_lib;
   use eth_lib.eth_pkg.all;
 
+library udp_intf_lib;
+
 entity udp_intf is
 generic (
   AXI_DATA_WIDTH    : natural;
@@ -19,48 +21,42 @@ generic (
   UDP_FILTER_PORT   : natural
 );
 port (
-  Sys_rst               : in  std_logic;
+  Sys_rst         : in  std_logic;
 
-  Udp_tx_header_wr_en   : in  std_logic;
-  Udp_tx_header_wr_addr : in  unsigned(2 downto 0);
-  Udp_tx_header_wr_data : in  std_logic_vector(31 downto 0);
-  Mac_tx_src_mac        : in  std_logic_vector(47 downto 0);
-  Mac_tx_dst_mac        : in  std_logic_vector(47 downto 0);
+  Ps_gmii_rx_clk  : out std_logic;
+  Ps_gmii_tx_clk  : out std_logic;
+  Ps_gmii_col     : out std_logic;
+  Ps_gmii_crs     : out std_logic;
+  Ps_gmii_rx_dv   : out std_logic;
+  Ps_gmii_rx_er   : out std_logic;
+  Ps_gmii_rxd     : out std_logic_vector(7 downto 0);
+  Ps_gmii_tx_en   : in  std_logic;
+  Ps_gmii_tx_er   : in  std_logic;
+  Ps_gmii_txd     : in  std_logic_vector(7 downto 0);
 
-  Ps_gmii_rx_clk        : out std_logic;
-  Ps_gmii_tx_clk        : out std_logic;
-  Ps_gmii_col           : out std_logic;
-  Ps_gmii_crs           : out std_logic;
-  Ps_gmii_rx_dv         : out std_logic;
-  Ps_gmii_rx_er         : out std_logic;
-  Ps_gmii_rxd           : out std_logic_vector(7 downto 0);
-  Ps_gmii_tx_en         : in  std_logic;
-  Ps_gmii_tx_er         : in  std_logic;
-  Ps_gmii_txd           : in  std_logic_vector(7 downto 0);
+  Hw_gmii_rx_clk  : in  std_logic;
+  Hw_gmii_tx_clk  : in  std_logic;
+  Hw_gmii_col     : in  std_logic;
+  Hw_gmii_crs     : in  std_logic;
+  Hw_gmii_rx_dv   : in  std_logic;
+  Hw_gmii_rx_er   : in  std_logic;
+  Hw_gmii_rxd     : in  std_logic_vector(7 downto 0);
+  Hw_gmii_tx_en   : out std_logic;
+  Hw_gmii_tx_er   : out std_logic;
+  Hw_gmii_txd     : out std_logic_vector(7 downto 0);
 
-  Hw_gmii_rx_clk        : in  std_logic;
-  Hw_gmii_tx_clk        : in  std_logic;
-  Hw_gmii_col           : in  std_logic;
-  Hw_gmii_crs           : in  std_logic;
-  Hw_gmii_rx_dv         : in  std_logic;
-  Hw_gmii_rx_er         : in  std_logic;
-  Hw_gmii_rxd           : in  std_logic_vector(7 downto 0);
-  Hw_gmii_tx_en         : out std_logic;
-  Hw_gmii_tx_er         : out std_logic;
-  Hw_gmii_txd           : out std_logic_vector(7 downto 0);
+  S_axis_clk      : in  std_logic;
+  S_axis_resetn   : in  std_logic;
+  S_axis_valid    : in  std_logic;
+  S_axis_data     : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  S_axis_last     : in  std_logic;
+  S_axis_ready    : out std_logic;
 
-  S_axis_clk            : in  std_logic;
-  S_axis_resetn         : in  std_logic;
-  S_axis_valid          : in  std_logic;
-  S_axis_data           : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  S_axis_last           : in  std_logic;
-  S_axis_ready          : out std_logic;
-
-  M_axis_clk            : in  std_logic;
-  M_axis_valid          : out std_logic;
-  M_axis_data           : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  M_axis_last           : out std_logic;
-  M_axis_ready          : in  std_logic
+  M_axis_clk      : in  std_logic;
+  M_axis_valid    : out std_logic;
+  M_axis_data     : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  M_axis_last     : out std_logic;
+  M_axis_ready    : in  std_logic
 );
 end entity udp_intf;
 
@@ -80,11 +76,9 @@ architecture rtl of udp_intf is
   signal r_rst_gmii_rx                : std_logic_vector(CDC_PIPE_STAGES - 1 downto 0);
   signal r_rst_gmii_tx                : std_logic_vector(CDC_PIPE_STAGES - 1 downto 0);
 
-  signal r_udp_tx_header_wr_en        : std_logic;
-  signal r_udp_tx_header_wr_addr      : unsigned(ETH_IP_UDP_HEADER_ADDR_WIDTH - 1 downto 0);
-  signal r_udp_tx_header_wr_data      : std_logic_vector(31 downto 0);
-  signal r_mac_tx_src_mac             : std_logic_vector(47 downto 0);
-  signal r_mac_tx_dst_mac             : std_logic_vector(47 downto 0);
+  signal w_tx_header_wr_en            : std_logic;
+  signal w_tx_header_wr_addr          : unsigned(ETH_TX_HEADER_ADDR_WIDTH - 1 downto 0);
+  signal w_tx_header_wr_data          : std_logic_vector(31 downto 0);
 
   signal w_s_axis_ready               : std_logic;
   signal w_s_axis_valid               : std_logic;
@@ -131,7 +125,7 @@ architecture rtl of udp_intf is
   signal w_m_axis_valid               : std_logic;
   signal w_m_axis_data                : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   signal w_m_axis_last                : std_logic;
-  signal w_m_axis_ready               : std_logic;
+  signal w_m_axis_ready               : std_logic_vector(1 downto 0);
 
   attribute ASYNC_REG                   : string;
   attribute ASYNC_REG of r_rst_gmii_rx  : signal is "TRUE";
@@ -163,14 +157,29 @@ begin
   process(Hw_gmii_tx_clk)
   begin
     if rising_edge(Hw_gmii_tx_clk) then
-      r_rst_gmii_tx           <= r_rst_gmii_tx(CDC_PIPE_STAGES - 2 downto 0) & Sys_rst;
-      r_udp_tx_header_wr_en   <= Udp_tx_header_wr_en;
-      r_udp_tx_header_wr_addr <= Udp_tx_header_wr_addr;
-      r_udp_tx_header_wr_data <= Udp_tx_header_wr_data;
-      r_mac_tx_src_mac        <= Mac_tx_src_mac;
-      r_mac_tx_dst_mac        <= Mac_tx_dst_mac;
+      r_rst_gmii_tx <= r_rst_gmii_tx(CDC_PIPE_STAGES - 2 downto 0) & Sys_rst;
     end if;
   end process;
+
+  i_udp_setup : entity udp_intf_lib.udp_setup
+  generic map (
+    AXI_DATA_WIDTH  => AXI_DATA_WIDTH
+  )
+  port map (
+    Clk             => Hw_gmii_tx_clk,
+    Clk_axi         => Hw_gmii_rx_clk,
+    Rst             => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
+    Rst_axi         => r_rst_gmii_rx(CDC_PIPE_STAGES - 1),
+
+    Udp_axis_valid  => w_m_axis_valid and w_m_axis_ready(1),  --only transfer when both readies are high
+    Udp_axis_data   => w_m_axis_data,
+    Udp_axis_last   => w_m_axis_last,
+    Udp_axis_ready  => w_m_axis_ready(0),
+
+    Header_wr_en    => w_tx_header_wr_en,
+    Header_wr_addr  => w_tx_header_wr_addr,
+    Header_wr_data  => w_tx_header_wr_data
+  );
 
   i_tx_axi_fifo : entity axi_lib.axis_async_fifo
   generic map (
@@ -221,9 +230,9 @@ begin
     Clk               => Hw_gmii_tx_clk,
     Rst               => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
 
-    Header_wr_en      => r_udp_tx_header_wr_en,
-    Header_wr_addr    => r_udp_tx_header_wr_addr,
-    Header_wr_data    => r_udp_tx_header_wr_data,
+    Header_wr_en      => w_tx_header_wr_en,
+    Header_wr_addr    => w_tx_header_wr_addr,
+    Header_wr_data    => w_tx_header_wr_data,
 
     Udp_length        => w_from_axi_to_udp_length,
     Udp_data          => w_from_axi_to_udp_data,
@@ -239,21 +248,22 @@ begin
 
   i_tx_mac : entity eth_lib.mac_1g_tx
   port map (
-    Clk           => Hw_gmii_tx_clk,
-    Rst           => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
+    Clk             => Hw_gmii_tx_clk,
+    Rst             => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
 
-    Source_mac    => r_mac_tx_src_mac,
-    Dest_mac      => r_mac_tx_dst_mac,
+    Header_wr_en    => w_tx_header_wr_en,
+    Header_wr_addr  => w_tx_header_wr_addr,
+    Header_wr_data  => w_tx_header_wr_data,
 
-    Payload_data  => w_from_udp_tx_payload_data,
-    Payload_valid => w_from_udp_tx_payload_valid,
-    Payload_last  => w_from_udp_tx_payload_last,
-    Payload_ready => w_from_udp_tx_payload_ready,
+    Payload_data    => w_from_udp_tx_payload_data,
+    Payload_valid   => w_from_udp_tx_payload_valid,
+    Payload_last    => w_from_udp_tx_payload_last,
+    Payload_ready   => w_from_udp_tx_payload_ready,
 
-    Mac_data      => w_from_mac_data,
-    Mac_valid     => w_from_mac_valid,
-    Mac_last      => w_from_mac_last,
-    Mac_ready     => w_from_mac_ready
+    Mac_data        => w_from_mac_data,
+    Mac_valid       => w_from_mac_valid,
+    Mac_last        => w_from_mac_last,
+    Mac_ready       => w_from_mac_ready
   );
 
   w_gmii_to_arb_data(0)   <= w_from_mac_data;
@@ -347,7 +357,7 @@ begin
     M_axis_valid  => w_m_axis_valid,
     M_axis_data   => w_m_axis_data,
     M_axis_last   => w_m_axis_last,
-    M_axis_ready  => w_m_axis_ready
+    M_axis_ready  => and_reduce(w_m_axis_ready)
   );
 
   i_rx_axi_fifo : entity axi_lib.axis_async_fifo
@@ -359,8 +369,8 @@ begin
   port map (
     S_axis_clk          => Hw_gmii_rx_clk,
     S_axis_resetn       => not(r_rst_gmii_rx(CDC_PIPE_STAGES - 1)),
-    S_axis_ready        => w_m_axis_ready,
-    S_axis_valid        => w_m_axis_valid,
+    S_axis_ready        => w_m_axis_ready(1),
+    S_axis_valid        => w_m_axis_valid and w_m_axis_ready(0), --only transfer when both readies are high
     S_axis_data         => w_m_axis_data,
     S_axis_last         => w_m_axis_last,
     S_axis_almost_full  => open,

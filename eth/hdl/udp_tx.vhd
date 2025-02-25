@@ -18,7 +18,7 @@ port (
   Rst               : in  std_logic;
 
   Header_wr_en      : in  std_logic;
-  Header_wr_addr    : in  unsigned(ETH_IP_UDP_HEADER_ADDR_WIDTH - 1 downto 0);
+  Header_wr_addr    : in  unsigned(ETH_TX_HEADER_ADDR_WIDTH - 1 downto 0);
   Header_wr_data    : in  std_logic_vector(31 downto 0);
 
   Udp_length        : in  unsigned(ETH_UDP_LENGTH_WIDTH - 1 downto 0);
@@ -48,7 +48,7 @@ architecture rtl of udp_tx is
 
   signal r_rst                            : std_logic;
   signal r_header_wr_en                   : std_logic;
-  signal r_header_wr_addr                 : unsigned(ETH_IP_UDP_HEADER_ADDR_WIDTH - 1 downto 0);
+  signal r_header_wr_addr                 : unsigned(ETH_TX_HEADER_ADDR_WIDTH - 1 downto 0);
   signal r_header_wr_data                 : std_logic_vector(31 downto 0);
 
   signal w_input_wr_data                  : std_logic_vector(INPUT_FIFO_WIDTH - 1 downto 0);
@@ -59,8 +59,8 @@ architecture rtl of udp_tx is
   signal w_input_last                     : std_logic;
   signal w_input_ready                    : std_logic;
 
-  signal r_header                         : std_logic_vector(ETH_IP_UDP_HEADER_WORD_LENGTH * 32 - 1 downto 0);
-  signal w_header                         : std_logic_vector(ETH_IP_UDP_HEADER_WORD_LENGTH * 32 - 1 downto 0);
+  signal r_header                         : std_logic_vector(ETH_TX_HEADER_WORD_LENGTH * 32 - 1 downto 0);
+  signal w_header                         : std_logic_vector(ETH_IP_UDP_HEADER_BYTE_LENGTH * 8 - 1 downto 0);
 
   signal r_udp_length                     : unsigned(15 downto 0);
   signal r_ip_total_length                : unsigned(15 downto 0);
@@ -99,7 +99,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      for i in 0 to (ETH_IP_UDP_HEADER_WORD_LENGTH - 1) loop
+      for i in 0 to (ETH_TX_HEADER_WORD_LENGTH - 1) loop
         if ((r_header_wr_en = '1') and (r_header_wr_addr = i)) then
           r_header(32*i + 31 downto 32*i) <= r_header_wr_data;
         end if;
@@ -183,7 +183,7 @@ begin
     end if;
   end process;
 
-  w_ip_header_partial_checksum    <= unsigned(r_header(95 downto 80));
+  w_ip_header_partial_checksum    <= unsigned(r_header(207 downto 192));
   w_ip_header_partial_checksum_s  <= byteswap(w_ip_header_partial_checksum, 8);
 
   process(Clk)
@@ -201,7 +201,7 @@ begin
 
   process(all)
   begin
-    w_header <= r_header;
+    w_header <= r_header(ETH_TX_HEADER_BYTE_LENGTH * 8 - 1 downto ETH_MAC_HEADER_LENGTH * 8);
     w_header(31 downto 16)    <= std_logic_vector(byteswap(r_ip_total_length, 8));
     w_header(95 downto 80)    <= std_logic_vector(byteswap(not(r_ip_header_checksum), 8));
     w_header(207 downto 192)  <= std_logic_vector(byteswap(r_udp_length, 8));

@@ -2,6 +2,33 @@
 
 import eth_pkg::*;
 
+interface header_tx_intf (input logic Clk);
+  logic                                     wr_en = 0;
+  logic [31:0]                              wr_data;
+  logic [eth_tx_header_addr_width - 1 : 0]  wr_addr;
+
+  task write(input logic [7:0] d [$]);
+    automatic logic [31:0] w [] = new[(d.size() + 3)/4];
+
+    for (int i = 0; i < d.size(); i++) begin
+      automatic int i_word = i / 4;
+      automatic int i_byte = i % 4;
+      w[i_word][i_byte * 8 +: 8] = d[i];
+    end
+
+    for (int i = 0; i < w.size(); i++) begin
+      wr_en     <= 1;
+      wr_data   <= w[i];
+      wr_addr   <= i;
+      @(posedge Clk);
+    end
+
+    wr_en     <= 0;
+    wr_data   <= 'x;
+    wr_addr   <= 'x;
+  endtask
+endinterface
+
 interface axi_tx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
   logic                           valid = 0;
   logic                           last;
@@ -62,9 +89,14 @@ module mac_1g_tx_tb;
     int post_packet_delay;
   } tx_data_t;
 
+  typedef struct {
+    logic [7:0] data [$];
+  } header_data_t;
+
   logic Clk;
   logic Rst;
 
+  header_tx_intf                                  header_intf (.*);
   axi_tx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  tx_intf (.*);
   axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  rx_intf (.*);
 
@@ -74,9 +106,6 @@ module mac_1g_tx_tb;
   int   num_received = 0;
   logic r_axi_rx_ready;
   logic w_axi_rx_valid;
-
-  logic [47:0] r_source_mac;
-  logic [47:0] r_dest_mac;
 
   initial begin
     Clk = 0;
@@ -101,8 +130,9 @@ module mac_1g_tx_tb;
     .Clk            (Clk),
     .Rst            (Rst),
 
-    .Source_mac     (r_source_mac),
-    .Dest_mac       (r_dest_mac),
+    .Header_wr_en   (header_intf.wr_en),
+    .Header_wr_addr (header_intf.wr_addr),
+    .Header_wr_data (header_intf.wr_data),
 
     .Payload_ready  (tx_intf.ready),
     .Payload_valid  (tx_intf.valid),
@@ -195,7 +225,7 @@ module mac_1g_tx_tb;
     return crc ^ 32'hFFFFFFFF;
   endfunction
 
-  function automatic expect_t get_expected_data(logic [47:0] src_mac, logic [47:0] dst_mac, tx_data_t tx_data);
+  function automatic expect_t get_expected_data(header_data_t header_data, tx_data_t tx_data);
     expect_t e;
     int padding_bytes = (eth_min_frame_size - eth_fcs_length) - (2*eth_mac_length + eth_type_length + tx_data.data.size());
     logic [31:0] fcs = '1;
@@ -207,18 +237,18 @@ module mac_1g_tx_tb;
     e.data.push_back(eth_sfd_byte);
 
     for (int i = 0; i < eth_mac_length; i++) begin
-      e.data.push_back(dst_mac[i*8+:8]);
-      fcs_data.push_back(dst_mac[i*8+:8]);
+      e.data.push_back(header_data.data[i]);
+      fcs_data.push_back(header_data.data[i]);
     end
 
     for (int i = 0; i < eth_mac_length; i++) begin
-      e.data.push_back(src_mac[i*8+:8]);
-      fcs_data.push_back(src_mac[i*8+:8]);
+      e.data.push_back(header_data.data[i+eth_mac_length]);
+      fcs_data.push_back(header_data.data[i+eth_mac_length]);
     end
 
     for (int i = 0; i < eth_type_length; i++) begin
-      e.data.push_back(eth_type_ip[i*8+:8]);
-      fcs_data.push_back(eth_type_ip[i*8+:8]);
+      e.data.push_back(header_data.data[i+2*eth_mac_length]);
+      fcs_data.push_back(header_data.data[i+2*eth_mac_length]);
     end
 
     for (int i = 0; i < tx_data.data.size(); i++) begin
@@ -241,19 +271,64 @@ module mac_1g_tx_tb;
     return e;
   endfunction
 
+  function automatic header_data_t randomize_header();
+    header_data_t r;
+    logic [15:0] ip_partial_checksum;
+
+    for (int i = 0; i < eth_mac_header_length; i++) begin
+      r.data.push_back($urandom);
+    end
+
+    r.data.push_back(8'h45);      // ver, IHL
+
+    r.data.push_back(0);          // DSCP, ECN
+    r.data.push_back(0);          // total length [0]
+    r.data.push_back(0);          // total length [1]
+
+    r.data.push_back($urandom);   // ID [0]
+    r.data.push_back($urandom);   // ID [1]
+
+    r.data.push_back(8'h40);      // flags - don't fragment
+    r.data.push_back($urandom);   // fragment offset
+
+    r.data.push_back(64);         //TTL
+    r.data.push_back(17);         // protocol = Udp_data
+    r.data.push_back($urandom);   // header checksum [0]
+    r.data.push_back($urandom);   // header checksum [1]
+
+    // source, dest addr
+    for (int i = 0; i < 8; i++) begin
+      r.data.push_back($urandom);
+    end
+
+    // source, dest port
+    for (int i = 0; i < 4; i++) begin
+      r.data.push_back($urandom);
+    end
+
+    r.data.push_back($urandom);   // UDP length [0]
+    r.data.push_back($urandom);   // UDP length [1]
+    r.data.push_back($urandom);   // UDP checksum [0]
+    r.data.push_back($urandom);   // UDP checksum [1]
+
+    assert (r.data.size() == eth_tx_header_byte_length) else $error("invalid size: %0d, expected %0d", r.data.size(), eth_tx_header_byte_length);
+
+    return r;
+  endfunction
+
   task automatic standard_test();
     parameter NUM_TESTS = 200;
 
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
       int max_write_delay = $urandom_range(5);
       int num_packets = $urandom_range(200, 100);
+      header_data_t header_data;
       tx_data_t tx_data;
       expect_t e;
 
       $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
-
-      r_source_mac  = {$urandom, $urandom};
-      r_dest_mac    = {$urandom, $urandom};
+      header_data = randomize_header();
+      header_intf.write(header_data.data);
 
       for (int i = 0; i < num_packets; i++) begin
         int r = $urandom_range(99);
@@ -271,7 +346,7 @@ module mac_1g_tx_tb;
         tx_queue.push_back(tx_data);
         $display("%0t: expecting: %p", $time, tx_data);
 
-        e = get_expected_data(r_source_mac, r_dest_mac, tx_data);
+        e = get_expected_data(header_data, tx_data);
         expected_data.push_back(e);
       end
 

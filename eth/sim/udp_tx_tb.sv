@@ -3,14 +3,22 @@
 import eth_pkg::*;
 
 interface header_tx_intf (input logic Clk);
-  logic                                         wr_en = 0;
-  logic [31:0]                                  wr_data;
-  logic [eth_ip_udp_header_addr_width - 1 : 0]  wr_addr;
+  logic                                     wr_en = 0;
+  logic [31:0]                              wr_data;
+  logic [eth_tx_header_addr_width - 1 : 0]  wr_addr;
 
-  task write(input logic [31:0] d []);
+  task write(input logic [7:0] d [$]);
+    automatic logic [31:0] w [] = new[(d.size() + 3)/4];
+
     for (int i = 0; i < d.size(); i++) begin
+      automatic int i_word = i / 4;
+      automatic int i_byte = i % 4;
+      w[i_word][i_byte * 8 +: 8] = d[i];
+    end
+
+    for (int i = 0; i < w.size(); i++) begin
       wr_en     <= 1;
-      wr_data   <= d[i];
+      wr_data   <= w[i];
       wr_addr   <= i;
       @(posedge Clk);
     end
@@ -18,7 +26,6 @@ interface header_tx_intf (input logic Clk);
     wr_en     <= 0;
     wr_data   <= 'x;
     wr_addr   <= 'x;
-
   endtask
 endinterface
 
@@ -92,7 +99,7 @@ module udp_tx_tb;
   } tx_data_t;
 
   typedef struct {
-    logic [31:0] data [];
+    logic [7:0] data [$];
   } header_data_t;
 
   logic Clk;
@@ -213,16 +220,14 @@ module udp_tx_tb;
     end
   end
 
-  function automatic logic [15:0] get_ip_checksum(logic [31:0] header []);
-    logic [31:0] ip_checksum;
+  function automatic logic [15:0] get_ip_checksum(logic [7:0] header [$]);
+    logic [31:0] ip_checksum = 0;
+    //$display("header = %p", header);
 
-    ip_checksum = 0;
-    for (int i = 0; i < 5; i++) begin
-      for (int j = 0; j < 2; j++) begin
-        logic [15:0] raw_word = header[i][16*j +: 16];
-        logic [15:0] swapped_word = {raw_word[7:0], raw_word[15:8]};
-        ip_checksum += swapped_word;
-      end
+    for (int i = eth_mac_header_length/2; i < (eth_mac_header_length + eth_ipv4_header_length)/2; i++) begin
+      logic [15:0] word = {header[2*i], header[2*i + 1]};
+      //$display("get_ip_checksum: i=%0d h=%02X, %02X  w=%04X   cs=%08X", i, header[2*i], header[2*i+1], word, ip_checksum);
+      ip_checksum += word;
     end
 
     while (ip_checksum > 16'hFFFF) begin
@@ -235,29 +240,32 @@ module udp_tx_tb;
 
   function automatic expect_t get_expected_data(header_data_t header_data, tx_data_t tx_data);
     expect_t e;
-    logic [31:0] header_copy [] = new[header_data.data.size()];
+    logic [7:0] header_copy [$];
     logic [15:0] ip_total_length;
     logic [15:0] udp_length;
     logic [15:0] ip_checksum;
 
-    for (int i = 0; i < header_copy.size(); i++) begin
-      header_copy[i] = header_data.data[i];
+    for (int i = 0; i < header_data.data.size(); i++) begin
+      header_copy.push_back(header_data.data[i]);
     end
 
     ip_total_length = eth_ipv4_header_length + eth_udp_header_length + tx_data.data.size();
     udp_length = eth_udp_header_length + tx_data.data.size();
 
-    header_copy[0][31:16] = {ip_total_length[7:0], ip_total_length[15:8]};
-    header_copy[6][15:0] = {udp_length[7:0], udp_length[15:8]};
+    header_copy[16] = ip_total_length[15:8];
+    header_copy[17] = ip_total_length[7:0];
 
-    header_copy[2][31:16] = 0;
+    header_copy[38] = udp_length[15:8];
+    header_copy[39] = udp_length[7:0];
+
+    header_copy[24] = 0;
+    header_copy[25] = 0;
     ip_checksum = ~get_ip_checksum(header_copy);
-    header_copy[2][31:16] = {ip_checksum[7:0], ip_checksum[15:8]};
+    header_copy[24] = ip_checksum[15:8];
+    header_copy[25] = ip_checksum[7:0];
 
-    for (int i = 0; i < header_copy.size(); i++) begin
-      for (int j = 0; j < 4; j++) begin
-        e.data.push_back(header_copy[i][j*8 +: 8]);
-      end
+    for (int i = eth_mac_header_length; i < header_copy.size(); i++) begin
+      e.data.push_back(header_copy[i]);
     end
 
     for (int i = 0; i < tx_data.data.size(); i++) begin
@@ -265,43 +273,58 @@ module udp_tx_tb;
     end
 
     ip_checksum = ~get_ip_checksum(header_copy);
-    assert (ip_checksum == 0) else $error("bad IP checksum");
+    assert (ip_checksum == 0) else $error("bad IP checksum: %04X -> %04X", ip_checksum, ~ip_checksum);
 
     //$display("%0t: get_expected_data: ip_total_length=%0d udp_len=%0d ip_checksum=%04X", $time, ip_total_length, udp_length, ip_checksum);
 
     return e;
   endfunction
 
-
   function automatic header_data_t randomize_header();
     header_data_t r;
     logic [15:0] ip_partial_checksum;
 
-    r.data = new[7];
+    for (int i = 0; i < eth_mac_header_length; i++) begin
+      r.data.push_back($urandom);
+    end
 
-    r.data[0][7:0]    = 8'h45;    // ver, IHL
-    r.data[0][15:8]   = 0;        // DSCP, ECN
-    r.data[0][31:16]  = 0;        // total length
+    r.data.push_back(8'h45);      // ver, IHL
 
-    r.data[1][15:0]   = $urandom; // ID
-    r.data[1][31:29]  = 3'h2;     // flags - don't fragment
-    r.data[1][28:16]  = $urandom; // fragment offset
+    r.data.push_back(0);          // DSCP, ECN
+    r.data.push_back(0);          // total length [0]
+    r.data.push_back(0);          // total length [1]
 
-    r.data[2][7:0]    = 64;       // TTL
-    r.data[2][15:8]   = 17;       // protocol = Udp_data
-    r.data[2][31:16]  = 0;        // header checksum
+    r.data.push_back($urandom);   // ID [0]
+    r.data.push_back($urandom);   // ID [1]
 
-    r.data[3]         = $urandom; // source address
-    r.data[4]         = $urandom; // dest address
+    r.data.push_back(8'h40);      // flags - don't fragment
+    r.data.push_back($urandom);   // fragment offset
 
-    r.data[5][15:0]   = $urandom; // source port
-    r.data[5][31:16]  = $urandom; // dest port
+    r.data.push_back(64);         //TTL
+    r.data.push_back(17);         // protocol = Udp_data
+    r.data.push_back(0);          // header checksum [0]
+    r.data.push_back(0);          // header checksum [1]
 
-    r.data[6][15:0]   = 0;        // UDP length
-    r.data[6][31:16]  = 0;        // UDP checksum
+    // source, dest addr
+    for (int i = 0; i < 8; i++) begin
+      r.data.push_back($urandom);
+    end
+
+    // source, dest port
+    for (int i = 0; i < 4; i++) begin
+      r.data.push_back($urandom);
+    end
+
+    r.data.push_back(0);          // UDP length [0]
+    r.data.push_back(0);          // UDP length [1]
+    r.data.push_back(0);          // UDP checksum [0]
+    r.data.push_back(0);          // UDP checksum [1]
+
+    assert (r.data.size() == eth_tx_header_byte_length) else $error("invalid size: %0d, expected %0d", r.data.size(), eth_tx_header_byte_length);
 
     ip_partial_checksum = get_ip_checksum(r.data);
-    r.data[2][31:16] = {ip_partial_checksum[7:0], ip_partial_checksum[15:8]};
+    r.data[24] = ip_partial_checksum[15:8];
+    r.data[25] = ip_partial_checksum[7:0];
 
     return r;
   endfunction

@@ -14,21 +14,22 @@ library eth_lib;
 
 entity mac_1g_tx is
 port (
-  Clk           : in  std_logic;
-  Rst           : in  std_logic;
+  Clk             : in  std_logic;
+  Rst             : in  std_logic;
 
-  Source_mac    : in  std_logic_vector(47 downto 0);
-  Dest_mac      : in  std_logic_vector(47 downto 0);
+  Header_wr_en    : in  std_logic;
+  Header_wr_addr  : in  unsigned(ETH_TX_HEADER_ADDR_WIDTH - 1 downto 0);
+  Header_wr_data  : in  std_logic_vector(31 downto 0);
 
-  Payload_data  : in  std_logic_vector(7 downto 0);
-  Payload_valid : in  std_logic;
-  Payload_last  : in  std_logic;
-  Payload_ready : out std_logic;
+  Payload_data    : in  std_logic_vector(7 downto 0);
+  Payload_valid   : in  std_logic;
+  Payload_last    : in  std_logic;
+  Payload_ready   : out std_logic;
 
-  Mac_data      : out std_logic_vector(7 downto 0);
-  Mac_valid     : out std_logic;
-  Mac_last      : out std_logic;
-  Mac_ready     : in  std_logic
+  Mac_data        : out std_logic_vector(7 downto 0);
+  Mac_valid       : out std_logic;
+  Mac_last        : out std_logic;
+  Mac_ready       : in  std_logic
 );
 begin
   -- PSL default clock is rising_edge(Clk);
@@ -45,8 +46,14 @@ architecture rtl of mac_1g_tx is
   constant MIN_FRAME_SIZE_TO_PAD          : natural := ETH_MIN_FRAME_SIZE - ETH_FCS_LENGTH;
 
   signal r_rst                            : std_logic;
-  signal r_src_mac                        : std_logic_vector(47 downto 0);
-  signal r_dst_mac                        : std_logic_vector(47 downto 0);
+  signal r_header_wr_en                   : std_logic;
+  signal r_header_wr_addr                 : unsigned(ETH_TX_HEADER_ADDR_WIDTH - 1 downto 0);
+  signal r_header_wr_data                 : std_logic_vector(31 downto 0);
+
+  signal r_header                         : std_logic_vector(ETH_TX_HEADER_WORD_LENGTH * 32 - 1 downto 0);
+  signal w_dst_mac                        : std_logic_vector(47 downto 0);
+  signal w_src_mac                        : std_logic_vector(47 downto 0);
+  signal w_eth_type                       : std_logic_vector(15 downto 0);
 
   signal s_state                          : state_t;
   signal r_state_sub_count                : unsigned(3 downto 0);
@@ -80,11 +87,27 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_rst     <= Rst;
-      r_src_mac <= Source_mac;
-      r_dst_mac <= Dest_mac;
+      r_rst             <= Rst;
+      r_header_wr_en    <= Header_wr_en;
+      r_header_wr_addr  <= Header_wr_addr;
+      r_header_wr_data  <= Header_wr_data;
     end if;
   end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      for i in 0 to (ETH_TX_HEADER_WORD_LENGTH - 1) loop
+        if ((r_header_wr_en = '1') and (r_header_wr_addr = i)) then
+          r_header(32*i + 31 downto 32*i) <= r_header_wr_data;
+        end if;
+      end loop;
+    end if;
+  end process;
+
+  w_dst_mac   <= r_header(47 downto 0);
+  w_src_mac   <= r_header(95 downto 48);
+  w_eth_type  <= r_header(111 downto 96);
 
   w_input_ready <= not(w_output_fifo_almost_full) and to_stdlogic(s_state = S_PAYLOAD);
 
@@ -253,19 +276,19 @@ begin
         w_frame_size_inc      <= '1';
         w_fcs_valid           <= '1';
         w_output_fifo_wr_en   <= '1';
-        w_output_fifo_wr_data <= shift_right(r_dst_mac, 8 * to_integer(r_state_sub_count))(7 downto 0);
+        w_output_fifo_wr_data <= shift_right(w_dst_mac, 8 * to_integer(r_state_sub_count))(7 downto 0);
 
       when S_SRC_MAC =>
         w_frame_size_inc      <= '1';
         w_fcs_valid           <= '1';
         w_output_fifo_wr_en   <= '1';
-        w_output_fifo_wr_data <= shift_right(r_src_mac, 8 * to_integer(r_state_sub_count))(7 downto 0);
+        w_output_fifo_wr_data <= shift_right(w_src_mac, 8 * to_integer(r_state_sub_count))(7 downto 0);
 
       when S_ETH_TYPE =>
         w_frame_size_inc      <= '1';
         w_fcs_valid           <= '1';
         w_output_fifo_wr_en   <= '1';
-        w_output_fifo_wr_data <= shift_right(ETH_TYPE_IP, 8 * to_integer(r_state_sub_count))(7 downto 0);
+        w_output_fifo_wr_data <= shift_right(w_eth_type, 8 * to_integer(r_state_sub_count))(7 downto 0);
 
       when S_PAYLOAD =>
         w_frame_size_inc      <= w_input_valid;

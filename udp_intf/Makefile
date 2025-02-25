@@ -15,6 +15,8 @@ GENERIC_DEPS += ../eth/hdl/mac_1g_tx.vhd
 GENERIC_DEPS += ../eth/hdl/mac_rx_to_udp.vhd
 GENERIC_DEPS += ../eth/hdl/udp_to_axi.vhd
 GENERIC_DEPS += ../eth/hdl/udp_tx.vhd
+GENERIC_DEPS += ./hdl/udp_intf_pkg.vhd
+GENERIC_DEPS += ./hdl/udp_setup.vhd
 GENERIC_DEPS += ./hdl/udp_intf.vhd
 
 XILINX_DEPS += udp_intf_ip.tcl
