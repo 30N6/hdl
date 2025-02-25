@@ -295,10 +295,6 @@ ad_connect axi_ad9361/dac_data_q0 GND
 ad_connect axi_ad9361/dac_data_i1 GND
 ad_connect axi_ad9361/dac_data_q1 GND
 
-ad_ip_instance util_vector_logic logic_or [list \
-  C_OPERATION {or} \
-  C_SIZE 1]
-
 ad_connect  axi_ad9361/l_clk axi_ad9361_adc_dma/fifo_wr_clk
 ad_connect  axi_ad9361/l_clk axi_ad9361_dac_dma/m_axis_aclk
 ad_connect  cpack/fifo_wr_overflow axi_ad9361/adc_dovf
@@ -323,10 +319,6 @@ ad_tdd_gen_create axi_tdd_0 $TDD_CHANNEL_CNT \
 
 ad_ip_instance util_vector_logic logic_inv [list \
   C_OPERATION {not} \
-  C_SIZE 1]
-
-ad_ip_instance util_vector_logic logic_or_1 [list \
-  C_OPERATION {or} \
   C_SIZE 1]
 
 ad_connect logic_inv/Op1  axi_ad9361/rst
@@ -373,3 +365,16 @@ ad_cpu_interrupt ps-13 mb-13 axi_ad9361_adc_dma/irq
 ad_cpu_interrupt ps-12 mb-12 axi_ad9361_dac_dma/irq
 
 
+
+ad_ip_instance esm_clocks ecm_clocks
+
+ad_connect ecm_clocks/Adc_clk   axi_ad9361/l_clk
+ad_connect ecm_clocks/Adc_rst   axi_ad9361/rst
+
+
+ad_ip_instance udp_intf udp_intf
+
+ad_connect udp_intf/Clk_gmii_rx   sys_200m_clk
+ad_connect udp_intf/Clk_gmii_tx   sys_200m_clk
+ad_connect udp_intf/Rst_gmii_rx   axi_ad9361/rst
+ad_connect udp_intf/Rst_gmii_tx   axi_ad9361/rst
