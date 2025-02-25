@@ -16,7 +16,7 @@ entity udp_intf is
 generic (
   AXI_DATA_WIDTH    : natural;
   OUTPUT_FIFO_DEPTH : natural;
-  UDP_FILTER_PORT   : unsigned(15 downto 0)
+  UDP_FILTER_PORT   : natural
 );
 port (
   Clk_gmii_rx           : in  std_logic;
@@ -281,7 +281,7 @@ begin
     Clk             => Clk_gmii_rx,
     Rst             => r_rst_gmii_rx,
 
-    Udp_filter_port => UDP_FILTER_PORT,
+    Udp_filter_port => to_unsigned(UDP_FILTER_PORT, 16),
 
     Mac_data        => Hw_gmii_rxd,
     Mac_valid       => Hw_gmii_rx_dv,
