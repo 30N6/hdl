@@ -378,8 +378,8 @@ ad_connect ecm_clocks/Adc_rst   axi_ad9361/rst
 ad_ip_instance udp_intf udp_intf
 ad_ip_parameter udp_intf  CONFIG.UDP_FILTER_PORT   65200
 
-#ad_connect udp_intf/Clk_gmii_rx             sys_200m_clk
-#ad_connect udp_intf/Clk_gmii_tx             sys_200m_clk
+ad_connect udp_intf/Clk_gmii_rx             sys_rgmii/gmii_rx_clk
+ad_connect udp_intf/Clk_gmii_tx             sys_rgmii/gmii_tx_clk
 ad_connect udp_intf/Rst_gmii_rx             axi_ad9361/rst
 ad_connect udp_intf/Rst_gmii_tx             axi_ad9361/rst
 ad_connect udp_intf/Hw_gmii                 sys_rgmii/GMII
