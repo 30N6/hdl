@@ -148,7 +148,6 @@ ad_connect  sys_rgmii/tx_reset sys_rstgen/peripheral_reset
 ad_connect  sys_rgmii/rx_reset sys_rstgen/peripheral_reset
 ad_connect  sys_rgmii/clkin sys_ps7/FCLK_CLK1
 ad_connect  sys_ps7/MDIO_ETHERNET_0 sys_rgmii/MDIO_GEM
-ad_connect  sys_ps7/GMII_ETHERNET_0 sys_rgmii/GMII
 ad_connect  sys_rgmii/MDIO_PHY MDIO_PHY
 ad_connect  sys_rgmii/RGMII RGMII
 
@@ -379,8 +378,10 @@ ad_connect ecm_clocks/Adc_rst   axi_ad9361/rst
 ad_ip_instance udp_intf udp_intf
 ad_ip_parameter udp_intf  CONFIG.UDP_FILTER_PORT   65200
 
-ad_connect udp_intf/Clk_gmii_rx             sys_200m_clk
-ad_connect udp_intf/Clk_gmii_tx             sys_200m_clk
+#ad_connect udp_intf/Clk_gmii_rx             sys_200m_clk
+#ad_connect udp_intf/Clk_gmii_tx             sys_200m_clk
 ad_connect udp_intf/Rst_gmii_rx             axi_ad9361/rst
 ad_connect udp_intf/Rst_gmii_tx             axi_ad9361/rst
+ad_connect udp_intf/Hw_gmii                 sys_rgmii/GMII
+ad_connect udp_intf/Ps_gmii                 sys_ps7/GMII_ETHERNET_0
 #ad_connect udp_intf/m_axis_aclk   axi_ad9361/l_clk
