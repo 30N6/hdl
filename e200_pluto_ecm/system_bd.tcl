@@ -288,9 +288,6 @@ ad_connect axi_ad9361_adc_dma/fifo_wr cpack/packed_fifo_wr
 ad_connect axi_ad9361/up_adc_gpio_out decim_slice/Din
 ad_connect rx_fir_decimator/active decim_slice/Dout
 
-#TODO
-ad_connect axi_ad9361/dac_data_i0 GND
-ad_connect axi_ad9361/dac_data_q0 GND
 ad_connect axi_ad9361/dac_data_i1 GND
 ad_connect axi_ad9361/dac_data_q1 GND
 
