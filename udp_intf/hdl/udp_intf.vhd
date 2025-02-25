@@ -398,8 +398,13 @@ begin
   Ps_gmii_rx_dv   <= Hw_gmii_rx_dv;
   Ps_gmii_rx_er   <= Hw_gmii_rx_er;
   Ps_gmii_rxd     <= Hw_gmii_rxd;
-  Hw_gmii_tx_en   <= Ps_gmii_tx_en;
-  Hw_gmii_tx_er   <= Ps_gmii_tx_er;
-  Hw_gmii_txd     <= Ps_gmii_txd;
+
+  --Hw_gmii_tx_en   <= Ps_gmii_tx_en;
+  --Hw_gmii_tx_er   <= Ps_gmii_tx_er;
+  --Hw_gmii_txd     <= Ps_gmii_txd;
+
+  Hw_gmii_tx_en   <= w_gmii_from_arb_valid;
+  Hw_gmii_tx_er   <= '0';
+  Hw_gmii_txd     <= w_gmii_from_arb_data;
 
 end architecture rtl;

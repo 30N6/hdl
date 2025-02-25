@@ -38,7 +38,7 @@ end entity udp_tx;
 
 architecture rtl of udp_tx is
 
-  type state_t is (S_IDLE, S_HEADER, S_PAYLOAD, S_DONE);
+  type state_t is (S_IDLE, S_HEADER, S_PAYLOAD, S_DROP, S_DONE);
 
   constant INPUT_FIFO_WIDTH               : natural := 8 + ETH_UDP_LENGTH_WIDTH;
 
@@ -122,7 +122,7 @@ begin
   end process;
 
   w_input_wr_data <= std_logic_vector(Udp_length) & Udp_data;
-  w_input_ready   <= not(w_output_fifo_almost_full) and to_stdlogic(s_state = S_PAYLOAD);
+  w_input_ready   <= not(w_output_fifo_almost_full) and to_stdlogic((s_state = S_PAYLOAD) or (s_state = S_DROP));
 
   i_input_fifo : entity axi_lib.axis_minififo
   generic map (
@@ -155,8 +155,12 @@ begin
         if (w_output_fifo_almost_full = '0') then
           case s_state is
           when S_IDLE =>
-            if ((w_input_valid = '1') and (r_header_valid = '1')) then
-              s_state <= S_HEADER;
+            if (w_input_valid = '1') then
+              if (r_header_valid = '1') then
+                s_state <= S_HEADER;
+              else
+                s_state <= S_DROP;
+              end if;
             else
               s_state <= S_IDLE;
             end if;
@@ -173,6 +177,13 @@ begin
               s_state <= S_DONE;
             else
               s_state <= S_PAYLOAD;
+            end if;
+
+          when S_DROP =>
+            if ((w_input_valid = '1') and (w_input_last = '1')) then
+              s_state <= S_DONE;
+            else
+              s_state <= S_DROP;
             end if;
 
           when S_DONE =>

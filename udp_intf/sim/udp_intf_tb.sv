@@ -149,8 +149,13 @@ module udp_intf_tb;
   int   num_received_axi = 0;
   int   num_received_gmii_ps = 0;
   int   num_received_gmii_hw = 0;
+
   logic r_axi_rx_ready;
+
   logic w_axi_rx_valid;
+  logic w_axi_rx_ready;
+  logic w_axi_rx_last;
+  logic [AXI_DATA_WIDTH - 1 : 0] w_axi_rx_data;
 
   initial begin
     Clk_axi = 0;
@@ -223,6 +228,21 @@ module udp_intf_tb;
     .M_axis_data    (rx_axi_intf.data),
     .M_axis_last    (rx_axi_intf.last),
     .M_axis_ready   (r_axi_rx_ready)
+/*
+    //loopback
+    .S_axis_clk     (Clk_axi),
+    .S_axis_resetn  (!Rst_axi),
+    .S_axis_valid   (w_axi_rx_valid),
+    .S_axis_data    (w_axi_rx_data),
+    .S_axis_last    (w_axi_rx_last),
+    .S_axis_ready   (w_axi_rx_ready),
+
+    .M_axis_clk     (Clk_axi),
+    .M_axis_valid   (w_axi_rx_valid),
+    .M_axis_data    (w_axi_rx_data),
+    .M_axis_last    (w_axi_rx_last),
+    .M_axis_ready   (w_axi_rx_ready)
+*/
   );
 
   assign rx_axi_intf.valid = w_axi_rx_valid && r_axi_rx_ready;
@@ -508,9 +528,9 @@ module udp_intf_tb;
   endfunction
 
   function automatic gmii_tx_data_t generate_setup_packet(gmii_tx_data_t header_data);
-    gmii_tx_data_t d = randomize_udp_packet_header(header_data.data.size());
-    int r;
     string udp_setup_magic = "UDPSETUP";
+    gmii_tx_data_t d = randomize_udp_packet_header(udp_setup_magic.len() + header_data.data.size());
+    int r;
 
     for (int i = 0; i < udp_setup_magic.len(); i++) begin
       d.data.push_back(udp_setup_magic.getc(i));
@@ -557,7 +577,10 @@ module udp_intf_tb;
         axi_expected_data.push_back(axi_e);
       end
 
-      repeat(100) @(posedge Clk_axi);
+      repeat(200) @(posedge Clk_axi);
+
+      /*from_hw_tx_queue.push_back(setup_packet);
+      to_ps_expected_data.push_back('{data: setup_packet.data});*/
 
       for (int i = 0; i < num_packets; i++) begin
         int r = $urandom_range(99);
