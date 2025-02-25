@@ -78,7 +78,7 @@ module system_top (
 
   output          enable,
   output          txnrx,
-  
+
   inout           gpio_resetb,
   inout           gpio_en_agc,
   inout   [ 3:0]  gpio_ctl,
@@ -89,7 +89,7 @@ module system_top (
   output          spi_mosi,
   input           spi_miso,
 
-  
+
   // clock form vctcxo
   input  wire	 			      CLK_40MHz_FPGA  ,
   // PPS or 10 MHz (need to choose from SW)
@@ -122,6 +122,9 @@ module system_top (
   wire            pl_spi_miso;
   wire            pl_spi_mosi;
   wire            pl_txdata;
+
+  wire    [3:0]   w_ad9361_ctl;
+  wire    [7:0]   w_ad9361_status;
 
   // instantiations
 
@@ -214,6 +217,8 @@ module system_top (
     .gpio_i (gpio_i),
     .gpio_o (gpio_o),
     .gpio_t (gpio_t),
+    .ad9361_ctl (w_ad9361_ctl),
+    .ad9361_status (w_ad9361_status),
     // .iic_main_scl_io (iic_scl),
     // .iic_main_sda_io (iic_sda),
     .rx_clk_in (rx_clk_in),

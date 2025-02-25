@@ -365,6 +365,10 @@ ad_cpu_interrupt ps-13 mb-13 axi_ad9361_adc_dma/irq
 ad_cpu_interrupt ps-12 mb-12 axi_ad9361_dac_dma/irq
 
 
+# #################
+
+create_bd_port -dir I -from 7 -to 0 ad9361_status
+create_bd_port -dir O -from 3 -to 0 ad9361_ctl
 
 ad_ip_instance esm_clocks ecm_clocks
 
@@ -373,8 +377,10 @@ ad_connect ecm_clocks/Adc_rst   axi_ad9361/rst
 
 
 ad_ip_instance udp_intf udp_intf
+ad_ip_parameter udp_intf  CONFIG.UDP_FILTER_PORT   65200
 
-ad_connect udp_intf/Clk_gmii_rx   sys_200m_clk
-ad_connect udp_intf/Clk_gmii_tx   sys_200m_clk
-ad_connect udp_intf/Rst_gmii_rx   axi_ad9361/rst
-ad_connect udp_intf/Rst_gmii_tx   axi_ad9361/rst
+ad_connect udp_intf/Clk_gmii_rx             sys_200m_clk
+ad_connect udp_intf/Clk_gmii_tx             sys_200m_clk
+ad_connect udp_intf/Rst_gmii_rx             axi_ad9361/rst
+ad_connect udp_intf/Rst_gmii_tx             axi_ad9361/rst
+#ad_connect udp_intf/m_axis_aclk   axi_ad9361/l_clk

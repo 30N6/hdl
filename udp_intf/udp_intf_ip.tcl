@@ -37,6 +37,7 @@ adi_add_bus "S_axis" "slave"          \
         {"S_axis_last"  "TLAST"}      \
   ]
 #adi_add_bus_clock "S_axis_clk" "S_axis" "S_axis_resetn"
+adi_add_bus_clock "Clk_gmii_tx" "S_axis"
 
 adi_add_bus "M_axis" "master"         \
   "xilinx.com:interface:axis_rtl:1.0" \
@@ -47,6 +48,7 @@ adi_add_bus "M_axis" "master"         \
         {"M_axis_last" "TLAST"}       \
   ]
 #adi_add_bus_clock "M_axis_clk" "M_axis" "M_axis_resetn"
+adi_add_bus_clock "Clk_gmii_rx" "M_axis"
 
 #ipx::infer_bus_interface Adc_clk xilinx.com:signal:clock_rtl:1.0 $cc
 #set reset_intf      [ipx::infer_bus_interface Adc_rst xilinx.com:signal:reset_rtl:1.0 $cc]
