@@ -266,26 +266,26 @@ begin
     Mac_payload_ready => w_from_udp_tx_payload_ready
   );
 
-  i_rx_buffer : entity eth_lib.gmii_buffer
-  generic map (
-    DATA_DEPTH    => TX_BUFFER_DATA_DEPTH,
-    FRAME_DEPTH   => TX_BUFFER_FRAME_DEPTH
-  )
-  port map (
-    Clk             => Hw_gmii_rx_clk,
-    Rst             => r_rst_gmii_rx(CDC_PIPE_STAGES - 1),
-
-    Input_data      => Hw_gmii_rxd,
-    Input_valid     => Hw_gmii_rx_dv,
-    Input_error     => Hw_gmii_rx_er,
-    Input_accepted  => w_to_rx_buffer_accepted,
-    Input_dropped   => w_to_rx_buffer_dropped,
-
-    Output_data     => w_from_rx_buffer_data,
-    Output_valid    => w_from_rx_buffer_valid,
-    Output_last     => w_from_rx_buffer_last,
-    Output_ready    => w_from_rx_buffer_ready
-  );
+  --i_rx_buffer : entity eth_lib.gmii_buffer
+  --generic map (
+  --  DATA_DEPTH    => TX_BUFFER_DATA_DEPTH,
+  --  FRAME_DEPTH   => TX_BUFFER_FRAME_DEPTH
+  --)
+  --port map (
+  --  Clk             => Hw_gmii_rx_clk,
+  --  Rst             => r_rst_gmii_rx(CDC_PIPE_STAGES - 1),
+  --
+  --  Input_data      => Hw_gmii_rxd,
+  --  Input_valid     => Hw_gmii_rx_dv,
+  --  Input_error     => Hw_gmii_rx_er,
+  --  Input_accepted  => w_to_rx_buffer_accepted,
+  --  Input_dropped   => w_to_rx_buffer_dropped,
+  --
+  --  Output_data     => w_from_rx_buffer_data,
+  --  Output_valid    => w_from_rx_buffer_valid,
+  --  Output_last     => w_from_rx_buffer_last,
+  --  Output_ready    => w_from_rx_buffer_ready
+  --);
 
   i_rx_cdc : entity axi_lib.axis_async_fifo
   generic map (
@@ -296,10 +296,10 @@ begin
   port map (
     S_axis_clk          => Hw_gmii_rx_clk,
     S_axis_resetn       => not(r_rst_gmii_rx(CDC_PIPE_STAGES - 1)),
-    S_axis_ready        => w_from_rx_buffer_ready,
-    S_axis_valid        => w_from_rx_buffer_valid,
-    S_axis_data         => w_from_rx_buffer_data,
-    S_axis_last         => w_from_rx_buffer_last,
+    S_axis_ready        => w_from_rx_to_udp_ready, ----w_from_rx_buffer_ready,
+    S_axis_valid        => w_from_rx_to_udp_valid, --w_from_rx_buffer_valid,
+    S_axis_data         => w_from_rx_to_udp_data, --w_from_rx_buffer_data,
+    S_axis_last         => w_from_rx_to_udp_last, ----w_from_rx_buffer_last,
     S_axis_almost_full  => open,
 
     M_axis_clk          => Hw_gmii_tx_clk,
@@ -417,9 +417,9 @@ begin
     Rst           => r_rst_gmii_rx(CDC_PIPE_STAGES - 1),
 
     Udp_data      => w_from_rx_to_udp_data,
-    Udp_valid     => w_from_rx_to_udp_valid,
+    Udp_valid     => '0', --w_from_rx_to_udp_valid,
     Udp_last      => w_from_rx_to_udp_last,
-    Udp_ready     => w_from_rx_to_udp_ready,
+    Udp_ready     => open, --w_from_rx_to_udp_ready,
 
     M_axis_valid  => w_m_axis_valid,
     M_axis_data   => w_m_axis_data,
