@@ -560,6 +560,23 @@ module udp_intf_tb;
     return d;
   endfunction
 
+  function automatic gmii_tx_data_t generate_udp_packet(gmii_tx_data_t header_data);
+    int payload_len = 50;
+    gmii_tx_data_t d = randomize_udp_packet_header(payload_len);
+    int r;
+
+    for (int i = 0; i < payload_len; i++) begin
+      d.data.push_back($urandom);
+    end
+
+    r = 4; //$urandom_range(20, 4);
+    for (int i = 0; i < r; i++) begin
+      d.data.push_back($urandom);
+    end
+
+    return d;
+  endfunction
+
   task automatic standard_test();
     parameter NUM_TESTS = 20;
 
@@ -576,17 +593,17 @@ module udp_intf_tb;
       gmii_expect_t   ps_e;         //to_ps_expected_data[$];
 
       gmii_tx_data_t  tx_header;
-      gmii_tx_data_t  setup_packet;
+      gmii_tx_data_t  udp_packet;
 
       $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
 
       tx_header     = generate_tx_header();
-      setup_packet  = generate_setup_packet(tx_header);
-      from_hw_tx_queue.push_back(setup_packet);
+      udp_packet  = generate_setup_packet(tx_header);
+      from_hw_tx_queue.push_back(udp_packet);
 
-      to_ps_expected_data.push_back('{data: setup_packet.data});
+      to_ps_expected_data.push_back('{data: udp_packet.data});
 
-      if (get_expected_data_axi_from_gmii(setup_packet, axi_e)) begin
+      if (get_expected_data_axi_from_gmii(udp_packet, axi_e)) begin
         axi_expected_data.push_back(axi_e);
       end
 
@@ -595,6 +612,7 @@ module udp_intf_tb;
       /*from_hw_tx_queue.push_back(setup_packet);
       to_ps_expected_data.push_back('{data: setup_packet.data});*/
 
+      //random packets from PS to HW
       for (int i = 0; i < num_packets; i++) begin
         int packet_len = $urandom_range(200, 10);
 
@@ -617,6 +635,7 @@ module udp_intf_tb;
       end
       repeat(1000) @(posedge Clk_axi);
 
+      //random packets from HW to PS
       for (int i = 0; i < num_packets; i++) begin
         int packet_len = $urandom_range(200, 10);
 
@@ -631,6 +650,23 @@ module udp_intf_tb;
         from_hw_tx_queue.push_back(hw_tx_data);
 
         ps_e.data = hw_tx_data.data;
+        to_ps_expected_data.push_back(ps_e);
+      end
+
+      while (from_hw_tx_queue.size() > 0) begin
+        @(posedge Clk_axi);
+      end
+      repeat(1000) @(posedge Clk_axi);
+
+      //random UDP packets from HW to PS
+      for (int i = 0; i < num_packets; i++) begin
+        int packet_len = $urandom_range(200, 10);
+
+        udp_packet = generate_udp_packet(tx_header);
+        hw_tx_data.post_packet_delay = $urandom_range(max_write_delay);
+        from_hw_tx_queue.push_back(udp_packet);
+
+        ps_e.data = udp_packet.data;
         to_ps_expected_data.push_back(ps_e);
       end
 

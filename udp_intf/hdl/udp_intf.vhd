@@ -297,7 +297,7 @@ begin
     S_axis_clk          => Hw_gmii_rx_clk,
     S_axis_resetn       => not(r_rst_gmii_rx(CDC_PIPE_STAGES - 1)),
     S_axis_ready        => w_from_rx_to_udp_ready, ----w_from_rx_buffer_ready,
-    S_axis_valid        => w_from_rx_to_udp_valid, --w_from_rx_buffer_valid,
+    S_axis_valid        => w_from_rx_to_udp_valid and w_from_rx_to_udp_last, --w_from_rx_buffer_valid,
     S_axis_data         => w_from_rx_to_udp_data, --w_from_rx_buffer_data,
     S_axis_last         => w_from_rx_to_udp_last, ----w_from_rx_buffer_last,
     S_axis_almost_full  => open,
@@ -416,9 +416,9 @@ begin
     Clk           => Hw_gmii_rx_clk,
     Rst           => r_rst_gmii_rx(CDC_PIPE_STAGES - 1),
 
-    Udp_data      => w_from_rx_to_udp_data,
+    Udp_data      => (others => '0'), --w_from_rx_to_udp_data,
     Udp_valid     => '0', --w_from_rx_to_udp_valid,
-    Udp_last      => w_from_rx_to_udp_last,
+    Udp_last      => '0', --w_from_rx_to_udp_last,
     Udp_ready     => open, --w_from_rx_to_udp_ready,
 
     M_axis_valid  => w_m_axis_valid,
