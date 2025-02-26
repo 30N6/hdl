@@ -103,17 +103,17 @@ architecture rtl of udp_intf is
   signal w_from_mac_last              : std_logic;
   signal w_from_mac_ready             : std_logic;
 
-  signal w_to_tx_buffer_accepted      : std_logic_vector(1 downto 0);
-  signal w_to_tx_buffer_dropped       : std_logic_vector(1 downto 0);
-  signal w_from_tx_buffer_data        : std_logic_vector_array_t(1 downto 0)(7 downto 0);
-  signal w_from_tx_buffer_valid       : std_logic_vector(1 downto 0);
-  signal w_from_tx_buffer_last        : std_logic_vector(1 downto 0);
-  signal w_from_tx_buffer_ready       : std_logic_vector(1 downto 0);
+  signal w_to_tx_buffer_accepted      : std_logic;
+  signal w_to_tx_buffer_dropped       : std_logic;
+  signal w_from_tx_buffer_data        : std_logic_vector(7 downto 0);
+  signal w_from_tx_buffer_valid       : std_logic;
+  signal w_from_tx_buffer_last        : std_logic;
+  signal w_from_tx_buffer_ready       : std_logic;
 
-  signal w_gmii_to_arb_data           : std_logic_vector_array_t(2 downto 0)(7 downto 0);
-  signal w_gmii_to_arb_valid          : std_logic_vector(2 downto 0);
-  signal w_gmii_to_arb_last           : std_logic_vector(2 downto 0);
-  signal w_gmii_to_arb_ready          : std_logic_vector(2 downto 0);
+  signal w_gmii_to_arb_data           : std_logic_vector_array_t(1 downto 0)(7 downto 0);
+  signal w_gmii_to_arb_valid          : std_logic_vector(1 downto 0);
+  signal w_gmii_to_arb_last           : std_logic_vector(1 downto 0);
+  signal w_gmii_to_arb_ready          : std_logic_vector(1 downto 0);
   signal w_gmii_from_arb_data         : std_logic_vector(7 downto 0);
   signal w_gmii_from_arb_valid        : std_logic;
   signal w_gmii_from_arb_last         : std_logic; --unused
@@ -280,37 +280,35 @@ begin
   w_gmii_to_arb_last(0)   <= w_from_mac_last;
   w_from_mac_ready        <= w_gmii_to_arb_ready(0);
 
-  g_tx_buffer : for i in 0 to 1 generate
-    i_tx_buffer : entity eth_lib.gmii_buffer
-    generic map (
-      DATA_DEPTH    => TX_BUFFER_DATA_DEPTH,
-      FRAME_DEPTH   => TX_BUFFER_FRAME_DEPTH
-    )
-    port map (
-      Clk             => Hw_gmii_tx_clk,
-      Rst             => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
+  i_tx_buffer : entity eth_lib.gmii_buffer
+  generic map (
+    DATA_DEPTH    => TX_BUFFER_DATA_DEPTH,
+    FRAME_DEPTH   => TX_BUFFER_FRAME_DEPTH
+  )
+  port map (
+    Clk             => Hw_gmii_tx_clk,
+    Rst             => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
 
-      Input_data      => Ps_gmii_txd,
-      Input_valid     => Ps_gmii_tx_en,
-      Input_error     => Ps_gmii_tx_er,
-      Input_accepted  => w_to_tx_buffer_accepted(i),
-      Input_dropped   => w_to_tx_buffer_dropped(i),
+    Input_data      => Ps_gmii_txd,
+    Input_valid     => Ps_gmii_tx_en,
+    Input_error     => Ps_gmii_tx_er,
+    Input_accepted  => w_to_tx_buffer_accepted,
+    Input_dropped   => w_to_tx_buffer_dropped,
 
-      Output_data     => w_from_tx_buffer_data(i),
-      Output_valid    => w_from_tx_buffer_valid(i),
-      Output_last     => w_from_tx_buffer_last(i),
-      Output_ready    => w_from_tx_buffer_ready(i)
-    );
+    Output_data     => w_from_tx_buffer_data,
+    Output_valid    => w_from_tx_buffer_valid,
+    Output_last     => w_from_tx_buffer_last,
+    Output_ready    => w_from_tx_buffer_ready
+  );
 
-    w_gmii_to_arb_data(1 + i)   <= w_from_tx_buffer_data(i);
-    w_gmii_to_arb_valid(1 + i)  <= w_from_tx_buffer_valid(i);
-    w_gmii_to_arb_last(1 + i)   <= w_from_tx_buffer_last(i);
-    w_from_tx_buffer_ready(i)   <= w_gmii_to_arb_ready(1 + i);
-  end generate g_tx_buffer;
+  w_gmii_to_arb_data(1)   <= w_from_tx_buffer_data;
+  w_gmii_to_arb_valid(1)  <= w_from_tx_buffer_valid;
+  w_gmii_to_arb_last(1)   <= w_from_tx_buffer_last;
+  w_from_tx_buffer_ready  <= w_gmii_to_arb_ready(1);
 
   i_tx_arb : entity eth_lib.gmii_arb
   generic map (
-    NUM_INPUTS      => 3,
+    NUM_INPUTS      => 2,
     INTERFRAME_GAP  => ETH_IFG_LENGTH + 1
   )
   port map (
