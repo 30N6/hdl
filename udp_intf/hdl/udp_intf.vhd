@@ -116,6 +116,7 @@ architecture rtl of udp_intf is
   signal w_from_tx_buffer_last        : std_logic;
   signal w_from_tx_buffer_ready       : std_logic;
 
+  signal w_debug_axis_data            : std_logic_vector(15 downto 0);
   signal w_debug_axis_ready           : std_logic;
 
   signal w_gmii_to_arb_data           : std_logic_vector_array_t(1 downto 0)(7 downto 0);
@@ -309,18 +310,21 @@ begin
     Output_ready    => w_from_tx_buffer_ready
   );
 
+  --TODO: use udp to axi?
+  w_debug_axis_data <= x"00" & w_from_tx_buffer_data;
+
   i_debug_fifo : entity axi_lib.axis_async_fifo
   generic map (
     FIFO_DEPTH        => 4096,
     ALMOST_FULL_LEVEL => 4096 - 5,
-    AXI_DATA_WIDTH    => 8
+    AXI_DATA_WIDTH    => 16
   )
   port map (
     S_axis_clk          => Hw_gmii_tx_clk,
     S_axis_resetn       => not(r_rst_gmii_tx(CDC_PIPE_STAGES - 1)),
     S_axis_ready        => w_debug_axis_ready,
     S_axis_valid        => w_from_tx_buffer_valid and w_gmii_to_arb_ready(1),
-    S_axis_data         => w_from_tx_buffer_data,
+    S_axis_data         => w_debug_axis_data,
     S_axis_last         => w_from_tx_buffer_last,
     S_axis_almost_full  => open,
 

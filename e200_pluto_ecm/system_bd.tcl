@@ -248,7 +248,7 @@ ad_ip_parameter axi_custom_dma_d2h CONFIG.CYCLIC                0
 ad_ip_parameter axi_custom_dma_d2h CONFIG.AXI_SLICE_SRC         0
 ad_ip_parameter axi_custom_dma_d2h CONFIG.AXI_SLICE_DEST        0
 ad_ip_parameter axi_custom_dma_d2h CONFIG.DMA_2D_TRANSFER       0
-ad_ip_parameter axi_custom_dma_d2h CONFIG.DMA_DATA_WIDTH_SRC    8
+ad_ip_parameter axi_custom_dma_d2h CONFIG.DMA_DATA_WIDTH_SRC    16
 ad_ip_parameter axi_custom_dma_d2h CONFIG.SYNC_TRANSFER_START   0
 ad_ip_parameter axi_custom_dma_d2h CONFIG.ENABLE_DIAGNOSTICS_IF 1
 
