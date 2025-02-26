@@ -43,7 +43,7 @@ architecture rtl of mac_1g_tx is
   constant OUTPUT_FIFO_DEPTH              : natural := 32;
   constant OUTPUT_FIFO_ALMOST_FULL_LEVEL  : natural := OUTPUT_FIFO_DEPTH - 8;
 
-  constant MIN_FRAME_SIZE_TO_PAD          : natural := ETH_MIN_FRAME_SIZE - ETH_FCS_LENGTH;
+  constant MIN_FRAME_SIZE_TO_PAD          : natural := ETH_MIN_FRAME_SIZE + 16; -- - ETH_FCS_LENGTH;
 
   signal r_rst                            : std_logic;
   signal r_header_wr_en                   : std_logic;
