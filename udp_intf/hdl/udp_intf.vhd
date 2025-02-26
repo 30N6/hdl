@@ -181,25 +181,30 @@ begin
     end if;
   end process;
 
-  i_udp_setup : entity udp_intf_lib.udp_setup
-  generic map (
-    AXI_DATA_WIDTH  => AXI_DATA_WIDTH
-  )
-  port map (
-    Clk             => Hw_gmii_tx_clk,
-    Clk_axi         => Hw_gmii_rx_clk,
-    Rst             => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
-    Rst_axi         => r_rst_gmii_rx(CDC_PIPE_STAGES - 1),
+  --i_udp_setup : entity udp_intf_lib.udp_setup
+  --generic map (
+  --  AXI_DATA_WIDTH  => AXI_DATA_WIDTH
+  --)
+  --port map (
+  --  Clk             => Hw_gmii_tx_clk,
+  --  Clk_axi         => Hw_gmii_rx_clk,
+  --  Rst             => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
+  --  Rst_axi         => r_rst_gmii_rx(CDC_PIPE_STAGES - 1),
+  --
+  --  Udp_axis_valid  => w_m_axis_valid and w_m_axis_ready(1),  --only transfer when both readies are high
+  --  Udp_axis_data   => w_m_axis_data,
+  --  Udp_axis_last   => w_m_axis_last,
+  --  Udp_axis_ready  => w_m_axis_ready(0),
+  --
+  --  Header_wr_en    => w_tx_header_wr_en,
+  --  Header_wr_addr  => w_tx_header_wr_addr,
+  --  Header_wr_data  => w_tx_header_wr_data
+  --);
 
-    Udp_axis_valid  => w_m_axis_valid and w_m_axis_ready(1),  --only transfer when both readies are high
-    Udp_axis_data   => w_m_axis_data,
-    Udp_axis_last   => w_m_axis_last,
-    Udp_axis_ready  => w_m_axis_ready(0),
-
-    Header_wr_en    => w_tx_header_wr_en,
-    Header_wr_addr  => w_tx_header_wr_addr,
-    Header_wr_data  => w_tx_header_wr_data
-  );
+  w_tx_header_wr_en <= '0';
+  w_tx_header_wr_addr <= (others => '0');
+  w_tx_header_wr_data <= (others => '0');
+  w_m_axis_ready(0) <= '1';
 
   i_tx_axi_fifo : entity axi_lib.axis_async_fifo
   generic map (
@@ -245,26 +250,26 @@ begin
     Udp_ready     => w_from_axi_to_udp_ready
   );
 
-  i_tx_udp_tx : entity eth_lib.udp_tx
-  port map (
-    Clk               => Hw_gmii_tx_clk,
-    Rst               => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
-
-    Header_wr_en      => w_tx_header_wr_en,
-    Header_wr_addr    => w_tx_header_wr_addr,
-    Header_wr_data    => w_tx_header_wr_data,
-
-    Udp_length        => w_from_axi_to_udp_length,
-    Udp_data          => w_from_axi_to_udp_data,
-    Udp_valid         => w_from_axi_to_udp_valid,
-    Udp_last          => w_from_axi_to_udp_last,
-    Udp_ready         => w_from_axi_to_udp_ready,
-
-    Mac_payload_data  => w_from_udp_tx_payload_data,
-    Mac_payload_valid => w_from_udp_tx_payload_valid,
-    Mac_payload_last  => w_from_udp_tx_payload_last,
-    Mac_payload_ready => w_from_udp_tx_payload_ready
-  );
+  --i_tx_udp_tx : entity eth_lib.udp_tx
+  --port map (
+  --  Clk               => Hw_gmii_tx_clk,
+  --  Rst               => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
+  --
+  --  Header_wr_en      => w_tx_header_wr_en,
+  --  Header_wr_addr    => w_tx_header_wr_addr,
+  --  Header_wr_data    => w_tx_header_wr_data,
+  --
+  --  Udp_length        => w_from_axi_to_udp_length,
+  --  Udp_data          => w_from_axi_to_udp_data,
+  --  Udp_valid         => w_from_axi_to_udp_valid,
+  --  Udp_last          => w_from_axi_to_udp_last,
+  --  Udp_ready         => w_from_axi_to_udp_ready,
+  --
+  --  Mac_payload_data  => w_from_udp_tx_payload_data,
+  --  Mac_payload_valid => w_from_udp_tx_payload_valid,
+  --  Mac_payload_last  => w_from_udp_tx_payload_last,
+  --  Mac_payload_ready => w_from_udp_tx_payload_ready
+  --);
 
   --i_rx_buffer : entity eth_lib.gmii_buffer
   --generic map (
@@ -287,27 +292,27 @@ begin
   --  Output_ready    => w_from_rx_buffer_ready
   --);
 
-  i_rx_cdc : entity axi_lib.axis_async_fifo
-  generic map (
-    FIFO_DEPTH        => 4096,
-    ALMOST_FULL_LEVEL => 4096 - 5,
-    AXI_DATA_WIDTH    => 8
-  )
-  port map (
-    S_axis_clk          => Hw_gmii_rx_clk,
-    S_axis_resetn       => not(r_rst_gmii_rx(CDC_PIPE_STAGES - 1)),
-    S_axis_ready        => w_from_rx_to_udp_ready, ----w_from_rx_buffer_ready,
-    S_axis_valid        => w_from_rx_to_udp_valid and w_from_rx_to_udp_last, --w_from_rx_buffer_valid,
-    S_axis_data         => w_from_rx_to_udp_data, --w_from_rx_buffer_data,
-    S_axis_last         => w_from_rx_to_udp_last, ----w_from_rx_buffer_last,
-    S_axis_almost_full  => open,
-
-    M_axis_clk          => Hw_gmii_tx_clk,
-    M_axis_ready        => w_from_rx_cdc_ready,
-    M_axis_valid        => w_from_rx_cdc_valid,
-    M_axis_data         => w_from_rx_cdc_data,
-    M_axis_last         => w_from_rx_cdc_last
-  );
+  --i_rx_cdc : entity axi_lib.axis_async_fifo
+  --generic map (
+  --  FIFO_DEPTH        => 4096,
+  --  ALMOST_FULL_LEVEL => 4096 - 5,
+  --  AXI_DATA_WIDTH    => 8
+  --)
+  --port map (
+  --  S_axis_clk          => Hw_gmii_rx_clk,
+  --  S_axis_resetn       => not(r_rst_gmii_rx(CDC_PIPE_STAGES - 1)),
+  --  S_axis_ready        => w_from_rx_to_udp_ready, ----w_from_rx_buffer_ready,
+  --  S_axis_valid        => w_from_rx_to_udp_valid and w_from_rx_to_udp_last, --w_from_rx_buffer_valid,
+  --  S_axis_data         => w_from_rx_to_udp_data, --w_from_rx_buffer_data,
+  --  S_axis_last         => w_from_rx_to_udp_last, ----w_from_rx_buffer_last,
+  --  S_axis_almost_full  => open,
+  --
+  --  M_axis_clk          => Hw_gmii_tx_clk,
+  --  M_axis_ready        => w_from_rx_cdc_ready,
+  --  M_axis_valid        => w_from_rx_cdc_valid,
+  --  M_axis_data         => w_from_rx_cdc_data,
+  --  M_axis_last         => w_from_rx_cdc_last
+  --);
 
   i_tx_mac : entity eth_lib.mac_1g_tx
   port map (
@@ -322,10 +327,15 @@ begin
     --Payload_valid   => w_from_udp_tx_payload_valid,
     --Payload_last    => w_from_udp_tx_payload_last,
     --Payload_ready   => w_from_udp_tx_payload_ready,
-    Payload_data    => w_from_rx_cdc_data,
-    Payload_valid   => w_from_rx_cdc_valid,
-    Payload_last    => w_from_rx_cdc_last,
-    Payload_ready   => w_from_rx_cdc_ready,
+
+    Payload_data    => w_from_axi_to_udp_data,
+    Payload_valid   => w_from_axi_to_udp_valid,
+    Payload_last    => w_from_axi_to_udp_last,
+    Payload_ready   => w_from_axi_to_udp_ready,
+    --Payload_data    => w_from_rx_cdc_data,
+    --Payload_valid   => w_from_rx_cdc_valid,
+    --Payload_last    => w_from_rx_cdc_last,
+    --Payload_ready   => w_from_rx_cdc_ready,
 
     Mac_data        => w_from_mac_data,
     Mac_valid       => w_from_mac_valid,
@@ -416,15 +426,15 @@ begin
     Clk           => Hw_gmii_rx_clk,
     Rst           => r_rst_gmii_rx(CDC_PIPE_STAGES - 1),
 
-    Udp_data      => (others => '0'), --w_from_rx_to_udp_data,
-    Udp_valid     => '0', --w_from_rx_to_udp_valid,
-    Udp_last      => '0', --w_from_rx_to_udp_last,
-    Udp_ready     => open, --w_from_rx_to_udp_ready,
+    Udp_data      => w_from_rx_to_udp_data,
+    Udp_valid     => w_from_rx_to_udp_valid,
+    Udp_last      => w_from_rx_to_udp_last,
+    Udp_ready     => w_from_rx_to_udp_ready,
 
     M_axis_valid  => w_m_axis_valid,
     M_axis_data   => w_m_axis_data,
     M_axis_last   => w_m_axis_last,
-    M_axis_ready  => and_reduce(w_m_axis_ready)
+    M_axis_ready  => w_m_axis_ready(1) --and_reduce(w_m_axis_ready)
   );
 
   i_rx_axi_fifo : entity axi_lib.axis_async_fifo
@@ -437,7 +447,7 @@ begin
     S_axis_clk          => Hw_gmii_rx_clk,
     S_axis_resetn       => not(r_rst_gmii_rx(CDC_PIPE_STAGES - 1)),
     S_axis_ready        => w_m_axis_ready(1),
-    S_axis_valid        => w_m_axis_valid and w_m_axis_ready(0), --only transfer when both readies are high
+    S_axis_valid        => w_m_axis_valid, --and w_m_axis_ready(0), --only transfer when both readies are high
     S_axis_data         => w_m_axis_data,
     S_axis_last         => w_m_axis_last,
     S_axis_almost_full  => open,

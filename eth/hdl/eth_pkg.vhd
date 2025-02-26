@@ -28,7 +28,7 @@ package eth_pkg is
   constant ETH_MAC_LENGTH                 : natural := 6;
   constant ETH_TYPE_LENGTH                : natural := 2;
   constant ETH_FCS_LENGTH                 : natural := 4;
-  constant ETH_IFG_LENGTH                 : natural := 12;
+  constant ETH_IFG_LENGTH                 : natural := 16;
 
   constant ETH_PREAMBLE_BYTE              : std_logic_vector(7 downto 0)  := x"55";
   constant ETH_SFD_BYTE                   : std_logic_vector(7 downto 0)  := x"D5";
