@@ -21,43 +21,49 @@ generic (
   OUTPUT_FIFO_DEPTH : natural
 );
 port (
-  Sys_clk         : in  std_logic;
-  Sys_rst         : in  std_logic;
+  Sys_clk           : in  std_logic;
+  Sys_rst           : in  std_logic;
 
-  Ps_gmii_rx_clk  : out std_logic;
-  Ps_gmii_tx_clk  : out std_logic;
-  Ps_gmii_col     : out std_logic;
-  Ps_gmii_crs     : out std_logic;
-  Ps_gmii_rx_dv   : out std_logic;
-  Ps_gmii_rx_er   : out std_logic;
-  Ps_gmii_rxd     : out std_logic_vector(7 downto 0);
-  Ps_gmii_tx_en   : in  std_logic;
-  Ps_gmii_tx_er   : in  std_logic;
-  Ps_gmii_txd     : in  std_logic_vector(7 downto 0);
+  Ps_gmii_rx_clk    : out std_logic;
+  Ps_gmii_tx_clk    : out std_logic;
+  Ps_gmii_col       : out std_logic;
+  Ps_gmii_crs       : out std_logic;
+  Ps_gmii_rx_dv     : out std_logic;
+  Ps_gmii_rx_er     : out std_logic;
+  Ps_gmii_rxd       : out std_logic_vector(7 downto 0);
+  Ps_gmii_tx_en     : in  std_logic;
+  Ps_gmii_tx_er     : in  std_logic;
+  Ps_gmii_txd       : in  std_logic_vector(7 downto 0);
 
-  Hw_gmii_rx_clk  : in  std_logic;
-  Hw_gmii_tx_clk  : in  std_logic;
-  Hw_gmii_col     : in  std_logic;
-  Hw_gmii_crs     : in  std_logic;
-  Hw_gmii_rx_dv   : in  std_logic;
-  Hw_gmii_rx_er   : in  std_logic;
-  Hw_gmii_rxd     : in  std_logic_vector(7 downto 0);
-  Hw_gmii_tx_en   : out std_logic;
-  Hw_gmii_tx_er   : out std_logic;
-  Hw_gmii_txd     : out std_logic_vector(7 downto 0);
+  Hw_gmii_rx_clk    : in  std_logic;
+  Hw_gmii_tx_clk    : in  std_logic;
+  Hw_gmii_col       : in  std_logic;
+  Hw_gmii_crs       : in  std_logic;
+  Hw_gmii_rx_dv     : in  std_logic;
+  Hw_gmii_rx_er     : in  std_logic;
+  Hw_gmii_rxd       : in  std_logic_vector(7 downto 0);
+  Hw_gmii_tx_en     : out std_logic;
+  Hw_gmii_tx_er     : out std_logic;
+  Hw_gmii_txd       : out std_logic_vector(7 downto 0);
 
-  S_axis_clk      : in  std_logic;
-  S_axis_resetn   : in  std_logic;
-  S_axis_valid    : in  std_logic;
-  S_axis_data     : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  S_axis_last     : in  std_logic;
-  S_axis_ready    : out std_logic;
+  S_axis_clk        : in  std_logic;
+  S_axis_resetn     : in  std_logic;
+  S_axis_valid      : in  std_logic;
+  S_axis_data       : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  S_axis_last       : in  std_logic;
+  S_axis_ready      : out std_logic;
 
-  M_axis_clk      : in  std_logic;
-  M_axis_valid    : out std_logic;
-  M_axis_data     : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  M_axis_last     : out std_logic;
-  M_axis_ready    : in  std_logic
+  M_axis_clk        : in  std_logic;
+  M_axis_valid      : out std_logic;
+  M_axis_data       : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  M_axis_last       : out std_logic;
+  M_axis_ready      : in  std_logic;
+
+  Debug_axis_clk    : in  std_logic;
+  Debug_axis_valid  : out std_logic;
+  Debug_axis_data   : out std_logic_vector(7 downto 0);
+  Debug_axis_last   : out std_logic;
+  Debug_axis_ready  : in  std_logic
 );
 end entity udp_intf;
 
@@ -109,6 +115,8 @@ architecture rtl of udp_intf is
   signal w_from_tx_buffer_valid       : std_logic;
   signal w_from_tx_buffer_last        : std_logic;
   signal w_from_tx_buffer_ready       : std_logic;
+
+  signal w_debug_axis_ready           : std_logic;
 
   signal w_gmii_to_arb_data           : std_logic_vector_array_t(1 downto 0)(7 downto 0);
   signal w_gmii_to_arb_valid          : std_logic_vector(1 downto 0);
@@ -301,10 +309,32 @@ begin
     Output_ready    => w_from_tx_buffer_ready
   );
 
+  i_debug_fifo : entity axi_lib.axis_async_fifo
+  generic map (
+    FIFO_DEPTH        => 4096,
+    ALMOST_FULL_LEVEL => 4096 - 5,
+    AXI_DATA_WIDTH    => 8
+  )
+  port map (
+    S_axis_clk          => Hw_gmii_tx_clk,
+    S_axis_resetn       => not(r_rst_gmii_tx(CDC_PIPE_STAGES - 1)),
+    S_axis_ready        => w_debug_axis_ready,
+    S_axis_valid        => w_from_tx_buffer_valid and w_gmii_to_arb_ready(1),
+    S_axis_data         => w_from_tx_buffer_data,
+    S_axis_last         => w_from_tx_buffer_last,
+    S_axis_almost_full  => open,
+
+    M_axis_clk          => Debug_axis_clk,
+    M_axis_ready        => Debug_axis_ready,
+    M_axis_valid        => Debug_axis_valid,
+    M_axis_data         => Debug_axis_data,
+    M_axis_last         => Debug_axis_last
+  );
+
   w_gmii_to_arb_data(1)   <= w_from_tx_buffer_data;
-  w_gmii_to_arb_valid(1)  <= w_from_tx_buffer_valid;
+  w_gmii_to_arb_valid(1)  <= w_from_tx_buffer_valid and w_debug_axis_ready;
   w_gmii_to_arb_last(1)   <= w_from_tx_buffer_last;
-  w_from_tx_buffer_ready  <= w_gmii_to_arb_ready(1);
+  w_from_tx_buffer_ready  <= w_gmii_to_arb_ready(1) and w_debug_axis_ready;
 
   i_tx_arb : entity eth_lib.gmii_arb
   generic map (

@@ -151,11 +151,17 @@ module udp_intf_tb;
   int   num_received_gmii_hw = 0;
 
   logic r_axi_rx_ready;
+  logic r_debug_rx_ready;
 
   logic w_axi_rx_valid;
   logic w_axi_rx_ready;
   logic w_axi_rx_last;
   logic [AXI_DATA_WIDTH - 1 : 0] w_axi_rx_data;
+
+  logic w_debug_rx_valid;
+  logic w_debug_rx_ready;
+  logic w_debug_rx_last;
+  logic [7:0] w_debug_rx_data;
 
   initial begin
     Clk_axi = 0;
@@ -187,6 +193,7 @@ module udp_intf_tb;
 
   always_ff @(posedge Clk_axi) begin
     r_axi_rx_ready <= $urandom_range(99) < 80;
+    r_debug_rx_ready <= $urandom_range(99) < 80;
   end
 
   udp_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH), .OUTPUT_FIFO_DEPTH(OUTPUT_FIFO_DEPTH)) dut
@@ -227,7 +234,7 @@ module udp_intf_tb;
     .M_axis_valid   (w_axi_rx_valid),
     .M_axis_data    (rx_axi_intf.data),
     .M_axis_last    (rx_axi_intf.last),
-    .M_axis_ready   (r_axi_rx_ready)
+    .M_axis_ready   (r_axi_rx_ready),
 /*
     //loopback
     .S_axis_clk     (Clk_axi),
@@ -243,6 +250,12 @@ module udp_intf_tb;
     .M_axis_last    (w_axi_rx_last),
     .M_axis_ready   (w_axi_rx_ready)
 */
+
+    .Debug_axis_clk    (Clk_axi),
+    .Debug_axis_valid  (w_debug_rx_valid),
+    .Debug_axis_data   (w_debug_rx_data),
+    .Debug_axis_last   (w_debug_rx_last),
+    .Debug_axis_ready  (r_debug_rx_ready)
   );
 
   assign rx_axi_intf.valid = w_axi_rx_valid && r_axi_rx_ready;
@@ -397,10 +410,22 @@ module udp_intf_tb;
   initial begin
     while (1) begin
       @(posedge Clk_axi);
+      if (axi_tx_queue.size() > 0) begin
+        $display("%0t: writing: %p", $time, axi_tx_queue[0].data);
+        tx_axi_intf.write(axi_tx_queue[0].data);
+        repeat(axi_tx_queue[0].post_packet_delay) @(posedge Clk_axi);
+        void'(axi_tx_queue.pop_front());
+      end
+    end
+  end
+
+  initial begin
+    while (1) begin
+      @(posedge Clk_gmii);
       if (from_hw_tx_queue.size() > 0) begin
         $display("%0t: writing: %p", $time, from_hw_tx_queue[0].data);
         from_hw_gmii_tx_intf.write(from_hw_tx_queue[0].data, from_hw_tx_queue[0].error);
-        repeat(from_hw_tx_queue[0].post_packet_delay) @(posedge Clk_axi);
+        repeat(from_hw_tx_queue[0].post_packet_delay) @(posedge Clk_gmii);
         void'(from_hw_tx_queue.pop_front());
       end
     end
@@ -408,17 +433,17 @@ module udp_intf_tb;
 
   initial begin
     while (1) begin
-      @(posedge Clk_axi);
+      @(posedge Clk_gmii);
       if (from_ps_tx_queue.size() > 0) begin
         $display("%0t: writing: %p", $time, from_ps_tx_queue[0].data);
         from_ps_gmii_tx_intf.write(from_ps_tx_queue[0].data, from_ps_tx_queue[0].error);
-        repeat(from_ps_tx_queue[0].post_packet_delay) @(posedge Clk_axi);
+        repeat(from_ps_tx_queue[0].post_packet_delay) @(posedge Clk_gmii);
         void'(from_ps_tx_queue.pop_front());
       end
     end
   end
 
-  function automatic bit get_expected_data_axi(gmii_tx_data_t tx_data, output axi_expect_t e);
+  function automatic bit get_expected_data_axi_from_gmii(gmii_tx_data_t tx_data, output axi_expect_t e);
     logic [31:0] output_data;
     logic [7:0] udp_payload [$];
     logic [15:0] udp_dest_port;
@@ -574,14 +599,35 @@ module udp_intf_tb;
 
       to_ps_expected_data.push_back('{data: setup_packet.data});
 
-      if (get_expected_data_axi(setup_packet, axi_e)) begin
+      if (get_expected_data_axi_from_gmii(setup_packet, axi_e)) begin
         axi_expected_data.push_back(axi_e);
       end
 
-      repeat(200) @(posedge Clk_axi);
+      repeat(1000) @(posedge Clk_axi);
 
       /*from_hw_tx_queue.push_back(setup_packet);
       to_ps_expected_data.push_back('{data: setup_packet.data});*/
+
+      for (int i = 0; i < num_packets; i++) begin
+        int packet_len = $urandom_range(200, 10);
+
+        ps_tx_data.post_packet_delay = $urandom_range(max_write_delay);
+        ps_tx_data.data.delete();
+
+        for (int j = 0; j < packet_len; j++) begin
+          ps_tx_data.data.push_back($urandom);
+          ps_tx_data.error.push_back(0);
+        end
+
+        from_ps_tx_queue.push_back(ps_tx_data);
+
+        hw_e.data = ps_tx_data.data;
+        to_hw_expected_data.push_back(hw_e);
+      end
+
+      while (from_ps_tx_queue.size() > 0) begin
+        @(posedge Clk_axi);
+      end
 
       for (int i = 0; i < num_packets; i++) begin
         int r = $urandom_range(99);
@@ -600,8 +646,8 @@ module udp_intf_tb;
 
         //$display("%0t: expecting: %p", $time, tx_data);
 
-        /*e = get_expected_data_axi(axi_tx_data);
-        expected_data.push_back(e);*/
+        //e = get_expected_data_axi(axi_tx_data);
+        //axi_expected_data.push_back(e);
       end
 
       begin

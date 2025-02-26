@@ -58,8 +58,10 @@ ad_ip_parameter sys_ps7 CONFIG.PCW_ENET0_PERIPHERAL_ENABLE 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_ENET0_ENET0_IO "EMIO"
 ad_ip_parameter sys_ps7 CONFIG.PCW_ENET0_GRP_MDIO_ENABLE 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_ENET0_GRP_MDIO_IO "EMIO"
+ad_ip_parameter sys_ps7 CONFIG.PCW_USE_S_AXI_HP0 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_USE_S_AXI_HP1 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_USE_S_AXI_HP2 1
+ad_ip_parameter sys_ps7 CONFIG.PCW_USE_S_AXI_HP3 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_EN_CLK1_PORT 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_EN_RST1_PORT 1
 ad_ip_parameter sys_ps7 CONFIG.PCW_FPGA0_PERIPHERAL_FREQMHZ 100.0
@@ -239,6 +241,27 @@ ad_ip_parameter axi_ad9361_adc_dma CONFIG.DMA_2D_TRANSFER 0
 ad_ip_parameter axi_ad9361_adc_dma CONFIG.DMA_DATA_WIDTH_SRC 64
 ad_ip_parameter axi_ad9361_adc_dma CONFIG.SYNC_TRANSFER_START {true}
 
+ad_ip_instance axi_dmac axi_custom_dma_d2h
+ad_ip_parameter axi_custom_dma_d2h CONFIG.DMA_TYPE_SRC          1
+ad_ip_parameter axi_custom_dma_d2h CONFIG.DMA_TYPE_DEST         0
+ad_ip_parameter axi_custom_dma_d2h CONFIG.CYCLIC                0
+ad_ip_parameter axi_custom_dma_d2h CONFIG.AXI_SLICE_SRC         0
+ad_ip_parameter axi_custom_dma_d2h CONFIG.AXI_SLICE_DEST        0
+ad_ip_parameter axi_custom_dma_d2h CONFIG.DMA_2D_TRANSFER       0
+ad_ip_parameter axi_custom_dma_d2h CONFIG.DMA_DATA_WIDTH_SRC    8
+ad_ip_parameter axi_custom_dma_d2h CONFIG.SYNC_TRANSFER_START   0
+ad_ip_parameter axi_custom_dma_d2h CONFIG.ENABLE_DIAGNOSTICS_IF 1
+
+ad_ip_instance axi_dmac axi_custom_dma_h2d
+ad_ip_parameter axi_custom_dma_h2d CONFIG.DMA_TYPE_SRC          0
+ad_ip_parameter axi_custom_dma_h2d CONFIG.DMA_TYPE_DEST         1
+ad_ip_parameter axi_custom_dma_h2d CONFIG.CYCLIC                0
+ad_ip_parameter axi_custom_dma_h2d CONFIG.AXI_SLICE_SRC         0
+ad_ip_parameter axi_custom_dma_h2d CONFIG.AXI_SLICE_DEST        0
+ad_ip_parameter axi_custom_dma_h2d CONFIG.DMA_2D_TRANSFER       0
+ad_ip_parameter axi_custom_dma_h2d CONFIG.DMA_DATA_WIDTH_DEST   32
+
+
 ad_add_decimation_filter "rx_fir_decimator" 8 2 1 {61.44} {61.44} \
                          "$ad_hdl_dir/library/util_fir_int/coefile_int.coe"
 ad_ip_instance xlslice decim_slice
@@ -330,6 +353,8 @@ ad_cpu_interconnect 0x79020000 axi_ad9361
 ad_cpu_interconnect 0x7C400000 axi_ad9361_adc_dma
 ad_cpu_interconnect 0x7C420000 axi_ad9361_dac_dma
 ad_cpu_interconnect 0x7C440000 axi_tdd_0
+ad_cpu_interconnect 0x7C450000 axi_custom_dma_d2h
+ad_cpu_interconnect 0x7C460000 axi_custom_dma_h2d
 ad_cpu_interconnect 0x43C00000 axi_vcxo_ctrl
 
 ad_ip_parameter sys_ps7 CONFIG.PCW_USE_S_AXI_HP1 {1}
@@ -350,15 +375,45 @@ create_bd_addr_seg -range 0x20000000 -offset 0x00000000 \
                     [get_bd_addr_segs sys_ps7/S_AXI_HP2/HP2_DDR_LOWOCM] \
                     SEG_sys_ps7_HP2_DDR_LOWOCM
 
+# D2H DMA
+ad_ip_parameter sys_ps7                       CONFIG.PCW_USE_S_AXI_HP3 {1}
+ad_connect      sys_cpu_clk                   sys_ps7/S_AXI_HP3_ACLK
+ad_connect      axi_custom_dma_d2h/m_dest_axi sys_ps7/S_AXI_HP3
+
+create_bd_addr_seg -range 0x20000000 -offset 0x00000000 \
+                    [get_bd_addr_spaces axi_custom_dma_d2h/m_dest_axi] \
+                    [get_bd_addr_segs sys_ps7/S_AXI_HP3/HP3_DDR_LOWOCM] \
+                    SEG_sys_ps7_HP3_DDR_LOWOCM
+
+# H2D DMA
+ad_ip_parameter sys_ps7                       CONFIG.PCW_USE_S_AXI_HP0 {1}
+ad_connect      sys_cpu_clk                   sys_ps7/S_AXI_HP0_ACLK
+ad_connect      axi_custom_dma_h2d/m_src_axi  sys_ps7/S_AXI_HP0
+
+create_bd_addr_seg -range 0x20000000 -offset 0x00000000 \
+                    [get_bd_addr_spaces axi_custom_dma_h2d/m_src_axi] \
+                    [get_bd_addr_segs sys_ps7/S_AXI_HP0/HP0_DDR_LOWOCM] \
+                    SEG_sys_ps7_HP0_DDR_LOWOCM
+
 ad_connect sys_cpu_clk axi_ad9361_dac_dma/m_src_axi_aclk
 ad_connect sys_cpu_clk axi_ad9361_adc_dma/m_dest_axi_aclk
 ad_connect sys_cpu_resetn axi_ad9361_adc_dma/m_dest_axi_aresetn
 ad_connect sys_cpu_resetn axi_ad9361_dac_dma/m_src_axi_aresetn
 
+ad_connect sys_cpu_clk    axi_custom_dma_d2h/m_dest_axi_aclk
+ad_connect sys_cpu_resetn axi_custom_dma_d2h/m_dest_axi_aresetn
+ad_connect sys_cpu_clk    axi_custom_dma_h2d/m_src_axi_aclk
+ad_connect sys_cpu_resetn axi_custom_dma_h2d/m_src_axi_aresetn
+ad_connect sys_cpu_clk    axi_custom_dma_d2h/s_axis_aclk
+ad_connect sys_cpu_clk    axi_custom_dma_h2d/m_axis_aclk
+
 # interrupts
 
 ad_cpu_interrupt ps-13 mb-13 axi_ad9361_adc_dma/irq
 ad_cpu_interrupt ps-12 mb-12 axi_ad9361_dac_dma/irq
+
+ad_cpu_interrupt ps-9   mb-9    axi_custom_dma_d2h/irq
+ad_cpu_interrupt ps-10  mb-10   axi_custom_dma_h2d/irq
 
 
 # #################
@@ -377,13 +432,14 @@ ad_ip_instance udp_intf   udp_intf
 ad_ip_parameter udp_intf  CONFIG.AXI_DATA_WIDTH     32
 ad_ip_parameter udp_intf  CONFIG.OUTPUT_FIFO_DEPTH  1024
 
-ad_connect udp_intf/Sys_clk       sys_cpu_clk
-ad_connect udp_intf/Sys_rst       sys_cpu_reset
-ad_connect udp_intf/Hw_gmii       sys_rgmii/GMII
-ad_connect udp_intf/Ps_gmii       sys_ps7/GMII_ETHERNET_0
-ad_connect udp_intf/S_axis_clk    sys_cpu_clk
-ad_connect udp_intf/S_axis_resetn sys_cpu_resetn
-ad_connect udp_intf/M_axis_clk    sys_cpu_clk
+ad_connect udp_intf/Sys_clk         sys_cpu_clk
+ad_connect udp_intf/Sys_rst         sys_cpu_reset
+ad_connect udp_intf/Hw_gmii         sys_rgmii/GMII
+ad_connect udp_intf/Ps_gmii         sys_ps7/GMII_ETHERNET_0
+ad_connect udp_intf/S_axis_clk      sys_cpu_clk
+ad_connect udp_intf/S_axis_resetn   sys_cpu_resetn
+ad_connect udp_intf/M_axis_clk      sys_cpu_clk
+ad_connect udp_intf/Debug_axis_clk  sys_cpu_clk
 
 ad_connect ecm_clocks/Adc_clk     axi_ad9361/l_clk
 ad_connect ecm_clocks/Adc_rst     axi_ad9361/rst
@@ -411,3 +467,6 @@ ad_connect  axi_ad9361/dac_data_i0  GND
 ad_connect  axi_ad9361/dac_data_q0  GND
 ad_connect  ad9361_ctl              GND
 ad_connect  udp_intf/M_axis         udp_intf/S_axis
+
+ad_connect udp_intf/Debug_axis              axi_custom_dma_d2h/S_axis
+ad_connect axi_custom_dma_h2d/m_axis_ready  VCC

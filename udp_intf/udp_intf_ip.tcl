@@ -43,13 +43,24 @@ adi_add_bus_clock "S_axis_clk" "S_axis" "S_axis_resetn"
 adi_add_bus "M_axis" "master"         \
   "xilinx.com:interface:axis_rtl:1.0" \
   "xilinx.com:interface:axis:1.0"     \
-  [list {"m_axis_ready" "TREADY"}     \
+  [list {"M_axis_ready" "TREADY"}     \
         {"M_axis_valid" "TVALID"}     \
         {"M_axis_data" "TDATA"}       \
         {"M_axis_last" "TLAST"}       \
   ]
 #no m_axis reset
 adi_add_bus_clock "M_axis_clk" "M_axis"
+
+adi_add_bus "Debug_axis" "master"         \
+  "xilinx.com:interface:axis_rtl:1.0" \
+  "xilinx.com:interface:axis:1.0"     \
+  [list {"Debug_axis_ready" "TREADY"}     \
+        {"Debug_axis_valid" "TVALID"}     \
+        {"Debug_axis_data" "TDATA"}       \
+        {"Debug_axis_last" "TLAST"}       \
+  ]
+#no m_axis reset
+adi_add_bus_clock "Debug_axis_clk" "Debug_axis"
 
 ipx::infer_bus_interface Sys_clk xilinx.com:signal:clock_rtl:1.0 $cc
 set reset_intf      [ipx::infer_bus_interface Sys_rst xilinx.com:signal:reset_rtl:1.0 $cc]
