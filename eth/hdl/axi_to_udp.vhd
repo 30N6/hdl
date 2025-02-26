@@ -39,7 +39,7 @@ end entity axi_to_udp;
 
 architecture rtl of axi_to_udp is
 
-  type state_t is (S_IDLE, S_ACTIVE, S_DONE);
+  type state_t is (S_IDLE, S_SEQ_NUM, S_ACTIVE, S_DONE);
 
   constant DATA_FIFO_WIDTH              : natural := 8 + 1;
   constant DATA_FIFO_ALMOST_FULL_LEVEL  : natural := DATA_FIFO_DEPTH - 8;
@@ -55,6 +55,8 @@ architecture rtl of axi_to_udp is
   signal s_state                        : state_t;
   signal r_byte_index                   : unsigned(1 downto 0);
   signal r_data_length                  : unsigned(ETH_UDP_LENGTH_WIDTH - 1 downto 0);
+
+  signal r_seq_num                      : unsigned(31 downto 0);
 
   signal w_data_fifo_wr_en              : std_logic;
   signal w_data_fifo_wr_last            : std_logic;
@@ -122,9 +124,16 @@ begin
           case s_state is
           when S_IDLE =>
             if (w_input_valid = '1') then
-              s_state <= S_ACTIVE;
+              s_state <= S_SEQ_NUM;
             else
               s_state <= S_IDLE;
+            end if;
+
+          when S_SEQ_NUM =>
+            if (r_byte_index = 3) then
+              s_state <= S_ACTIVE;
+            else
+              s_state <= S_SEQ_NUM;
             end if;
 
           when S_ACTIVE =>
@@ -158,10 +167,38 @@ begin
     end if;
   end process;
 
-  w_data_fifo_wr_en   <= to_stdlogic(s_state = S_ACTIVE) and not(w_any_fifo_almost_full) and w_input_valid;
-  w_data_fifo_wr_last <= w_input_last and to_stdlogic(r_byte_index = 3);
-  w_data_fifo_wr_data <= shift_right(w_input_data, 8 * to_integer(r_byte_index))(7 downto 0);
-  w_frame_fifo_wr_en  <= to_stdlogic(s_state = S_ACTIVE) and not(w_any_fifo_almost_full) and w_input_valid and w_input_last and to_stdlogic(r_byte_index = 3);
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      if (r_rst = '1') then
+        r_seq_num <= (others => '0');
+      else
+        if ((w_any_fifo_almost_full = '0') and (s_state = S_DONE)) then
+          r_seq_num <= r_seq_num + 1;
+        end if;
+      end if;
+    end if;
+  end process;
+
+  process(all)
+  begin
+    if (s_state = S_SEQ_NUM) then
+      w_data_fifo_wr_en   <= not(w_any_fifo_almost_full);
+      w_data_fifo_wr_last <= '0';
+      w_data_fifo_wr_data <= shift_right(std_logic_vector(byteswap(r_seq_num, 8)), 8 * to_integer(r_byte_index))(7 downto 0);
+      w_frame_fifo_wr_en  <= '0';
+    elsif (s_state = S_ACTIVE) then
+      w_data_fifo_wr_en   <= not(w_any_fifo_almost_full) and w_input_valid;
+      w_data_fifo_wr_last <= w_input_last and to_stdlogic(r_byte_index = 3);
+      w_data_fifo_wr_data <= shift_right(w_input_data, 8 * to_integer(r_byte_index))(7 downto 0);
+      w_frame_fifo_wr_en  <= not(w_any_fifo_almost_full) and w_input_valid and w_input_last and to_stdlogic(r_byte_index = 3);
+    else
+      w_data_fifo_wr_en   <= '0';
+      w_data_fifo_wr_last <= '-';
+      w_data_fifo_wr_data <= (others => '-');
+      w_frame_fifo_wr_en  <= '0';
+    end if;
+  end process;
 
   process(Clk)
   begin

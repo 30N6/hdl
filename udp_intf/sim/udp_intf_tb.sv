@@ -554,6 +554,7 @@ module udp_intf_tb;
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
       int max_write_delay = $urandom_range(5);
       int num_packets = $urandom_range(200, 100);
+      logic [31:0] udp_seq_num = 0;
 
       axi_tx_data_t   axi_tx_data;
       axi_expect_t    axi_e;

@@ -186,8 +186,12 @@ module axi_to_udp_tb;
     end
   end
 
-  function automatic expect_t get_expected_data(tx_data_t tx_data);
+  function automatic expect_t get_expected_data(logic [31:0] seq_num, tx_data_t tx_data);
     expect_t e;
+
+    for (int i = 0; i < 4; i++) begin
+      e.data.push_back(seq_num[(3-i)*8 +: 8]);
+    end
 
     for (int i = 0; i < tx_data.data.size(); i++) begin
       for (int j = 0; j < AXI_DATA_WIDTH/8; j++) begin
@@ -206,6 +210,7 @@ module axi_to_udp_tb;
       int num_packets = $urandom_range(200, 100);
       tx_data_t tx_data;
       expect_t e;
+      logic [31:0] seq_num = 0;
 
       $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
 
@@ -225,8 +230,9 @@ module axi_to_udp_tb;
         tx_queue.push_back(tx_data);
         $display("%0t: expecting: %p", $time, tx_data);
 
-        e = get_expected_data(tx_data);
+        e = get_expected_data(seq_num, tx_data);
         expected_data.push_back(e);
+        seq_num++;
       end
 
       begin
