@@ -61,7 +61,7 @@ port (
 
   Debug_axis_clk    : in  std_logic;
   Debug_axis_valid  : out std_logic;
-  Debug_axis_data   : out std_logic_vector(7 downto 0);
+  Debug_axis_data   : out std_logic_vector(15 downto 0);
   Debug_axis_last   : out std_logic;
   Debug_axis_ready  : in  std_logic
 );
