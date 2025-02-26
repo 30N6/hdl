@@ -103,12 +103,12 @@ architecture rtl of udp_intf is
   signal w_from_mac_last              : std_logic;
   signal w_from_mac_ready             : std_logic;
 
-  signal w_to_tx_buffer_accepted      : std_logic_vector(1 downto 0);
-  signal w_to_tx_buffer_dropped       : std_logic_vector(1 downto 0);
-  signal w_from_tx_buffer_data        : std_logic_vector_array_t(1 downto 0)(7 downto 0);
-  signal w_from_tx_buffer_valid       : std_logic_vector(1 downto 0);
-  signal w_from_tx_buffer_last        : std_logic_vector(1 downto 0);
-  signal w_from_tx_buffer_ready       : std_logic_vector(1 downto 0);
+  signal w_to_tx_buffer_accepted      : std_logic;
+  signal w_to_tx_buffer_dropped       : std_logic;
+  signal w_from_tx_buffer_data        : std_logic_vector(7 downto 0);
+  signal w_from_tx_buffer_valid       : std_logic;
+  signal w_from_tx_buffer_last        : std_logic;
+  signal w_from_tx_buffer_ready       : std_logic;
 
   signal w_gmii_to_arb_data           : std_logic_vector_array_t(1 downto 0)(7 downto 0);
   signal w_gmii_to_arb_valid          : std_logic_vector(1 downto 0);
@@ -128,6 +128,17 @@ architecture rtl of udp_intf is
   signal w_m_axis_data                : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   signal w_m_axis_last                : std_logic;
   signal w_m_axis_ready               : std_logic_vector(1 downto 0);
+
+  signal w_to_rx_buffer_accepted      : std_logic;
+  signal w_to_rx_buffer_dropped       : std_logic;
+  signal w_from_rx_buffer_data        : std_logic_vector(7 downto 0);
+  signal w_from_rx_buffer_valid       : std_logic;
+  signal w_from_rx_buffer_last        : std_logic;
+  signal w_from_rx_buffer_ready       : std_logic;
+  signal w_from_rx_cdc_data           : std_logic_vector(7 downto 0);
+  signal w_from_rx_cdc_valid          : std_logic;
+  signal w_from_rx_cdc_last           : std_logic;
+  signal w_from_rx_cdc_ready          : std_logic;
 
   attribute ASYNC_REG                   : string;
   attribute ASYNC_REG of r_rst_gmii_rx  : signal is "TRUE";
@@ -255,25 +266,47 @@ begin
     Mac_payload_ready => w_from_udp_tx_payload_ready
   );
 
-  i_tx_buffer_mac : entity eth_lib.gmii_buffer
+  i_rx_buffer : entity eth_lib.gmii_buffer
   generic map (
     DATA_DEPTH    => TX_BUFFER_DATA_DEPTH,
     FRAME_DEPTH   => TX_BUFFER_FRAME_DEPTH
   )
   port map (
-    Clk             => Hw_gmii_tx_clk,
-    Rst             => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
+    Clk             => Hw_gmii_rx_clk,
+    Rst             => r_rst_gmii_rx(CDC_PIPE_STAGES - 1),
 
-    Input_data      => Ps_gmii_txd,
-    Input_valid     => Ps_gmii_tx_en,
-    Input_error     => Ps_gmii_tx_er,
-    Input_accepted  => w_to_tx_buffer_accepted(1),
-    Input_dropped   => w_to_tx_buffer_dropped(1),
+    Input_data      => Hw_gmii_rxd,
+    Input_valid     => Hw_gmii_rx_dv,
+    Input_error     => Hw_gmii_rx_er,
+    Input_accepted  => w_to_rx_buffer_accepted,
+    Input_dropped   => w_to_rx_buffer_dropped,
 
-    Output_data     => w_from_tx_buffer_data(1),
-    Output_valid    => w_from_tx_buffer_valid(1),
-    Output_last     => w_from_tx_buffer_last(1),
-    Output_ready    => w_from_tx_buffer_ready(1)
+    Output_data     => w_from_rx_buffer_data,
+    Output_valid    => w_from_rx_buffer_valid,
+    Output_last     => w_from_rx_buffer_last,
+    Output_ready    => w_from_rx_buffer_ready
+  );
+
+  i_rx_cdc : entity axi_lib.axis_async_fifo
+  generic map (
+    FIFO_DEPTH        => 4096,
+    ALMOST_FULL_LEVEL => 4096 - 5,
+    AXI_DATA_WIDTH    => 8
+  )
+  port map (
+    S_axis_clk          => Hw_gmii_rx_clk,
+    S_axis_resetn       => not(r_rst_gmii_rx(CDC_PIPE_STAGES - 1)),
+    S_axis_ready        => w_from_rx_buffer_ready,
+    S_axis_valid        => w_from_rx_buffer_valid,
+    S_axis_data         => w_from_rx_buffer_data,
+    S_axis_last         => w_from_rx_buffer_last,
+    S_axis_almost_full  => open,
+
+    M_axis_clk          => Hw_gmii_tx_clk,
+    M_axis_ready        => w_from_rx_cdc_ready,
+    M_axis_valid        => w_from_rx_cdc_valid,
+    M_axis_data         => w_from_rx_cdc_data,
+    M_axis_last         => w_from_rx_cdc_last
   );
 
   i_tx_mac : entity eth_lib.mac_1g_tx
@@ -289,10 +322,10 @@ begin
     --Payload_valid   => w_from_udp_tx_payload_valid,
     --Payload_last    => w_from_udp_tx_payload_last,
     --Payload_ready   => w_from_udp_tx_payload_ready,
-    Payload_data    => w_from_tx_buffer_data(1),
-    Payload_valid   => w_from_tx_buffer_valid(1),
-    Payload_last    => w_from_tx_buffer_last(1),
-    Payload_ready   => w_from_tx_buffer_ready(1),
+    Payload_data    => w_from_rx_cdc_data,
+    Payload_valid   => w_from_rx_cdc_valid,
+    Payload_last    => w_from_rx_cdc_last,
+    Payload_ready   => w_from_rx_cdc_ready,
 
     Mac_data        => w_from_mac_data,
     Mac_valid       => w_from_mac_valid,
@@ -317,19 +350,19 @@ begin
     Input_data      => Ps_gmii_txd,
     Input_valid     => Ps_gmii_tx_en,
     Input_error     => Ps_gmii_tx_er,
-    Input_accepted  => w_to_tx_buffer_accepted(0),
-    Input_dropped   => w_to_tx_buffer_dropped(0),
+    Input_accepted  => w_to_tx_buffer_accepted,
+    Input_dropped   => w_to_tx_buffer_dropped,
 
-    Output_data     => w_from_tx_buffer_data(0),
-    Output_valid    => w_from_tx_buffer_valid(0),
-    Output_last     => w_from_tx_buffer_last(0),
-    Output_ready    => w_from_tx_buffer_ready(0)
+    Output_data     => w_from_tx_buffer_data,
+    Output_valid    => w_from_tx_buffer_valid,
+    Output_last     => w_from_tx_buffer_last,
+    Output_ready    => w_from_tx_buffer_ready
   );
 
-  w_gmii_to_arb_data(1)     <= w_from_tx_buffer_data(0);
-  w_gmii_to_arb_valid(1)    <= w_from_tx_buffer_valid(0);
-  w_gmii_to_arb_last(1)     <= w_from_tx_buffer_last(0);
-  w_from_tx_buffer_ready(0) <= w_gmii_to_arb_ready(1);
+  w_gmii_to_arb_data(1)   <= w_from_tx_buffer_data;
+  w_gmii_to_arb_valid(1)  <= w_from_tx_buffer_valid;
+  w_gmii_to_arb_last(1)   <= w_from_tx_buffer_last;
+  w_from_tx_buffer_ready  <= w_gmii_to_arb_ready(1);
 
   i_tx_arb : entity eth_lib.gmii_arb
   generic map (

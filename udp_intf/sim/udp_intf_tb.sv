@@ -303,7 +303,7 @@ module udp_intf_tb;
 
     return 1;
   endfunction
-
+/*
   initial begin
     automatic logic [AXI_DATA_WIDTH - 1 : 0] read_data [$];
 
@@ -362,7 +362,7 @@ module udp_intf_tb;
 
       num_received_gmii_ps++;
     end
-  end
+  end*/
 
   final begin
     if ( axi_expected_data.size() != 0 ) begin
@@ -615,6 +615,29 @@ module udp_intf_tb;
       while (from_ps_tx_queue.size() > 0) begin
         @(posedge Clk_axi);
       end
+      repeat(1000) @(posedge Clk_axi);
+
+      for (int i = 0; i < num_packets; i++) begin
+        int packet_len = $urandom_range(200, 10);
+
+        hw_tx_data.post_packet_delay = $urandom_range(max_write_delay);
+        hw_tx_data.data.delete();
+
+        for (int j = 0; j < packet_len; j++) begin
+          hw_tx_data.data.push_back($urandom);
+          hw_tx_data.error.push_back(0);
+        end
+
+        from_hw_tx_queue.push_back(hw_tx_data);
+
+        ps_e.data = hw_tx_data.data;
+        to_ps_expected_data.push_back(ps_e);
+      end
+
+      while (from_hw_tx_queue.size() > 0) begin
+        @(posedge Clk_axi);
+      end
+      repeat(1000) @(posedge Clk_axi);
 
       for (int i = 0; i < num_packets; i++) begin
         int r = $urandom_range(99);
