@@ -60,7 +60,7 @@ architecture rtl of udp_tx is
   signal w_input_last                     : std_logic;
   signal w_input_ready                    : std_logic;
 
-  signal r_header                         : std_logic_vector(ETH_TX_HEADER_WORD_LENGTH * 32 - 1 downto 0);
+  signal r_header                         : std_logic_vector(ETH_TX_HEADER_WORD_LENGTH * 32 - 1 downto 0) := x"000000000000b0feb0fe0c03a8c0c803a8c00000114000400000000000450008220100350a00a6622962a3c8";
   signal w_header                         : std_logic_vector(ETH_IP_UDP_HEADER_BYTE_LENGTH * 8 - 1 downto 0);
 
   signal r_udp_length                     : unsigned(15 downto 0);
@@ -112,7 +112,7 @@ begin
   begin
     if rising_edge(Clk) then
       if (r_rst = '1') then
-        r_header_valid <= '0';
+        r_header_valid <= '1';  --TODO
       else
         if ((r_header_wr_en = '1') and (r_header_wr_addr = (ETH_TX_HEADER_WORD_LENGTH - 1))) then
           r_header_valid <= '1';

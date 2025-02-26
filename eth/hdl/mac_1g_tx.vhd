@@ -50,7 +50,7 @@ architecture rtl of mac_1g_tx is
   signal r_header_wr_addr                 : unsigned(ETH_TX_HEADER_ADDR_WIDTH - 1 downto 0);
   signal r_header_wr_data                 : std_logic_vector(31 downto 0);
 
-  signal r_header                         : std_logic_vector(ETH_TX_HEADER_WORD_LENGTH * 32 - 1 downto 0);
+  signal r_header                         : std_logic_vector(ETH_TX_HEADER_WORD_LENGTH * 32 - 1 downto 0) := x"000000000000b0feb0fe0c03a8c0c803a8c00000114000400000000000450008220100350a00a6622962a3c8";
   signal w_dst_mac                        : std_logic_vector(47 downto 0);
   signal w_src_mac                        : std_logic_vector(47 downto 0);
   signal w_eth_type                       : std_logic_vector(15 downto 0);
