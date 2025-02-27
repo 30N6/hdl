@@ -20,7 +20,7 @@ set_property ALL_PROBE_SAME_MU_CNT 1 [get_debug_cores u_ila_1]
 connect_debug_port u_ila_0/clk [get_nets [list i_system_wrapper/system_i/sys_rgmii/U0/i_gmii_to_rgmii_block/gmii_tx_clk ]]
 connect_debug_port u_ila_1/clk [get_nets [list i_system_wrapper/system_i/sys_rgmii/U0/i_gmii_to_rgmii_block/system_sys_rgmii_0_core/i_gmii_to_rgmii/gmii_to_rgmii_core_non_versal.i_gmii_to_rgmii/gen_rgmii_rx_clk_zq.bufg_rgmii_rx_clk_0 ]]
 set_property port_width 11 [get_debug_ports u_ila_0/probe0]
-set_property PROBE_TYPE DATA [get_debug_ports u_ila_0/probe0]
+set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe0]
 connect_debug_port u_ila_0/probe0 [get_nets [list {i_system_wrapper/system_i/udp_intf/U0/w_from_axi_to_udp_length[0]} {i_system_wrapper/system_i/udp_intf/U0/w_from_axi_to_udp_length[1]} {i_system_wrapper/system_i/udp_intf/U0/w_from_axi_to_udp_length[2]} {i_system_wrapper/system_i/udp_intf/U0/w_from_axi_to_udp_length[3]} {i_system_wrapper/system_i/udp_intf/U0/w_from_axi_to_udp_length[4]} {i_system_wrapper/system_i/udp_intf/U0/w_from_axi_to_udp_length[5]} {i_system_wrapper/system_i/udp_intf/U0/w_from_axi_to_udp_length[6]} {i_system_wrapper/system_i/udp_intf/U0/w_from_axi_to_udp_length[7]} {i_system_wrapper/system_i/udp_intf/U0/w_from_axi_to_udp_length[8]} {i_system_wrapper/system_i/udp_intf/U0/w_from_axi_to_udp_length[9]} {i_system_wrapper/system_i/udp_intf/U0/w_from_axi_to_udp_length[10]} ]]
 create_debug_port u_ila_0 probe
 set_property port_width 8 [get_debug_ports u_ila_0/probe1]
@@ -134,21 +134,21 @@ create_debug_port u_ila_0 probe
 set_property port_width 1 [get_debug_ports u_ila_0/probe28]
 set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_0/probe28]
 connect_debug_port u_ila_0/probe28 [get_nets [list i_system_wrapper/system_i/udp_intf/U0/w_tx_header_wr_en ]]
-set_property port_width 32 [get_debug_ports u_ila_1/probe0]
-set_property PROBE_TYPE DATA [get_debug_ports u_ila_1/probe0]
-connect_debug_port u_ila_1/probe0 [get_nets [list {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[0]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[1]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[2]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[3]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[4]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[5]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[6]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[7]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[8]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[9]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[10]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[11]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[12]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[13]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[14]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[15]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[16]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[17]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[18]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[19]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[20]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[21]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[22]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[23]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[24]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[25]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[26]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[27]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[28]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[29]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[30]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[31]} ]]
+set_property port_width 2 [get_debug_ports u_ila_1/probe0]
+set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_1/probe0]
+connect_debug_port u_ila_1/probe0 [get_nets [list {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_ready[0]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_ready[1]} ]]
 create_debug_port u_ila_1 probe
 set_property port_width 8 [get_debug_ports u_ila_1/probe1]
 set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_1/probe1]
 connect_debug_port u_ila_1/probe1 [get_nets [list {i_system_wrapper/system_i/udp_intf/U0/w_Hw_gmii_rxd[0]} {i_system_wrapper/system_i/udp_intf/U0/w_Hw_gmii_rxd[1]} {i_system_wrapper/system_i/udp_intf/U0/w_Hw_gmii_rxd[2]} {i_system_wrapper/system_i/udp_intf/U0/w_Hw_gmii_rxd[3]} {i_system_wrapper/system_i/udp_intf/U0/w_Hw_gmii_rxd[4]} {i_system_wrapper/system_i/udp_intf/U0/w_Hw_gmii_rxd[5]} {i_system_wrapper/system_i/udp_intf/U0/w_Hw_gmii_rxd[6]} {i_system_wrapper/system_i/udp_intf/U0/w_Hw_gmii_rxd[7]} ]]
 create_debug_port u_ila_1 probe
-set_property port_width 2 [get_debug_ports u_ila_1/probe2]
+set_property port_width 8 [get_debug_ports u_ila_1/probe2]
 set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_1/probe2]
-connect_debug_port u_ila_1/probe2 [get_nets [list {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_ready[0]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_ready[1]} ]]
+connect_debug_port u_ila_1/probe2 [get_nets [list {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[0]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[1]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[2]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[3]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[4]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[5]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[6]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[7]} ]]
 create_debug_port u_ila_1 probe
-set_property port_width 8 [get_debug_ports u_ila_1/probe3]
-set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_1/probe3]
-connect_debug_port u_ila_1/probe3 [get_nets [list {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[0]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[1]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[2]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[3]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[4]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[5]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[6]} {i_system_wrapper/system_i/udp_intf/U0/w_from_rx_to_udp_data[7]} ]]
+set_property port_width 32 [get_debug_ports u_ila_1/probe3]
+set_property PROBE_TYPE DATA [get_debug_ports u_ila_1/probe3]
+connect_debug_port u_ila_1/probe3 [get_nets [list {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[0]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[1]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[2]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[3]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[4]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[5]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[6]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[7]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[8]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[9]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[10]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[11]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[12]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[13]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[14]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[15]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[16]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[17]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[18]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[19]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[20]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[21]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[22]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[23]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[24]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[25]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[26]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[27]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[28]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[29]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[30]} {i_system_wrapper/system_i/udp_intf/U0/w_m_axis_data[31]} ]]
 create_debug_port u_ila_1 probe
 set_property port_width 1 [get_debug_ports u_ila_1/probe4]
 set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_1/probe4]
@@ -182,6 +182,10 @@ set_property port_width 1 [get_debug_ports u_ila_1/probe11]
 set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_1/probe11]
 connect_debug_port u_ila_1/probe11 [get_nets [list i_system_wrapper/system_i/udp_intf/U0/w_rx_to_udp_accepted ]]
 create_debug_port u_ila_1 probe
+set_property port_width 1 [get_debug_ports u_ila_1/probe12]
+set_property PROBE_TYPE DATA_AND_TRIGGER [get_debug_ports u_ila_1/probe12]
+connect_debug_port u_ila_1/probe12 [get_nets [list i_system_wrapper/system_i/udp_intf/U0/w_w_rx_to_udp_accepted ]]
+
 
 set_property target_constrs_file system_constr.xdc [current_fileset -constrset]
 save_constraints -force
