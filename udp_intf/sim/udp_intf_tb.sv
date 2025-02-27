@@ -303,7 +303,7 @@ module udp_intf_tb;
 
     return 1;
   endfunction
-
+/*
   initial begin
     automatic logic [AXI_DATA_WIDTH - 1 : 0] read_data [$];
 
@@ -362,7 +362,7 @@ module udp_intf_tb;
 
       num_received_gmii_ps++;
     end
-  end
+  end*/
 
   final begin
     if ( axi_expected_data.size() != 0 ) begin
@@ -397,10 +397,22 @@ module udp_intf_tb;
   initial begin
     while (1) begin
       @(posedge Clk_axi);
+      if (axi_tx_queue.size() > 0) begin
+        $display("%0t: writing: %p", $time, axi_tx_queue[0].data);
+        tx_axi_intf.write(axi_tx_queue[0].data);
+        repeat(axi_tx_queue[0].post_packet_delay) @(posedge Clk_axi);
+        void'(axi_tx_queue.pop_front());
+      end
+    end
+  end
+
+  initial begin
+    while (1) begin
+      @(posedge Clk_gmii);
       if (from_hw_tx_queue.size() > 0) begin
         $display("%0t: writing: %p", $time, from_hw_tx_queue[0].data);
         from_hw_gmii_tx_intf.write(from_hw_tx_queue[0].data, from_hw_tx_queue[0].error);
-        repeat(from_hw_tx_queue[0].post_packet_delay) @(posedge Clk_axi);
+        repeat(from_hw_tx_queue[0].post_packet_delay) @(posedge Clk_gmii);
         void'(from_hw_tx_queue.pop_front());
       end
     end
@@ -408,17 +420,17 @@ module udp_intf_tb;
 
   initial begin
     while (1) begin
-      @(posedge Clk_axi);
+      @(posedge Clk_gmii);
       if (from_ps_tx_queue.size() > 0) begin
         $display("%0t: writing: %p", $time, from_ps_tx_queue[0].data);
         from_ps_gmii_tx_intf.write(from_ps_tx_queue[0].data, from_ps_tx_queue[0].error);
-        repeat(from_ps_tx_queue[0].post_packet_delay) @(posedge Clk_axi);
+        repeat(from_ps_tx_queue[0].post_packet_delay) @(posedge Clk_gmii);
         void'(from_ps_tx_queue.pop_front());
       end
     end
   end
 
-  function automatic bit get_expected_data_axi(gmii_tx_data_t tx_data, output axi_expect_t e);
+  function automatic bit get_expected_data_axi_from_gmii(gmii_tx_data_t tx_data, output axi_expect_t e);
     logic [31:0] output_data;
     logic [7:0] udp_payload [$];
     logic [15:0] udp_dest_port;
@@ -548,6 +560,23 @@ module udp_intf_tb;
     return d;
   endfunction
 
+  function automatic gmii_tx_data_t generate_udp_packet(gmii_tx_data_t header_data);
+    int payload_len = 50;
+    gmii_tx_data_t d = randomize_udp_packet_header(payload_len);
+    int r;
+
+    for (int i = 0; i < payload_len; i++) begin
+      d.data.push_back($urandom);
+    end
+
+    r = 4; //$urandom_range(20, 4);
+    for (int i = 0; i < r; i++) begin
+      d.data.push_back($urandom);
+    end
+
+    return d;
+  endfunction
+
   task automatic standard_test();
     parameter NUM_TESTS = 20;
 
@@ -564,24 +593,87 @@ module udp_intf_tb;
       gmii_expect_t   ps_e;         //to_ps_expected_data[$];
 
       gmii_tx_data_t  tx_header;
-      gmii_tx_data_t  setup_packet;
+      gmii_tx_data_t  udp_packet;
 
       $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
 
       tx_header     = generate_tx_header();
-      setup_packet  = generate_setup_packet(tx_header);
-      from_hw_tx_queue.push_back(setup_packet);
+      udp_packet  = generate_setup_packet(tx_header);
+      from_hw_tx_queue.push_back(udp_packet);
 
-      to_ps_expected_data.push_back('{data: setup_packet.data});
+      to_ps_expected_data.push_back('{data: udp_packet.data});
 
-      if (get_expected_data_axi(setup_packet, axi_e)) begin
+      if (get_expected_data_axi_from_gmii(udp_packet, axi_e)) begin
         axi_expected_data.push_back(axi_e);
       end
 
-      repeat(200) @(posedge Clk_axi);
+      repeat(1000) @(posedge Clk_axi);
 
       /*from_hw_tx_queue.push_back(setup_packet);
       to_ps_expected_data.push_back('{data: setup_packet.data});*/
+
+      //random packets from PS to HW
+      for (int i = 0; i < num_packets; i++) begin
+        int packet_len = $urandom_range(200, 10);
+
+        ps_tx_data.post_packet_delay = $urandom_range(max_write_delay);
+        ps_tx_data.data.delete();
+
+        for (int j = 0; j < packet_len; j++) begin
+          ps_tx_data.data.push_back($urandom);
+          ps_tx_data.error.push_back(0);
+        end
+
+        from_ps_tx_queue.push_back(ps_tx_data);
+
+        hw_e.data = ps_tx_data.data;
+        to_hw_expected_data.push_back(hw_e);
+      end
+
+      while (from_ps_tx_queue.size() > 0) begin
+        @(posedge Clk_axi);
+      end
+      repeat(1000) @(posedge Clk_axi);
+
+      //random packets from HW to PS
+      for (int i = 0; i < num_packets; i++) begin
+        int packet_len = $urandom_range(200, 10);
+
+        hw_tx_data.post_packet_delay = $urandom_range(max_write_delay);
+        hw_tx_data.data.delete();
+
+        for (int j = 0; j < packet_len; j++) begin
+          hw_tx_data.data.push_back($urandom);
+          hw_tx_data.error.push_back(0);
+        end
+
+        from_hw_tx_queue.push_back(hw_tx_data);
+
+        ps_e.data = hw_tx_data.data;
+        to_ps_expected_data.push_back(ps_e);
+      end
+
+      while (from_hw_tx_queue.size() > 0) begin
+        @(posedge Clk_axi);
+      end
+      repeat(1000) @(posedge Clk_axi);
+
+      //random UDP packets from HW to PS
+      for (int i = 0; i < num_packets; i++) begin
+        int packet_len = $urandom_range(200, 10);
+
+        udp_packet = generate_udp_packet(tx_header);
+        hw_tx_data.post_packet_delay = $urandom_range(max_write_delay);
+        from_hw_tx_queue.push_back(udp_packet);
+
+        ps_e.data = udp_packet.data;
+        to_ps_expected_data.push_back(ps_e);
+      end
+
+      while (from_hw_tx_queue.size() > 0) begin
+        @(posedge Clk_axi);
+      end
+      repeat(1000) @(posedge Clk_axi);
 
       for (int i = 0; i < num_packets; i++) begin
         int r = $urandom_range(99);
@@ -600,8 +692,8 @@ module udp_intf_tb;
 
         //$display("%0t: expecting: %p", $time, tx_data);
 
-        /*e = get_expected_data_axi(axi_tx_data);
-        expected_data.push_back(e);*/
+        //e = get_expected_data_axi(axi_tx_data);
+        //axi_expected_data.push_back(e);
       end
 
       begin
