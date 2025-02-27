@@ -221,6 +221,20 @@ architecture rtl of udp_intf is
   attribute MARK_DEBUG of w_m_axis_ready  : signal is "TRUE";
   attribute DONT_TOUCH of w_m_axis_ready  : signal is "TRUE";
 
+  signal w_Hw_gmii_rxd            : std_logic_vector(7 downto 0);
+  signal w_Hw_gmii_rx_dv          : std_logic;
+  signal w_Hw_gmii_rx_er          : std_logic;
+  signal w_w_rx_to_udp_accepted   : std_logic;
+
+  attribute MARK_DEBUG of w_Hw_gmii_rxd  : signal is "TRUE";
+  attribute DONT_TOUCH of w_Hw_gmii_rxd  : signal is "TRUE";
+  attribute MARK_DEBUG of w_Hw_gmii_rx_dv : signal is "TRUE";
+  attribute DONT_TOUCH of w_Hw_gmii_rx_dv : signal is "TRUE";
+  attribute MARK_DEBUG of w_Hw_gmii_rx_er  : signal is "TRUE";
+  attribute DONT_TOUCH of w_Hw_gmii_rx_er  : signal is "TRUE";
+  attribute MARK_DEBUG of w_w_rx_to_udp_accepted  : signal is "TRUE";
+  attribute DONT_TOUCH of w_w_rx_to_udp_accepted  : signal is "TRUE";
+
 begin
 
   assert (AXI_DATA_WIDTH = 32)
@@ -404,6 +418,12 @@ begin
   );
 
   ------- RX -------
+
+  w_Hw_gmii_rxd           <= Hw_gmii_rxd;
+  w_Hw_gmii_rx_dv         <= Hw_gmii_rx_dv;
+  w_Hw_gmii_rx_er         <= Hw_gmii_rx_er;
+  w_w_rx_to_udp_accepted  <= w_rx_to_udp_accepted;
+
 
   i_rx_to_udp : entity eth_lib.mac_rx_to_udp
   generic map (
