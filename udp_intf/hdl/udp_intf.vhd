@@ -240,8 +240,8 @@ begin
     Input_data      => Ps_gmii_txd,
     Input_valid     => Ps_gmii_tx_en,
     Input_error     => Ps_gmii_tx_er,
-    Input_accepted  => w_to_tx_buffer_accepted,
-    Input_dropped   => w_to_tx_buffer_dropped,
+    Input_accepted  => w_to_rx_buffer_accepted,
+    Input_dropped   => w_to_rx_buffer_dropped,
 
     Output_data     => w_from_rx_buffer_data,
     Output_valid    => w_from_rx_buffer_valid,
