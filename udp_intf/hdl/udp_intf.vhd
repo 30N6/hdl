@@ -228,51 +228,48 @@ begin
     M_axis_last         => w_s_axis_last
   );
 
-  i_rx_buffer : entity eth_lib.gmii_buffer
-  generic map (
-    DATA_DEPTH    => TX_BUFFER_DATA_DEPTH,
-    FRAME_DEPTH   => TX_BUFFER_FRAME_DEPTH
-  )
-  port map (
-    Clk             => Hw_gmii_tx_clk,
-    Rst             => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
-
-    Input_data      => Ps_gmii_txd,
-    Input_valid     => Ps_gmii_tx_en,
-    Input_error     => Ps_gmii_tx_er,
-    Input_accepted  => w_to_rx_buffer_accepted,
-    Input_dropped   => w_to_rx_buffer_dropped,
-
-    Output_data     => w_from_rx_buffer_data,
-    Output_valid    => w_from_rx_buffer_valid,
-    Output_last     => w_from_rx_buffer_last,
-    Output_ready    => w_from_rx_buffer_ready
-  );
-
-  w_s_axis_ready <= '1';
-  --i_tx_axi_to_udp : entity eth_lib.axi_to_udp
+  --i_rx_buffer : entity eth_lib.gmii_buffer
   --generic map (
-  --  AXI_DATA_WIDTH    => AXI_DATA_WIDTH,
-  --  DATA_FIFO_DEPTH   => TX_AXI_TO_UDP_DATA_DEPTH,
-  --  FRAME_FIFO_DEPTH  => TX_AXI_TO_UDP_FRAME_DEPTH
+  --  DATA_DEPTH    => TX_BUFFER_DATA_DEPTH,
+  --  FRAME_DEPTH   => TX_BUFFER_FRAME_DEPTH
   --)
   --port map (
-  --  Clk           => Hw_gmii_tx_clk,
-  --  Rst           => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
+  --  Clk             => Hw_gmii_tx_clk,
+  --  Rst             => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
   --
-  --  S_axis_valid  => w_s_axis_valid,
-  --  S_axis_data   => w_s_axis_data,
-  --  S_axis_last   => w_s_axis_last,
-  --  S_axis_ready  => w_s_axis_ready,
+  --  Input_data      => Ps_gmii_txd,
+  --  Input_valid     => Ps_gmii_tx_en,
+  --  Input_error     => Ps_gmii_tx_er,
+  --  Input_accepted  => w_to_rx_buffer_accepted,
+  --  Input_dropped   => w_to_rx_buffer_dropped,
   --
-  --  Udp_length    => w_from_axi_to_udp_length,
-  --  Udp_data      => w_from_axi_to_udp_data,
-  --  Udp_valid     => w_from_axi_to_udp_valid,
-  --  Udp_last      => w_from_axi_to_udp_last,
-  --  Udp_ready     => w_from_axi_to_udp_ready
+  --  Output_data     => w_from_rx_buffer_data,
+  --  Output_valid    => w_from_rx_buffer_valid,
+  --  Output_last     => w_from_rx_buffer_last,
+  --  Output_ready    => w_from_rx_buffer_ready
   --);
 
-  w_from_axi_to_udp_length <= to_unsigned(4, w_from_axi_to_udp_length'length);
+  i_tx_axi_to_udp : entity eth_lib.axi_to_udp
+  generic map (
+    AXI_DATA_WIDTH    => AXI_DATA_WIDTH,
+    DATA_FIFO_DEPTH   => TX_AXI_TO_UDP_DATA_DEPTH,
+    FRAME_FIFO_DEPTH  => TX_AXI_TO_UDP_FRAME_DEPTH
+  )
+  port map (
+    Clk           => Hw_gmii_tx_clk,
+    Rst           => r_rst_gmii_tx(CDC_PIPE_STAGES - 1),
+
+    S_axis_valid  => w_s_axis_valid,
+    S_axis_data   => w_s_axis_data,
+    S_axis_last   => w_s_axis_last,
+    S_axis_ready  => w_s_axis_ready,
+
+    Udp_length    => w_from_axi_to_udp_length,
+    Udp_data      => w_from_axi_to_udp_data,
+    Udp_valid     => w_from_axi_to_udp_valid,
+    Udp_last      => w_from_axi_to_udp_last,
+    Udp_ready     => w_from_axi_to_udp_ready
+  );
 
   i_tx_udp_tx : entity eth_lib.udp_tx
   port map (
@@ -283,17 +280,17 @@ begin
     Header_wr_addr    => w_tx_header_wr_addr,
     Header_wr_data    => w_tx_header_wr_data,
 
-    Udp_length        => w_from_axi_to_udp_length,
-    Udp_data          => w_from_rx_buffer_data,
-    Udp_valid         => w_from_rx_buffer_valid,
-    Udp_last          => w_from_rx_buffer_last,
-    Udp_ready         => w_from_rx_buffer_ready,
-
     --Udp_length        => w_from_axi_to_udp_length,
-    --Udp_data          => w_from_axi_to_udp_data,
-    --Udp_valid         => w_from_axi_to_udp_valid,
-    --Udp_last          => w_from_axi_to_udp_last,
-    --Udp_ready         => w_from_axi_to_udp_ready,
+    --Udp_data          => w_from_rx_buffer_data,
+    --Udp_valid         => w_from_rx_buffer_valid,
+    --Udp_last          => w_from_rx_buffer_last,
+    --Udp_ready         => w_from_rx_buffer_ready,
+
+    Udp_length        => w_from_axi_to_udp_length,
+    Udp_data          => w_from_axi_to_udp_data,
+    Udp_valid         => w_from_axi_to_udp_valid,
+    Udp_last          => w_from_axi_to_udp_last,
+    Udp_ready         => w_from_axi_to_udp_ready,
 
     Mac_payload_data  => w_from_udp_tx_payload_data,
     Mac_payload_valid => w_from_udp_tx_payload_valid,
