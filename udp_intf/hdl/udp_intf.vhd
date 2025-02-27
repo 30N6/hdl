@@ -70,8 +70,8 @@ architecture rtl of udp_intf is
   constant TX_BUFFER_DATA_DEPTH       : natural := 4096;
   constant TX_BUFFER_FRAME_DEPTH      : natural := 64;
   constant RX_TO_UDP_DATA_DEPTH       : natural := 2048;
-  constant RX_TO_UDP_FRAME_DEPTH      : natural := 32;
-  constant RX_UDP_TO_AXI_FIFO_DEPTH   : natural := 32;
+  constant RX_TO_UDP_FRAME_DEPTH      : natural := 64;
+  constant RX_UDP_TO_AXI_FIFO_DEPTH   : natural := 1024;
   constant CDC_PIPE_STAGES            : natural := 3;
 
   signal r_sys_rst                    : std_logic;
