@@ -195,7 +195,7 @@ module udp_to_axi_tb;
     int byte_index = 0;
 
     for (int i = 0; i < tx_data.data.size(); i++) begin
-      output_data = {output_data[23:0], tx_data.data[i]};
+      output_data[8*(i%4) +: 8] = tx_data.data[i];
 
       if (i % 4 == 3) begin
         e.data.push_back(output_data);
