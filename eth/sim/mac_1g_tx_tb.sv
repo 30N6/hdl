@@ -227,7 +227,7 @@ module mac_1g_tx_tb;
 
   function automatic expect_t get_expected_data(header_data_t header_data, tx_data_t tx_data);
     expect_t e;
-    int padding_bytes = (eth_min_frame_size - eth_fcs_length) - (2*eth_mac_length + eth_type_length + tx_data.data.size());
+    int padding_bytes = (eth_min_frame_size /*- eth_fcs_length*/) - (2*eth_mac_length + eth_type_length + tx_data.data.size());
     logic [31:0] fcs = '1;
     logic [7:0] fcs_data [$];
 

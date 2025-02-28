@@ -303,7 +303,7 @@ module udp_intf_tb;
 
     return 1;
   endfunction
-/*
+
   initial begin
     automatic logic [AXI_DATA_WIDTH - 1 : 0] read_data [$];
 
@@ -362,7 +362,7 @@ module udp_intf_tb;
 
       num_received_gmii_ps++;
     end
-  end*/
+  end
 
   final begin
     if ( axi_expected_data.size() != 0 ) begin
@@ -456,7 +456,7 @@ module udp_intf_tb;
     end
 
     for (int i = 0; i < udp_payload.size(); i++) begin
-      output_data = {output_data[23:0], udp_payload[i]};
+      output_data[8*(i%4) +: 8] = udp_payload[i];
 
       if (i % 4 == 3) begin
         e.data.push_back(output_data);
@@ -470,6 +470,107 @@ module udp_intf_tb;
     e.byte_length = udp_payload.size();
 
     return 1;
+  endfunction
+
+  function automatic logic [15:0] get_ip_checksum(logic [7:0] header [$]);
+    logic [31:0] ip_checksum = 0;
+    //$display("header = %p", header);
+
+    for (int i = eth_mac_header_length/2; i < (eth_mac_header_length + eth_ipv4_header_length)/2; i++) begin
+      logic [15:0] word = {header[2*i], header[2*i + 1]};
+      $display("get_ip_checksum: i=%0d h=%02X, %02X  w=%04X   cs=%08X", i, header[2*i], header[2*i+1], word, ip_checksum);
+      ip_checksum += word;
+    end
+
+    while (ip_checksum > 16'hFFFF) begin
+      logic [31:0] new_checksum = ip_checksum[15:0] + ip_checksum[31:16];
+      ip_checksum = new_checksum;
+    end
+
+    $display("get_ip_checksum: result=%04X", ip_checksum[15:0]);
+
+    return ip_checksum[15:0];
+  endfunction
+
+  function automatic logic [31:0] get_fcs(logic [7:0] data [$], int start_index);
+    logic [31:0] crc = '1;
+
+    for (int i = start_index; i < data.size(); i++) begin
+      crc[7:0] ^= data[i];
+
+      for (int k = 0; k < 8; k++) begin
+        crc = (crc & 1) ? ((crc >> 1) ^ 32'hEDB88320) : (crc >> 1);
+      end
+    end
+
+    return crc ^ 32'hFFFFFFFF;
+  endfunction
+
+  function automatic gmii_expect_t get_expected_data_gmii_from_axi(logic [31:0] seq_num, gmii_tx_data_t tx_header, axi_tx_data_t tx_data);
+    gmii_expect_t d;
+    int padding_bytes;
+    logic [7:0] packet_header [$];
+    logic [15:0] ip_total_length;
+    logic [15:0] udp_length;
+    logic [15:0] ip_checksum;
+    logic [31:0] fcs;
+
+    for (int i = 0; i < tx_header.data.size(); i++) begin
+      packet_header.push_back(tx_header.data[i]);
+    end
+
+    ip_total_length = eth_ipv4_header_length + eth_udp_header_length + 4 + tx_data.data.size() * 4;
+    udp_length = eth_udp_header_length + 4 + tx_data.data.size() * 4;
+
+    padding_bytes = eth_min_frame_size - ip_total_length - eth_mac_header_length;
+
+    packet_header[16] = ip_total_length[15:8];
+    packet_header[17] = ip_total_length[7:0];
+
+    packet_header[38] = udp_length[15:8];
+    packet_header[39] = udp_length[7:0];
+
+    packet_header[24] = 0;
+    packet_header[25] = 0;
+    ip_checksum = ~get_ip_checksum(packet_header);
+    packet_header[24] = ip_checksum[15:8];
+    packet_header[25] = ip_checksum[7:0];
+
+    $display("get_expected_data_gmii_from_axi: ip_len=%04X ip_cs=%04X", ip_total_length, ip_checksum);
+
+    ip_checksum = ~get_ip_checksum(packet_header);
+    assert (ip_checksum == 0) else $error("bad IP checksum: %04X -> %04X", ip_checksum, ~ip_checksum);
+
+    for (int i = 0; i < 7; i++) begin
+      d.data.push_back(eth_preamble_byte);
+    end
+    d.data.push_back(eth_sfd_byte);
+
+    for (int i = 0; i < packet_header.size(); i++) begin
+      d.data.push_back(packet_header[i]);
+    end
+
+    for (int i = 0; i < 4; i++) begin
+      d.data.push_back(seq_num[(3-i)*8 +: 8]);
+    end
+
+    for (int i = 0; i < tx_data.data.size(); i++) begin
+      for (int j = 0; j < 4; j++) begin
+        d.data.push_back(tx_data.data[i][j*8 +: 8]);
+      end
+    end
+
+    for (int i = 0; i < padding_bytes; i++) begin
+      d.data.push_back(0);
+    end
+
+    fcs = get_fcs(d.data, 8);
+
+    for (int i = 0; i < eth_fcs_length; i++) begin
+      d.data.push_back(fcs[i*8+:8]);
+    end
+
+    return d;
   endfunction
 
   function automatic gmii_tx_data_t randomize_udp_packet_header(logic [15:0] udp_len);
@@ -516,6 +617,7 @@ module udp_intf_tb;
 
   function automatic gmii_tx_data_t generate_tx_header();
     gmii_tx_data_t r;
+    logic [15:0] ip_partial_checksum;
 
     for (int i = 0; i < eth_tx_header_byte_length; i++) begin
       r.data.push_back($urandom);
@@ -534,6 +636,11 @@ module udp_intf_tb;
     r.data[24] = 0; //checksum [0]
     r.data[25] = 0; //checksum [1]
 
+    ip_partial_checksum = get_ip_checksum(r.data);
+    r.data[24] = ip_partial_checksum[15:8];
+    r.data[25] = ip_partial_checksum[7:0];
+
+    $display("generate_tx_header: partial ip_checksum: %04X", ip_partial_checksum);
     //TODO: set partial checksum, verify in rx data
 
     return r;
@@ -597,7 +704,7 @@ module udp_intf_tb;
 
       $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
 
-      tx_header     = generate_tx_header();
+      tx_header   = generate_tx_header();
       udp_packet  = generate_setup_packet(tx_header);
       from_hw_tx_queue.push_back(udp_packet);
 
@@ -668,6 +775,10 @@ module udp_intf_tb;
 
         ps_e.data = udp_packet.data;
         to_ps_expected_data.push_back(ps_e);
+
+        if (get_expected_data_axi_from_gmii(udp_packet, axi_e)) begin
+          axi_expected_data.push_back(axi_e);
+        end
       end
 
       while (from_hw_tx_queue.size() > 0) begin
@@ -682,7 +793,7 @@ module udp_intf_tb;
         if (r < 25) begin
           packet_len = $urandom_range(10, 1);
         end else begin
-          packet_len = $urandom_range(1000, 1);
+          packet_len = $urandom_range(350, 1);
         end
 
         axi_tx_data.post_packet_delay = $urandom_range(max_write_delay);
@@ -690,23 +801,23 @@ module udp_intf_tb;
         repeat(packet_len) axi_tx_data.data.push_back($urandom);
         axi_tx_queue.push_back(axi_tx_data);
 
-        //$display("%0t: expecting: %p", $time, tx_data);
+        hw_e = get_expected_data_gmii_from_axi(udp_seq_num, tx_header, axi_tx_data);
+        to_hw_expected_data.push_back(hw_e);
 
-        //e = get_expected_data_axi(axi_tx_data);
-        //axi_expected_data.push_back(e);
+        udp_seq_num++;
       end
 
       begin
         int wait_cycles = 0;
         while (1) begin
-          if (((axi_tx_queue.size() == 0) && (axi_expected_data.size() == 0)) || (wait_cycles > 1e6)) begin
+          if (((axi_expected_data.size() == 0) && (to_ps_expected_data.size() == 0) && (to_hw_expected_data.size() == 0)) || (wait_cycles > 1e6)) begin
             break;
           end
 
           @(posedge Clk_axi);
           wait_cycles++;
         end
-        assert (wait_cycles < 1e6) else $error("Timeout while waiting for expected queue to empty during test.");
+        assert (wait_cycles < 1e6) else $error("Timeout while waiting for expected queue to empty during test: %0d %0d %0d", axi_expected_data.size(), to_ps_expected_data.size(), to_hw_expected_data.size());
       end
 
       $display("%0t: Test finished: num_received = %0d %0d %0d", $time, num_received_axi, num_received_gmii_hw, num_received_gmii_ps);

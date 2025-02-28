@@ -51,7 +51,9 @@ architecture rtl of udp_to_axi is
 
   signal s_state                          : state_t;
   signal r_byte_index                     : unsigned(1 downto 0);
-  signal r_prev_data                      : std_logic_vector(23 downto 0);
+
+  signal w_data_word                      : std_logic_vector(31 downto 0);
+  signal r_data_word                      : std_logic_vector(31 downto 0);
 
   signal w_output_fifo_wr_en              : std_logic;
   signal w_output_fifo_wr_last            : std_logic;
@@ -129,6 +131,17 @@ begin
     end if;
   end process;
 
+  process(all)
+  begin
+    w_data_word <= r_data_word;
+
+    for i in 0 to 3 loop
+      if (r_byte_index = i) then
+        w_data_word(8 * i + 7 downto 8 * i) <= w_input_data;
+      end if;
+    end loop;
+  end process;
+
   process(Clk)
   begin
     if rising_edge(Clk) then
@@ -139,14 +152,14 @@ begin
           r_byte_index <= r_byte_index + 1;
         end if;
 
-        r_prev_data <= r_prev_data(15 downto 0) & w_input_data;
+        r_data_word <= w_data_word;
       end if;
     end if;
   end process;
 
   w_output_fifo_wr_en   <= to_stdlogic(s_state = S_ACTIVE) and not(w_output_fifo_almost_full) and w_input_valid and (to_stdlogic(r_byte_index = 3) or w_input_last);
   w_output_fifo_wr_last <= w_input_last;
-  w_output_fifo_wr_data <= r_prev_data & w_input_data;
+  w_output_fifo_wr_data <= w_data_word;
 
   process(Clk)
   begin
