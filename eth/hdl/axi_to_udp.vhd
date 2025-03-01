@@ -79,6 +79,64 @@ architecture rtl of axi_to_udp is
 
   signal w_any_fifo_almost_full         : std_logic;
 
+  attribute MARK_DEBUG                          : string;
+  attribute DONT_TOUCH                          : string;
+  attribute MARK_DEBUG of w_input_valid  : signal is "TRUE";
+  attribute DONT_TOUCH of w_input_valid  : signal is "TRUE";
+  attribute MARK_DEBUG of w_input_data : signal is "TRUE";
+  attribute DONT_TOUCH of w_input_data : signal is "TRUE";
+  attribute MARK_DEBUG of w_input_last  : signal is "TRUE";
+  attribute DONT_TOUCH of w_input_last  : signal is "TRUE";
+  attribute MARK_DEBUG of w_input_ready  : signal is "TRUE";
+  attribute DONT_TOUCH of w_input_ready  : signal is "TRUE";
+
+  attribute MARK_DEBUG of s_state  : signal is "TRUE";
+  attribute DONT_TOUCH of s_state  : signal is "TRUE";
+  attribute MARK_DEBUG of r_byte_index : signal is "TRUE";
+  attribute DONT_TOUCH of r_byte_index : signal is "TRUE";
+  attribute MARK_DEBUG of r_data_length  : signal is "TRUE";
+  attribute DONT_TOUCH of r_data_length  : signal is "TRUE";
+  attribute MARK_DEBUG of r_seq_num  : signal is "TRUE";
+  attribute DONT_TOUCH of r_seq_num  : signal is "TRUE";
+
+  attribute MARK_DEBUG of w_data_fifo_wr_en  : signal is "TRUE";
+  attribute DONT_TOUCH of w_data_fifo_wr_en  : signal is "TRUE";
+  attribute MARK_DEBUG of w_data_fifo_wr_last : signal is "TRUE";
+  attribute DONT_TOUCH of w_data_fifo_wr_last : signal is "TRUE";
+  attribute MARK_DEBUG of w_data_fifo_wr_data  : signal is "TRUE";
+  attribute DONT_TOUCH of w_data_fifo_wr_data  : signal is "TRUE";
+  attribute MARK_DEBUG of r_data_fifo_wr_en  : signal is "TRUE";
+  attribute DONT_TOUCH of r_data_fifo_wr_en  : signal is "TRUE";
+  attribute MARK_DEBUG of r_data_fifo_wr_data  : signal is "TRUE";
+  attribute DONT_TOUCH of r_data_fifo_wr_data  : signal is "TRUE";
+  attribute MARK_DEBUG of w_data_fifo_almost_full  : signal is "TRUE";
+  attribute DONT_TOUCH of w_data_fifo_almost_full  : signal is "TRUE";
+
+  attribute MARK_DEBUG of w_data_fifo_rd_en  : signal is "TRUE";
+  attribute DONT_TOUCH of w_data_fifo_rd_en  : signal is "TRUE";
+  attribute MARK_DEBUG of w_data_fifo_rd_data : signal is "TRUE";
+  attribute DONT_TOUCH of w_data_fifo_rd_data : signal is "TRUE";
+  attribute MARK_DEBUG of w_data_fifo_empty  : signal is "TRUE";
+  attribute DONT_TOUCH of w_data_fifo_empty  : signal is "TRUE";
+
+  attribute MARK_DEBUG of w_frame_fifo_wr_en  : signal is "TRUE";
+  attribute DONT_TOUCH of w_frame_fifo_wr_en  : signal is "TRUE";
+  attribute MARK_DEBUG of r_frame_fifo_wr_en : signal is "TRUE";
+  attribute DONT_TOUCH of r_frame_fifo_wr_en : signal is "TRUE";
+  attribute MARK_DEBUG of r_frame_fifo_wr_data  : signal is "TRUE";
+  attribute DONT_TOUCH of r_frame_fifo_wr_data  : signal is "TRUE";
+  attribute MARK_DEBUG of w_frame_fifo_almost_full  : signal is "TRUE";
+  attribute DONT_TOUCH of w_frame_fifo_almost_full  : signal is "TRUE";
+  attribute MARK_DEBUG of w_frame_fifo_rd_en  : signal is "TRUE";
+  attribute DONT_TOUCH of w_frame_fifo_rd_en  : signal is "TRUE";
+  attribute MARK_DEBUG of w_frame_fifo_rd_data  : signal is "TRUE";
+  attribute DONT_TOUCH of w_frame_fifo_rd_data  : signal is "TRUE";
+  attribute MARK_DEBUG of w_frame_fifo_empty  : signal is "TRUE";
+  attribute DONT_TOUCH of w_frame_fifo_empty  : signal is "TRUE";
+
+  attribute MARK_DEBUG of w_any_fifo_almost_full  : signal is "TRUE";
+  attribute DONT_TOUCH of w_any_fifo_almost_full  : signal is "TRUE";
+
 begin
 
   assert (AXI_DATA_WIDTH = 32)
