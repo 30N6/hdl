@@ -367,13 +367,13 @@ create_bd_port -dir I -from 7 -to 0 ad9361_status
 create_bd_port -dir O -from 3 -to 0 ad9361_ctl
 
 ad_ip_instance esm_clocks ecm_clocks
-#ad_ip_instance ecm_top    ecm_top
+ad_ip_instance ecm_top    ecm_top
 ad_ip_instance udp_intf   udp_intf
 
-#ad_ip_parameter ecm_top   CONFIG.AXI_DATA_WIDTH     32
-#ad_ip_parameter ecm_top   CONFIG.ADC_WIDTH          16
-#ad_ip_parameter ecm_top   CONFIG.DAC_WIDTH          16
-#ad_ip_parameter ecm_top   CONFIG.IQ_WIDTH           12
+ad_ip_parameter ecm_top   CONFIG.AXI_DATA_WIDTH     32
+ad_ip_parameter ecm_top   CONFIG.ADC_WIDTH          16
+ad_ip_parameter ecm_top   CONFIG.DAC_WIDTH          16
+ad_ip_parameter ecm_top   CONFIG.IQ_WIDTH           12
 ad_ip_parameter udp_intf  CONFIG.AXI_DATA_WIDTH     32
 ad_ip_parameter udp_intf  CONFIG.OUTPUT_FIFO_DEPTH  1024
 
@@ -388,26 +388,26 @@ ad_connect udp_intf/M_axis_clk    sys_cpu_clk
 ad_connect ecm_clocks/Adc_clk     axi_ad9361/l_clk
 ad_connect ecm_clocks/Adc_rst     axi_ad9361/rst
 
-#ad_connect ecm_top/Adc_clk_x4     ecm_clocks/Adc_clk_x4
-#ad_connect ecm_top/Adc_clk        axi_ad9361/l_clk
-#ad_connect ecm_top/Adc_rst        axi_ad9361/rst
-#ad_connect ecm_top/Adc_valid      axi_ad9361/adc_valid_i0
-#ad_connect ecm_top/Adc_data_i     axi_ad9361/adc_data_i0
-#ad_connect ecm_top/Adc_data_q     axi_ad9361/adc_data_q0
-#ad_connect ecm_top/Dac_data_i     axi_ad9361/dac_data_i0
-#ad_connect ecm_top/Dac_data_q     axi_ad9361/dac_data_q0
-#ad_connect ecm_top/Ad9361_status  ad9361_status
-#ad_connect ecm_top/Ad9361_control ad9361_ctl
-#
-#ad_connect ecm_top/S_axis_clk     sys_cpu_clk
-#ad_connect ecm_top/S_axis_resetn  sys_cpu_resetn
-#ad_connect ecm_top/M_axis_clk     sys_cpu_clk
-#ad_connect ecm_top/M_axis_resetn  sys_cpu_resetn
-#ad_connect ecm_top/S_axis         udp_intf/M_axis
-#ad_connect ecm_top/M_axis         udp_intf/S_axis
+ad_connect ecm_top/Adc_clk_x4     ecm_clocks/Adc_clk_x4
+ad_connect ecm_top/Adc_clk        axi_ad9361/l_clk
+ad_connect ecm_top/Adc_rst        axi_ad9361/rst
+ad_connect ecm_top/Adc_valid      axi_ad9361/adc_valid_i0
+ad_connect ecm_top/Adc_data_i     axi_ad9361/adc_data_i0
+ad_connect ecm_top/Adc_data_q     axi_ad9361/adc_data_q0
+ad_connect ecm_top/Dac_data_i     axi_ad9361/dac_data_i0
+ad_connect ecm_top/Dac_data_q     axi_ad9361/dac_data_q0
+ad_connect ecm_top/Ad9361_status  ad9361_status
+ad_connect ecm_top/Ad9361_control ad9361_ctl
+
+ad_connect ecm_top/S_axis_clk     sys_cpu_clk
+ad_connect ecm_top/S_axis_resetn  sys_cpu_resetn
+ad_connect ecm_top/M_axis_clk     sys_cpu_clk
+ad_connect ecm_top/M_axis_resetn  sys_cpu_resetn
+ad_connect ecm_top/S_axis         udp_intf/M_axis
+ad_connect ecm_top/M_axis         udp_intf/S_axis
 
 #loopback
-ad_connect  axi_ad9361/dac_data_i0  GND
-ad_connect  axi_ad9361/dac_data_q0  GND
-ad_connect  ad9361_ctl              GND
-ad_connect  udp_intf/M_axis         udp_intf/S_axis
+#ad_connect  axi_ad9361/dac_data_i0  GND
+#ad_connect  axi_ad9361/dac_data_q0  GND
+#ad_connect  ad9361_ctl              GND
+#ad_connect  udp_intf/M_axis         udp_intf/S_axis
