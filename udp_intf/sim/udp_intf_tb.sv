@@ -451,7 +451,7 @@ module udp_intf_tb;
       return 0;
     end
 
-    for (int i = 0; i < udp_len; i++) begin
+    for (int i = 0; i < udp_len-8; i++) begin
       udp_payload.push_back(tx_data.data[packet_start + 42 + i]);
     end
 
@@ -648,7 +648,7 @@ module udp_intf_tb;
 
   function automatic gmii_tx_data_t generate_setup_packet(gmii_tx_data_t header_data);
     string udp_setup_magic = "UDPSETUP";
-    gmii_tx_data_t d = randomize_udp_packet_header(udp_setup_magic.len() + header_data.data.size());
+    gmii_tx_data_t d = randomize_udp_packet_header(8 + udp_setup_magic.len() + header_data.data.size());
     int r;
 
     for (int i = 0; i < udp_setup_magic.len(); i++) begin
@@ -669,7 +669,7 @@ module udp_intf_tb;
 
   function automatic gmii_tx_data_t generate_udp_packet(gmii_tx_data_t header_data);
     int payload_len = 50;
-    gmii_tx_data_t d = randomize_udp_packet_header(payload_len);
+    gmii_tx_data_t d = randomize_udp_packet_header(8 + payload_len);
     int r;
 
     for (int i = 0; i < payload_len; i++) begin

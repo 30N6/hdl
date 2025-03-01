@@ -229,7 +229,7 @@ begin
             if ((w_mac_valid = '1') and (r_state_sub_count = 3) and ((r_prev_data & w_mac_data) /= std_logic_vector(r_udp_filter_port))) then
               s_state <= S_DROP;
             elsif ((w_mac_valid = '1') and (r_state_sub_count = (ETH_UDP_HEADER_LENGTH - 1))) then
-              if (r_udp_length > 0) then
+              if (r_udp_length > 8) then
                 s_state <= S_UDP_PAYLOAD;
               else
                 s_state <= S_DROP;
@@ -310,14 +310,14 @@ begin
         if (s_state = S_UDP_PAYLOAD) then
           r_udp_count <= r_udp_count + 1;
         else
-          r_udp_count <= to_unsigned(1, r_udp_count'length);
+          r_udp_count <= to_unsigned(9, r_udp_count'length);
         end if;
       end if;
     end if;
   end process;
 
-  w_output_fifo_wr_en   <= not(w_output_fifo_almost_full) and to_stdlogic(s_state = S_UDP_PAYLOAD);
-  w_output_fifo_wr_last <= to_stdlogic(r_udp_length = r_udp_count);
+  w_output_fifo_wr_en   <= w_mac_valid and not(w_output_fifo_almost_full) and to_stdlogic(s_state = S_UDP_PAYLOAD);
+  w_output_fifo_wr_last <= to_stdlogic(r_udp_length = r_udp_count) or w_mac_last;
 
   process(Clk)
   begin
