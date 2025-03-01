@@ -194,15 +194,15 @@ module mac_rx_to_udp_tb;
     end
 
     if ($urandom_range(99) < 5) begin
-      udp_len = 0;
+      udp_len = 8;
     end else begin
-      udp_len = $urandom_range(eth_udp_max_payload_length, 0);
+      udp_len = $urandom_range(eth_udp_max_payload_length, 8);
     end
 
     error = ($urandom_range(99) < 5);
 
     accepted = (eth_type == eth_type_ip) && (ip_ver_ihl == eth_ip_ver_ihl) && (ip_proto == eth_ip_proto_udp) &&
-               (udp_dest_port == filter_port) && (udp_len > 0) && !error;
+               (udp_dest_port == filter_port) && (udp_len > 8) && !error;
 
     $display("randomize_tx_data: accepted=%0d ip_ver_ihl=%02X", accepted, ip_ver_ihl);
 
@@ -241,7 +241,7 @@ module mac_rx_to_udp_tb;
       d.data.push_back($urandom);
     end
 
-    for (int i = 0; i < udp_len; i++) begin
+    for (int i = 8; i < udp_len; i++) begin
       d.data.push_back($urandom);
     end
 
@@ -283,7 +283,7 @@ module mac_rx_to_udp_tb;
                   d.data[frame_start_index + eth_mac_header_length + eth_ipv4_header_length + 5]};
 
     e.data.delete();
-    for (int i = 0; i < udp_length; i++) begin
+    for (int i = 0; i < udp_length - 8; i++) begin
       e.data.push_back(d.data[data_start_index + i]);
     end
 
@@ -306,17 +306,7 @@ module mac_rx_to_udp_tb;
       r_filter_port = $urandom;
 
       for (int i = 0; i < num_packets; i++) begin
-        int r = $urandom_range(99);
-        int packet_len;
-        bit accepted;
-
-        if (r < 25) begin
-          packet_len = $urandom_range(45, 1);
-        end else begin
-          packet_len = $urandom_range(1500, 1);
-        end
-
-        accepted = randomize_tx_data(r_filter_port, tx_data);
+        bit accepted = randomize_tx_data(r_filter_port, tx_data);
 
         tx_data.post_packet_delay = $urandom_range(max_write_delay);
 
