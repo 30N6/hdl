@@ -133,16 +133,6 @@ architecture rtl of udp_intf is
   attribute ASYNC_REG of r_rst_gmii_rx  : signal is "TRUE";
   attribute ASYNC_REG of r_rst_gmii_tx  : signal is "TRUE";
 
-  --TODO: remove
-  attribute MARK_DEBUG                          : string;
-  attribute DONT_TOUCH                          : string;
-  attribute MARK_DEBUG of w_gmii_from_arb_data  : signal is "TRUE";
-  attribute DONT_TOUCH of w_gmii_from_arb_data  : signal is "TRUE";
-  attribute MARK_DEBUG of w_gmii_from_arb_valid : signal is "TRUE";
-  attribute DONT_TOUCH of w_gmii_from_arb_valid : signal is "TRUE";
-  attribute MARK_DEBUG of w_gmii_from_arb_last  : signal is "TRUE";
-  attribute DONT_TOUCH of w_gmii_from_arb_last  : signal is "TRUE";
-
 begin
 
   assert (AXI_DATA_WIDTH = 32)
@@ -398,10 +388,6 @@ begin
   Ps_gmii_rx_dv   <= Hw_gmii_rx_dv;
   Ps_gmii_rx_er   <= Hw_gmii_rx_er;
   Ps_gmii_rxd     <= Hw_gmii_rxd;
-
-  --Hw_gmii_tx_en   <= Ps_gmii_tx_en;
-  --Hw_gmii_tx_er   <= Ps_gmii_tx_er;
-  --Hw_gmii_txd     <= Ps_gmii_txd;
 
   Hw_gmii_tx_en   <= w_gmii_from_arb_valid;
   Hw_gmii_tx_er   <= '0';
