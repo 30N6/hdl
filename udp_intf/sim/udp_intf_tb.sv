@@ -100,6 +100,7 @@ module udp_intf_tb;
   parameter time GMII_CLK_HALF_PERIOD = 7ns;
   parameter AXI_DATA_WIDTH            = 32;
   parameter OUTPUT_FIFO_DEPTH         = 64;
+  parameter TX_THROTTLE_CYCLES        = 16;
 
   typedef struct
   {
@@ -189,7 +190,7 @@ module udp_intf_tb;
     r_axi_rx_ready <= $urandom_range(99) < 80;
   end
 
-  udp_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH), .OUTPUT_FIFO_DEPTH(OUTPUT_FIFO_DEPTH)) dut
+  udp_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH), .OUTPUT_FIFO_DEPTH(OUTPUT_FIFO_DEPTH), .TX_THROTTLE_CYCLES(TX_THROTTLE_CYCLES)) dut
   (
     .Sys_clk        (Clk_axi),
     .Sys_rst        (Rst_axi),

@@ -26,6 +26,17 @@ end entity ecm_drfm_mem;
 
 architecture rtl of ecm_drfm_mem is
 
+  function is_split_mem return boolean is
+  begin
+    if (ECM_DRFM_MEM_DEPTH = 2**ECM_DRFM_ADDR_WIDTH) then
+      return false;
+    else
+      return true;
+    end if;
+  end;
+
+  constant USE_SPLIT_MEM  : boolean := is_split_mem;
+
   constant MEM0_DEPTH     : natural := 2**(ECM_DRFM_ADDR_WIDTH - 1);
   constant MEM1_DEPTH     : natural := 2**(ECM_DRFM_ADDR_WIDTH - 2);
 
@@ -44,68 +55,93 @@ begin
     report "LATENCY must be 3"
     severity failure;
 
-  assert (ECM_DRFM_MEM_DEPTH = (MEM0_DEPTH + MEM1_DEPTH))
-    report "Unexpected memory depth"
-    severity failure;
+  g_mem : if (USE_SPLIT_MEM) generate
 
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      r1_rd_addr <= Rd_addr;
-      r2_rd_addr <= r1_rd_addr;
-    end if;
-  end process;
+    assert (ECM_DRFM_MEM_DEPTH = (MEM0_DEPTH + MEM1_DEPTH))
+      report "Unexpected memory depth"
+      severity failure;
 
-  w0_mem0_wr_en <= Wr_en and not(Wr_addr(ECM_DRFM_ADDR_WIDTH - 1));
-  w0_mem1_wr_en <= Wr_en and Wr_addr(ECM_DRFM_ADDR_WIDTH - 1);
-
-  i_mem_0 : entity mem_lib.ram_sdp
-  generic map (
-    ADDR_WIDTH  => ECM_DRFM_ADDR_WIDTH - 1,
-    DATA_WIDTH  => DATA_WIDTH,
-    LATENCY     => 2
-  )
-  port map (
-    Clk       => Clk,
-
-    Wr_en     => w0_mem0_wr_en,
-    Wr_addr   => Wr_addr(ECM_DRFM_ADDR_WIDTH - 2 downto 0),
-    Wr_data   => Wr_data,
-
-    Rd_en     => '1',
-    Rd_reg_ce => '1',
-    Rd_addr   => Rd_addr(ECM_DRFM_ADDR_WIDTH - 2 downto 0),
-    Rd_data   => w2_mem0_rd_data
-  );
-
-  i_mem_1 : entity mem_lib.ram_sdp
-  generic map (
-    ADDR_WIDTH  => ECM_DRFM_ADDR_WIDTH - 2,
-    DATA_WIDTH  => DATA_WIDTH,
-    LATENCY     => 2
-  )
-  port map (
-    Clk       => Clk,
-
-    Wr_en     => w0_mem1_wr_en,
-    Wr_addr   => Wr_addr(ECM_DRFM_ADDR_WIDTH - 3 downto 0),
-    Wr_data   => Wr_data,
-
-    Rd_en     => '1',
-    Rd_reg_ce => '1',
-    Rd_addr   => Rd_addr(ECM_DRFM_ADDR_WIDTH - 3 downto 0),
-    Rd_data   => w2_mem1_rd_data
-  );
-
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      if (r2_rd_addr(ECM_DRFM_ADDR_WIDTH - 1) = '0') then
-        Rd_data <= w2_mem0_rd_data;
-      else
-        Rd_data <= w2_mem1_rd_data;
+    process(Clk)
+    begin
+      if rising_edge(Clk) then
+        r1_rd_addr <= Rd_addr;
+        r2_rd_addr <= r1_rd_addr;
       end if;
-    end if;
-  end process;
+    end process;
+
+    w0_mem0_wr_en <= Wr_en and not(Wr_addr(ECM_DRFM_ADDR_WIDTH - 1));
+    w0_mem1_wr_en <= Wr_en and Wr_addr(ECM_DRFM_ADDR_WIDTH - 1);
+
+    i_mem_0 : entity mem_lib.ram_sdp
+    generic map (
+      ADDR_WIDTH  => ECM_DRFM_ADDR_WIDTH - 1,
+      DATA_WIDTH  => DATA_WIDTH,
+      LATENCY     => 2
+    )
+    port map (
+      Clk       => Clk,
+
+      Wr_en     => w0_mem0_wr_en,
+      Wr_addr   => Wr_addr(ECM_DRFM_ADDR_WIDTH - 2 downto 0),
+      Wr_data   => Wr_data,
+
+      Rd_en     => '1',
+      Rd_reg_ce => '1',
+      Rd_addr   => Rd_addr(ECM_DRFM_ADDR_WIDTH - 2 downto 0),
+      Rd_data   => w2_mem0_rd_data
+    );
+
+    i_mem_1 : entity mem_lib.ram_sdp
+    generic map (
+      ADDR_WIDTH  => ECM_DRFM_ADDR_WIDTH - 2,
+      DATA_WIDTH  => DATA_WIDTH,
+      LATENCY     => 2
+    )
+    port map (
+      Clk       => Clk,
+
+      Wr_en     => w0_mem1_wr_en,
+      Wr_addr   => Wr_addr(ECM_DRFM_ADDR_WIDTH - 3 downto 0),
+      Wr_data   => Wr_data,
+
+      Rd_en     => '1',
+      Rd_reg_ce => '1',
+      Rd_addr   => Rd_addr(ECM_DRFM_ADDR_WIDTH - 3 downto 0),
+      Rd_data   => w2_mem1_rd_data
+    );
+
+    process(Clk)
+    begin
+      if rising_edge(Clk) then
+        if (r2_rd_addr(ECM_DRFM_ADDR_WIDTH - 1) = '0') then
+          Rd_data <= w2_mem0_rd_data;
+        else
+          Rd_data <= w2_mem1_rd_data;
+        end if;
+      end if;
+    end process;
+
+  else generate
+
+    i_mem : entity mem_lib.ram_sdp
+    generic map (
+      ADDR_WIDTH  => ECM_DRFM_ADDR_WIDTH,
+      DATA_WIDTH  => DATA_WIDTH,
+      LATENCY     => LATENCY
+    )
+    port map (
+      Clk       => Clk,
+
+      Wr_en     => Wr_en,
+      Wr_addr   => Wr_addr,
+      Wr_data   => Wr_data,
+
+      Rd_en     => '1',
+      Rd_reg_ce => '1',
+      Rd_addr   => Rd_addr,
+      Rd_data   => Rd_data
+    );
+
+  end generate g_mem;
 
 end architecture rtl;

@@ -17,8 +17,9 @@ library udp_intf_lib;
 
 entity udp_intf is
 generic (
-  AXI_DATA_WIDTH    : natural;
-  OUTPUT_FIFO_DEPTH : natural
+  AXI_DATA_WIDTH      : natural;
+  OUTPUT_FIFO_DEPTH   : natural;
+  TX_THROTTLE_CYCLES  : natural
 );
 port (
   Sys_clk         : in  std_logic;
@@ -67,11 +68,12 @@ architecture rtl of udp_intf is
   constant MASTER_FIFO_DEPTH          : natural := 1024;
   constant TX_AXI_TO_UDP_DATA_DEPTH   : natural := 4096;
   constant TX_AXI_TO_UDP_FRAME_DEPTH  : natural := 64;
-  constant TX_BUFFER_DATA_DEPTH       : natural := 4096;
-  constant TX_BUFFER_FRAME_DEPTH      : natural := 64;
+  constant TX_BUFFER_DATA_DEPTH       : natural := 131072;
+  constant TX_BUFFER_FRAME_DEPTH      : natural := 1024;
   constant RX_TO_UDP_DATA_DEPTH       : natural := 2048;
-  constant RX_TO_UDP_FRAME_DEPTH      : natural := 64;
-  constant RX_UDP_TO_AXI_FIFO_DEPTH   : natural := 1024;
+  constant RX_TO_UDP_FRAME_DEPTH      : natural := 32;
+  constant RX_UDP_TO_AXI_FIFO_DEPTH   : natural := 32;
+
   constant CDC_PIPE_STAGES            : natural := 3;
 
   signal r_sys_rst                    : std_logic;
@@ -117,6 +119,9 @@ architecture rtl of udp_intf is
   signal w_gmii_from_arb_data         : std_logic_vector(7 downto 0);
   signal w_gmii_from_arb_valid        : std_logic;
   signal w_gmii_from_arb_last         : std_logic; --unused
+  signal r_gmii_from_arb_ready        : std_logic;
+
+  signal r_gmii_throttle_counter      : unsigned(clog2(TX_THROTTLE_CYCLES) - 1 downto 0) := (others => '0');
 
   signal w_rx_to_udp_accepted         : std_logic;
   signal w_from_rx_to_udp_data        : std_logic_vector(7 downto 0);
@@ -133,107 +138,104 @@ architecture rtl of udp_intf is
   attribute ASYNC_REG of r_rst_gmii_rx  : signal is "TRUE";
   attribute ASYNC_REG of r_rst_gmii_tx  : signal is "TRUE";
 
-  --TODO: remove
-  attribute MARK_DEBUG                          : string;
-  attribute DONT_TOUCH                          : string;
-  attribute MARK_DEBUG of w_gmii_from_arb_data  : signal is "TRUE";
-  attribute DONT_TOUCH of w_gmii_from_arb_data  : signal is "TRUE";
-  attribute MARK_DEBUG of w_gmii_from_arb_valid : signal is "TRUE";
-  attribute DONT_TOUCH of w_gmii_from_arb_valid : signal is "TRUE";
-  attribute MARK_DEBUG of w_gmii_from_arb_last  : signal is "TRUE";
-  attribute DONT_TOUCH of w_gmii_from_arb_last  : signal is "TRUE";
-
-  attribute MARK_DEBUG of w_tx_header_wr_en  : signal is "TRUE";
-  attribute DONT_TOUCH of w_tx_header_wr_en  : signal is "TRUE";
-  attribute MARK_DEBUG of w_tx_header_wr_addr : signal is "TRUE";
-  attribute DONT_TOUCH of w_tx_header_wr_addr : signal is "TRUE";
-  attribute MARK_DEBUG of w_tx_header_wr_data  : signal is "TRUE";
-  attribute DONT_TOUCH of w_tx_header_wr_data  : signal is "TRUE";
-
-  attribute MARK_DEBUG of w_s_axis_ready  : signal is "TRUE";
-  attribute DONT_TOUCH of w_s_axis_ready  : signal is "TRUE";
-  attribute MARK_DEBUG of w_s_axis_valid : signal is "TRUE";
-  attribute DONT_TOUCH of w_s_axis_valid : signal is "TRUE";
-  attribute MARK_DEBUG of w_s_axis_last  : signal is "TRUE";
-  attribute DONT_TOUCH of w_s_axis_last  : signal is "TRUE";
-  attribute MARK_DEBUG of w_s_axis_data  : signal is "TRUE";
-  attribute DONT_TOUCH of w_s_axis_data  : signal is "TRUE";
-
-  attribute MARK_DEBUG of w_from_axi_to_udp_length  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_axi_to_udp_length  : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_axi_to_udp_data : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_axi_to_udp_data : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_axi_to_udp_valid  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_axi_to_udp_valid  : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_axi_to_udp_last  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_axi_to_udp_last  : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_axi_to_udp_ready  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_axi_to_udp_ready  : signal is "TRUE";
-
-  attribute MARK_DEBUG of w_from_udp_tx_payload_data  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_udp_tx_payload_data  : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_udp_tx_payload_valid : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_udp_tx_payload_valid : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_udp_tx_payload_last  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_udp_tx_payload_last  : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_udp_tx_payload_ready  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_udp_tx_payload_ready  : signal is "TRUE";
-
-  attribute MARK_DEBUG of w_from_mac_data  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_mac_data  : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_mac_valid : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_mac_valid : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_mac_last  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_mac_last  : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_mac_ready  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_mac_ready  : signal is "TRUE";
-
-  attribute MARK_DEBUG of w_to_tx_buffer_accepted  : signal is "TRUE";
-  attribute DONT_TOUCH of w_to_tx_buffer_accepted  : signal is "TRUE";
-  attribute MARK_DEBUG of w_to_tx_buffer_dropped : signal is "TRUE";
-  attribute DONT_TOUCH of w_to_tx_buffer_dropped : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_tx_buffer_data  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_tx_buffer_data  : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_tx_buffer_valid  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_tx_buffer_valid  : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_tx_buffer_last  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_tx_buffer_last  : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_tx_buffer_ready  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_tx_buffer_ready  : signal is "TRUE";
-
-  attribute MARK_DEBUG of w_rx_to_udp_accepted  : signal is "TRUE";
-  attribute DONT_TOUCH of w_rx_to_udp_accepted  : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_rx_to_udp_data : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_rx_to_udp_data : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_rx_to_udp_valid  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_rx_to_udp_valid  : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_rx_to_udp_last  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_rx_to_udp_last  : signal is "TRUE";
-  attribute MARK_DEBUG of w_from_rx_to_udp_ready  : signal is "TRUE";
-  attribute DONT_TOUCH of w_from_rx_to_udp_ready  : signal is "TRUE";
-
-  attribute MARK_DEBUG of w_m_axis_valid  : signal is "TRUE";
-  attribute DONT_TOUCH of w_m_axis_valid  : signal is "TRUE";
-  attribute MARK_DEBUG of w_m_axis_data : signal is "TRUE";
-  attribute DONT_TOUCH of w_m_axis_data : signal is "TRUE";
-  attribute MARK_DEBUG of w_m_axis_last  : signal is "TRUE";
-  attribute DONT_TOUCH of w_m_axis_last  : signal is "TRUE";
-  attribute MARK_DEBUG of w_m_axis_ready  : signal is "TRUE";
-  attribute DONT_TOUCH of w_m_axis_ready  : signal is "TRUE";
-
-  signal w_Hw_gmii_rxd            : std_logic_vector(7 downto 0);
-  signal w_Hw_gmii_rx_dv          : std_logic;
-  signal w_Hw_gmii_rx_er          : std_logic;
-  signal w_w_rx_to_udp_accepted   : std_logic;
-
-  attribute MARK_DEBUG of w_Hw_gmii_rxd  : signal is "TRUE";
-  attribute DONT_TOUCH of w_Hw_gmii_rxd  : signal is "TRUE";
-  attribute MARK_DEBUG of w_Hw_gmii_rx_dv : signal is "TRUE";
-  attribute DONT_TOUCH of w_Hw_gmii_rx_dv : signal is "TRUE";
-  attribute MARK_DEBUG of w_Hw_gmii_rx_er  : signal is "TRUE";
-  attribute DONT_TOUCH of w_Hw_gmii_rx_er  : signal is "TRUE";
-  attribute MARK_DEBUG of w_w_rx_to_udp_accepted  : signal is "TRUE";
-  attribute DONT_TOUCH of w_w_rx_to_udp_accepted  : signal is "TRUE";
+--  --TODO: remove
+--  attribute MARK_DEBUG                          : string;
+--  attribute DONT_TOUCH                          : string;
+--  attribute MARK_DEBUG of w_gmii_from_arb_data  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_gmii_from_arb_data  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_gmii_from_arb_valid : signal is "TRUE";
+--  attribute DONT_TOUCH of w_gmii_from_arb_valid : signal is "TRUE";
+--  attribute MARK_DEBUG of w_gmii_from_arb_last  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_gmii_from_arb_last  : signal is "TRUE";
+--
+--  attribute MARK_DEBUG of w_tx_header_wr_en  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_tx_header_wr_en  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_tx_header_wr_addr : signal is "TRUE";
+--  attribute DONT_TOUCH of w_tx_header_wr_addr : signal is "TRUE";
+--  attribute MARK_DEBUG of w_tx_header_wr_data  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_tx_header_wr_data  : signal is "TRUE";
+--
+--  attribute MARK_DEBUG of w_s_axis_ready  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_s_axis_ready  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_s_axis_valid : signal is "TRUE";
+--  attribute DONT_TOUCH of w_s_axis_valid : signal is "TRUE";
+--  attribute MARK_DEBUG of w_s_axis_last  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_s_axis_last  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_s_axis_data  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_s_axis_data  : signal is "TRUE";
+--
+--  attribute MARK_DEBUG of w_from_axi_to_udp_length  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_axi_to_udp_length  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_axi_to_udp_data : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_axi_to_udp_data : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_axi_to_udp_valid  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_axi_to_udp_valid  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_axi_to_udp_last  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_axi_to_udp_last  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_axi_to_udp_ready  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_axi_to_udp_ready  : signal is "TRUE";
+--
+--  attribute MARK_DEBUG of w_from_udp_tx_payload_data  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_udp_tx_payload_data  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_udp_tx_payload_valid : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_udp_tx_payload_valid : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_udp_tx_payload_last  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_udp_tx_payload_last  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_udp_tx_payload_ready  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_udp_tx_payload_ready  : signal is "TRUE";
+--
+--  attribute MARK_DEBUG of w_from_mac_data  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_mac_data  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_mac_valid : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_mac_valid : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_mac_last  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_mac_last  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_mac_ready  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_mac_ready  : signal is "TRUE";
+--
+--  attribute MARK_DEBUG of w_to_tx_buffer_accepted  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_to_tx_buffer_accepted  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_to_tx_buffer_dropped : signal is "TRUE";
+--  attribute DONT_TOUCH of w_to_tx_buffer_dropped : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_tx_buffer_data  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_tx_buffer_data  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_tx_buffer_valid  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_tx_buffer_valid  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_tx_buffer_last  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_tx_buffer_last  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_tx_buffer_ready  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_tx_buffer_ready  : signal is "TRUE";
+--
+--  attribute MARK_DEBUG of w_rx_to_udp_accepted  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_rx_to_udp_accepted  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_rx_to_udp_data : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_rx_to_udp_data : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_rx_to_udp_valid  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_rx_to_udp_valid  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_rx_to_udp_last  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_rx_to_udp_last  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_from_rx_to_udp_ready  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_from_rx_to_udp_ready  : signal is "TRUE";
+--
+--  attribute MARK_DEBUG of w_m_axis_valid  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_m_axis_valid  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_m_axis_data : signal is "TRUE";
+--  attribute DONT_TOUCH of w_m_axis_data : signal is "TRUE";
+--  attribute MARK_DEBUG of w_m_axis_last  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_m_axis_last  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_m_axis_ready  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_m_axis_ready  : signal is "TRUE";
+--
+--  signal w_Hw_gmii_rxd            : std_logic_vector(7 downto 0);
+--  signal w_Hw_gmii_rx_dv          : std_logic;
+--  signal w_Hw_gmii_rx_er          : std_logic;
+--
+--  attribute MARK_DEBUG of w_Hw_gmii_rxd  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_Hw_gmii_rxd  : signal is "TRUE";
+--  attribute MARK_DEBUG of w_Hw_gmii_rx_dv : signal is "TRUE";
+--  attribute DONT_TOUCH of w_Hw_gmii_rx_dv : signal is "TRUE";
+--  attribute MARK_DEBUG of w_Hw_gmii_rx_er  : signal is "TRUE";
+--  attribute DONT_TOUCH of w_Hw_gmii_rx_er  : signal is "TRUE";
 
 begin
 
@@ -398,6 +400,19 @@ begin
   w_gmii_to_arb_last(1)   <= w_from_tx_buffer_last;
   w_from_tx_buffer_ready  <= w_gmii_to_arb_ready(1);
 
+  process(Hw_gmii_tx_clk)
+  begin
+    if rising_edge(Hw_gmii_tx_clk) then
+      if (r_gmii_throttle_counter = (TX_THROTTLE_CYCLES - 1)) then
+        r_gmii_throttle_counter <= (others => '0');
+        r_gmii_from_arb_ready   <= '1';
+      else
+        r_gmii_throttle_counter <= r_gmii_throttle_counter + 1;
+        r_gmii_from_arb_ready   <= '0';
+      end if;
+    end if;
+  end process;
+
   i_tx_arb : entity eth_lib.gmii_arb
   generic map (
     NUM_INPUTS      => 2,
@@ -414,15 +429,15 @@ begin
 
     Output_data   => w_gmii_from_arb_data,
     Output_valid  => w_gmii_from_arb_valid,
-    Output_last   => w_gmii_from_arb_last
+    Output_last   => w_gmii_from_arb_last,
+    Output_ready  => r_gmii_from_arb_ready
   );
 
   ------- RX -------
 
-  w_Hw_gmii_rxd           <= Hw_gmii_rxd;
-  w_Hw_gmii_rx_dv         <= Hw_gmii_rx_dv;
-  w_Hw_gmii_rx_er         <= Hw_gmii_rx_er;
-  w_w_rx_to_udp_accepted  <= w_rx_to_udp_accepted;
+  --w_Hw_gmii_rxd           <= Hw_gmii_rxd;
+  --w_Hw_gmii_rx_dv         <= Hw_gmii_rx_dv;
+  --w_Hw_gmii_rx_er         <= Hw_gmii_rx_er;
 
 
   i_rx_to_udp : entity eth_lib.mac_rx_to_udp
@@ -496,10 +511,6 @@ begin
   Ps_gmii_rx_dv   <= Hw_gmii_rx_dv;
   Ps_gmii_rx_er   <= Hw_gmii_rx_er;
   Ps_gmii_rxd     <= Hw_gmii_rxd;
-
-  --Hw_gmii_tx_en   <= Ps_gmii_tx_en;
-  --Hw_gmii_tx_er   <= Ps_gmii_tx_er;
-  --Hw_gmii_txd     <= Ps_gmii_txd;
 
   Hw_gmii_tx_en   <= w_gmii_from_arb_valid;
   Hw_gmii_tx_er   <= '0';

@@ -77,7 +77,7 @@ package ecm_pkg is
 
   constant ECM_DRFM_DATA_WIDTH                            : natural := 16;
   constant ECM_DRFM_DATA_WIDTH_WIDTH                      : natural := clog2(ECM_DRFM_DATA_WIDTH);
-  constant ECM_DRFM_MEM_DEPTH                             : natural := 1024 * 24;
+  constant ECM_DRFM_MEM_DEPTH                             : natural := 1024 * 32;
   constant ECM_DRFM_ADDR_WIDTH                            : natural := clog2(ECM_DRFM_MEM_DEPTH);
   constant ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH            : natural := 32;
   constant ECM_DRFM_SEGMENT_LENGTH_WIDTH                  : natural := 12;

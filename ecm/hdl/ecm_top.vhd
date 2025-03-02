@@ -58,11 +58,10 @@ architecture rtl of ecm_top is
   constant ENABLE_SYNTHESIZER         : boolean := true;
   constant ENABLE_DWELL_STATS         : boolean := true;
   constant ENABLE_DRFM                : boolean := true;
-  constant ENABLE_DEBUG               : boolean := false;
 
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
-  constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + clog2(8) + clog2(ECM_NUM_CHANNELS); -- 8 taps per channel
-  constant SYNTHESIZER16_OUTPUT_WIDTH : natural := ECM_SYNTHESIZER_DATA_WIDTH + clog2(ECM_NUM_CHANNELS) + clog2(6) + 1; -- 6 taps per channel
+  constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + clog2(12) + clog2(ECM_NUM_CHANNELS); -- 12 taps per channel
+  constant SYNTHESIZER16_OUTPUT_WIDTH : natural := ECM_SYNTHESIZER_DATA_WIDTH + clog2(ECM_NUM_CHANNELS) + clog2(8) + 1; -- 8 taps per channel
 
   constant SYNC_TO_DRFM_READ_LATENCY  : natural := 7;
   constant DRFM_READ_LATENCY          : natural := 5;
@@ -165,6 +164,63 @@ architecture rtl of ecm_top is
 
   attribute ASYNC_REG : string;
   attribute ASYNC_REG of r_ad9361_status : signal is "TRUE";
+
+  attribute MARK_DEBUG                          : string;
+  attribute DONT_TOUCH                          : string;
+  attribute MARK_DEBUG of w_config_rst  : signal is "TRUE";
+  attribute DONT_TOUCH of w_config_rst  : signal is "TRUE";
+  attribute MARK_DEBUG of r_combined_rst  : signal is "TRUE";
+  attribute DONT_TOUCH of r_combined_rst  : signal is "TRUE";
+  attribute MARK_DEBUG of w_module_config  : signal is "TRUE";
+  attribute DONT_TOUCH of w_module_config  : signal is "TRUE";
+  attribute MARK_DEBUG of w_enable_status : signal is "TRUE";
+  attribute DONT_TOUCH of w_enable_status : signal is "TRUE";
+  attribute MARK_DEBUG of w_enable_chan  : signal is "TRUE";
+  attribute DONT_TOUCH of w_enable_chan  : signal is "TRUE";
+  attribute MARK_DEBUG of w_enable_synth  : signal is "TRUE";
+  attribute DONT_TOUCH of w_enable_synth  : signal is "TRUE";
+  attribute MARK_DEBUG of w_ad9361_control  : signal is "TRUE";
+  attribute DONT_TOUCH of w_ad9361_control  : signal is "TRUE";
+  attribute MARK_DEBUG of r_ad9361_status : signal is "TRUE";
+  attribute DONT_TOUCH of r_ad9361_status : signal is "TRUE";
+
+  attribute MARK_DEBUG of w_dwell_active  : signal is "TRUE";
+  attribute DONT_TOUCH of w_dwell_active  : signal is "TRUE";
+  attribute MARK_DEBUG of w_dwell_active_meas : signal is "TRUE";
+  attribute DONT_TOUCH of w_dwell_active_meas : signal is "TRUE";
+  attribute MARK_DEBUG of w_dwell_active_tx  : signal is "TRUE";
+  attribute DONT_TOUCH of w_dwell_active_tx  : signal is "TRUE";
+  attribute MARK_DEBUG of w_dwell_transmit_count  : signal is "TRUE";
+  attribute DONT_TOUCH of w_dwell_transmit_count  : signal is "TRUE";
+  attribute MARK_DEBUG of w_dwell_done  : signal is "TRUE";
+  attribute DONT_TOUCH of w_dwell_done  : signal is "TRUE";
+  attribute MARK_DEBUG of w_dwell_data : signal is "TRUE";
+  attribute DONT_TOUCH of w_dwell_data : signal is "TRUE";
+  attribute MARK_DEBUG of w_dwell_global_counter  : signal is "TRUE";
+  attribute DONT_TOUCH of w_dwell_global_counter  : signal is "TRUE";
+  attribute MARK_DEBUG of w_dwell_program_tag : signal is "TRUE";
+  attribute DONT_TOUCH of w_dwell_program_tag : signal is "TRUE";
+  attribute MARK_DEBUG of w_dwell_stats_report_done  : signal is "TRUE";
+  attribute DONT_TOUCH of w_dwell_stats_report_done  : signal is "TRUE";
+  attribute MARK_DEBUG of w_dwell_drfm_reports_done  : signal is "TRUE";
+  attribute DONT_TOUCH of w_dwell_drfm_reports_done  : signal is "TRUE";
+
+  attribute MARK_DEBUG of w_d2h_mux_in_ready  : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_mux_in_ready  : signal is "TRUE";
+  attribute MARK_DEBUG of w_d2h_mux_in_valid : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_mux_in_valid : signal is "TRUE";
+  attribute MARK_DEBUG of w_d2h_mux_in_data  : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_mux_in_data  : signal is "TRUE";
+  attribute MARK_DEBUG of w_d2h_mux_in_last  : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_mux_in_last  : signal is "TRUE";
+  attribute MARK_DEBUG of w_d2h_mux_out_ready  : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_mux_out_ready  : signal is "TRUE";
+  attribute MARK_DEBUG of w_d2h_mux_out_valid : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_mux_out_valid : signal is "TRUE";
+  attribute MARK_DEBUG of w_d2h_mux_out_data  : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_mux_out_data  : signal is "TRUE";
+  attribute MARK_DEBUG of w_d2h_mux_out_last : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_mux_out_last : signal is "TRUE";
 
 begin
 
