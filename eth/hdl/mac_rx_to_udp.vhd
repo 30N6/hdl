@@ -73,45 +73,45 @@ architecture rtl of mac_rx_to_udp is
   signal w_output_fifo_rd_data            : std_logic_vector(OUTPUT_FIFO_WIDTH - 1 downto 0);
   signal w_output_fifo_empty              : std_logic;
 
-  attribute MARK_DEBUG                          : string;
-  attribute DONT_TOUCH                          : string;
-  attribute MARK_DEBUG of w_mac_data  : signal is "TRUE";
-  attribute DONT_TOUCH of w_mac_data  : signal is "TRUE";
-  attribute MARK_DEBUG of w_mac_valid : signal is "TRUE";
-  attribute DONT_TOUCH of w_mac_valid : signal is "TRUE";
-  attribute MARK_DEBUG of w_mac_last  : signal is "TRUE";
-  attribute DONT_TOUCH of w_mac_last  : signal is "TRUE";
-  attribute MARK_DEBUG of w_mac_ready  : signal is "TRUE";
-  attribute DONT_TOUCH of w_mac_ready  : signal is "TRUE";
-
-  attribute MARK_DEBUG of s_state  : signal is "TRUE";
-  attribute DONT_TOUCH of s_state  : signal is "TRUE";
-  attribute MARK_DEBUG of r_state_sub_count : signal is "TRUE";
-  attribute DONT_TOUCH of r_state_sub_count : signal is "TRUE";
-  attribute MARK_DEBUG of r_prev_data  : signal is "TRUE";
-  attribute DONT_TOUCH of r_prev_data  : signal is "TRUE";
-  attribute MARK_DEBUG of r_udp_length  : signal is "TRUE";
-  attribute DONT_TOUCH of r_udp_length  : signal is "TRUE";
-  attribute MARK_DEBUG of r_udp_count  : signal is "TRUE";
-  attribute DONT_TOUCH of r_udp_count  : signal is "TRUE";
-
-  attribute MARK_DEBUG of w_output_fifo_wr_en  : signal is "TRUE";
-  attribute DONT_TOUCH of w_output_fifo_wr_en  : signal is "TRUE";
-  attribute MARK_DEBUG of w_output_fifo_wr_last : signal is "TRUE";
-  attribute DONT_TOUCH of w_output_fifo_wr_last : signal is "TRUE";
-  attribute MARK_DEBUG of r_output_fifo_wr_en  : signal is "TRUE";
-  attribute DONT_TOUCH of r_output_fifo_wr_en  : signal is "TRUE";
-  attribute MARK_DEBUG of r_output_fifo_wr_data  : signal is "TRUE";
-  attribute DONT_TOUCH of r_output_fifo_wr_data  : signal is "TRUE";
-  attribute MARK_DEBUG of w_output_fifo_almost_full  : signal is "TRUE";
-  attribute DONT_TOUCH of w_output_fifo_almost_full  : signal is "TRUE";
-
-  attribute MARK_DEBUG of w_output_fifo_rd_en : signal is "TRUE";
-  attribute DONT_TOUCH of w_output_fifo_rd_en : signal is "TRUE";
-  attribute MARK_DEBUG of w_output_fifo_rd_data  : signal is "TRUE";
-  attribute DONT_TOUCH of w_output_fifo_rd_data  : signal is "TRUE";
-  attribute MARK_DEBUG of w_output_fifo_empty  : signal is "TRUE";
-  attribute DONT_TOUCH of w_output_fifo_empty  : signal is "TRUE";
+  --attribute MARK_DEBUG                          : string;
+  --attribute DONT_TOUCH                          : string;
+  --attribute MARK_DEBUG of w_mac_data  : signal is "TRUE";
+  --attribute DONT_TOUCH of w_mac_data  : signal is "TRUE";
+  --attribute MARK_DEBUG of w_mac_valid : signal is "TRUE";
+  --attribute DONT_TOUCH of w_mac_valid : signal is "TRUE";
+  --attribute MARK_DEBUG of w_mac_last  : signal is "TRUE";
+  --attribute DONT_TOUCH of w_mac_last  : signal is "TRUE";
+  --attribute MARK_DEBUG of w_mac_ready  : signal is "TRUE";
+  --attribute DONT_TOUCH of w_mac_ready  : signal is "TRUE";
+  --
+  --attribute MARK_DEBUG of s_state  : signal is "TRUE";
+  --attribute DONT_TOUCH of s_state  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_state_sub_count : signal is "TRUE";
+  --attribute DONT_TOUCH of r_state_sub_count : signal is "TRUE";
+  --attribute MARK_DEBUG of r_prev_data  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_prev_data  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_udp_length  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_udp_length  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_udp_count  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_udp_count  : signal is "TRUE";
+  --
+  --attribute MARK_DEBUG of w_output_fifo_wr_en  : signal is "TRUE";
+  --attribute DONT_TOUCH of w_output_fifo_wr_en  : signal is "TRUE";
+  --attribute MARK_DEBUG of w_output_fifo_wr_last : signal is "TRUE";
+  --attribute DONT_TOUCH of w_output_fifo_wr_last : signal is "TRUE";
+  --attribute MARK_DEBUG of r_output_fifo_wr_en  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_output_fifo_wr_en  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_output_fifo_wr_data  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_output_fifo_wr_data  : signal is "TRUE";
+  --attribute MARK_DEBUG of w_output_fifo_almost_full  : signal is "TRUE";
+  --attribute DONT_TOUCH of w_output_fifo_almost_full  : signal is "TRUE";
+  --
+  --attribute MARK_DEBUG of w_output_fifo_rd_en : signal is "TRUE";
+  --attribute DONT_TOUCH of w_output_fifo_rd_en : signal is "TRUE";
+  --attribute MARK_DEBUG of w_output_fifo_rd_data  : signal is "TRUE";
+  --attribute DONT_TOUCH of w_output_fifo_rd_data  : signal is "TRUE";
+  --attribute MARK_DEBUG of w_output_fifo_empty  : signal is "TRUE";
+  --attribute DONT_TOUCH of w_output_fifo_empty  : signal is "TRUE";
 
 begin
 
