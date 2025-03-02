@@ -215,6 +215,13 @@ architecture rtl of ecm_drfm_reporter is
   signal r_read_valid_pipe : std_logic_vector(11 downto 0);
   signal r_read_timeout : std_logic;
 
+  attribute MARK_DEBUG of r_outstanding_reads : signal is "TRUE";
+  attribute DONT_TOUCH of r_outstanding_reads : signal is "TRUE";
+  attribute MARK_DEBUG of r_read_valid_pipe  : signal is "TRUE";
+  attribute DONT_TOUCH of r_read_valid_pipe  : signal is "TRUE";
+  attribute MARK_DEBUG of r_read_timeout  : signal is "TRUE";
+  attribute DONT_TOUCH of r_read_timeout  : signal is "TRUE";
+
 begin
 
   process(Clk)
