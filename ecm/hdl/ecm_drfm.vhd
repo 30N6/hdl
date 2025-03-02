@@ -137,6 +137,48 @@ architecture rtl of ecm_drfm is
   signal r_reporter_mem_result_valid      : std_logic;
   signal r_reporter_mem_result_data       : std_logic_vector(MEM_WIDTH - 1 downto 0);
 
+  signal r_Error_ext_read_overflow        : std_logic;
+  signal r_Error_int_read_overflow        : std_logic;
+  signal r_Error_invalid_read             : std_logic;
+
+  attribute MARK_DEBUG                          : string;
+  attribute DONT_TOUCH                          : string;
+  attribute MARK_DEBUG of r_dwell_active  : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_active  : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_active_tx  : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_active_tx  : signal is "TRUE";  
+  attribute MARK_DEBUG of r_dwell_done  : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_done  : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_start  : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_start  : signal is "TRUE";    
+  attribute MARK_DEBUG of w_reporter_mem_read_valid  : signal is "TRUE";
+  attribute DONT_TOUCH of w_reporter_mem_read_valid  : signal is "TRUE";
+  attribute MARK_DEBUG of w_reporter_mem_read_addr  : signal is "TRUE";
+  attribute DONT_TOUCH of w_reporter_mem_read_addr  : signal is "TRUE";
+  attribute MARK_DEBUG of r_reporter_mem_read_valid  : signal is "TRUE";
+  attribute DONT_TOUCH of r_reporter_mem_read_valid  : signal is "TRUE";
+  attribute MARK_DEBUG of r_reporter_mem_read_addr  : signal is "TRUE";
+  attribute DONT_TOUCH of r_reporter_mem_read_addr  : signal is "TRUE";
+  attribute MARK_DEBUG of r_reporter_mem_result_valid : signal is "TRUE";
+  attribute DONT_TOUCH of r_reporter_mem_result_valid : signal is "TRUE";
+  attribute MARK_DEBUG of r_Error_ext_read_overflow  : signal is "TRUE";
+  attribute DONT_TOUCH of r_Error_ext_read_overflow  : signal is "TRUE";
+  attribute MARK_DEBUG of r_Error_int_read_overflow  : signal is "TRUE";
+  attribute DONT_TOUCH of r_Error_int_read_overflow  : signal is "TRUE";
+  attribute MARK_DEBUG of r_Error_invalid_read : signal is "TRUE";
+  attribute DONT_TOUCH of r_Error_invalid_read : signal is "TRUE";
+
+  attribute MARK_DEBUG of r0_read_req  : signal is "TRUE";
+  attribute DONT_TOUCH of r0_read_req  : signal is "TRUE";
+  attribute MARK_DEBUG of r0_mem_rd_addr  : signal is "TRUE";
+  attribute DONT_TOUCH of r0_mem_rd_addr  : signal is "TRUE";
+  attribute MARK_DEBUG of r0_read_valid  : signal is "TRUE";
+  attribute DONT_TOUCH of r0_read_valid  : signal is "TRUE";
+  attribute MARK_DEBUG of r3_read_valid : signal is "TRUE";
+  attribute DONT_TOUCH of r3_read_valid : signal is "TRUE";
+  attribute MARK_DEBUG of r3_read_req  : signal is "TRUE";
+  attribute DONT_TOUCH of r3_read_req  : signal is "TRUE";
+
 begin
 
   assert (READ_LATENCY = (MEM_LATENCY + 2))
@@ -400,10 +442,15 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Error_ext_read_overflow <= r0_read_req.read_valid and Read_req.read_valid;
-      Error_int_read_overflow <= w_reporter_mem_read_valid and r_reporter_mem_read_valid and r0_read_req.read_valid;
-      Error_invalid_read      <= r0_read_req.read_valid and not(r_channel_was_written(to_integer(r0_read_req.channel_index)));
+      r_Error_ext_read_overflow <= r0_read_req.read_valid and Read_req.read_valid;
+      r_Error_int_read_overflow <= w_reporter_mem_read_valid and r_reporter_mem_read_valid and r0_read_req.read_valid;
+      r_Error_invalid_read      <= r0_read_req.read_valid and not(r_channel_was_written(to_integer(r0_read_req.channel_index)));
     end if;
   end process;
+
+  Error_ext_read_overflow <= r_Error_ext_read_overflow;
+  Error_int_read_overflow <= r_Error_int_read_overflow;
+  Error_invalid_read      <= r_Error_invalid_read;
+
 
 end architecture rtl;

@@ -211,7 +211,34 @@ architecture rtl of ecm_drfm_reporter is
   attribute MARK_DEBUG of r1_fifo_almost_full  : signal is "TRUE";
   attribute DONT_TOUCH of r1_fifo_almost_full  : signal is "TRUE";
 
+  signal r_outstanding_reads : unsigned(7 downto 0);
+  signal r_read_valid_pipe : std_logic_vector(11 downto 0);
+  signal r_read_timeout : std_logic;
+
 begin
+
+  process(Clk)
+    variable v_outstanding_reads : unsigned(7 downto 0);
+  begin
+    if rising_edge(Clk) then
+      if (Rst = '1') then
+        r_outstanding_reads <= (others => '0');
+      else
+        v_outstanding_reads := r_outstanding_reads;
+        if (Read_valid = '1') then
+          v_outstanding_reads := v_outstanding_reads + 1;
+        end if;
+        if (Read_result_valid = '1') then
+          v_outstanding_reads := v_outstanding_reads - 1;
+        end if;
+        r_outstanding_reads <= v_outstanding_reads;
+      end if;
+
+      r_read_valid_pipe <= r_read_valid_pipe(r_read_valid_pipe'length - 2 downto 0) & Read_valid;
+
+      r_read_timeout <= to_stdlogic(r_outstanding_reads > 0) and not(or_reduce(r_read_valid_pipe));
+    end if;
+  end process;
 
   assert (AXI_DATA_WIDTH = 32)
     report "AXI_DATA_WIDTH expected to be 32."
