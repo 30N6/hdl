@@ -40,8 +40,11 @@ port (
   Channel_max_iq_bits     : in  unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
 
   Read_valid              : out std_logic;
+  Read_last               : out std_logic;
   Read_addr               : out unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
+
   Read_result_valid       : in  std_logic;
+  Read_result_last        : in  std_logic;
   Read_result_data        : in  std_logic_vector(MEM_WIDTH - 1 downto 0);
 
   Channel_reports_done    : out std_logic;
@@ -121,11 +124,8 @@ architecture rtl of ecm_drfm_reporter is
   signal r_segment_first_addr             : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal r_segment_last_addr              : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal r_segment_addr                   : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
-  signal r_segment_addr_next              : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
-  signal r_slice_samples_remaining        : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  signal r_slice_samples_remaining_next   : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
+  signal r_samples_in_packet              : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   signal r_segment_samples_remaining      : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
-  signal r_segment_samples_remaining_next : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
 
   signal r_read_samples_remaining         : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
   signal r_read_samples_remaining_next    : unsigned(ECM_DRFM_SEGMENT_LENGTH_WIDTH - 1 downto 0);
@@ -133,11 +133,10 @@ architecture rtl of ecm_drfm_reporter is
   signal r_read_addr                      : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal r_read_addr_next                 : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal r_read_valid                     : std_logic;
+  signal r_read_last                      : std_logic;
 
   signal w_fifo_almost_full               : std_logic;
   signal w_fifo_ready                     : std_logic;
-
-  signal r_fifo_almost_full               : std_logic;
 
   signal w_fifo_valid                     : std_logic;
   signal w_fifo_valid_opt                 : std_logic;
@@ -233,7 +232,7 @@ begin
         when S_CHANNEL_SEGMENT_INFO =>
           s_state <= S_CHANNEL_SLICE_INFO;
         when S_CHANNEL_SLICE_INFO =>
-          if (r_slice_samples_remaining > 0) then
+          if (r_samples_in_packet > 0) then
             s_state <= S_CHANNEL_IQ_READ_START;
           else
             s_state <= S_CHANNEL_PAD;
@@ -244,7 +243,7 @@ begin
 
         when S_CHANNEL_IQ_RESULT =>
           s_state <= S_CHANNEL_IQ_RESULT;
-          if ((Read_result_valid = '1') and (r_slice_samples_remaining = 1)) then
+          if ((Read_result_valid = '1') and (Read_result_last = '1')) then
             s_state <= S_CHANNEL_PAD;
           end if;
 
@@ -384,11 +383,8 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_segment_addr_next               <= r_segment_addr + 1;
-      r_segment_samples_remaining_next  <= r_segment_samples_remaining - 1;
-      r_slice_samples_remaining_next    <= r_slice_samples_remaining - 1;
-      r_read_addr_next                  <= r_read_addr + 1;
-      r_read_samples_remaining_next     <= r_read_samples_remaining - 1;
+      r_read_addr_next              <= r_read_addr + 1;
+      r_read_samples_remaining_next <= r_read_samples_remaining - 1;
     end if;
   end process;
 
@@ -401,14 +397,12 @@ begin
         r_segment_addr              <= Channel_addr_first;
         r_segment_samples_remaining <= r_channel_samples_remaining;
       elsif ((s_state = S_CHANNEL_IQ_RESULT) and (Read_result_valid = '1')) then
-        r_segment_addr              <= r_segment_addr_next;
-        r_segment_samples_remaining <= r_segment_samples_remaining_next;
+        r_segment_addr              <= r_segment_addr + 1;
+        r_segment_samples_remaining <= r_segment_samples_remaining - 1;
       end if;
 
       if (s_state = S_CHANNEL_HEADER_0) then
-        r_slice_samples_remaining   <= minimum(r_segment_samples_remaining, ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT);
-      elsif ((s_state = S_CHANNEL_IQ_RESULT) and (Read_result_valid = '1')) then
-        r_slice_samples_remaining   <= r_slice_samples_remaining_next;
+        r_samples_in_packet <= minimum(r_segment_samples_remaining, ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT);
       end if;
     end if;
   end process;
@@ -418,6 +412,7 @@ begin
     if rising_edge(Clk) then
       if (Rst = '1') then
         r_read_valid              <= '0';
+        r_read_last               <= '-';
         r_read_delay              <= '0';
         r_read_samples_remaining  <= (others => '-');
         r_read_addr               <= (others => '-');
@@ -431,9 +426,11 @@ begin
         if (s_state = S_CHANNEL_HEADER_0) then
           r_read_samples_remaining  <= minimum(r_segment_samples_remaining, ECM_DRFM_MAX_PACKET_IQ_SAMPLES_PER_REPORT);
           r_read_addr               <= r_segment_addr;
+          r_read_last               <= to_stdlogic(r_segment_samples_remaining <= 1);
         elsif ((r_read_valid = '1') and (r_read_delay = '1')) then
           r_read_samples_remaining  <= r_read_samples_remaining_next;
           r_read_addr               <= r_read_addr_next;
+          r_read_last               <= to_stdlogic(r_read_samples_remaining_next <= 1);
         end if;
 
         if (s_state = S_CHANNEL_IQ_READ_START) then
@@ -446,6 +443,7 @@ begin
   end process;
 
   Read_valid  <= r_read_valid and r_read_delay;
+  Read_last   <= r_read_last;
   Read_addr   <= r_read_addr;
 
   process(all)
@@ -494,7 +492,7 @@ begin
 
     when S_CHANNEL_SLICE_INFO =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(resize_up(r_segment_addr, 16)) & std_logic_vector(resize_up(r_slice_samples_remaining, 16));
+      w_fifo_partial_0_data   <= std_logic_vector(resize_up(r_segment_addr, 16)) & std_logic_vector(resize_up(r_samples_in_packet, 16));
 
     when S_CHANNEL_IQ_RESULT =>
       w_fifo_valid            <= Read_result_valid;
