@@ -68,8 +68,8 @@ architecture rtl of udp_intf is
   constant MASTER_FIFO_DEPTH          : natural := 1024;
   constant TX_AXI_TO_UDP_DATA_DEPTH   : natural := 4096;
   constant TX_AXI_TO_UDP_FRAME_DEPTH  : natural := 64;
-  constant TX_BUFFER_DATA_DEPTH       : natural := 4096;
-  constant TX_BUFFER_FRAME_DEPTH      : natural := 64;
+  constant TX_BUFFER_DATA_DEPTH       : natural := 65536;
+  constant TX_BUFFER_FRAME_DEPTH      : natural := 512;
   constant RX_TO_UDP_DATA_DEPTH       : natural := 2048;
   constant RX_TO_UDP_FRAME_DEPTH      : natural := 32;
   constant RX_UDP_TO_AXI_FIFO_DEPTH   : natural := 32;
