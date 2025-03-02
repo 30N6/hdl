@@ -137,8 +137,6 @@ architecture rtl of ecm_drfm_reporter is
   signal w_fifo_almost_full               : std_logic;
   signal w_fifo_ready                     : std_logic;
 
-  signal r_fifo_almost_full               : std_logic;
-
   signal w_fifo_valid                     : std_logic;
   signal w_fifo_valid_opt                 : std_logic;
   signal w_fifo_last                      : std_logic;
@@ -204,8 +202,6 @@ architecture rtl of ecm_drfm_reporter is
   attribute DONT_TOUCH of w_fifo_almost_full : signal is "TRUE";
   attribute MARK_DEBUG of w_fifo_ready  : signal is "TRUE";
   attribute DONT_TOUCH of w_fifo_ready  : signal is "TRUE";
-  attribute MARK_DEBUG of r_fifo_almost_full  : signal is "TRUE";
-  attribute DONT_TOUCH of r_fifo_almost_full  : signal is "TRUE";
   attribute MARK_DEBUG of r1_fifo_valid  : signal is "TRUE";
   attribute DONT_TOUCH of r1_fifo_valid  : signal is "TRUE";
   attribute MARK_DEBUG of r1_fifo_last : signal is "TRUE";
