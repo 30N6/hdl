@@ -376,6 +376,8 @@ ad_ip_parameter ecm_top   CONFIG.DAC_WIDTH          16
 ad_ip_parameter ecm_top   CONFIG.IQ_WIDTH           12
 ad_ip_parameter udp_intf  CONFIG.AXI_DATA_WIDTH     32
 ad_ip_parameter udp_intf  CONFIG.OUTPUT_FIFO_DEPTH  1024
+ad_ip_parameter udp_intf  CONFIG.TX_THROTTLE_CYCLES 6250
+
 
 ad_connect udp_intf/Sys_clk       sys_cpu_clk
 ad_connect udp_intf/Sys_rst       sys_cpu_reset

@@ -24,7 +24,8 @@ port (
 
   Output_data   : out std_logic_vector(7 downto 0);
   Output_valid  : out std_logic;
-  Output_last   : out std_logic
+  Output_last   : out std_logic;
+  Output_ready  : in  std_logic
 );
 begin
   -- PSL default clock is rising_edge(Clk);
@@ -50,7 +51,7 @@ begin
         r_index   <= (others => '-');
       else
         if (r_active = '0') then
-          if ((or_reduce(Input_valid) = '1') and (r_ifg_count = 0)) then
+          if ((or_reduce(Input_valid) = '1') and (r_ifg_count = 0) and (Output_ready = '1')) then
             r_active  <= '1';
             r_index   <= first_bit_index(Input_valid);
           end if;

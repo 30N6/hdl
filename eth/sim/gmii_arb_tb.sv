@@ -77,6 +77,9 @@ module gmii_arb_tb;
   logic [NUM_INPUTS - 1 : 0]  w_input_last;
   logic [NUM_INPUTS - 1 : 0]  w_input_ready;
 
+  logic [3:0]                 r_output_throttle = 0;
+  logic                       r_output_ready;
+
   initial begin
     Clk = 0;
     forever begin
@@ -103,8 +106,14 @@ module gmii_arb_tb;
 
     .Output_data  (rx_intf.data),
     .Output_valid (rx_intf.valid),
-    .Output_last  (rx_intf.last)
+    .Output_last  (rx_intf.last),
+    .Output_ready (r_output_ready)
   );
+
+  always_ff @(posedge Clk) begin
+    r_output_throttle <= r_output_throttle + 1;
+    r_output_ready <= (r_output_throttle == 0);
+  end
 
   genvar i_input;
   generate

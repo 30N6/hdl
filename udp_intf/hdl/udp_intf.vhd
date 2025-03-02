@@ -17,8 +17,9 @@ library udp_intf_lib;
 
 entity udp_intf is
 generic (
-  AXI_DATA_WIDTH    : natural;
-  OUTPUT_FIFO_DEPTH : natural
+  AXI_DATA_WIDTH      : natural;
+  OUTPUT_FIFO_DEPTH   : natural;
+  TX_THROTTLE_CYCLES  : natural
 );
 port (
   Sys_clk         : in  std_logic;
@@ -72,6 +73,7 @@ architecture rtl of udp_intf is
   constant RX_TO_UDP_DATA_DEPTH       : natural := 2048;
   constant RX_TO_UDP_FRAME_DEPTH      : natural := 32;
   constant RX_UDP_TO_AXI_FIFO_DEPTH   : natural := 32;
+
   constant CDC_PIPE_STAGES            : natural := 3;
 
   signal r_sys_rst                    : std_logic;
@@ -117,6 +119,9 @@ architecture rtl of udp_intf is
   signal w_gmii_from_arb_data         : std_logic_vector(7 downto 0);
   signal w_gmii_from_arb_valid        : std_logic;
   signal w_gmii_from_arb_last         : std_logic; --unused
+  signal r_gmii_from_arb_ready        : std_logic;
+
+  signal r_gmii_throttle_counter      : unsigned(clog2(TX_THROTTLE_CYCLES) - 1 downto 0) := (others => '0');
 
   signal w_rx_to_udp_accepted         : std_logic;
   signal w_from_rx_to_udp_data        : std_logic_vector(7 downto 0);
@@ -296,6 +301,19 @@ begin
   w_gmii_to_arb_last(1)   <= w_from_tx_buffer_last;
   w_from_tx_buffer_ready  <= w_gmii_to_arb_ready(1);
 
+  process(Hw_gmii_tx_clk)
+  begin
+    if rising_edge(Hw_gmii_tx_clk) then
+      if (r_gmii_throttle_counter = (TX_THROTTLE_CYCLES - 1)) then
+        r_gmii_throttle_counter <= (others => '0');
+        r_gmii_from_arb_ready   <= '1';
+      else
+        r_gmii_throttle_counter <= r_gmii_throttle_counter + 1;
+        r_gmii_from_arb_ready   <= '0';
+      end if;
+    end if;
+  end process;
+
   i_tx_arb : entity eth_lib.gmii_arb
   generic map (
     NUM_INPUTS      => 2,
@@ -312,7 +330,8 @@ begin
 
     Output_data   => w_gmii_from_arb_data,
     Output_valid  => w_gmii_from_arb_valid,
-    Output_last   => w_gmii_from_arb_last
+    Output_last   => w_gmii_from_arb_last,
+    Output_ready  => r_gmii_from_arb_ready
   );
 
   ------- RX -------
