@@ -95,6 +95,8 @@ architecture rtl of ecm_top is
   signal w_dwell_sequence_num         : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal w_dwell_global_counter       : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   signal w_dwell_program_tag          : unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
+  signal w_dwell_report_enable_drfm   : std_logic;
+  signal w_dwell_report_enable_stats  : std_logic;
   signal w_dwell_stats_report_done    : std_logic;
   signal w_dwell_drfm_reports_done    : std_logic;
 
