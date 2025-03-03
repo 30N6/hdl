@@ -273,6 +273,7 @@ package ecm_pkg is
     first               : std_logic;
     last                : std_logic;
     trigger_accepted    : std_logic;
+    trigger_forced      : std_logic;
     channel_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
     address             : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
     data                : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);

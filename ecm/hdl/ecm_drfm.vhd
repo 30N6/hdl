@@ -127,6 +127,7 @@ architecture rtl of ecm_drfm is
   signal m_address_first                  : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal m_address_last                   : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal m_max_iq_bits                    : unsigned_array_t(ECM_NUM_CHANNELS - 1 downto 0)(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal m_trigger_forced                 : std_logic_array_t(ECM_NUM_CHANNELS - 1 downto 0);
 
   signal w_channel_reports_done           : std_logic;
   signal w_reporter_channel_index         : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
@@ -135,6 +136,7 @@ architecture rtl of ecm_drfm is
   signal r_reporter_channel_addr_first    : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal r_reporter_channel_addr_last     : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   signal r_reporter_channel_max_iq_bits   : unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  signal r_reporter_channel_forced        : std_logic;
 
   signal w_reporter_mem_read_valid        : std_logic;
   signal w_reporter_mem_read_last         : std_logic;
@@ -341,10 +343,12 @@ begin
   begin
     if rising_edge(Clk) then
       if ((r1_write_req.valid = '1') and (r1_write_req.first = '1')) then
-        m_timestamp(to_integer(r1_write_req.channel_index))      <= r_timestamp;
-        m_address_first(to_integer(r1_write_req.channel_index))  <= r1_write_req.address;
-        m_seq_num(to_integer(r1_write_req.channel_index))        <= r1_write_next_seq_num;
+        m_timestamp(to_integer(r1_write_req.channel_index))       <= r_timestamp;
+        m_address_first(to_integer(r1_write_req.channel_index))   <= r1_write_req.address;
+        m_seq_num(to_integer(r1_write_req.channel_index))         <= r1_write_next_seq_num;
+        m_trigger_forced(to_integer(r1_write_req.channel_index))  <= r1_write_req.trigger_forced;
       end if;
+
       if ((r1_write_req.valid = '1') and (r1_write_req.last = '1')) then
         m_address_last(to_integer(r1_write_req.channel_index))  <= r1_write_req.address;
       end if;
@@ -359,6 +363,7 @@ begin
       r_reporter_channel_addr_first   <= m_address_first(to_integer(w_reporter_channel_index));
       r_reporter_channel_addr_last    <= m_address_last(to_integer(w_reporter_channel_index));
       r_reporter_channel_max_iq_bits  <= m_max_iq_bits(to_integer(w_reporter_channel_index));
+      r_reporter_channel_forced       <= m_trigger_forced(to_integer(w_reporter_channel_index));
     end if;
   end process;
 
@@ -397,6 +402,7 @@ begin
     Channel_addr_first      => r_reporter_channel_addr_first,
     Channel_addr_last       => r_reporter_channel_addr_last,
     Channel_max_iq_bits     => r_reporter_channel_max_iq_bits,
+    Channel_forced          => r_reporter_channel_forced,
 
     Read_valid              => w_reporter_mem_read_valid,
     Read_last               => w_reporter_mem_read_last,

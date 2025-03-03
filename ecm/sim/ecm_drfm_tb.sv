@@ -115,6 +115,7 @@ interface dwell_tx_intf (input logic Clk);
       write_req.first             = 'x;
       write_req.last              = 'x;
       write_req.trigger_accepted  = 'x;
+      write_req.trigger_forced    = 'x;
       write_req.channel_index     = 'x;
       write_req.address           = 'x;
       write_req.data              = '{default: 'x};
@@ -241,7 +242,8 @@ module ecm_drfm_tb;
 
     bit [7:0]   channel_index;
     bit [7:0]   max_iq_bits;
-    bit [15:0]  padding;
+    bit [7:0]   forced;
+    bit [7:0]   padding;
 
     bit [31:0]  segment_seq_num;
     bit [63:0]  segment_timestamp;
@@ -487,6 +489,10 @@ module ecm_drfm_tb;
         $display("max_iq_bits mismatch: %X %X", report_a.max_iq_bits, report_b.max_iq_bits);
         return 0;
       end
+      if (report_a.forced !== report_b.forced) begin
+        $display("forced mismatch: %X %X", report_a.forced, report_b.forced);
+        return 0;
+      end
       if (report_a.segment_seq_num !== report_b.segment_seq_num) begin
         $display("segment_seq_num mismatch: %X %X", report_a.segment_seq_num, report_b.segment_seq_num);
         return 0;
@@ -699,6 +705,7 @@ module ecm_drfm_tb;
           report_header.dwell_sequence_num  = dwell_seq_num;
           report_header.channel_index       = i_channel;
           report_header.max_iq_bits         = max_iq_bits[i_channel];
+          report_header.forced              = writes_by_channel[i_channel][0].trigger_forced;
           report_header.padding             = 0;
           report_header.segment_seq_num     = segment_seq_num[i_channel];
           report_header.segment_timestamp   = 0;
@@ -830,6 +837,7 @@ module ecm_drfm_tb;
           d.first             = (channel_data_index[i] == 0);
           d.last              = (channel_data_index[i] == (channel_duration[i] - 1));
           d.trigger_accepted  = ($urandom_range(99) < 95);
+          d.trigger_forced    = ($urandom_range(99) < 50);
           d.channel_index     = i;
           d.address           = channel_addr_start[i] + channel_data_index[i];
 

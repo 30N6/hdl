@@ -39,6 +39,7 @@ port (
   Channel_addr_first      : in  unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   Channel_addr_last       : in  unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
   Channel_max_iq_bits     : in  unsigned(ECM_DRFM_DATA_WIDTH_WIDTH - 1 downto 0);
+  Channel_forced          : in  std_logic;
 
   Read_valid              : out std_logic;
   Read_last               : out std_logic;
@@ -482,7 +483,7 @@ begin
 
     when S_CHANNEL_INFO =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(resize_up(r_channel_index, 8)) & std_logic_vector(resize_up(Channel_max_iq_bits, 8)) & x"0000";
+      w_fifo_partial_0_data   <= std_logic_vector(resize_up(r_channel_index, 8)) & std_logic_vector(resize_up(Channel_max_iq_bits, 8)) & ("0000000" & Channel_forced) & x"00";
 
     when S_CHANNEL_SEGMENT_SEQ_NUM =>
       w_fifo_valid            <= '1';
