@@ -1,5 +1,7 @@
 `timescale 1ns/1ps
 
+import eth_pkg::*;
+
 interface axi_tx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
   logic                           valid = 0;
   logic                           last;
@@ -9,7 +11,7 @@ interface axi_tx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
   task write(input logic [AXI_DATA_WIDTH - 1 : 0] d []);
     for (int i = 0; i < d.size(); i++) begin
       if ($urandom_range(99) < 10) begin
-        @(posedge Clk);
+        repeat($urandom_range(10, 1)) @(posedge Clk);
       end
       valid <= 1;
       data  <= d[i];
@@ -26,32 +28,43 @@ interface axi_tx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
   endtask
 endinterface
 
-interface axi_rx_intf #(parameter AXI_DATA_WIDTH) (input logic Clk);
-  logic                           valid;
-  logic                           last;
-  logic [AXI_DATA_WIDTH - 1 : 0]  data;
+interface udp_rx_intf (input logic Clk);
+  logic                                 valid;
+  logic                                 last;
+  logic [7:0]                           data;
+  logic [eth_udp_length_width - 1 : 0]  length;
 
-  task read(output logic [AXI_DATA_WIDTH - 1 : 0] d [$]);
+  task read(output logic [7:0] d [$]);
     automatic bit done = 0;
+    automatic bit first = 1;
+    automatic int len = 0;
     d.delete();
 
     do begin
       if (valid) begin
         d.push_back(data);
         done = last;
+        if (first) begin
+          len = length;
+          first = 0;
+        end
       end
       @(posedge Clk);
     end while(!done);
+
+    assert (len == d.size()) else $error("length mismatch");
   endtask
 endinterface
 
-module axis_minififo_tb;
+module axi_to_udp_tb;
   parameter time CLK_HALF_PERIOD  = 5ns;
   parameter AXI_DATA_WIDTH        = 32;
+  parameter DATA_FIFO_DEPTH       = 4096;
+  parameter FRAME_FIFO_DEPTH      = 64;
 
   typedef struct
   {
-    logic [AXI_DATA_WIDTH - 1 : 0] data [$];
+    logic [7:0] data [$];
   } expect_t;
 
   typedef struct
@@ -63,15 +76,15 @@ module axis_minififo_tb;
   logic Clk;
   logic Rst;
 
-  axi_tx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  slave_tx_intf   (.*);
-  axi_rx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  master_rx_intf  (.*);
+  axi_tx_intf #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH))  tx_intf (.*);
+  udp_rx_intf                                     rx_intf (.*);
 
   tx_data_t   tx_queue[$];
   expect_t    expected_data[$];
 
   int   num_received = 0;
-  logic r_axi_rx_ready;
-  logic w_axi_rx_valid;
+  logic r_udp_rx_ready;
+  logic w_udp_rx_valid;
 
   initial begin
     Clk = 0;
@@ -88,26 +101,27 @@ module axis_minififo_tb;
   end
 
   always_ff @(posedge Clk) begin
-    r_axi_rx_ready <= $urandom_range(99) < 80;
+    r_udp_rx_ready <= $urandom_range(99) < 80;
   end
 
-  axis_minififo #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH)) dut
+  axi_to_udp #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH), .DATA_FIFO_DEPTH(DATA_FIFO_DEPTH), .FRAME_FIFO_DEPTH(FRAME_FIFO_DEPTH)) dut
   (
     .Clk          (Clk),
     .Rst          (Rst),
 
-    .S_axis_ready (slave_tx_intf.ready),
-    .S_axis_valid (slave_tx_intf.valid),
-    .S_axis_data  (slave_tx_intf.data),
-    .S_axis_last  (slave_tx_intf.last),
+    .S_axis_valid (tx_intf.valid),
+    .S_axis_data  (tx_intf.data),
+    .S_axis_last  (tx_intf.last),
+    .S_axis_ready (tx_intf.ready),
 
-    .M_axis_ready (r_axi_rx_ready),
-    .M_axis_valid (w_axi_rx_valid),
-    .M_axis_data  (master_rx_intf.data),
-    .M_axis_last  (master_rx_intf.last)
+    .Udp_length   (rx_intf.length),
+    .Udp_data     (rx_intf.data),
+    .Udp_valid    (w_udp_rx_valid),
+    .Udp_last     (rx_intf.last),
+    .Udp_ready    (r_udp_rx_ready)
   );
 
-  assign master_rx_intf.valid = w_axi_rx_valid && r_axi_rx_ready;
+  assign rx_intf.valid = w_udp_rx_valid && r_udp_rx_ready;
 
   task automatic wait_for_reset();
     do begin
@@ -115,7 +129,7 @@ module axis_minififo_tb;
     end while (Rst);
   endtask
 
-  function automatic bit data_match(logic [AXI_DATA_WIDTH - 1 : 0] a [$], logic [AXI_DATA_WIDTH - 1 : 0] b []);
+  function automatic bit data_match(logic [7:0] a [$], logic [7:0] b []);
     if (a.size() != b.size()) begin
       $display("%0t: size mismatch: a=%0d b=%0d", $time, a.size(), b.size());
       return 0;
@@ -132,12 +146,12 @@ module axis_minififo_tb;
   endfunction
 
   initial begin
-    automatic logic [AXI_DATA_WIDTH - 1 : 0] read_data [$];
+    automatic logic [7:0] read_data [$];
 
     wait_for_reset();
 
     forever begin
-      master_rx_intf.read(read_data);
+      rx_intf.read(read_data);
 
       if (data_match(read_data, expected_data[0].data)) begin
         $display("%0t: data match - %p", $time, read_data);
@@ -164,49 +178,81 @@ module axis_minififo_tb;
     while (1) begin
       @(posedge Clk);
       if (tx_queue.size() > 0) begin
-        slave_tx_intf.write(tx_queue[0].data);
+        $display("%0t: writing: %p", $time, tx_queue[0].data);
+        tx_intf.write(tx_queue[0].data);
         repeat(tx_queue[0].post_packet_delay) @(posedge Clk);
         void'(tx_queue.pop_front());
       end
     end
   end
 
+  function automatic expect_t get_expected_data(logic [31:0] seq_num, tx_data_t tx_data);
+    expect_t e;
+
+    for (int i = 0; i < 4; i++) begin
+      e.data.push_back(seq_num[(3-i)*8 +: 8]);
+    end
+
+    for (int i = 0; i < tx_data.data.size(); i++) begin
+      for (int j = 0; j < AXI_DATA_WIDTH/8; j++) begin
+        e.data.push_back(tx_data.data[i][j*8 +: 8]);
+      end
+    end
+
+    return e;
+  endfunction
+
   task automatic standard_test();
-    parameter NUM_TESTS = 200;
+    parameter NUM_TESTS = 20;
 
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
       int max_write_delay = $urandom_range(5);
+      int num_packets = $urandom_range(200, 100);
       tx_data_t tx_data;
       expect_t e;
-      int r;
+      logic [31:0] seq_num = 0;
 
       $display("%0t: Test started - max_write_delay=%0d", $time, max_write_delay);
 
-      r = $urandom_range(200, 20);
-      for (int i = 0; i < r; i++) begin
+      for (int i = 0; i < num_packets; i++) begin
+        int r = $urandom_range(99);
+        int packet_len;
+
+        if (r < 25) begin
+          packet_len = $urandom_range(10, 1);
+        end else begin
+          packet_len = $urandom_range(300, 1);
+        end
+
         tx_data.post_packet_delay = $urandom_range(max_write_delay);
         tx_data.data.delete();
-        repeat($urandom_range(100, 1)) tx_data.data.push_back($urandom);
+        repeat(packet_len) tx_data.data.push_back($urandom);
         tx_queue.push_back(tx_data);
-        $display("expecting: %p", tx_data);
-        e.data = tx_data.data;
+        $display("%0t: expecting: %p", $time, tx_data);
+
+        e = get_expected_data(seq_num, tx_data);
         expected_data.push_back(e);
+        seq_num++;
       end
 
       begin
         int wait_cycles = 0;
         while (1) begin
-          if ((expected_data.size() == 0) || (wait_cycles > 1e5)) begin
+          if (((tx_queue.size() == 0) && (expected_data.size() == 0)) || (wait_cycles > 1e6)) begin
             break;
           end
 
           @(posedge Clk);
           wait_cycles++;
         end
-        assert (wait_cycles < 1e5) else $error("Timeout while waiting for expected queue to empty during test.");
+        assert (wait_cycles < 1e6) else $error("Timeout while waiting for expected queue to empty during test.");
       end
 
       $display("%0t: Test finished: num_received = %0d", $time, num_received);
+      Rst = 1;
+      repeat(10) @(posedge Clk);
+      Rst = 0;
+      repeat(10) @(posedge Clk);
     end
   endtask
 

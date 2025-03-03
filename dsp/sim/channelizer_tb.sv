@@ -41,7 +41,7 @@ module channelizer_tb;
   parameter time CLK_HALF_PERIOD  = 4ns;
   parameter NUM_CHANNELS          = 32;
   parameter CHANNEL_INDEX_WIDTH   = $clog2(NUM_CHANNELS);
-  parameter NUM_COEFS_PER_CHANNEL = (NUM_CHANNELS > 16) ? 12 : 8;
+  parameter NUM_COEFS_PER_CHANNEL = (NUM_CHANNELS > 8) ? 12 : 8;
   parameter INPUT_DATA_WIDTH      = 12;
   parameter OUTPUT_DATA_WIDTH     = 12 + $clog2(NUM_COEFS_PER_CHANNEL) + $clog2(NUM_CHANNELS);
   parameter BASEBANDING_ENABLE    = 1;

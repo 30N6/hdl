@@ -58,11 +58,10 @@ architecture rtl of ecm_top is
   constant ENABLE_SYNTHESIZER         : boolean := true;
   constant ENABLE_DWELL_STATS         : boolean := true;
   constant ENABLE_DRFM                : boolean := true;
-  constant ENABLE_DEBUG               : boolean := false;
 
   constant NUM_D2H_MUX_INPUTS         : natural := 3;
-  constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + clog2(8) + clog2(ECM_NUM_CHANNELS); -- 8 taps per channel
-  constant SYNTHESIZER16_OUTPUT_WIDTH : natural := ECM_SYNTHESIZER_DATA_WIDTH + clog2(ECM_NUM_CHANNELS) + clog2(6) + 1; -- 6 taps per channel
+  constant CHANNELIZER16_DATA_WIDTH   : natural := IQ_WIDTH + clog2(12) + clog2(ECM_NUM_CHANNELS); -- 12 taps per channel
+  constant SYNTHESIZER16_OUTPUT_WIDTH : natural := ECM_SYNTHESIZER_DATA_WIDTH + clog2(ECM_NUM_CHANNELS) + clog2(8) + 1; -- 8 taps per channel
 
   constant SYNC_TO_DRFM_READ_LATENCY  : natural := 7;
   constant DRFM_READ_LATENCY          : natural := 5;
@@ -96,6 +95,8 @@ architecture rtl of ecm_top is
   signal w_dwell_sequence_num         : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal w_dwell_global_counter       : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   signal w_dwell_program_tag          : unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
+  signal w_dwell_report_enable_drfm   : std_logic;
+  signal w_dwell_report_enable_stats  : std_logic;
   signal w_dwell_stats_report_done    : std_logic;
   signal w_dwell_drfm_reports_done    : std_logic;
 
@@ -250,6 +251,8 @@ begin
     Dwell_global_counter          => w_dwell_global_counter,
     Dwell_program_tag             => w_dwell_program_tag,
     Dwell_transmit_count          => w_dwell_transmit_count,
+    Dwell_report_enable_drfm      => w_dwell_report_enable_drfm,
+    Dwell_report_enable_stats     => w_dwell_report_enable_stats,
     Dwell_report_done_drfm        => w_dwell_drfm_reports_done,
     Dwell_report_done_stats       => w_dwell_stats_report_done,
 
@@ -412,6 +415,7 @@ begin
       Dwell_sequence_num        => w_dwell_sequence_num,
       Dwell_global_counter      => w_dwell_global_counter,
       Dwell_program_tag         => w_dwell_program_tag,
+      Dwell_report_enable       => w_dwell_report_enable_stats,
       Dwell_report_done         => w_dwell_stats_report_done,
 
       Input_ctrl                => w_stretched_ctrl,
@@ -447,6 +451,7 @@ begin
       Dwell_active_transmit   => w_dwell_active_tx,
       Dwell_done              => w_dwell_done,
       Dwell_sequence_num      => w_dwell_sequence_num,
+      Dwell_report_enable     => w_dwell_report_enable_drfm,
       Dwell_reports_done      => w_dwell_drfm_reports_done,
 
       Write_req               => w_drfm_write_req,

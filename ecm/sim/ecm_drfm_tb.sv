@@ -56,6 +56,7 @@ endfunction
 interface dwell_tx_intf (input logic Clk);
   logic                                         dwell_active = 0;
   logic                                         dwell_done;
+  logic                                         dwell_report_enable;
   logic [ecm_dwell_sequence_num_width - 1 : 0]  dwell_sequence_num;
   logic                                         dwell_reports_done;
 
@@ -72,26 +73,49 @@ interface dwell_tx_intf (input logic Clk);
     @(posedge Clk);
   endtask
 
-  task write(int unsigned seq_num, ecm_drfm_write_req_queue_t write_req_data, ecm_drfm_read_req_queue_t read_req_data);
+  task write(int unsigned seq_num, ecm_drfm_write_req_queue_t write_req_data, ecm_drfm_read_req_queue_t read_req_data, bit random_reads, bit report_enable);
     automatic int burst_length = 0;
     automatic int gap_length = 0;
+    automatic bit prev_read = 0;
 
-    dwell_active        = 1;
-    dwell_done          = 0;
-    dwell_sequence_num  = seq_num;
-    read_req.read_valid = 0;
-    read_req.sync_valid = 0;
-    write_req.valid     = 0;
+    dwell_active            = 1;
+    dwell_done              = 0;
+    dwell_report_enable     = report_enable;
+    dwell_sequence_num      = seq_num;
+    read_req.read_valid     = 0;
+    read_req.sync_valid     = 0;
+    read_req.address        = 'x;
+    read_req.channel_index  = 'x;
+    read_req.channel_last   = 'x;
+    write_req.valid         = 0;
 
     repeat ($urandom_range(200, 20)) @(posedge Clk);
 
     while (write_req_data.size() > 0) begin
+      if (random_reads) begin
+        if (prev_read) begin
+          prev_read = 0;
+        end else if ($urandom_range(99) < 10) begin
+          read_req.read_valid = 1;
+          read_req.sync_valid = 1;
+          prev_read = 1;
+        end
+      end
+
       write_req = write_req_data.pop_front();
+
       @(posedge Clk);
+
+      if (random_reads) begin
+        read_req.read_valid = 0;
+        read_req.sync_valid = 0;
+      end
+
       write_req.valid             = 0;
       write_req.first             = 'x;
       write_req.last              = 'x;
       write_req.trigger_accepted  = 'x;
+      write_req.trigger_forced    = 'x;
       write_req.channel_index     = 'x;
       write_req.address           = 'x;
       write_req.data              = '{default: 'x};
@@ -100,32 +124,34 @@ interface dwell_tx_intf (input logic Clk);
 
     repeat($urandom_range(100)) @(posedge Clk);
 
-    while (read_req_data.size() > 0) begin
-      if (burst_length > 0) begin
-        burst_length--;
-        repeat ($urandom_range(1)) @(posedge Clk);
-      end else if (gap_length > 0) begin
-        gap_length--;
-        @(posedge Clk);
-        continue;
-      end else begin
-        automatic int r = $urandom_range(99);
-        if (r < 5) begin
-          burst_length = $urandom_range(20, 10);
-        end else if (r < 10) begin
-          gap_length = $urandom_range(20, 10);
+    if (!random_reads) begin
+      while (read_req_data.size() > 0) begin
+        if (burst_length > 0) begin
+          burst_length--;
+          repeat ($urandom_range(1)) @(posedge Clk);
+        end else if (gap_length > 0) begin
+          gap_length--;
+          @(posedge Clk);
+          continue;
+        end else begin
+          automatic int r = $urandom_range(99);
+          if (r < 5) begin
+            burst_length = $urandom_range(20, 10);
+          end else if (r < 10) begin
+            gap_length = $urandom_range(20, 10);
+          end
+          repeat ($urandom_range(10)) @(posedge Clk);
         end
-        repeat ($urandom_range(10)) @(posedge Clk);
-      end
 
-      read_req = read_req_data.pop_front();
-      @(posedge Clk);
-      read_req.read_valid    = 0;
-      read_req.sync_valid    = 0;
-      read_req.address       = 'x;
-      read_req.channel_index = 'x;
-      read_req.channel_last  = 'x;
-      repeat(1) @(posedge Clk);
+        read_req = read_req_data.pop_front();
+        @(posedge Clk);
+        read_req.read_valid    = 0;
+        read_req.sync_valid    = 0;
+        read_req.address       = 'x;
+        read_req.channel_index = 'x;
+        read_req.channel_last  = 'x;
+        repeat(1) @(posedge Clk);
+      end
     end
 
     repeat ($urandom_range(10, 5)) @(posedge Clk);
@@ -216,7 +242,8 @@ module ecm_drfm_tb;
 
     bit [7:0]   channel_index;
     bit [7:0]   max_iq_bits;
-    bit [15:0]  padding;
+    bit [7:0]   forced;
+    bit [7:0]   padding;
 
     bit [31:0]  segment_seq_num;
     bit [63:0]  segment_timestamp;
@@ -277,6 +304,8 @@ module ecm_drfm_tb;
   logic           w_error_reporter_timeout;
   logic           w_error_reporter_overflow;
 
+  logic           random_reads;
+
   initial begin
     Clk_axi = 0;
     forever begin
@@ -318,6 +347,7 @@ module ecm_drfm_tb;
     .Dwell_active_transmit    (tx_intf.dwell_active),
     .Dwell_done               (tx_intf.dwell_done),
     .Dwell_sequence_num       (tx_intf.dwell_sequence_num),
+    .dwell_report_enable      (tx_intf.dwell_report_enable),
     .Dwell_reports_done       (tx_intf.dwell_reports_done),
 
     .Write_req                (tx_intf.write_req),
@@ -343,11 +373,11 @@ module ecm_drfm_tb;
 
   always_ff @(posedge Clk) begin
     if (!Rst) begin
-      if (w_error_ext_read_overflow)  $error("ext read overflow");
-      if (w_error_int_read_overflow)  $error("int read overflow");
-      if (w_error_invalid_read)       $error("invalid read");
-      if (w_error_reporter_timeout)   $error("reporter timeout");
-      if (w_error_reporter_overflow)  $error("reporter overflow");
+      if (w_error_ext_read_overflow)              $error("ext read overflow");
+      if (w_error_int_read_overflow)              $error("int read overflow");
+      if (w_error_invalid_read && !random_reads)  $error("invalid read");
+      if (w_error_reporter_timeout)               $error("reporter timeout");
+      if (w_error_reporter_overflow)              $error("reporter overflow");
     end
   end
 
@@ -413,7 +443,7 @@ module ecm_drfm_tb;
     return report_a.channel_index;
   endfunction
 
-  function automatic bit report_data_match(logic [AXI_DATA_WIDTH - 1 : 0] a [$], logic [AXI_DATA_WIDTH - 1 : 0] b []);
+  function automatic bit report_data_match(logic [AXI_DATA_WIDTH - 1 : 0] a [$], logic [AXI_DATA_WIDTH - 1 : 0] b [], bit random_reads);
     ecm_common_report_header_t header_a = unpack_common_report_header(a);
     ecm_common_report_header_t header_b = unpack_common_report_header(a);
 
@@ -457,6 +487,10 @@ module ecm_drfm_tb;
       end
       if (report_a.max_iq_bits !== report_b.max_iq_bits) begin
         $display("max_iq_bits mismatch: %X %X", report_a.max_iq_bits, report_b.max_iq_bits);
+        return 0;
+      end
+      if (report_a.forced !== report_b.forced) begin
+        $display("forced mismatch: %X %X", report_a.forced, report_b.forced);
         return 0;
       end
       if (report_a.segment_seq_num !== report_b.segment_seq_num) begin
@@ -504,7 +538,7 @@ module ecm_drfm_tb;
         $display("channel_was_written mismatch: %X %X", report_a.channel_was_written, report_b.channel_was_written);
         return 0;
       end
-      if (report_a.channel_was_read !== report_b.channel_was_read) begin
+      if (!random_reads && (report_a.channel_was_read !== report_b.channel_was_read)) begin
         $display("channel_was_read mismatch: %X %X", report_a.channel_was_read, report_b.channel_was_read);
         return 0;
       end
@@ -551,7 +585,7 @@ module ecm_drfm_tb;
       channel_index = get_report_channel(read_data);
 
       if (channel_index >= 0) begin
-        if (report_data_match(read_data, expected_channel_reports[channel_index][0].data)) begin
+        if (report_data_match(read_data, expected_channel_reports[channel_index][0].data, 0)) begin
           $display("%0t: channel=%0d: data match - %p", $time, channel_index, read_data);
         end else begin
           $error("%0t: channel=%0d: error -- data mismatch: expected = %p  actual = %p", $time, channel_index, expected_channel_reports[channel_index][0].data, read_data);
@@ -559,7 +593,7 @@ module ecm_drfm_tb;
         num_received++;
         void'(expected_channel_reports[channel_index].pop_front());
       end else begin
-        if (report_data_match(read_data, expected_summary_reports[0].data)) begin
+        if (report_data_match(read_data, expected_summary_reports[0].data, random_reads)) begin
           $display("%0t: summary data match - %p", $time, read_data);
         end else begin
           $error("%0t: error -- summary data mismatch: expected = %p  actual = %p", $time, expected_summary_reports[0].data, read_data);
@@ -600,6 +634,10 @@ module ecm_drfm_tb;
     forever begin
       output_rx_intf.read(read_data);
 
+      if (random_reads) begin
+        continue;
+      end
+
       if (output_data_match(read_data, expected_output_data[0])) begin
         $display("%0t: data match - %p", $time, read_data);
       end else begin
@@ -620,7 +658,7 @@ module ecm_drfm_tb;
     end
   end
 
-  function automatic void expect_reports_and_output(int unsigned dwell_seq_num, ecm_drfm_write_req_t write_req_data [$], ecm_drfm_read_req_t read_req_data [$]);
+  function automatic void expect_reports_and_output(int unsigned dwell_seq_num, ecm_drfm_write_req_t write_req_data [$], ecm_drfm_read_req_t read_req_data [$], bit report_enable);
     ecm_drfm_write_req_t  writes_by_channel   [ecm_num_channels - 1 : 0][$];
     ecm_drfm_read_req_t   reads_by_channel    [ecm_num_channels - 1 : 0][$];
     int                   max_iq_bits         [ecm_num_channels - 1 : 0] = '{default:0};
@@ -667,6 +705,7 @@ module ecm_drfm_tb;
           report_header.dwell_sequence_num  = dwell_seq_num;
           report_header.channel_index       = i_channel;
           report_header.max_iq_bits         = max_iq_bits[i_channel];
+          report_header.forced              = writes_by_channel[i_channel][0].trigger_forced;
           report_header.padding             = 0;
           report_header.segment_seq_num     = segment_seq_num[i_channel];
           report_header.segment_timestamp   = 0;
@@ -698,14 +737,16 @@ module ecm_drfm_tb;
             report_axi.data.push_back(0);
           end
 
-          expected_channel_reports[i_channel].push_back(report_axi);
+          if (report_enable) begin
+            expected_channel_reports[i_channel].push_back(report_axi);
+          end
         end
       end
 
       segment_seq_num[i_channel]++;
     end
 
-    begin
+    if (report_enable) begin
       expect_report_t                       report_axi;
       ecm_drfm_summary_report_header_t      report_header;
       ecm_drfm_summary_report_header_bits_t report_header_packed;
@@ -796,6 +837,7 @@ module ecm_drfm_tb;
           d.first             = (channel_data_index[i] == 0);
           d.last              = (channel_data_index[i] == (channel_duration[i] - 1));
           d.trigger_accepted  = ($urandom_range(99) < 95);
+          d.trigger_forced    = ($urandom_range(99) < 50);
           d.channel_index     = i;
           d.address           = channel_addr_start[i] + channel_data_index[i];
 
@@ -869,13 +911,20 @@ module ecm_drfm_tb;
       for (int i_dwell = 0; i_dwell < 10; i_dwell++) begin
         int unsigned          dwell_seq_num       = $urandom;
         int                   max_bits            = $urandom_range(ecm_drfm_data_width - 1, 4);
+        bit                   report_enable       = $urandom_range(99) < 95;
         ecm_drfm_write_req_t  write_req_data [$]  = randomize_drfm_writes(max_bits);
-        ecm_drfm_read_req_t   read_req_data [$]   = randomize_drfm_reads(write_req_data);
+        ecm_drfm_read_req_t   read_req_data [$];
+
+        random_reads = $urandom_range(99) < 25;
+
+        if (!random_reads) begin
+          read_req_data = randomize_drfm_reads(write_req_data);
+        end
 
         $display("dwell %0d started: seq=%0X max_bits=%0d", i_dwell, dwell_seq_num, max_bits);
 
-        expect_reports_and_output(dwell_seq_num, write_req_data, read_req_data);
-        tx_intf.write(dwell_seq_num, write_req_data, read_req_data);
+        expect_reports_and_output(dwell_seq_num, write_req_data, read_req_data, report_enable);
+        tx_intf.write(dwell_seq_num, write_req_data, read_req_data, random_reads, report_enable);
 
         repeat(1000) @(posedge Clk);
 

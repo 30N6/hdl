@@ -2,8 +2,8 @@
 # for each new project. There should be no need to
 # modify the rest of the script.
 
-set tb_lib      dsp_lib
-set tb_name     channelizer_tb
+set tb_lib      udp_intf_lib
+set tb_name     udp_intf_tb
 set top_level   $tb_lib.$tb_name
 
 set xilinx_dir  C:/Xilinx/Vivado/2022.2/data/verilog/src
@@ -14,35 +14,31 @@ set library_file_list [list \
   ] \
   common_lib [list \
     ../common/hdl/common_pkg.vhd \
-    ../common/hdl/math_pkg.vhd \
-    ../common/sim/math_pkg_sv.sv \
+    ] \
+  axi_lib [list \
+    ../axi/hdl/axis_async_fifo.vhd \
+    ../axi/hdl/axis_minififo.vhd \
     ] \
   mem_lib [list \
+    ../mem/hdl/xpm_fallthrough_fifo.vhd \
     ../mem/hdl/ram_sdp.vhd \
     ] \
-  dsp_lib [list \
-    ./hdl/dsp_pkg.vhd \
-    ./hdl/fft_sample_fifo.vhd \
-    ./hdl/fft_mux.vhd \
-    ./hdl/fft_4.vhd \
-    ./hdl/fft_4_serializer.vhd \
-    ./hdl/fft_twiddle_mem.vhd \
-    ./hdl/fft_radix2_output.vhd \
-    ./hdl/fft_radix2_stage.vhd \
-    ./hdl/fft_pipelined.vhd \
-    ./hdl/pfb_demux_2x.vhd \
-    ./hdl/pfb_baseband_2x.vhd \
-    ./hdl/pfb_filter_buffer.vhd \
-    ./hdl/pfb_filter_mult.vhd \
-    ./hdl/pfb_filter_stage.vhd \
-    ./hdl/pfb_filter.vhd \
-    ./hdl/channelizer_power.vhd \
-    ./hdl/channelizer_common.vhd \
-    ./hdl/channelizer_8.vhd \
-    ./hdl/channelizer_16.vhd \
-    ./hdl/channelizer_32.vhd \
-    ./hdl/channelizer_64.vhd \
-    ./sim/channelizer_tb.sv \
+  eth_lib [list \
+    ../eth/hdl/eth_pkg.vhd \
+    ../eth/hdl/axi_to_udp.vhd \
+    ../eth/hdl/ethernet_fcs.vhd \
+    ../eth/hdl/gmii_arb.vhd \
+    ../eth/hdl/gmii_buffer.vhd \
+    ../eth/hdl/mac_1g_tx.vhd \
+    ../eth/hdl/mac_rx_to_udp.vhd \
+    ../eth/hdl/udp_to_axi.vhd \
+    ../eth/hdl/udp_tx.vhd \
+    ] \
+  udp_intf_lib [list \
+    ./hdl/udp_intf_pkg.vhd \
+    ./hdl/udp_setup.vhd \
+    ./hdl/udp_intf.vhd \
+    ./sim/udp_intf_tb.sv \
     ] \
 ]
 
@@ -51,7 +47,9 @@ set incdir_list [list \
   ./hdl \
   ../common/hdl \
   ../common/sim \
+  ../axi/hdl \
   ../mem/hdl \
+  ../eth/hdl \
   $xilinx_dir \
 ]
 
@@ -102,9 +100,9 @@ foreach {library file_list} $library_file_list {
   foreach file $file_list {
     if { $last_compile_time < [file mtime $file] } {
       if [regexp {.vhdl?$} $file] {
-        vcom -2008 -mixedsvvh -suppress 12110 -work $library $file
+        vcom -2008 -mixedsvvh -work $library $file
       } else {
-        vlog +define+SIM -sv -mixedsvvh -suppress 12110 -timescale "1 ns / 1 ns" {*}[split $vlog_lib_str] -work $library $file {*}[split $incdir_str " "]
+        vlog +define+SIM -sv -mixedsvvh -timescale "1 ns / 1 ns" {*}[split $vlog_lib_str] -work $library $file {*}[split $incdir_str " "]
       }
       set last_compile_time 0
     }
@@ -113,26 +111,10 @@ foreach {library file_list} $library_file_list {
 set last_compile_time $time_now
 
 # Load the simulation
-#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=8
-#set NumericStdNoWarnings 1
-#set BreakOnAssertion 2
-#run -all
-
-#-novopt
-vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=16 -novopt
+vsim $top_level glbl.glbl
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all
-
-#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=32
-#set NumericStdNoWarnings 1
-#set BreakOnAssertion 2
-#run -all
-
-#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=64  -novopt
-#set NumericStdNoWarnings 1
-#set BreakOnAssertion 2
-#run -all
 
 # If waves exists
 if [file exist wave.do] {

@@ -77,7 +77,7 @@ package ecm_pkg is
 
   constant ECM_DRFM_DATA_WIDTH                            : natural := 16;
   constant ECM_DRFM_DATA_WIDTH_WIDTH                      : natural := clog2(ECM_DRFM_DATA_WIDTH);
-  constant ECM_DRFM_MEM_DEPTH                             : natural := 1024 * 24;
+  constant ECM_DRFM_MEM_DEPTH                             : natural := 1024 * 32;
   constant ECM_DRFM_ADDR_WIDTH                            : natural := clog2(ECM_DRFM_MEM_DEPTH);
   constant ECM_DRFM_SEGMENT_SEQUENCE_NUM_WIDTH            : natural := 32;
   constant ECM_DRFM_SEGMENT_LENGTH_WIDTH                  : natural := 12;
@@ -204,9 +204,11 @@ package ecm_pkg is
     enable                    : std_logic;
     initial_dwell_index       : unsigned(ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
     global_counter_init       : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
+    reporting_threshold_drfm  : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
+    reporting_threshold_stats : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
     tag                       : unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
   end record;
-  constant ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 16 + 16 + 16; --16 bits of padding
+  constant ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH : natural := 8 + 8 + 16 + 16 + 16 + 16 + 16; --16 bits of padding
 
   type ecm_hardware_control_entry_t is record
     reset                     : std_logic;
@@ -271,6 +273,7 @@ package ecm_pkg is
     first               : std_logic;
     last                : std_logic;
     trigger_accepted    : std_logic;
+    trigger_forced      : std_logic;
     channel_index       : unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
     address             : unsigned(ECM_DRFM_ADDR_WIDTH - 1 downto 0);
     data                : signed_array_t(1 downto 0)(ECM_DRFM_DATA_WIDTH - 1 downto 0);
@@ -465,10 +468,12 @@ package body ecm_pkg is
   function unpack_aligned(v : std_logic_vector(ECM_DWELL_PROGRAM_ENTRY_ALIGNED_WIDTH - 1 downto 0)) return ecm_dwell_program_entry_t is
     variable r : ecm_dwell_program_entry_t;
   begin
-    r.enable              := v(0);
-    r.initial_dwell_index := unsigned(v(8 + ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 8));
-    r.global_counter_init := unsigned(v(16 + ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 16));
-    r.tag                 := unsigned(v(32 + ECM_DWELL_TAG_WIDTH - 1 downto 32));
+    r.enable                    := v(0);
+    r.initial_dwell_index       := unsigned(v(8 + ECM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 8));
+    r.global_counter_init       := unsigned(v(16 + ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 16));
+    r.reporting_threshold_drfm  := unsigned(v(32 + ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 32));
+    r.reporting_threshold_stats := unsigned(v(48 + ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 48));
+    r.tag                       := unsigned(v(64 + ECM_DWELL_TAG_WIDTH - 1 downto 64));
     return r;
   end function;
 
