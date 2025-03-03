@@ -56,6 +56,7 @@ endfunction
 interface dwell_tx_intf (input logic Clk);
   logic                                         dwell_active = 0;
   logic                                         dwell_done;
+  logic                                         dwell_report_enable;
   logic [ecm_dwell_sequence_num_width - 1 : 0]  dwell_sequence_num;
   logic                                         dwell_reports_done;
 
@@ -72,13 +73,14 @@ interface dwell_tx_intf (input logic Clk);
     @(posedge Clk);
   endtask
 
-  task write(int unsigned seq_num, ecm_drfm_write_req_queue_t write_req_data, ecm_drfm_read_req_queue_t read_req_data, bit random_reads);
+  task write(int unsigned seq_num, ecm_drfm_write_req_queue_t write_req_data, ecm_drfm_read_req_queue_t read_req_data, bit random_reads, bit report_enable);
     automatic int burst_length = 0;
     automatic int gap_length = 0;
     automatic bit prev_read = 0;
 
     dwell_active            = 1;
     dwell_done              = 0;
+    dwell_report_enable     = report_enable;
     dwell_sequence_num      = seq_num;
     read_req.read_valid     = 0;
     read_req.sync_valid     = 0;
@@ -343,6 +345,7 @@ module ecm_drfm_tb;
     .Dwell_active_transmit    (tx_intf.dwell_active),
     .Dwell_done               (tx_intf.dwell_done),
     .Dwell_sequence_num       (tx_intf.dwell_sequence_num),
+    .dwell_report_enable      (tx_intf.dwell_report_enable),
     .Dwell_reports_done       (tx_intf.dwell_reports_done),
 
     .Write_req                (tx_intf.write_req),
@@ -649,7 +652,7 @@ module ecm_drfm_tb;
     end
   end
 
-  function automatic void expect_reports_and_output(int unsigned dwell_seq_num, ecm_drfm_write_req_t write_req_data [$], ecm_drfm_read_req_t read_req_data [$]);
+  function automatic void expect_reports_and_output(int unsigned dwell_seq_num, ecm_drfm_write_req_t write_req_data [$], ecm_drfm_read_req_t read_req_data [$], bit report_enable);
     ecm_drfm_write_req_t  writes_by_channel   [ecm_num_channels - 1 : 0][$];
     ecm_drfm_read_req_t   reads_by_channel    [ecm_num_channels - 1 : 0][$];
     int                   max_iq_bits         [ecm_num_channels - 1 : 0] = '{default:0};
@@ -727,14 +730,16 @@ module ecm_drfm_tb;
             report_axi.data.push_back(0);
           end
 
-          expected_channel_reports[i_channel].push_back(report_axi);
+          if (report_enable) begin
+            expected_channel_reports[i_channel].push_back(report_axi);
+          end
         end
       end
 
       segment_seq_num[i_channel]++;
     end
 
-    begin
+    if (report_enable) begin
       expect_report_t                       report_axi;
       ecm_drfm_summary_report_header_t      report_header;
       ecm_drfm_summary_report_header_bits_t report_header_packed;
@@ -898,6 +903,7 @@ module ecm_drfm_tb;
       for (int i_dwell = 0; i_dwell < 10; i_dwell++) begin
         int unsigned          dwell_seq_num       = $urandom;
         int                   max_bits            = $urandom_range(ecm_drfm_data_width - 1, 4);
+        bit                   report_enable       = $urandom_range(99) < 95;
         ecm_drfm_write_req_t  write_req_data [$]  = randomize_drfm_writes(max_bits);
         ecm_drfm_read_req_t   read_req_data [$];
 
@@ -909,8 +915,8 @@ module ecm_drfm_tb;
 
         $display("dwell %0d started: seq=%0X max_bits=%0d", i_dwell, dwell_seq_num, max_bits);
 
-        expect_reports_and_output(dwell_seq_num, write_req_data, read_req_data);
-        tx_intf.write(dwell_seq_num, write_req_data, read_req_data, random_reads);
+        expect_reports_and_output(dwell_seq_num, write_req_data, read_req_data, report_enable);
+        tx_intf.write(dwell_seq_num, write_req_data, read_req_data, random_reads, report_enable);
 
         repeat(1000) @(posedge Clk);
 

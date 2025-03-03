@@ -222,6 +222,8 @@ module ecm_dwell_controller_tb;
   logic [31:0]              w_dwell_seq_num;
   logic [15:0]              w_dwell_global_counter;
   logic [15:0]              w_dwell_program_tag;
+  logic                     w_dwell_report_enable_drfm;
+  logic                     w_dwell_report_enable_stats;
   logic                     r_dwell_report_done_drfm;
   logic                     r_dwell_report_done_stats;
   logic                     r_dwell_active_meas;
@@ -317,6 +319,8 @@ module ecm_dwell_controller_tb;
     .Dwell_global_counter         (w_dwell_global_counter),
     .Dwell_program_tag            (w_dwell_program_tag),
     .Dwell_transmit_count         (),
+    .Dwell_report_enable_drfm     (w_dwell_report_enable_drfm),
+    .Dwell_report_enable_stats    (w_dwell_report_enable_stats),
     .Dwell_report_done_drfm       (r_dwell_report_done_drfm),
     .Dwell_report_done_stats      (r_dwell_report_done_stats),
 
@@ -880,7 +884,9 @@ module ecm_dwell_controller_tb;
     packed_entry[0]     = data.enable;
     packed_entry[15:8]  = data.initial_dwell_index;
     packed_entry[31:16] = data.global_counter_init;
-    packed_entry[47:32] = data.tag;
+    packed_entry[47:32] = data.reporting_threshold_drfm;
+    packed_entry[63:48] = data.reporting_threshold_stats;
+    packed_entry[79:64] = data.tag;
 
     config_data[0] = ecm_control_magic_num;
     config_data[1] = config_seq_num++;
@@ -1618,10 +1624,12 @@ module ecm_dwell_controller_tb;
       dwell_entries   = randomize_dwell_entries(num_dwells);
       channel_entries = randomize_channel_entries(dwell_entries, tx_programs, channel_mem_depth, enable_immediate_trigger);
 
-      dwell_program.enable              = 1;
-      dwell_program.initial_dwell_index = $urandom_range(2, 0);
-      dwell_program.global_counter_init = num_dwells - dwell_program.initial_dwell_index + 1;
-      dwell_program.tag                 = $urandom;
+      dwell_program.enable                    = 1;
+      dwell_program.initial_dwell_index       = $urandom_range(2, 0);
+      dwell_program.global_counter_init       = num_dwells - dwell_program.initial_dwell_index + 1;
+      dwell_program.reporting_threshold_drfm  = $urandom_range(dwell_program.global_counter_init, 1);
+      dwell_program.reporting_threshold_stats = $urandom_range(dwell_program.global_counter_init, 1);
+      dwell_program.tag                       = $urandom;
 
       generate_channelizer_data(dwell_program, dwell_entries, channel_entries, dwell_seq_num);
       generate_expected_events(dwell_program, dwell_entries, channel_entries, tx_programs, dwell_seq_num);

@@ -28,6 +28,7 @@ port (
   Dwell_active_transmit   : in  std_logic;
   Dwell_done              : in  std_logic;
   Dwell_sequence_num      : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+  Dwell_report_enable     : in  std_logic;
   Dwell_reports_done      : out std_logic;
 
   Write_req               : in  ecm_drfm_write_req_t;
@@ -74,6 +75,7 @@ architecture rtl of ecm_drfm is
   signal r_dwell_active                   : std_logic;
   signal r_dwell_active_tx                : std_logic;
   signal r_dwell_done                     : std_logic;
+  signal r_dwell_report_enable            : std_logic;
   signal r_dwell_sequence_num             : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal r_dwell_start                    : std_logic;
 
@@ -158,6 +160,7 @@ begin
       r_dwell_start         <= Dwell_active and not(r_dwell_active);
       r_dwell_active_tx     <= Dwell_active_transmit;
       r_dwell_done          <= Dwell_done;
+      r_dwell_report_enable <= Dwell_report_enable;
       r_dwell_sequence_num  <= Dwell_sequence_num;
       r0_write_req          <= Write_req;
       r0_read_req           <= Read_req;
@@ -381,6 +384,7 @@ begin
     Dwell_active            => r_dwell_active,
     Dwell_start             => r_dwell_start,
     Dwell_done              => r_dwell_done,
+    Dwell_report_enable     => r_dwell_report_enable,
     Dwell_sequence_num      => r_dwell_sequence_num,
 
     Channel_report_pending  => r_channel_report_pending,

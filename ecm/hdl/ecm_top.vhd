@@ -249,6 +249,8 @@ begin
     Dwell_global_counter          => w_dwell_global_counter,
     Dwell_program_tag             => w_dwell_program_tag,
     Dwell_transmit_count          => w_dwell_transmit_count,
+    Dwell_report_enable_drfm      => w_dwell_report_enable_drfm,
+    Dwell_report_enable_stats     => w_dwell_report_enable_stats,
     Dwell_report_done_drfm        => w_dwell_drfm_reports_done,
     Dwell_report_done_stats       => w_dwell_stats_report_done,
 
@@ -411,6 +413,7 @@ begin
       Dwell_sequence_num        => w_dwell_sequence_num,
       Dwell_global_counter      => w_dwell_global_counter,
       Dwell_program_tag         => w_dwell_program_tag,
+      Dwell_report_enable       => w_dwell_report_enable_stats,
       Dwell_report_done         => w_dwell_stats_report_done,
 
       Input_ctrl                => w_stretched_ctrl,
@@ -446,6 +449,7 @@ begin
       Dwell_active_transmit   => w_dwell_active_tx,
       Dwell_done              => w_dwell_done,
       Dwell_sequence_num      => w_dwell_sequence_num,
+      Dwell_report_enable     => w_dwell_report_enable_drfm,
       Dwell_reports_done      => w_dwell_drfm_reports_done,
 
       Write_req               => w_drfm_write_req,

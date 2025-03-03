@@ -26,6 +26,7 @@ port (
   Dwell_active            : in  std_logic;
   Dwell_start             : in  std_logic;
   Dwell_done              : in  std_logic;
+  Dwell_report_enable     : in  std_logic;
   Dwell_sequence_num      : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   Channel_report_pending  : in  std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
@@ -103,6 +104,8 @@ architecture rtl of ecm_drfm_reporter is
     S_SUMMARY_REPORT_DELAY_SUMMARY_START,
     S_SUMMARY_PAD,
     S_SUMMARY_DONE,
+
+    S_NO_REPORT,
 
     S_WAIT_IDLE
   );
@@ -185,10 +188,14 @@ begin
           end if;
 
         when S_START_WAIT =>
-          if (r_channel_report_pending_any = '1') then
+          if ((r_channel_report_pending_any = '1') and (Dwell_report_enable = '1')) then
             s_state <= S_READ_CHANNEL_0;
           elsif (Dwell_done = '1') then
-            s_state <= S_START_SUMMARY;
+            if (Dwell_report_enable = '1') then
+              s_state <= S_START_SUMMARY;
+            else
+              s_state <= S_NO_REPORT;
+            end if;
           else
             s_state <= S_START_WAIT;
           end if;
@@ -298,6 +305,9 @@ begin
         when S_SUMMARY_DONE =>
           s_state <= S_WAIT_IDLE;
 
+        when S_NO_REPORT =>
+          s_state <= S_WAIT_IDLE;
+
         when S_WAIT_IDLE =>
           s_state <= S_IDLE;
 
@@ -311,7 +321,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Dwell_reports_done <= to_stdlogic(s_state = S_SUMMARY_DONE);
+      Dwell_reports_done <= to_stdlogic((s_state = S_SUMMARY_DONE) or (s_state = S_NO_REPORT));
     end if;
   end process;
 
@@ -555,6 +565,7 @@ begin
     when S_CHANNEL_DONE_0         =>  w_fifo_valid_opt <= '0';
     when S_CHANNEL_DONE_1         =>  w_fifo_valid_opt <= '0';
     when S_SUMMARY_DONE           =>  w_fifo_valid_opt <= '0';
+    when S_NO_REPORT              =>  w_fifo_valid_opt <= '0';
     when S_WAIT_IDLE              =>  w_fifo_valid_opt <= '0';
     when others => null;
     end case;

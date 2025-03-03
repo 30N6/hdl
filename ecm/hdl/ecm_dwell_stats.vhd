@@ -31,6 +31,7 @@ port (
   Dwell_sequence_num        : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   Dwell_global_counter      : in  unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   Dwell_program_tag         : in  unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
+  Dwell_report_enable       : in  std_logic;
   Dwell_report_done         : out std_logic;
 
   Input_ctrl                : in  channelizer_control_t;
@@ -58,6 +59,7 @@ architecture rtl of ecm_dwell_stats is
     S_WAIT_DONE,
     S_DONE,
     S_REPORT_WAIT,
+    S_NO_REPORT_WAIT,
     S_REPORT_ACK
   );
 
@@ -67,6 +69,7 @@ architecture rtl of ecm_dwell_stats is
   signal r_dwell_active             : std_logic;
   signal r_dwell_active_meas        : std_logic;
   signal r_dwell_active_tx          : std_logic;
+  signal r_dwell_report_enable      : std_logic;
   signal r_dwell_data               : ecm_dwell_entry_t;
   signal r_dwell_sequence_num       : unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal r_dwell_global_counter     : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
@@ -131,11 +134,12 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_input_ctrl        <= Input_ctrl;
-      r_input_pwr         <= Input_pwr;
-      r_dwell_active      <= Dwell_active;
-      r_dwell_active_meas <= Dwell_active_measurement;
-      r_dwell_active_tx   <= Dwell_active_transmit;
+      r_input_ctrl          <= Input_ctrl;
+      r_input_pwr           <= Input_pwr;
+      r_dwell_active        <= Dwell_active;
+      r_dwell_active_meas   <= Dwell_active_measurement;
+      r_dwell_active_tx     <= Dwell_active_transmit;
+      r_dwell_report_enable <= Dwell_report_enable;
 
       if (s_state = S_IDLE) then
         r_dwell_data            <= Dwell_data;
@@ -155,7 +159,11 @@ begin
         case s_state is
         when S_IDLE =>
           if ((r_enable = '1') and (r_dwell_active = '1') and (r_dwell_active_meas = '1')) then
-            s_state <= S_ACTIVE;
+            if (r_dwell_report_enable = '1') then
+              s_state <= S_ACTIVE;
+            else
+              s_state <= S_NO_REPORT_WAIT;
+            end if;
           else
             s_state <= S_IDLE;
           end if;
@@ -184,6 +192,13 @@ begin
             s_state <= S_REPORT_ACK;
           else
             s_state <= S_REPORT_WAIT;
+          end if;
+
+        when S_NO_REPORT_WAIT =>
+          if (r_dwell_active = '0') then
+            s_state <= S_REPORT_ACK;
+          else
+            s_state <= S_NO_REPORT_WAIT;
           end if;
 
         when S_REPORT_ACK =>
