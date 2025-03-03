@@ -161,6 +161,9 @@ module ecm_dwell_stats_tb;
     bit         dwell_tx_active;
     bit [30:0]  dwell_actual_total_duration;
     bit [63:0]  ts_dwell_start;
+    bit [63:0]  cycles_total;
+    bit [63:0]  cycles_active_meas;
+    bit [63:0]  cycles_active_tx;
   } ecm_dwell_report_header_t;
 
   typedef struct packed
@@ -470,6 +473,9 @@ module ecm_dwell_stats_tb;
     report_header.dwell_actual_total_duration       = 0;
     report_header.dwell_tx_active                   = dwell_tx_active;
     report_header.ts_dwell_start                    = 0;
+    report_header.cycles_total                      = 0;
+    report_header.cycles_active_meas                = 0;
+    report_header.cycles_active_tx                  = 0;
 
     report_header_packed = dwell_report_header_bits_t'(report_header);
     $display("expecting report_header: %p", report_header);
