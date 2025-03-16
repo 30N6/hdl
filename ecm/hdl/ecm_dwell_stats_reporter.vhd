@@ -31,6 +31,9 @@ port (
   Dwell_total_duration        : in  unsigned(ECM_DWELL_DURATION_WIDTH - 1 downto 0);
   Dwell_tx_active             : in  std_logic;
   Timestamp_start             : in  unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
+  Cycles_total                : in  unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
+  Cycles_active_meas          : in  unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
+  Cycles_active_tx            : in  unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
 
   Read_req                    : out std_logic;
   Read_index                  : out unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
@@ -81,6 +84,12 @@ architecture rtl of ecm_dwell_stats_reporter is
     S_DURATION_TOTAL,
     S_TIMESTAMP_START_0,
     S_TIMESTAMP_START_1,
+    S_CYCLES_TOTAL_0,
+    S_CYCLES_TOTAL_1,
+    S_CYCLES_ACTIVE_MEAS_0,
+    S_CYCLES_ACTIVE_MEAS_1,
+    S_CYCLES_ACTIVE_TX_0,
+    S_CYCLES_ACTIVE_TX_1,
 
     S_READ_CHANNEL_REQ,
     S_READ_CHANNEL_ACK,
@@ -178,9 +187,21 @@ begin
           s_state <= S_DURATION_TOTAL;
         when S_DURATION_TOTAL =>
           s_state <= S_TIMESTAMP_START_0;
-             when S_TIMESTAMP_START_0 =>
+        when S_TIMESTAMP_START_0 =>
           s_state <= S_TIMESTAMP_START_1;
         when S_TIMESTAMP_START_1 =>
+          s_state <= S_CYCLES_TOTAL_0;
+        when S_CYCLES_TOTAL_0 =>
+          s_state <= S_CYCLES_TOTAL_1;
+        when S_CYCLES_TOTAL_1 =>
+          s_state <= S_CYCLES_ACTIVE_MEAS_0;
+        when S_CYCLES_ACTIVE_MEAS_0 =>
+          s_state <= S_CYCLES_ACTIVE_MEAS_1;
+        when S_CYCLES_ACTIVE_MEAS_1 =>
+          s_state <= S_CYCLES_ACTIVE_TX_0;
+        when S_CYCLES_ACTIVE_TX_0 =>
+          s_state <= S_CYCLES_ACTIVE_TX_1;
+        when S_CYCLES_ACTIVE_TX_1 =>
           s_state <= S_READ_CHANNEL_REQ;
 
         when S_READ_CHANNEL_REQ =>
@@ -343,6 +364,30 @@ begin
     when S_TIMESTAMP_START_1 =>
       w_fifo_valid            <= '1';
       w_fifo_partial_1_data   <= std_logic_vector(Timestamp_start(31 downto 0));
+
+    when S_CYCLES_TOTAL_0 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(resize_up(Cycles_total(ECM_TIMESTAMP_WIDTH - 1 downto 32), 32));
+
+    when S_CYCLES_TOTAL_1 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(Cycles_total(31 downto 0));
+
+    when S_CYCLES_ACTIVE_MEAS_0 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(resize_up(Cycles_active_meas(ECM_TIMESTAMP_WIDTH - 1 downto 32), 32));
+
+    when S_CYCLES_ACTIVE_MEAS_1 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(Cycles_active_meas(31 downto 0));
+
+    when S_CYCLES_ACTIVE_TX_0 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(resize_up(Cycles_active_tx(ECM_TIMESTAMP_WIDTH - 1 downto 32), 32));
+
+    when S_CYCLES_ACTIVE_TX_1 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_1_data   <= std_logic_vector(Cycles_active_tx(31 downto 0));
 
     when S_CHANNEL_CYCLES =>
       w_fifo_valid            <= '1';

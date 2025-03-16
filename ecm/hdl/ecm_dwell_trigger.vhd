@@ -219,6 +219,7 @@ begin
       r3_drfm_write_req.first             <= '-';
       r3_drfm_write_req.last              <= '-';
       r3_drfm_write_req.trigger_accepted  <= to_stdlogic(r2_duration_next >= Dwell_min_trigger_duration);
+      r3_drfm_write_req.trigger_forced    <= '0';
       r3_drfm_write_req.address           <= (others => '-');
       r3_drfm_write_req.channel_index     <= r2_channelizer_ctrl.data_index(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
 
@@ -243,6 +244,7 @@ begin
           r3_drfm_write_req.first                       <= '1';
           r3_drfm_write_req.last                        <= '0';
           r3_drfm_write_req.address                     <= r2_channel_control.recording_address;
+          r3_drfm_write_req.trigger_forced              <= r2_trigger_is_forced;
         end if;
       elsif (r2_channel_state.trigger_state = S_ACTIVE) then
         r3_channel_state_wr_en                          <= r2_channelizer_ctrl.valid;

@@ -40,6 +40,8 @@ port (
   Dwell_global_counter          : out unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   Dwell_program_tag             : out unsigned(ECM_DWELL_TAG_WIDTH - 1 downto 0);
   Dwell_transmit_count          : out unsigned(ECM_CHANNEL_COUNT_WIDTH - 1 downto 0);
+  Dwell_report_enable_drfm      : out std_logic;
+  Dwell_report_enable_stats     : out std_logic;
   Dwell_report_done_drfm        : in  std_logic;
   Dwell_report_done_stats       : in  std_logic;
 
@@ -121,6 +123,7 @@ architecture rtl of ecm_dwell_controller is
 
   signal r_global_counter               : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
   signal r_global_counter_is_zero       : std_logic;
+  signal r_global_counter_next          : unsigned(ECM_DWELL_GLOBAL_COUNTER_WIDTH - 1 downto 0);
 
   signal w_current_dwell_valid          : std_logic;
 
@@ -151,6 +154,8 @@ architecture rtl of ecm_dwell_controller is
   signal r_dwell_active_meas            : std_logic;
   signal r_dwell_active_tx              : std_logic;
   signal r_dwell_report_wait            : std_logic;
+  signal r_dwell_report_enable_drfm     : std_logic;
+  signal r_dwell_report_enable_stats    : std_logic;
 
   signal w_transmit_count               : unsigned(ECM_CHANNEL_COUNT_WIDTH - 1 downto 0);
   signal r_transmit_count               : unsigned(ECM_CHANNEL_COUNT_WIDTH - 1 downto 0);
@@ -439,6 +444,15 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      r_global_counter_next       <= r_global_counter - 1;
+      r_dwell_report_enable_drfm  <= to_stdlogic(r_global_counter <= r_dwell_program_data.reporting_threshold_drfm);
+      r_dwell_report_enable_stats <= to_stdlogic(r_global_counter <= r_dwell_program_data.reporting_threshold_stats);
+    end if;
+  end process;
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
       if (s_state = S_IDLE) then
         r_dwell_entry_index         <= r_dwell_program_data.initial_dwell_index;
         r_global_counter            <= r_dwell_program_data.global_counter_init;
@@ -448,7 +462,7 @@ begin
           r_dwell_entry_index       <= r_dwell_entry_d1.next_dwell_index;
         end if;
         if (r_dwell_entry_d1.global_counter_dec = '1') then
-          r_global_counter          <= r_global_counter - 1;
+          r_global_counter          <= r_global_counter_next;
           r_global_counter_is_zero  <= to_stdlogic(r_global_counter = 1);
         end if;
       end if;
@@ -552,6 +566,8 @@ begin
   Dwell_active_measurement  <= r_dwell_active_meas;
   Dwell_active_transmit     <= r_dwell_active_tx;
   Dwell_done                <= r_dwell_report_wait; --hold done for external modules until reports are sent
+  Dwell_report_enable_drfm  <= r_dwell_report_enable_drfm;
+  Dwell_report_enable_stats <= r_dwell_report_enable_stats;
 
   Dwell_data            <= r_dwell_entry_d1;
   Dwell_sequence_num    <= r_dwell_sequence_num;
