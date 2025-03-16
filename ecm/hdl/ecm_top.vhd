@@ -167,6 +167,14 @@ architecture rtl of ecm_top is
   attribute ASYNC_REG : string;
   attribute ASYNC_REG of r_ad9361_status : signal is "TRUE";
 
+  signal w_Ad9361_control_o: std_logic_vector(3 downto 0);
+  signal w_Ad9361_status   : std_logic_vector(7 downto 0);
+  signal w_Adc_valid       : std_logic;
+  signal w_Adc_data_i      : signed(ADC_WIDTH - 1 downto 0);
+  signal w_Adc_data_q      : signed(ADC_WIDTH - 1 downto 0);
+  signal w_Dac_data_i      : signed(DAC_WIDTH - 1 downto 0);
+  signal w_Dac_data_q      : signed(DAC_WIDTH - 1 downto 0);
+
   attribute MARK_DEBUG                          : string;
   attribute DONT_TOUCH                          : string;
   --attribute MARK_DEBUG of w_config_rst  : signal is "TRUE";
@@ -224,7 +232,30 @@ architecture rtl of ecm_top is
   attribute MARK_DEBUG of w_d2h_mux_out_last : signal is "TRUE";
   attribute DONT_TOUCH of w_d2h_mux_out_last : signal is "TRUE";
 
+  attribute MARK_DEBUG of w_Ad9361_control_o  : signal is "TRUE";
+  attribute DONT_TOUCH of w_Ad9361_control_o  : signal is "TRUE";
+  attribute MARK_DEBUG of w_Ad9361_status : signal is "TRUE";
+  attribute DONT_TOUCH of w_Ad9361_status : signal is "TRUE";
+  attribute MARK_DEBUG of w_Adc_valid  : signal is "TRUE";
+  attribute DONT_TOUCH of w_Adc_valid  : signal is "TRUE";
+  attribute MARK_DEBUG of w_Adc_data_i  : signal is "TRUE";
+  attribute DONT_TOUCH of w_Adc_data_i  : signal is "TRUE";
+  attribute MARK_DEBUG of w_Adc_data_q  : signal is "TRUE";
+  attribute DONT_TOUCH of w_Adc_data_q  : signal is "TRUE";
+  attribute MARK_DEBUG of w_Dac_data_i : signal is "TRUE";
+  attribute DONT_TOUCH of w_Dac_data_i : signal is "TRUE";
+  attribute MARK_DEBUG of w_Dac_data_q  : signal is "TRUE";
+  attribute DONT_TOUCH of w_Dac_data_q  : signal is "TRUE";
+
 begin
+
+  w_Ad9361_control_o <= Ad9361_control;
+  w_Ad9361_status   <= Ad9361_status ;
+  w_Adc_valid       <= Adc_valid     ;
+  w_Adc_data_i      <= Adc_data_i    ;
+  w_Adc_data_q      <= Adc_data_q    ;
+  w_Dac_data_i      <= Dac_data_i    ;
+  w_Dac_data_q      <= Dac_data_q    ;
 
   i_phase_marker : entity common_lib.clk_x4_phase_marker
   port map (

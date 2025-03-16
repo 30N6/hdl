@@ -161,96 +161,96 @@ architecture rtl of ecm_drfm_reporter is
 
   signal r_timeout                        : unsigned(clog2(TIMEOUT_CYCLES) - 1 downto 0);
 
-  attribute MARK_DEBUG                          : string;
-  attribute DONT_TOUCH                          : string;
-  attribute MARK_DEBUG of s_state  : signal is "TRUE";
-  attribute DONT_TOUCH of s_state  : signal is "TRUE";
-  attribute MARK_DEBUG of r_channel_report_pending_any  : signal is "TRUE";
-  attribute DONT_TOUCH of r_channel_report_pending_any  : signal is "TRUE";
-  attribute MARK_DEBUG of r_channel_index  : signal is "TRUE";
-  attribute DONT_TOUCH of r_channel_index  : signal is "TRUE";
-  attribute MARK_DEBUG of r_words_in_msg : signal is "TRUE";
-  attribute DONT_TOUCH of r_words_in_msg : signal is "TRUE";
-  attribute MARK_DEBUG of r_channel_samples_remaining  : signal is "TRUE";
-  attribute DONT_TOUCH of r_channel_samples_remaining  : signal is "TRUE";
-  attribute MARK_DEBUG of r_segment_first_addr  : signal is "TRUE";
-  attribute DONT_TOUCH of r_segment_first_addr  : signal is "TRUE";
-  attribute MARK_DEBUG of r_segment_last_addr  : signal is "TRUE";
-  attribute DONT_TOUCH of r_segment_last_addr  : signal is "TRUE";
-  attribute MARK_DEBUG of r_segment_addr : signal is "TRUE";
-  attribute DONT_TOUCH of r_segment_addr : signal is "TRUE";
-  attribute MARK_DEBUG of r_segment_addr_next  : signal is "TRUE";
-  attribute DONT_TOUCH of r_segment_addr_next  : signal is "TRUE";
-  attribute MARK_DEBUG of r_slice_samples_remaining : signal is "TRUE";
-  attribute DONT_TOUCH of r_slice_samples_remaining : signal is "TRUE";
-  attribute MARK_DEBUG of r_slice_samples_remaining_next  : signal is "TRUE";
-  attribute DONT_TOUCH of r_slice_samples_remaining_next  : signal is "TRUE";
-  attribute MARK_DEBUG of r_segment_samples_remaining  : signal is "TRUE";
-  attribute DONT_TOUCH of r_segment_samples_remaining  : signal is "TRUE";
-  attribute MARK_DEBUG of r_segment_samples_remaining_next  : signal is "TRUE";
-  attribute DONT_TOUCH of r_segment_samples_remaining_next  : signal is "TRUE";
-  attribute MARK_DEBUG of r_read_samples_remaining : signal is "TRUE";
-  attribute DONT_TOUCH of r_read_samples_remaining : signal is "TRUE";
-  attribute MARK_DEBUG of r_read_samples_remaining_next  : signal is "TRUE";
-  attribute DONT_TOUCH of r_read_samples_remaining_next  : signal is "TRUE";
-  attribute MARK_DEBUG of r_read_delay : signal is "TRUE";
-  attribute DONT_TOUCH of r_read_delay : signal is "TRUE";
-  attribute MARK_DEBUG of r_read_addr  : signal is "TRUE";
-  attribute DONT_TOUCH of r_read_addr  : signal is "TRUE";
-  attribute MARK_DEBUG of r_read_addr_next  : signal is "TRUE";
-  attribute DONT_TOUCH of r_read_addr_next  : signal is "TRUE";
-  attribute MARK_DEBUG of r_read_valid  : signal is "TRUE";
-  attribute DONT_TOUCH of r_read_valid  : signal is "TRUE";
-
-
-  attribute MARK_DEBUG of w_fifo_almost_full : signal is "TRUE";
-  attribute DONT_TOUCH of w_fifo_almost_full : signal is "TRUE";
-  attribute MARK_DEBUG of w_fifo_ready  : signal is "TRUE";
-  attribute DONT_TOUCH of w_fifo_ready  : signal is "TRUE";
-  attribute MARK_DEBUG of r1_fifo_valid  : signal is "TRUE";
-  attribute DONT_TOUCH of r1_fifo_valid  : signal is "TRUE";
-  attribute MARK_DEBUG of r1_fifo_last : signal is "TRUE";
-  attribute DONT_TOUCH of r1_fifo_last : signal is "TRUE";
-  attribute MARK_DEBUG of r1_fifo_data  : signal is "TRUE";
-  attribute DONT_TOUCH of r1_fifo_data  : signal is "TRUE";
-  attribute MARK_DEBUG of r1_fifo_almost_full  : signal is "TRUE";
-  attribute DONT_TOUCH of r1_fifo_almost_full  : signal is "TRUE";
-
-  signal r_outstanding_reads : unsigned(7 downto 0);
-  signal r_read_valid_pipe : std_logic_vector(11 downto 0);
-  signal r_read_timeout : std_logic;
-
-  attribute MARK_DEBUG of r_outstanding_reads : signal is "TRUE";
-  attribute DONT_TOUCH of r_outstanding_reads : signal is "TRUE";
-  attribute MARK_DEBUG of r_read_valid_pipe  : signal is "TRUE";
-  attribute DONT_TOUCH of r_read_valid_pipe  : signal is "TRUE";
-  attribute MARK_DEBUG of r_read_timeout  : signal is "TRUE";
-  attribute DONT_TOUCH of r_read_timeout  : signal is "TRUE";
+  --attribute MARK_DEBUG                          : string;
+  --attribute DONT_TOUCH                          : string;
+  --attribute MARK_DEBUG of s_state  : signal is "TRUE";
+  --attribute DONT_TOUCH of s_state  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_channel_report_pending_any  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_channel_report_pending_any  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_channel_index  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_channel_index  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_words_in_msg : signal is "TRUE";
+  --attribute DONT_TOUCH of r_words_in_msg : signal is "TRUE";
+  --attribute MARK_DEBUG of r_channel_samples_remaining  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_channel_samples_remaining  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_segment_first_addr  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_segment_first_addr  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_segment_last_addr  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_segment_last_addr  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_segment_addr : signal is "TRUE";
+  --attribute DONT_TOUCH of r_segment_addr : signal is "TRUE";
+  --attribute MARK_DEBUG of r_segment_addr_next  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_segment_addr_next  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_slice_samples_remaining : signal is "TRUE";
+  --attribute DONT_TOUCH of r_slice_samples_remaining : signal is "TRUE";
+  --attribute MARK_DEBUG of r_slice_samples_remaining_next  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_slice_samples_remaining_next  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_segment_samples_remaining  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_segment_samples_remaining  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_segment_samples_remaining_next  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_segment_samples_remaining_next  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_read_samples_remaining : signal is "TRUE";
+  --attribute DONT_TOUCH of r_read_samples_remaining : signal is "TRUE";
+  --attribute MARK_DEBUG of r_read_samples_remaining_next  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_read_samples_remaining_next  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_read_delay : signal is "TRUE";
+  --attribute DONT_TOUCH of r_read_delay : signal is "TRUE";
+  --attribute MARK_DEBUG of r_read_addr  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_read_addr  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_read_addr_next  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_read_addr_next  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_read_valid  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_read_valid  : signal is "TRUE";
+  --
+  --
+  --attribute MARK_DEBUG of w_fifo_almost_full : signal is "TRUE";
+  --attribute DONT_TOUCH of w_fifo_almost_full : signal is "TRUE";
+  --attribute MARK_DEBUG of w_fifo_ready  : signal is "TRUE";
+  --attribute DONT_TOUCH of w_fifo_ready  : signal is "TRUE";
+  --attribute MARK_DEBUG of r1_fifo_valid  : signal is "TRUE";
+  --attribute DONT_TOUCH of r1_fifo_valid  : signal is "TRUE";
+  --attribute MARK_DEBUG of r1_fifo_last : signal is "TRUE";
+  --attribute DONT_TOUCH of r1_fifo_last : signal is "TRUE";
+  --attribute MARK_DEBUG of r1_fifo_data  : signal is "TRUE";
+  --attribute DONT_TOUCH of r1_fifo_data  : signal is "TRUE";
+  --attribute MARK_DEBUG of r1_fifo_almost_full  : signal is "TRUE";
+  --attribute DONT_TOUCH of r1_fifo_almost_full  : signal is "TRUE";
+  --
+  --signal r_outstanding_reads : unsigned(7 downto 0);
+  --signal r_read_valid_pipe : std_logic_vector(11 downto 0);
+  --signal r_read_timeout : std_logic;
+  --
+  --attribute MARK_DEBUG of r_outstanding_reads : signal is "TRUE";
+  --attribute DONT_TOUCH of r_outstanding_reads : signal is "TRUE";
+  --attribute MARK_DEBUG of r_read_valid_pipe  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_read_valid_pipe  : signal is "TRUE";
+  --attribute MARK_DEBUG of r_read_timeout  : signal is "TRUE";
+  --attribute DONT_TOUCH of r_read_timeout  : signal is "TRUE";
 
 begin
 
-  process(Clk)
-    variable v_outstanding_reads : unsigned(7 downto 0);
-  begin
-    if rising_edge(Clk) then
-      if (Rst = '1') then
-        r_outstanding_reads <= (others => '0');
-      else
-        v_outstanding_reads := r_outstanding_reads;
-        if (Read_valid = '1') then
-          v_outstanding_reads := v_outstanding_reads + 1;
-        end if;
-        if (Read_result_valid = '1') then
-          v_outstanding_reads := v_outstanding_reads - 1;
-        end if;
-        r_outstanding_reads <= v_outstanding_reads;
-      end if;
-
-      r_read_valid_pipe <= r_read_valid_pipe(r_read_valid_pipe'length - 2 downto 0) & Read_valid;
-
-      r_read_timeout <= to_stdlogic(r_outstanding_reads > 0) and not(or_reduce(r_read_valid_pipe));
-    end if;
-  end process;
+  --process(Clk)
+  --  variable v_outstanding_reads : unsigned(7 downto 0);
+  --begin
+  --  if rising_edge(Clk) then
+  --    if (Rst = '1') then
+  --      r_outstanding_reads <= (others => '0');
+  --    else
+  --      v_outstanding_reads := r_outstanding_reads;
+  --      if (Read_valid = '1') then
+  --        v_outstanding_reads := v_outstanding_reads + 1;
+  --      end if;
+  --      if (Read_result_valid = '1') then
+  --        v_outstanding_reads := v_outstanding_reads - 1;
+  --      end if;
+  --      r_outstanding_reads <= v_outstanding_reads;
+  --    end if;
+  --
+  --    r_read_valid_pipe <= r_read_valid_pipe(r_read_valid_pipe'length - 2 downto 0) & Read_valid;
+  --
+  --    r_read_timeout <= to_stdlogic(r_outstanding_reads > 0) and not(or_reduce(r_read_valid_pipe));
+  --  end if;
+  --end process;
 
   assert (AXI_DATA_WIDTH = 32)
     report "AXI_DATA_WIDTH expected to be 32."
