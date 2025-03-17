@@ -218,6 +218,7 @@ ad_ip_parameter axi_ad9361 CONFIG.ADC_INIT_DELAY            21
 #TODO: IQ correction necessary?
 ad_ip_parameter axi_ad9361 CONFIG.DAC_IQCORRECTION_DISABLE  0
 ad_ip_parameter axi_ad9361 CONFIG.DAC_DDS_DISABLE           1
+ad_ip_parameter axi_ad9361 CONFIG.TDD_DISABLE               1
 
 ad_ip_instance axi_dmac axi_ad9361_dac_dma
 ad_ip_parameter axi_ad9361_dac_dma CONFIG.DMA_TYPE_SRC 0
