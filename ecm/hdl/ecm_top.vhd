@@ -418,7 +418,7 @@ begin
         r_dac_data_q_x4 <= w_dac_data_out(1);
       end if;
 
-      r_enable_tx_x4 <= w_dwell_active_tx or not(w_dwell_active);
+      r_enable_tx_x4 <= w_dwell_active_tx; -- or not(w_dwell_active);
     end if;
   end process;
 
