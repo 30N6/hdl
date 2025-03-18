@@ -37,6 +37,9 @@ port (
   Dac_data_i      : out signed(DAC_WIDTH - 1 downto 0);
   Dac_data_q      : out signed(DAC_WIDTH - 1 downto 0);
 
+  Enable_rx       : out std_logic;
+  Enable_tx       : out std_logic;
+
   S_axis_clk      : in  std_logic;
   S_axis_resetn   : in  std_logic;
   S_axis_ready    : out std_logic;
@@ -114,6 +117,8 @@ architecture rtl of ecm_top is
   signal r_dac_data_q_x4              : signed(IQ_WIDTH - 1 downto 0);
   signal w_dac_data_out               : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
   signal w_dac_valid_out              : std_logic;
+
+  signal r_enable_tx                  : std_logic;
 
   signal w_channelizer16_ctrl         : channelizer_control_t;
   signal w_channelizer16_data         : signed_array_t(1 downto 0)(CHANNELIZER16_DATA_WIDTH - 1 downto 0);
@@ -283,11 +288,16 @@ begin
 
       r_dac_data_i  <= r_dac_data_i_x4;
       r_dac_data_q  <= r_dac_data_q_x4;
+
+      r_enable_tx   <= w_dwell_active_tx;
     end if;
   end process;
 
   Dac_data_i <= shift_left(resize_up(r_dac_data_i, DAC_WIDTH), DAC_WIDTH - IQ_WIDTH);
   Dac_data_q <= shift_left(resize_up(r_dac_data_q, DAC_WIDTH), DAC_WIDTH - IQ_WIDTH);
+
+  Enable_rx <= '1';
+  Enable_tx <= r_enable_tx;
 
   process(Adc_clk_x4)
   begin
