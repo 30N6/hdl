@@ -118,6 +118,7 @@ architecture rtl of ecm_top is
   signal w_dac_data_out               : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
   signal w_dac_valid_out              : std_logic;
 
+  signal r_enable_tx_x4               : std_logic;
   signal r_enable_tx                  : std_logic;
 
   signal w_channelizer16_ctrl         : channelizer_control_t;
@@ -288,16 +289,11 @@ begin
 
       r_dac_data_i  <= r_dac_data_i_x4;
       r_dac_data_q  <= r_dac_data_q_x4;
-
-      r_enable_tx   <= w_dwell_active_tx;
     end if;
   end process;
 
   Dac_data_i <= shift_left(resize_up(r_dac_data_i, DAC_WIDTH), DAC_WIDTH - IQ_WIDTH);
   Dac_data_q <= shift_left(resize_up(r_dac_data_q, DAC_WIDTH), DAC_WIDTH - IQ_WIDTH);
-
-  Enable_rx <= '1';
-  Enable_tx <= r_enable_tx;
 
   process(Adc_clk_x4)
   begin
@@ -310,10 +306,23 @@ begin
         r_dac_data_i_x4 <= w_dac_data_out(0);
         r_dac_data_q_x4 <= w_dac_data_out(1);
       end if;
+
+      r_enable_tx_x4 <= w_dwell_active_tx or not(w_dwell_active);
     end if;
   end process;
 
   w_adc_data_in <= (r_adc_data_q_x4, r_adc_data_i_x4);
+
+  -- the AXI clock is the user pin clock in the 9361 ocore
+  process(M_axis_clk)
+  begin
+    if rising_edge(M_axis_clk) then
+      r_enable_tx <= r_enable_tx_x4;
+    end if;
+  end process;
+
+  Enable_rx <= '1';
+  Enable_tx <= r_enable_tx;
 
   g_channelizer : if (ENABLE_CHANNELIZER) generate
     i_channelizer : entity dsp_lib.channelizer_16
