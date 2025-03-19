@@ -428,7 +428,7 @@ begin
   process(M_axis_clk)
   begin
     if rising_edge(M_axis_clk) then
-      r_enable_tx <= '0'; --r_enable_tx_x4;
+      r_enable_tx <= r_enable_tx_x4;
     end if;
   end process;
 
