@@ -218,6 +218,7 @@ ad_ip_parameter axi_ad9361 CONFIG.ADC_INIT_DELAY            21
 #TODO: IQ correction necessary?
 ad_ip_parameter axi_ad9361 CONFIG.DAC_IQCORRECTION_DISABLE  0
 ad_ip_parameter axi_ad9361 CONFIG.DAC_DDS_DISABLE           1
+ad_ip_parameter axi_ad9361 CONFIG.TDD_DISABLE               1
 
 ad_ip_instance axi_dmac axi_ad9361_dac_dma
 ad_ip_parameter axi_ad9361_dac_dma CONFIG.DMA_TYPE_SRC 0
@@ -254,8 +255,6 @@ ad_connect  tx_frame_out axi_ad9361/tx_frame_out
 ad_connect  tx_data_out axi_ad9361/tx_data_out
 ad_connect  enable axi_ad9361/enable
 ad_connect  txnrx axi_ad9361/txnrx
-ad_connect  up_enable axi_ad9361/up_enable
-ad_connect  up_txnrx axi_ad9361/up_txnrx
 
 ad_connect  axi_ad9361/tdd_sync GND
 ad_connect  sys_200m_clk axi_ad9361/delay_clk
@@ -378,7 +377,6 @@ ad_ip_parameter udp_intf  CONFIG.AXI_DATA_WIDTH     32
 ad_ip_parameter udp_intf  CONFIG.OUTPUT_FIFO_DEPTH  1024
 ad_ip_parameter udp_intf  CONFIG.TX_THROTTLE_CYCLES 6250
 
-
 ad_connect udp_intf/Sys_clk       sys_cpu_clk
 ad_connect udp_intf/Sys_rst       sys_cpu_reset
 ad_connect udp_intf/Hw_gmii       sys_rgmii/GMII
@@ -400,6 +398,8 @@ ad_connect ecm_top/Dac_data_i     axi_ad9361/dac_data_i0
 ad_connect ecm_top/Dac_data_q     axi_ad9361/dac_data_q0
 ad_connect ecm_top/Ad9361_status  ad9361_status
 ad_connect ecm_top/Ad9361_control ad9361_ctl
+ad_connect ecm_top/Enable_rx      axi_ad9361/up_enable
+ad_connect ecm_top/Enable_tx      axi_ad9361/up_txnrx
 
 ad_connect ecm_top/S_axis_clk     sys_cpu_clk
 ad_connect ecm_top/S_axis_resetn  sys_cpu_resetn

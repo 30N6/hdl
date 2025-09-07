@@ -29,9 +29,9 @@ port (
   Dwell_report_enable     : in  std_logic;
   Dwell_sequence_num      : in  unsigned(ECM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
-  Channel_report_pending  : in  std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
-  Channel_was_read        : in  std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
-  Channel_was_written     : in  std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
+  Channels_pending        : in  std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
+  Channels_read           : in  std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
+  Channels_written        : in  std_logic_vector(ECM_NUM_CHANNELS - 1 downto 0);
 
   Channel_index           : out unsigned(ECM_CHANNEL_INDEX_WIDTH - 1 downto 0);
   Channel_timestamp       : in  unsigned(ECM_TIMESTAMP_WIDTH - 1 downto 0);
@@ -170,7 +170,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_channel_report_pending_any <= not(Dwell_start) and or_reduce(Channel_report_pending);
+      r_channel_report_pending_any <= not(Dwell_start) and or_reduce(Channels_pending);
     end if;
   end process;
 
@@ -262,7 +262,7 @@ begin
             s_state <= S_CHANNEL_PAD;
           end if;
 
-        when S_CHANNEL_DONE_0 => --extra state for Channel_report_pending propagation
+        when S_CHANNEL_DONE_0 => --extra state for Channels_pending propagation
           s_state <= S_CHANNEL_DONE_1;
 
         when S_CHANNEL_DONE_1 =>
@@ -377,7 +377,7 @@ begin
   begin
     if rising_edge(Clk) then
       if (s_state = S_START_WAIT) then
-        r_channel_index <= first_bit_index(Channel_report_pending);
+        r_channel_index <= first_bit_index(Channels_pending);
       end if;
     end if;
   end process;
@@ -527,7 +527,7 @@ begin
 
     when S_SUMMARY_CHANNEL_STATE =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= Channel_was_written & Channel_was_read;
+      w_fifo_partial_1_data   <= Channels_written & Channels_read;
 
     when S_SUMMARY_REPORT_DELAY_CHANNEL_WRITE =>
       w_fifo_valid            <= '1';

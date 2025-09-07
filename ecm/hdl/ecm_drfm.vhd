@@ -392,9 +392,9 @@ begin
     Dwell_report_enable     => r_dwell_report_enable,
     Dwell_sequence_num      => r_dwell_sequence_num,
 
-    Channel_report_pending  => r_channel_report_pending,
-    Channel_was_read        => r_channel_was_read,
-    Channel_was_written     => r_channel_was_written,
+    Channels_pending        => r_channel_report_pending,
+    Channels_read           => r_channel_was_read,
+    Channels_written        => r_channel_was_written,
 
     Channel_index           => w_reporter_channel_index,
     Channel_timestamp       => r_reporter_channel_timestamp,
@@ -413,7 +413,6 @@ begin
 
     Channel_reports_done    => w_channel_reports_done,
     Dwell_reports_done      => Dwell_reports_done,
-
 
     Axis_ready              => Axis_ready,
     Axis_valid              => Axis_valid,

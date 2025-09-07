@@ -144,6 +144,9 @@ module ecm_top_tb;
     .Dac_data_i     (),
     .Dac_data_q     (),
 
+    .Enable_rx      (),
+    .Enable_tx      (),
+
     .S_axis_clk     (Axi_clk),
     .S_axis_resetn  (Axi_rstn),
     .S_axis_ready   (cfg_tx_intf.ready),
