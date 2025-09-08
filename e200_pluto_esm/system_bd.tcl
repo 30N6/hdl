@@ -407,6 +407,3 @@ ad_connect esm_top/M_axis_clk     sys_cpu_clk
 ad_connect esm_top/M_axis_resetn  sys_cpu_resetn
 ad_connect esm_top/S_axis         udp_intf/M_axis
 ad_connect esm_top/M_axis         udp_intf/S_axis
-
-ad_connect  axi_ad9361/dac_data_i0  GND
-ad_connect  axi_ad9361/dac_data_q0  GND
