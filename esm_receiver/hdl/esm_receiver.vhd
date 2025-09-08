@@ -19,6 +19,7 @@ entity esm_receiver is
 generic (
   AXI_DATA_WIDTH  : natural;
   ADC_WIDTH       : natural;
+  DAC_WIDTH       : natural;
   IQ_WIDTH        : natural
 );
 port (
@@ -32,6 +33,12 @@ port (
   Adc_valid       : in  std_logic;
   Adc_data_i      : in  signed(ADC_WIDTH - 1 downto 0);
   Adc_data_q      : in  signed(ADC_WIDTH - 1 downto 0);
+
+  Dac_data_i      : out signed(DAC_WIDTH - 1 downto 0);
+  Dac_data_q      : out signed(DAC_WIDTH - 1 downto 0);
+
+  Enable_rx       : out std_logic;
+  Enable_tx       : out std_logic;
 
   S_axis_clk      : in  std_logic;
   S_axis_resetn   : in  std_logic;
@@ -133,6 +140,11 @@ architecture rtl of esm_receiver is
   attribute ASYNC_REG of r_ad9361_status : signal is "TRUE";
 
 begin
+
+  Dac_data_i <= (others => '0');
+  Dac_data_q <= (others => '0');
+  Enable_rx  <= '1';
+  Enable_tx  <= '0';
 
   i_phase_marker : entity common_lib.clk_x4_phase_marker
   port map (
@@ -506,7 +518,6 @@ begin
     Axis_last             => w_d2h_fifo_in_last(4)
   );
 
-  --TODO: remove
   g_d2h_fifo : for i in 0 to (NUM_D2H_MUX_INPUTS - 1) generate
     i_fifo : entity axi_lib.axis_minififo
     generic map (

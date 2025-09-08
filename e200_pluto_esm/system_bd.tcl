@@ -371,6 +371,7 @@ ad_ip_instance udp_intf     udp_intf
 
 ad_ip_parameter esm_top   CONFIG.AXI_DATA_WIDTH     32
 ad_ip_parameter esm_top   CONFIG.ADC_WIDTH          16
+ad_ip_parameter esm_top   CONFIG.DAC_WIDTH          16
 ad_ip_parameter esm_top   CONFIG.IQ_WIDTH           12
 ad_ip_parameter udp_intf  CONFIG.AXI_DATA_WIDTH     32
 ad_ip_parameter udp_intf  CONFIG.OUTPUT_FIFO_DEPTH  1024
@@ -393,8 +394,12 @@ ad_connect esm_top/Adc_rst        axi_ad9361/rst
 ad_connect esm_top/Adc_valid      axi_ad9361/adc_valid_i0
 ad_connect esm_top/Adc_data_i     axi_ad9361/adc_data_i0
 ad_connect esm_top/Adc_data_q     axi_ad9361/adc_data_q0
+ad_connect esm_top/Dac_data_i     axi_ad9361/dac_data_i0
+ad_connect esm_top/Dac_data_q     axi_ad9361/dac_data_q0
 ad_connect esm_top/Ad9361_status  ad9361_status
 ad_connect esm_top/Ad9361_control ad9361_ctl
+ad_connect esm_top/Enable_rx      axi_ad9361/up_enable
+ad_connect esm_top/Enable_tx      axi_ad9361/up_txnrx
 
 ad_connect esm_top/S_axis_clk     sys_cpu_clk
 ad_connect esm_top/S_axis_resetn  sys_cpu_resetn
@@ -403,11 +408,5 @@ ad_connect esm_top/M_axis_resetn  sys_cpu_resetn
 ad_connect esm_top/S_axis         udp_intf/M_axis
 ad_connect esm_top/M_axis         udp_intf/S_axis
 
-#loopback
 ad_connect  axi_ad9361/dac_data_i0  GND
 ad_connect  axi_ad9361/dac_data_q0  GND
-ad_connect  axi_ad9361/up_txnrx     GND
-ad_connect  axi_ad9361/up_enable    VCC
-
-#ad_connect  ad9361_ctl              GND
-#ad_connect  udp_intf/M_axis         udp_intf/S_axis
