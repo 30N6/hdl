@@ -57,8 +57,10 @@ architecture rtl of esm_config is
 
   signal w_module_id            : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0);
   signal w_message_type         : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0);
+  signal w_address              : unsigned(ESM_CONFIG_ADDRESS_WIDTH - 1 downto 0);
   signal r_module_id            : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0);
   signal r_message_type         : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0);
+  signal r_address              : unsigned(ESM_CONFIG_ADDRESS_WIDTH - 1 downto 0);
   signal r_first                : std_logic;
 
   signal r_module_config        : esm_config_data_t;
@@ -103,6 +105,7 @@ begin
 
   w_module_id     <= unsigned(r_axis_data(24 + ESM_MODULE_ID_WIDTH - 1 downto 24));
   w_message_type  <= unsigned(r_axis_data(16 + ESM_MESSAGE_TYPE_WIDTH - 1 downto 16));
+  w_address       <= unsigned(r_axis_data(ESM_CONFIG_ADDRESS_WIDTH - 1 downto 0));
 
   process(S_axis_clk)
   begin
@@ -160,6 +163,7 @@ begin
       if (s_state = S_WORD_2) then
         r_module_id     <= w_module_id;
         r_message_type  <= w_message_type;
+        r_address       <= w_address;
       end if;
 
       if (r_axis_valid = '1') then
@@ -177,6 +181,7 @@ begin
       r_module_config.data          <= r_axis_data;
       r_module_config.module_id     <= r_module_id;
       r_module_config.message_type  <= r_message_type;
+      r_module_config.address       <= r_address;
     end if;
   end process;
 

@@ -10,6 +10,7 @@ library dsp_lib;
 
 package esm_pkg is
 
+  constant ESM_MAX_WORDS_PER_PACKET                     : natural := 128;
   constant ESM_CONTROL_MAGIC_NUM                        : std_logic_vector(31 downto 0) := x"45534D43";
   constant ESM_REPORT_MAGIC_NUM                         : std_logic_vector(31 downto 0) := x"45534D52";
 
@@ -34,6 +35,8 @@ package esm_pkg is
   constant ESM_REPORT_MESSAGE_TYPE_PDW_PULSE            : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"20";
   constant ESM_REPORT_MESSAGE_TYPE_PDW_SUMMARY          : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"21";
   constant ESM_REPORT_MESSAGE_TYPE_STATUS               : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"30";
+
+  constant ESM_CONFIG_ADDRESS_WIDTH                     : natural := 16;
 
   constant ESM_NUM_CHANNELS_NARROW                      : natural := 64;
   constant ESM_NUM_CHANNELS_WIDE                        : natural := 8;
@@ -67,7 +70,9 @@ package esm_pkg is
   --  sequence_num              : unsigned(31 downto 0);
   --  module_id                 : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0);
   --  message_type              : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0);
+  --  address                   : unsigned(ESM_CONFIG_ADDRESS_WIDTH - 1 downto 0);
   --end record;
+  constant ESM_COMMON_HEADER_WIDTH  : natural := 96;
 
   --type esm_message_enable_t is record
   --  header                    : esm_common_header_t;
@@ -242,8 +247,9 @@ package esm_pkg is
     data                      : std_logic_vector(31 downto 0);
     module_id                 : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0);
     message_type              : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0);
+    address                   : unsigned(ESM_CONFIG_ADDRESS_WIDTH - 1 downto 0);
   end record;
-  constant ESM_CONFIG_DATA_WIDTH : natural := 3 + 32 + ESM_MODULE_ID_WIDTH + ESM_MESSAGE_TYPE_WIDTH;
+  constant ESM_CONFIG_DATA_WIDTH : natural := 3 + 32 + ESM_MODULE_ID_WIDTH + ESM_MESSAGE_TYPE_WIDTH + ESM_CONFIG_ADDRESS_WIDTH;
 
   type esm_channelizer_warnings_t is record
     demux_gap       : std_logic;
@@ -433,6 +439,7 @@ package body esm_pkg is
     r.data          := v(34 downto 3);
     r.module_id     := unsigned(v(35 + ESM_MODULE_ID_WIDTH - 1 downto 35));
     r.message_type  := unsigned(v(35 + ESM_MODULE_ID_WIDTH + ESM_MESSAGE_TYPE_WIDTH - 1 downto 35 + ESM_MODULE_ID_WIDTH));
+    r.address       := unsigned(v(35 + ESM_MODULE_ID_WIDTH + ESM_MESSAGE_TYPE_WIDTH + ESM_CONFIG_ADDRESS_WIDTH - 1 downto 35 + ESM_MODULE_ID_WIDTH + ESM_MESSAGE_TYPE_WIDTH));
 
     return r;
   end function;
@@ -526,12 +533,18 @@ package body esm_pkg is
   function pack(v : esm_config_data_t) return std_logic_vector is
     variable r : std_logic_vector(ESM_CONFIG_DATA_WIDTH - 1 downto 0);
   begin
-    r(0)             := v.valid;
-    r(1)             := v.first;
-    r(2)             := v.last;
-    r(34 downto 3)   := v.data;
-    r(35 + ESM_MODULE_ID_WIDTH - 1 downto 35)                                                 := std_logic_vector(v.module_id);
-    r(35 + ESM_MODULE_ID_WIDTH + ESM_MESSAGE_TYPE_WIDTH - 1 downto 35 + ESM_MODULE_ID_WIDTH)  := std_logic_vector(v.message_type);
+    r := (std_logic_vector(v.address),
+          std_logic_vector(v.message_type),
+          std_logic_vector(v.module_id),
+          v.data, v.last, v.first, v.valid);
+
+    --TODO: cleanup
+    --r(0)             := v.valid;
+    --r(1)             := v.first;
+    --r(2)             := v.last;
+    --r(34 downto 3)   := v.data;
+    --r(35 + ESM_MODULE_ID_WIDTH - 1 downto 35)                                                 := std_logic_vector(v.module_id);
+    --r(35 + ESM_MODULE_ID_WIDTH + ESM_MESSAGE_TYPE_WIDTH - 1 downto 35 + ESM_MODULE_ID_WIDTH)  := std_logic_vector(v.message_type);
 
     return r;
   end function;

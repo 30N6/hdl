@@ -54,8 +54,7 @@ end entity esm_dwell_reporter;
 architecture rtl of esm_dwell_reporter is
 
   constant FIFO_DEPTH             : natural := 1024;
-  constant MAX_WORDS_PER_PACKET   : natural := 64;
-  constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - MAX_WORDS_PER_PACKET - 10;
+  constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - ESM_MAX_WORDS_PER_PACKET - 10;
 
   constant TIMEOUT_CYCLES         : natural := 1024;
 
@@ -105,7 +104,7 @@ architecture rtl of esm_dwell_reporter is
   signal r_packet_seq_num       : unsigned(31 downto 0);
 
   signal r_channel_index        : unsigned(CHANNEL_INDEX_WIDTH - 1 downto 0);
-  signal r_words_in_msg         : unsigned(clog2(MAX_WORDS_PER_PACKET) - 1 downto 0);
+  signal r_words_in_msg         : unsigned(clog2(ESM_MAX_WORDS_PER_PACKET) - 1 downto 0);
 
   signal r_read_accum           : unsigned(63 downto 0);
   signal r_read_max             : unsigned(31 downto 0);
@@ -215,14 +214,14 @@ begin
         when S_CHANNEL_ACCUM_1 =>
           s_state <= S_CHANNEL_MAX;
         when S_CHANNEL_MAX =>
-          if ((r_channel_index = (NUM_CHANNELS - 1)) or (r_words_in_msg > (MAX_WORDS_PER_PACKET - 4 - 2))) then
+          if ((r_channel_index = (NUM_CHANNELS - 1)) or (r_words_in_msg > (ESM_MAX_WORDS_PER_PACKET - 4 - 2))) then
             s_state <= S_PAD;
           else
             s_state <= S_READ_CHANNEL_REQ;
           end if;
 
         when S_PAD =>
-          if (r_words_in_msg = (MAX_WORDS_PER_PACKET - 1)) then
+          if (r_words_in_msg = (ESM_MAX_WORDS_PER_PACKET - 1)) then
             s_state <= S_DONE;
           else
             s_state <= S_PAD;
@@ -396,7 +395,7 @@ begin
     when S_PAD =>
       w_fifo_valid            <= '1';
       w_fifo_partial_1_data   <= (others => '0');
-      w_fifo_last             <= to_stdlogic(r_words_in_msg = (MAX_WORDS_PER_PACKET - 1));
+      w_fifo_last             <= to_stdlogic(r_words_in_msg = (ESM_MAX_WORDS_PER_PACKET - 1));
 
     when others => null;
     end case;
