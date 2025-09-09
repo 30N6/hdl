@@ -414,6 +414,7 @@ package body esm_pkg is
       report "Invalid length."
       severity failure;
 
+    --TODO: use new style
     r.sequence_num          := unsigned(v(31 downto 0));
     r.channel               := unsigned(v(37 downto 32));
     r.power_threshold       := unsigned(v(69 downto 38));
@@ -421,8 +422,8 @@ package body esm_pkg is
     r.duration              := unsigned(v(149 downto 118));
     r.frequency             := unsigned(v(165 downto 150));
     r.pulse_start_time      := unsigned(v(213 downto 166));
-    r.buffered_frame_index  := unsigned(v(218 downto 214));
-    r.buffered_frame_valid  := v(219);
+    r.buffered_frame_index  := unsigned(v(219 downto 214));
+    r.buffered_frame_valid  := v(220);
     return r;
   end function;
 
@@ -448,7 +449,7 @@ package body esm_pkg is
   function pack(v : esm_pdw_fifo_data_t) return std_logic_vector is
     variable r : std_logic_vector(ESM_PDW_FIFO_DATA_WIDTH - 1 downto 0);
   begin
-
+    --TODO: use new style
     r(31 downto 0)    := std_logic_vector(v.sequence_num);
     r(37 downto 32)   := std_logic_vector(v.channel);
     r(69 downto 38)   := std_logic_vector(v.power_threshold);
@@ -456,8 +457,8 @@ package body esm_pkg is
     r(149 downto 118) := std_logic_vector(v.duration);
     r(165 downto 150) := std_logic_vector(v.frequency);
     r(213 downto 166) := std_logic_vector(v.pulse_start_time);
-    r(218 downto 214) := std_logic_vector(v.buffered_frame_index);
-    r(219)            := v.buffered_frame_valid;
+    r(219 downto 214) := std_logic_vector(v.buffered_frame_index);
+    r(220)            := v.buffered_frame_valid;
 
     return r;
   end function;
