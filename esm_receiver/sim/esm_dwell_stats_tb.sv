@@ -126,7 +126,6 @@ module esm_dwell_stats_tb;
   typedef bit [$bits(esm_dwell_report_header_t) - 1 : 0]        dwell_report_header_bits_t;
   typedef bit [$bits(esm_dwell_report_channel_entry_t) - 1 : 0] dwell_report_channel_entry_bits_t;
 
-  parameter MAX_WORDS_PER_PACKET = 64;
   parameter NUM_HEADER_WORDS = ($bits(esm_dwell_report_header_t) / AXI_DATA_WIDTH);
 
   logic Clk_axi;
@@ -328,7 +327,7 @@ module esm_dwell_stats_tb;
       return 0;
     end
 
-    for (int i = NUM_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
+    for (int i = NUM_HEADER_WORDS; i < esm_max_words_per_packet; i++) begin
       if (a[i] !== b[i]) begin
         $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
         return 0;
@@ -369,7 +368,7 @@ module esm_dwell_stats_tb;
   end
 
   function automatic void expect_reports(esm_dwell_metadata_t dwell_data, int unsigned dwell_seq_num, dwell_channel_data_t  dwell_input []);
-    int channels_per_packet = (MAX_WORDS_PER_PACKET - NUM_HEADER_WORDS) / 4;
+    int channels_per_packet = (esm_max_words_per_packet - NUM_HEADER_WORDS) / 4;
     int num_packets = (NUM_CHANNELS + channels_per_packet - 1) / channels_per_packet;
     int num_padding_words = 0;
     int channel_index = 0;
@@ -434,7 +433,7 @@ module esm_dwell_stats_tb;
         channel_index++;
       end
 
-      num_padding_words = MAX_WORDS_PER_PACKET - r.data.size();
+      num_padding_words = esm_max_words_per_packet - r.data.size();
       for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
         r.data.push_back(0);
       end

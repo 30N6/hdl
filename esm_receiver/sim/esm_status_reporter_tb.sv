@@ -128,7 +128,6 @@ module esm_status_reporter_tb;
   typedef bit [$bits(esm_path_status_flags_packed_t) - 1 : 0]       esm_path_status_flags_packed_bits_t;
   typedef bit [$bits(esm_status_reporter_errors_packed_t) - 1 : 0]  esm_status_reporter_errors_packed_bits_t;
 
-  parameter MAX_WORDS_PER_PACKET = 64;
   parameter NUM_HEADER_WORDS = ($bits(esm_status_report_header_t) / AXI_DATA_WIDTH);
 
   logic Clk_axi;
@@ -276,7 +275,7 @@ module esm_status_reporter_tb;
       return 0;
     end
 
-    for (int i = NUM_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
+    for (int i = NUM_HEADER_WORDS; i < esm_max_words_per_packet; i++) begin
       if (a[i] !== b[i]) begin
         $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
         return 0;
@@ -370,7 +369,7 @@ module esm_status_reporter_tb;
       r.data.push_back(report_header_packed[(NUM_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
     end
 
-    num_padding_words = MAX_WORDS_PER_PACKET - r.data.size();
+    num_padding_words = esm_max_words_per_packet - r.data.size();
     for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
       r.data.push_back(0);
     end

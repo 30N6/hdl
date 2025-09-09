@@ -151,7 +151,6 @@ module esm_pdw_encoder_tb;
   typedef bit [$bits(esm_pdw_pulse_report_header_t) - 1 : 0]    pdw_pulse_report_header_bits_t;
   typedef bit [$bits(esm_pdw_summary_report_header_t) - 1 : 0]  pdw_summary_report_header_bits_t;
 
-  parameter MAX_WORDS_PER_PACKET      = 64;
   parameter NUM_HEADER_WORDS          = ($bits(pdw_report_header_bits_t) / AXI_DATA_WIDTH);
   parameter NUM_PULSE_HEADER_WORDS    = ($bits(pdw_pulse_report_header_bits_t) / AXI_DATA_WIDTH);
   parameter NUM_SUMMARY_HEADER_WORDS  = ($bits(pdw_summary_report_header_bits_t) / AXI_DATA_WIDTH);
@@ -406,7 +405,7 @@ module esm_pdw_encoder_tb;
         return 0;
       end
 
-      for (int i = NUM_SUMMARY_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
+      for (int i = NUM_SUMMARY_HEADER_WORDS; i < esm_max_words_per_packet; i++) begin
         if (a[i] !== b[i]) begin
           $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
           return 0;
@@ -453,7 +452,7 @@ module esm_pdw_encoder_tb;
         return 0;
       end*/
 
-      /*for (int i = NUM_PULSE_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
+      /*for (int i = NUM_PULSE_HEADER_WORDS; i < esm_max_words_per_packet; i++) begin
         if (a[i] !== b[i]) begin
           $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
           return 0;
@@ -549,7 +548,7 @@ module esm_pdw_encoder_tb;
           for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
             r.data.push_back(report_header_packed[(NUM_PULSE_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
           end
-          num_padding_words = MAX_WORDS_PER_PACKET - r.data.size();
+          num_padding_words = esm_max_words_per_packet - r.data.size();
           for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
             r.data.push_back(0);
           end
@@ -601,7 +600,7 @@ module esm_pdw_encoder_tb;
       for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
         r.data.push_back(report_header_packed[(NUM_SUMMARY_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
       end
-      num_padding_words = MAX_WORDS_PER_PACKET - r.data.size();
+      num_padding_words = esm_max_words_per_packet - r.data.size();
       for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
         r.data.push_back(0);
       end

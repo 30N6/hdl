@@ -128,7 +128,7 @@ module esm_receiver_tb;
     Axi_rstn = 1;
   end
 
-  esm_receiver #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH), .ADC_WIDTH(ADC_WIDTH), .IQ_WIDTH(IQ_WIDTH)) dut
+  esm_receiver #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH), .ADC_WIDTH(ADC_WIDTH), .DAC_WIDTH(16), .IQ_WIDTH(IQ_WIDTH)) dut
   (
     .Adc_clk        (Adc_clk),
     .Adc_clk_x4     (Adc_clk_x4),
@@ -140,6 +140,12 @@ module esm_receiver_tb;
     .Adc_valid      (tx_intf.valid),
     .Adc_data_i     (tx_intf.data_i),
     .Adc_data_q     (tx_intf.data_q),
+
+    .Dac_data_i     (),
+    .Dac_data_q     (),
+
+    .Enable_rx      (),
+    .Enable_tx      (),
 
     .S_axis_clk     (Axi_clk),
     .S_axis_resetn  (Axi_rstn),
