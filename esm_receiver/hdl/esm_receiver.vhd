@@ -91,7 +91,7 @@ architecture rtl of esm_receiver is
   signal r_ad9361_status              : std_logic_vector_array_t(AD9361_BIT_PIPE_DEPTH - 1 downto 0)(7 downto 0);
 
   signal w_dwell_active               : std_logic;
-  signal w_dwell_data                 : esm_dwell_metadata_t;
+  signal w_dwell_data                 : esm_dwell_entry_t;
   signal w_dwell_sequence_num         : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   signal r_adc_valid                  : std_logic;

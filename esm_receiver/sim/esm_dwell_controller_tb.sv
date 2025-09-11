@@ -4,10 +4,10 @@ import math::*;
 import esm_pkg::*;
 
 interface dwell_rx_intf (input logic Clk);
-  esm_dwell_metadata_t  data;
+  esm_dwell_entry_t  data;
   logic                 valid;
 
-  task read(output esm_dwell_metadata_t d);
+  task read(output esm_dwell_entry_t d);
     logic v;
     do begin
       d <= data;
@@ -47,7 +47,7 @@ module esm_dwell_controller_tb;
 
   typedef struct
   {
-    esm_dwell_metadata_t data;
+    esm_dwell_entry_t data;
   } expect_t;
 
   logic Clk_axi;
@@ -64,7 +64,7 @@ module esm_dwell_controller_tb;
   esm_config_data_t                               w_module_config;
   logic                                           w_dwell_active;
   logic                                           r_dwell_active;
-  esm_dwell_metadata_t                            w_dwell_data;
+  esm_dwell_entry_t                               w_dwell_data;
   logic [31:0]                                    w_dwell_seq_num;
 
   logic [3:0]                                     w_ad9361_control;
@@ -72,7 +72,7 @@ module esm_dwell_controller_tb;
   logic [7:0]                                     w_ad9361_status;
 
   bit [31:0]                                      config_seq_num = 0;
-  esm_dwell_metadata_t                            dwell_entry_mem [esm_num_dwell_entries - 1 : 0];
+  esm_dwell_entry_t                               dwell_entry_mem [esm_num_dwell_entries - 1 : 0];
 
   expect_t                                        expected_data [$];
   int                                             num_received = 0;
@@ -176,32 +176,30 @@ module esm_dwell_controller_tb;
     end
   endtask
 
-  task automatic send_dwell_entry(esm_message_dwell_entry_t entry);
-    bit [esm_message_dwell_entry_packed_width - 1 : 0] packed_entry = '0;
-    bit [31:0] config_data [] = new[4 + esm_message_dwell_entry_packed_width/32];
+  task automatic send_dwell_entry(int index, esm_dwell_entry_t entry);
+    bit [esm_dwell_entry_packed_width - 1 : 0] packed_entry = '0;
+    bit [31:0] config_data [] = new[4 + esm_dwell_entry_packed_width/32];
+    bit [15:0] addr = index;
 
-    $display("%0t: send_dwell_entry[%0d] = %p", $time, entry.entry_index, entry.entry_data);
+    $display("%0t: send_dwell_entry[%0d] = %p", $time, index, entry);
 
-    packed_entry[7   :   0] = entry.entry_index;
-    packed_entry[63  :  32] = 32'hDEADBEEF;
-
-    packed_entry[79  :  64] = entry.entry_data.tag;
-    packed_entry[95  :  80] = entry.entry_data.frequency;
-    packed_entry[127 :  96] = entry.entry_data.duration;
-    packed_entry[135 : 128] = entry.entry_data.gain;
-    packed_entry[143 : 136] = entry.entry_data.fast_lock_profile;
-    packed_entry[167 : 160] = entry.entry_data.threshold_shift_narrow;
-    packed_entry[175 : 168] = entry.entry_data.threshold_shift_wide;
-    packed_entry[255 : 192] = entry.entry_data.channel_mask_narrow;
-    packed_entry[263 : 256] = entry.entry_data.channel_mask_wide;
-    packed_entry[287 : 272] = entry.entry_data.min_pulse_duration;
+    packed_entry[15  :  0]  = entry.tag;
+    packed_entry[31  :  16] = entry.frequency;
+    packed_entry[64 :  32]  = entry.duration;
+    packed_entry[71 : 64]   = entry.gain;
+    packed_entry[79 : 72]   = entry.fast_lock_profile;
+    packed_entry[103 : 96]  = entry.threshold_shift_narrow;
+    packed_entry[111 : 104] = entry.threshold_shift_wide;
+    packed_entry[191 : 128] = entry.channel_mask_narrow;
+    packed_entry[199 : 192] = entry.channel_mask_wide;
+    packed_entry[223 : 208] = entry.min_pulse_duration;
 
     config_data[0] = esm_control_magic_num;
     config_data[1] = config_seq_num++;
-    config_data[2] = {esm_module_id_dwell_controller, esm_control_message_type_dwell_entry, 16'h0000};
+    config_data[2] = {esm_module_id_dwell_controller, esm_control_message_type_dwell_entry, addr};
     config_data[3] = 32'hDEADBEEF;
 
-    for (int i = 0; i < (esm_message_dwell_entry_packed_width/32); i++) begin
+    for (int i = 0; i < (esm_dwell_entry_packed_width/32); i++) begin
       config_data[4 + i] = packed_entry[i*32 +: 32];
     end
 
@@ -224,9 +222,9 @@ module esm_dwell_controller_tb;
     return r;
   endfunction
 
-  task automatic send_dwell_program(esm_message_dwell_program_t dwell_program);
-    bit [esm_message_dwell_program_header_packed_width - 1 : 0] packed_header = '0;
-    bit [31:0] config_data [] = new[4 + esm_message_dwell_program_header_packed_width/32 + esm_num_dwell_instructions];
+  task automatic send_dwell_program(esm_dwell_program_t dwell_program);
+    bit [esm_dwell_program_header_packed_width - 1 : 0] packed_header = '0;
+    bit [31:0] config_data [] = new[4 + esm_dwell_program_header_packed_width/32 + esm_num_dwell_instructions];
 
     $display("%0t: send_dwell_program = %p", $time, dwell_program);
 
@@ -240,18 +238,18 @@ module esm_dwell_controller_tb;
     config_data[2] = {esm_module_id_dwell_controller, esm_control_message_type_dwell_program, 16'h0000};
     config_data[3] = 32'hDEADBEEF;
 
-    for (int i = 0; i < (esm_message_dwell_program_header_packed_width/32); i++) begin
+    for (int i = 0; i < (esm_dwell_program_header_packed_width/32); i++) begin
       config_data[4 + i] = packed_header[i*32 +: 32];
     end
 
     for (int i = 0; i < esm_num_dwell_instructions; i++) begin
-      config_data[4 + (esm_message_dwell_program_header_packed_width/32) + i] = pack_dwell_instruction(dwell_program.instructions[i]);
+      config_data[4 + (esm_dwell_program_header_packed_width/32) + i] = pack_dwell_instruction(dwell_program.instructions[i]);
     end
 
     write_config(config_data);
   endtask
 
-  function automatic bit compare_data(esm_dwell_metadata_t a, esm_dwell_metadata_t b);
+  function automatic bit compare_data(esm_dwell_entry_t a, esm_dwell_entry_t b);
     if(a.tag                    !== b.tag)                    return 0;
     if(a.frequency              !== b.frequency)              return 0;
     if(a.duration               !== b.duration)               return 0;
@@ -266,7 +264,7 @@ module esm_dwell_controller_tb;
   endfunction
 
   initial begin
-    automatic esm_dwell_metadata_t read_data;
+    automatic esm_dwell_entry_t read_data;
 
     wait_for_reset();
 
@@ -292,7 +290,7 @@ module esm_dwell_controller_tb;
     end
   end
 
-  function automatic void randomize_instructions(inout esm_message_dwell_program_t dwell_program, bit global_counter_enable);
+  function automatic void randomize_instructions(inout esm_dwell_program_t dwell_program, bit global_counter_enable);
     int random_order = $urandom_range(99) < 50;
     int loop = ($urandom_range(99) < 50) && global_counter_enable;
     int num_instructions = $urandom_range(10, esm_num_dwell_instructions - 1);
@@ -339,7 +337,7 @@ module esm_dwell_controller_tb;
     end
   endfunction
 
-  function automatic void expect_dwell_program(esm_message_dwell_program_t dwell_program);
+  function automatic void expect_dwell_program(esm_dwell_program_t dwell_program);
     int global_counter = dwell_program.global_counter_init;
     int inst_index = 0;
     bit done = 0;
@@ -388,21 +386,21 @@ module esm_dwell_controller_tb;
       send_initial_config();
 
       for (int i_dwell = 0; i_dwell < esm_num_dwell_entries; i_dwell++) begin
-        esm_message_dwell_entry_t entry;
-        entry.entry_index                       = i_dwell;
-        entry.entry_data.tag                    = $urandom;
-        entry.entry_data.frequency              = $urandom;
-        entry.entry_data.duration               = $urandom_range(1000);
-        entry.entry_data.gain                   = $urandom;
-        entry.entry_data.fast_lock_profile      = $urandom;
-        entry.entry_data.threshold_shift_narrow = $urandom;
-        entry.entry_data.threshold_shift_wide   = $urandom;
-        entry.entry_data.channel_mask_narrow    = $urandom;
-        entry.entry_data.channel_mask_wide      = $urandom;
-        entry.entry_data.min_pulse_duration     = $urandom;
+        esm_dwell_entry_t entry;
 
-        send_dwell_entry(entry);
-        dwell_entry_mem[i_dwell] = entry.entry_data;
+        entry.tag                    = $urandom;
+        entry.frequency              = $urandom;
+        entry.duration               = $urandom_range(1000);
+        entry.gain                   = $urandom;
+        entry.fast_lock_profile      = $urandom;
+        entry.threshold_shift_narrow = $urandom;
+        entry.threshold_shift_wide   = $urandom;
+        entry.channel_mask_narrow    = $urandom;
+        entry.channel_mask_wide      = $urandom;
+        entry.min_pulse_duration     = $urandom;
+
+        send_dwell_entry(i_dwell, entry);
+        dwell_entry_mem[i_dwell] = entry;
       end
 
       for (int i_rep = 0; i_rep < 10; i_rep++) begin
@@ -411,7 +409,7 @@ module esm_dwell_controller_tb;
         int delayed_start_time    = $urandom_range(5000);
         int delayed_start_enable  = $urandom;
 
-        esm_message_dwell_program_t dwell_program;
+        esm_dwell_program_t dwell_program;
         dwell_program.enable_program        = 1;
         dwell_program.enable_delayed_start  = delayed_start_enable;
         dwell_program.global_counter_init   = global_counter_init;

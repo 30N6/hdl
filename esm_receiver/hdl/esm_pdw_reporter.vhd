@@ -27,7 +27,7 @@ port (
 
   Dwell_active          : in  std_logic;
   Dwell_done            : in  std_logic;
-  Dwell_data            : in  esm_dwell_metadata_t;
+  Dwell_data            : in  esm_dwell_entry_t;
   Dwell_sequence_num    : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   Dwell_timestamp       : in  unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
   Dwell_duration        : in  unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);

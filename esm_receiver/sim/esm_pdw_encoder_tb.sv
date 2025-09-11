@@ -17,14 +17,14 @@ typedef dwell_channel_data_t dwell_channel_array_t [];
 
 interface dwell_data_tx_intf (input logic Clk);
   logic                                         dwell_active = 0;
-  esm_dwell_metadata_t                          dwell_data;
+  esm_dwell_entry_t                             dwell_data;
   logic [esm_dwell_sequence_num_width - 1 : 0]  dwell_sequence_num;
 
   channelizer_control_t                         input_ctrl = {valid:0, default:0};
   logic [chan_power_width - 1 : 0]              input_power;
   logic signed [15:0]                           input_iq [1:0];
 
-  task write(esm_dwell_metadata_t data, int unsigned seq_num, dwell_channel_data_t input_data []);
+  task write(esm_dwell_entry_t data, int unsigned seq_num, dwell_channel_data_t input_data []);
     automatic dwell_channel_data_t d;
 
     dwell_active        = 1;
@@ -500,7 +500,7 @@ module esm_pdw_encoder_tb;
     end
   end
 
-  function automatic void expect_reports(esm_dwell_metadata_t dwell_data, int unsigned dwell_seq_num, dwell_channel_data_t dwell_input []);
+  function automatic void expect_reports(esm_dwell_entry_t dwell_data, int unsigned dwell_seq_num, dwell_channel_data_t dwell_input []);
     int num_padding_words = 0;
     bit [NUM_CHANNELS - 1 : 0]  pulse_active = '0;
     longint unsigned            pulse_power_accum [NUM_CHANNELS] = {default:0};
@@ -610,8 +610,8 @@ module esm_pdw_encoder_tb;
 
   endfunction
 
-  function automatic esm_dwell_metadata_t randomize_dwell_metadata();
-    esm_dwell_metadata_t r;
+  function automatic esm_dwell_entry_t randomize_dwell_entry();
+    esm_dwell_entry_t r;
     r.tag                     = $urandom;
     r.frequency               = $urandom;
     r.duration                = $urandom;
@@ -635,7 +635,7 @@ module esm_pdw_encoder_tb;
     return r;
   endfunction
 
-  function automatic dwell_channel_array_t randomize_dwell_input(esm_dwell_metadata_t dwell_data);
+  function automatic dwell_channel_array_t randomize_dwell_input(esm_dwell_entry_t dwell_data);
     dwell_channel_array_t r;
     dwell_channel_array_t channel_data [NUM_CHANNELS];
     int pulse_start_time [NUM_CHANNELS][$];
@@ -741,7 +741,7 @@ module esm_pdw_encoder_tb;
 
       for (int i_dwell = 0; i_dwell < NUM_DWELLS; i_dwell++) begin
         int unsigned          dwell_seq_num   = $urandom;
-        esm_dwell_metadata_t  dwell_data      = randomize_dwell_metadata();
+        esm_dwell_entry_t     dwell_data      = randomize_dwell_entry();
         dwell_channel_data_t  dwell_input []  = randomize_dwell_input(dwell_data);
 
         expect_reports(dwell_data, dwell_seq_num, dwell_input);
