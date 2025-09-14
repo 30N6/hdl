@@ -391,6 +391,7 @@ begin
     when S_PULSE_BUFFER_STATUS =>
       w_fifo_valid            <= '1';
       w_fifo_partial_1_data   <= "0000000" & Pdw_data.buffered_frame_valid & std_logic_vector(resize_up(Pdw_data.buffered_frame_index, 8)) & x"0000";
+      w_fifo_last             <= not(Pdw_data.buffered_frame_valid);
 
     when S_BUFFERED_SAMPLE =>
       w_fifo_valid            <= Buffered_frame_ack.sample_valid;
