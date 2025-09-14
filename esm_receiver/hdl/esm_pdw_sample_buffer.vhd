@@ -56,7 +56,7 @@ architecture rtl of esm_pdw_sample_buffer is
   signal r_rd_data                : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
 
   signal r_buffer_pending         : std_logic_vector(2**ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
-  signal w_buffer_full            : std_logic;
+  signal r_buffer_full            : std_logic;
   signal w_buffer_next_index      : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
 
   signal r_buffer_next_index      : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
@@ -123,14 +123,14 @@ begin
     if rising_edge(Clk) then
       r_buffer_next_index     <= w_buffer_next_index;
       r_buffer_update_pending <= Buffer_next_start or (r_output_valid and r_output_sample_last) or Output_frame_req.frame_drop;
+      r_buffer_full           <= and_reduce(r_buffer_pending) or Buffer_next_start or (r_output_valid and r_output_sample_last) or Output_frame_req.frame_drop;
     end if;
   end process;
 
-  -- PSL buffer_update : assert always ((Rst = '0') and (r_buffer_pending /= prev(r_buffer_pending))) -> (w_buffer_full = '1');
+  -- PSL buffer_update : assert always ((Rst = '0') and (r_buffer_pending /= prev(r_buffer_pending))) -> (r_buffer_full = '1');
 
-  w_buffer_full     <= and_reduce(r_buffer_pending) or r_buffer_update_pending;
   Buffer_empty      <= not(or_reduce(r_buffer_pending));
-  Buffer_full       <= w_buffer_full;
+  Buffer_full       <= r_buffer_full;
   Buffer_next_index <= r_buffer_next_index;
 
   process(Clk)
@@ -189,7 +189,7 @@ begin
   begin
     if rising_edge(Clk) then
       Error_underflow <= Output_frame_req.frame_read and not(r_buffer_pending(to_integer(Output_frame_req.frame_index)));
-      Error_overflow  <= Buffer_next_start and w_buffer_full;
+      Error_overflow  <= Buffer_next_start and r_buffer_full;
     end if;
   end process;
 
