@@ -113,7 +113,7 @@ begin
           r_buffer_pending(to_integer(r_output_frame_index)) <= '0';
         end if;
         if (Output_frame_req.frame_drop = '1') then
-          r_buffer_pending(to_integer(Output_frame_req.frame_index)) <= '0';
+          r_buffer_pending(to_integer(Output_frame_req.frame_index(FRAME_INDEX_WIDTH - 1 downto 0))) <= '0';
         end if;
       end if;
     end if;
@@ -146,7 +146,7 @@ begin
       else
         if (Output_frame_req.frame_read = '1') then
           r_output_valid        <= '1';
-          r_output_frame_index  <= Output_frame_req.frame_index;
+          r_output_frame_index  <= Output_frame_req.frame_index(FRAME_INDEX_WIDTH - 1 downto 0);
           r_output_sample_index <= (others => '0');
           r_output_sample_last  <= '0';
         elsif (r_output_valid = '1') then
@@ -190,7 +190,7 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Error_underflow <= Output_frame_req.frame_read and not(r_buffer_pending(to_integer(Output_frame_req.frame_index)));
+      Error_underflow <= Output_frame_req.frame_read and not(r_buffer_pending(to_integer(Output_frame_req.frame_index(FRAME_INDEX_WIDTH - 1 downto 0))));
       Error_overflow  <= Buffer_next_start and r_buffer_full;
     end if;
   end process;
