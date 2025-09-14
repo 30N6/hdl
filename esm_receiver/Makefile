@@ -35,6 +35,7 @@ GENERIC_DEPS += ../dsp/hdl/pfb_filter_buffer.vhd
 GENERIC_DEPS += ../dsp/hdl/pfb_filter_mult.vhd
 GENERIC_DEPS += ../dsp/hdl/pfb_filter_stage.vhd
 GENERIC_DEPS += ../dsp/hdl/channelizer_power.vhd
+GENERIC_DEPS += ../dsp/hdl/channelizer_1.vhd
 GENERIC_DEPS += ../dsp/hdl/channelizer_8.vhd
 GENERIC_DEPS += ../dsp/hdl/channelizer_32.vhd
 GENERIC_DEPS += ../dsp/hdl/channelizer_64.vhd

@@ -4,12 +4,12 @@ import math::*;
 import esm_pkg::*;
 
 typedef struct {
-  bit [1:0]                     enable_channelizer;
-  bit [1:0]                     enable_pdw_encoder;
-  esm_channelizer_warnings_t    channelizer_warnings [1:0];
-  esm_channelizer_errors_t      channelizer_errors [1:0];
-  esm_dwell_stats_errors_t      dwell_stats_errors [1:0];
-  esm_pdw_encoder_errors_t      pdw_encoder_errors [1:0];
+  bit [2:0]                     enable_channelizer;
+  bit [2:0]                     enable_pdw_encoder;
+  esm_channelizer_warnings_t    channelizer_warnings [2:0];
+  esm_channelizer_errors_t      channelizer_errors [2:0];
+  esm_dwell_stats_errors_t      dwell_stats_errors [2:0];
+  esm_pdw_encoder_errors_t      pdw_encoder_errors [2:0];
   esm_status_reporter_errors_t  status_reporter_errors;
   int                           pre_write_delay;
 } esm_status_data_t;
@@ -17,12 +17,12 @@ typedef struct {
 typedef esm_status_data_t esm_status_data_array_t [];
 
 interface esm_status_tx_intf (input logic Clk);
-  bit [1:0]                   enable_channelizer;
-  bit [1:0]                   enable_pdw_encoder;
-  esm_channelizer_warnings_t  channelizer_warnings [1:0];
-  esm_channelizer_errors_t    channelizer_errors [1:0];
-  esm_dwell_stats_errors_t    dwell_stats_errors [1:0];
-  esm_pdw_encoder_errors_t    pdw_encoder_errors [1:0];
+  bit [2:0]                   enable_channelizer;
+  bit [2:0]                   enable_pdw_encoder;
+  esm_channelizer_warnings_t  channelizer_warnings [2:0];
+  esm_channelizer_errors_t    channelizer_errors [2:0];
+  esm_dwell_stats_errors_t    dwell_stats_errors [2:0];
+  esm_pdw_encoder_errors_t    pdw_encoder_errors [2:0];
 
   task clear();
     enable_channelizer    = 0;
@@ -91,6 +91,7 @@ module esm_status_reporter_tb;
     bit [31:0]  enables;
     bit [31:0]  status_path_0;
     bit [31:0]  status_path_1;
+    bit [31:0]  status_path_2;
     bit [31:0]  status_reporter;
     bit [63:0]  timestamp;
   } esm_status_report_header_t;
@@ -270,6 +271,10 @@ module esm_status_reporter_tb;
       $display("status_path_1 mismatch: %X %X", report_a.status_path_1, report_b.status_path_1);
       return 0;
     end
+    if (report_a.status_path_2 !== report_b.status_path_2) begin
+      $display("status_path_2 mismatch: %X %X", report_a.status_path_2, report_b.status_path_2);
+      return 0;
+    end
     if (report_a.status_reporter !== report_b.status_reporter) begin
       $display("status_reporter mismatch: %X %X", report_a.status_reporter, report_b.status_reporter);
       return 0;
@@ -320,14 +325,14 @@ module esm_status_reporter_tb;
     esm_status_report_header_bits_t           report_header_packed;
     esm_status_reporter_errors_packed_t       reporter_errors;
     esm_status_reporter_errors_packed_bits_t  reporter_errors_packed;
-    esm_path_status_flags_packed_t            status_flags [1 : 0];
-    esm_path_status_flags_packed_bits_t       status_flags_packed [1 : 0];
+    esm_path_status_flags_packed_t            status_flags [2 : 0];
+    esm_path_status_flags_packed_bits_t       status_flags_packed [2 : 0];
 
     //$display("%0t: expect_report: input=%p", $time, input_data);
     reporter_errors.error_status_reporter_overflow = input_data.status_reporter_errors.reporter_overflow;
     reporter_errors.error_status_reporter_timeout  = input_data.status_reporter_errors.reporter_timeout;
 
-    for (int i = 0; i < 2; i++) begin
+    for (int i = 0; i < 3; i++) begin
       status_flags[i].warning_demux_gap                  = input_data.channelizer_warnings[i].demux_gap;
 
       status_flags[i].error_demux_overflow               = input_data.channelizer_errors[i].demux_overflow;
@@ -355,9 +360,10 @@ module esm_status_reporter_tb;
     report_header.sequence_num    = report_seq_num;
     report_header.module_id       = MODULE_ID;
     report_header.message_type    = esm_report_message_type_status;
-    report_header.enables         = {27'h0, input_data.enable_pdw_encoder, input_data.enable_channelizer, 1'b1};
+    report_header.enables         = {25'h0, input_data.enable_pdw_encoder, input_data.enable_channelizer, 1'b1};
     report_header.status_path_0   = status_flags_packed[0];
     report_header.status_path_1   = status_flags_packed[1];
+    report_header.status_path_2   = status_flags_packed[2];
     report_header.status_reporter = reporter_errors;
     report_header.timestamp       = 0;
 
@@ -401,7 +407,7 @@ module esm_status_reporter_tb;
         r[i].pre_write_delay = packet_cycle[i] - packet_cycle[i - 1];
       end
 
-      for (int j = 0; j < 2; j++) begin
+      for (int j = 0; j < 3; j++) begin
         r[i].enable_channelizer[j]                          = $urandom_range(1);
         r[i].enable_pdw_encoder[j]                          = $urandom_range(1);
 

@@ -23,7 +23,8 @@ package esm_pkg is
   constant ESM_MODULE_ID_DWELL_STATS_WIDE               : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"03";
   constant ESM_MODULE_ID_PDW_NARROW                     : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"04";
   constant ESM_MODULE_ID_PDW_WIDE                       : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"05";
-  constant ESM_MODULE_ID_STATUS                         : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"06";
+  constant ESM_MODULE_ID_PDW_FULL                       : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"06";
+  constant ESM_MODULE_ID_STATUS                         : unsigned(ESM_MODULE_ID_WIDTH - 1 downto 0) := x"07";
 
   constant ESM_CONTROL_MESSAGE_TYPE_ENABLE              : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"00";
   constant ESM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY         : unsigned(ESM_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"01";
@@ -40,6 +41,7 @@ package esm_pkg is
 
   constant ESM_NUM_CHANNELS_NARROW                      : natural := 64;
   constant ESM_NUM_CHANNELS_WIDE                        : natural := 8;
+  constant ESM_NUM_CHANNELS_FULL                        : natural := 1;
   constant ESM_CHANNEL_INDEX_WIDTH                      : natural := clog2(ESM_NUM_CHANNELS_NARROW);
 
   constant ESM_NUM_FAST_LOCK_PROFILES                   : natural := 8;

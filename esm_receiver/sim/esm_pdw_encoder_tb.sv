@@ -24,8 +24,10 @@ interface dwell_data_tx_intf (input logic Clk);
   logic [chan_power_width - 1 : 0]              input_power;
   logic signed [15:0]                           input_iq [1:0];
 
-  task write(esm_dwell_entry_t data, int unsigned seq_num, dwell_channel_data_t input_data []);
+  task write(esm_dwell_entry_t data, int unsigned seq_num, dwell_channel_data_t input_data [], bit single_channel_mode);
     automatic dwell_channel_data_t d;
+    automatic int invalid_min = single_channel_mode ? 3 : 0;
+    automatic int invalid_max = single_channel_mode ? 3 : 1;
 
     dwell_active        = 1;
     dwell_data          = data;
@@ -51,7 +53,7 @@ interface dwell_data_tx_intf (input logic Clk);
       input_power           = '0;
       input_iq[0]           = 'x;
       input_iq[1]           = 'x;
-      repeat($urandom_range(1,0)) @(posedge Clk);
+      repeat($urandom_range(invalid_max,invalid_min)) @(posedge Clk);
     end
 
     dwell_active        = 0;
@@ -652,7 +654,7 @@ module esm_pdw_encoder_tb;
 
       if ($urandom_range(99) < 50) begin
         int num_pulses = $urandom_range(10, 1);
-        time_offset[i] = $urandom_range(400, 200);
+        time_offset[i] = $urandom_range(500, 300); //must have enough time for threshold calc to be valid before sending pulses
 
         for (int p = 0; p < num_pulses; p++) begin
           pulse_start_time[i].push_back(time_offset[i]);
@@ -745,7 +747,7 @@ module esm_pdw_encoder_tb;
         dwell_channel_data_t  dwell_input []  = randomize_dwell_input(dwell_data);
 
         expect_reports(dwell_data, dwell_seq_num, dwell_input);
-        dwell_tx_intf.write(dwell_data, dwell_seq_num, dwell_input);
+        dwell_tx_intf.write(dwell_data, dwell_seq_num, dwell_input, NUM_CHANNELS == 1);
 
         repeat(1000) @(posedge Clk);
 

@@ -18,6 +18,7 @@ library esm_lib;
 
 entity esm_pdw_sample_processor is
 generic (
+  NUM_CHANNELS                : natural;
   CHANNEL_INDEX_WIDTH         : natural;
   DATA_WIDTH                  : natural;
   BUFFERED_SAMPLES_PER_FRAME  : natural;
@@ -33,7 +34,7 @@ port (
 
   Timestamp               : in  unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
 
-  Dwell_channel_mask      : in  std_logic_vector(2**CHANNEL_INDEX_WIDTH - 1 downto 0);
+  Dwell_channel_mask      : in  std_logic_vector(NUM_CHANNELS - 1 downto 0);
   Dwell_active            : in  std_logic;
   Dwell_done              : in  std_logic;
   Dwell_ack               : out std_logic;
@@ -206,7 +207,11 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_reset_index <= r_reset_index + 1;
+      if (NUM_CHANNELS = 1) then
+        r_reset_index <= (others => '0');
+      else
+        r_reset_index <= r_reset_index + 1;
+      end if;
     end if;
   end process;
 
@@ -220,9 +225,20 @@ begin
       r0_input_power            <= Input_power;
       r0_input_threshold_value  <= Input_threshold_value;
       r0_input_threshold_valid  <= Input_threshold_valid;
-      r0_context                <= m_channel_context(to_integer(Input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0)));
+
+      if (NUM_CHANNELS = 1) then
+        if (r3_context_wr_valid = '1') then
+          r0_context            <= w3_context;
+        else
+          r0_context            <= m_channel_context(0);
+        end if;
+      else
+        r0_context              <= m_channel_context(to_integer(Input_ctrl.data_index(CHANNEL_INDEX_WIDTH - 1 downto 0)));
+      end if;
     end if;
   end process;
+
+  -- PSL assert always (NUM_CHANNELS = 1) and (r3_context_wr_valid = '1') -> (r3_context_wr_index = 0);
 
   process(Clk)
   begin

@@ -26,8 +26,8 @@ port (
 
   Rst_out       : out std_logic;
   Enable_status : out std_logic;
-  Enable_chan   : out std_logic_vector(1 downto 0);
-  Enable_pdw    : out std_logic_vector(1 downto 0);
+  Enable_chan   : out std_logic_vector(2 downto 0);
+  Enable_pdw    : out std_logic_vector(2 downto 0);
 
   Module_config : out esm_config_data_t
 );
@@ -71,13 +71,13 @@ architecture rtl of esm_config is
 
   signal r_rst_out              : std_logic;
   signal r_enable_status        : std_logic;
-  signal r_enable_chan          : std_logic_vector(1 downto 0);
-  signal r_enable_pdw           : std_logic_vector(1 downto 0);
+  signal r_enable_chan          : std_logic_vector(2 downto 0);
+  signal r_enable_pdw           : std_logic_vector(2 downto 0);
 
   signal r_module_config_x4     : esm_config_data_t; --from cdc fifo
   signal r_rst_out_x4           : std_logic_vector(CDC_STAGES - 1 downto 0);
-  signal r_enable_chan_x4       : std_logic_vector_array_t(CDC_STAGES - 1 downto 0)(1 downto 0);
-  signal r_enable_pdw_x4        : std_logic_vector_array_t(CDC_STAGES - 1 downto 0)(1 downto 0);
+  signal r_enable_chan_x4       : std_logic_vector_array_t(CDC_STAGES - 1 downto 0)(2 downto 0);
+  signal r_enable_pdw_x4        : std_logic_vector_array_t(CDC_STAGES - 1 downto 0)(2 downto 0);
   signal r_enable_status_x4     : std_logic_vector(CDC_STAGES - 1 downto 0);
 
   attribute ASYNC_REG : string;
@@ -234,8 +234,8 @@ begin
       else
         if ((r_axis_valid = '1') and (s_state = S_ACTIVE_CONFIG_CONTROL) and (r_first = '1') and (r_message_type = ESM_CONTROL_MESSAGE_TYPE_ENABLE)) then
           r_rst_out       <= r_axis_data(24);
-          r_enable_chan   <= r_axis_data(17 downto 16);
-          r_enable_pdw    <= r_axis_data(9 downto 8);
+          r_enable_chan   <= r_axis_data(18 downto 16);
+          r_enable_pdw    <= r_axis_data(10 downto 8);
           r_enable_status <= r_axis_data(0);
         end if;
       end if;

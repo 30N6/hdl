@@ -60,7 +60,7 @@ end entity esm_pdw_encoder;
 
 architecture rtl of esm_pdw_encoder is
 
-  constant CHANNEL_INDEX_WIDTH        : natural := clog2(NUM_CHANNELS);
+  constant CHANNEL_INDEX_WIDTH        : natural := clog2_min1bit(NUM_CHANNELS);
   constant DWELL_STOP_WAIT_CYCLES     : natural := NUM_CHANNELS * 4;
   constant IQ_WIDTH                   : natural := 16;
   constant THRESHOLD_LATENCY          : natural := 4;
@@ -83,7 +83,7 @@ architecture rtl of esm_pdw_encoder is
 
   signal s_state                    : state_t;
   signal r_stop_wait_count          : unsigned(clog2(DWELL_STOP_WAIT_CYCLES) - 1 downto 0);
-  signal r_clear_index              : unsigned(clog2(NUM_CHANNELS) - 1 downto 0);
+  signal r_clear_index              : unsigned(clog2_min1bit(NUM_CHANNELS) - 1 downto 0);
 
   signal r_dwell_active             : std_logic;
   signal r_dwell_data               : esm_dwell_entry_t;
@@ -221,13 +221,13 @@ begin
     end if;
   end process;
 
-  assert (DATA_WIDTH >= IQ_WIDTH)
-    report "DATA_WIDTH expected to be >= IQ_WIDTH."
-    severity failure;
-
-  --TODO: test scaling in TB - try wider data_width
-  w_iq_scaled(0) <= Input_data(0)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
-  w_iq_scaled(1) <= Input_data(1)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
+  g_iq_scaling : if (DATA_WIDTH >= IQ_WIDTH) generate
+    w_iq_scaled(0) <= Input_data(0)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
+    w_iq_scaled(1) <= Input_data(1)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
+  else generate
+    w_iq_scaled(0) <= resize_up(Input_data(0), IQ_WIDTH);
+    w_iq_scaled(1) <= resize_up(Input_data(1), IQ_WIDTH);
+  end generate g_iq_scaling;
 
   w_threshold_shift <= Dwell_data.threshold_shift_wide when WIDE_BANDWIDTH else Dwell_data.threshold_shift_narrow;
 
@@ -281,7 +281,7 @@ begin
   begin
     if rising_edge(Clk) then
       if (WIDE_BANDWIDTH) then
-        r_dwell_channel_mask <= r_dwell_data.channel_mask_wide;
+        r_dwell_channel_mask <= r_dwell_data.channel_mask_wide(NUM_CHANNELS - 1 downto 0);
       else
         r_dwell_channel_mask <= r_dwell_data.channel_mask_narrow;
       end if;
@@ -290,6 +290,7 @@ begin
 
   i_sample_processor : entity esm_lib.esm_pdw_sample_processor
   generic map (
+    NUM_CHANNELS                => NUM_CHANNELS,
     CHANNEL_INDEX_WIDTH         => CHANNEL_INDEX_WIDTH,
     DATA_WIDTH                  => IQ_WIDTH,
     BUFFERED_SAMPLES_PER_FRAME  => ESM_PDW_BUFFERED_SAMPLES_PER_FRAME,
@@ -328,8 +329,8 @@ begin
     Error_fifo_overflow     => w_pdw_fifo_overflow,
     Error_fifo_underflow    => w_pdw_fifo_underflow,
     Error_buffer_busy       => w_sample_buffer_busy,
-    Error_buffer_underflow  => w_sample_buffer_overflow,
-    Error_buffer_overflow   => w_sample_buffer_underflow
+    Error_buffer_underflow  => w_sample_buffer_underflow,
+    Error_buffer_overflow   => w_sample_buffer_overflow
   );
 
   process(Clk)

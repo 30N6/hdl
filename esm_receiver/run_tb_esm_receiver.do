@@ -56,6 +56,7 @@ set library_file_list [list \
     ../dsp/hdl/pfb_filter.vhd \
     ../dsp/hdl/channelizer_power.vhd \
     ../dsp/hdl/channelizer_common.vhd \
+    ../dsp/hdl/channelizer_1.vhd \
     ../dsp/hdl/channelizer_8.vhd \
     ../dsp/hdl/channelizer_32.vhd \
     ../dsp/hdl/channelizer_64.vhd \
