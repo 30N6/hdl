@@ -58,7 +58,7 @@ end entity esm_pdw_reporter;
 architecture rtl of esm_pdw_reporter is
 
   constant FIFO_DEPTH             : natural := 4096;
-  constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - ESM_MAX_WORDS_PER_PACKET - 10;
+  constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - ESM_MAX_WORDS_PER_PACKET_LARGE - 10;
   constant TIMEOUT_CYCLES         : natural := 1024;
 
   type state_t is
@@ -96,7 +96,6 @@ architecture rtl of esm_pdw_reporter is
     S_PULSE_START_TIME_0,
     S_PULSE_START_TIME_1,
     S_PULSE_BUFFER_STATUS,
-    S_PULSE_PAD,
     S_PULSE_DONE,
 
     S_BUFFER_READ,
@@ -111,7 +110,7 @@ architecture rtl of esm_pdw_reporter is
   signal s_state                : state_t;
 
   signal r_packet_seq_num       : unsigned(31 downto 0);
-  signal r_words_in_msg         : unsigned(clog2(ESM_MAX_WORDS_PER_PACKET) - 1 downto 0);
+  signal r_words_in_msg         : unsigned(clog2(ESM_MAX_WORDS_PER_PACKET_LARGE) - 1 downto 0);
 
   signal r_min_duration_valid   : std_logic;
 
@@ -207,7 +206,7 @@ begin
           if (Pdw_data.buffered_frame_valid = '1') then
             s_state <= S_BUFFER_READ;
           else
-            s_state <= S_PULSE_PAD;
+            s_state <= S_PDW_READ;
           end if;
 
         when S_BUFFER_READ =>
@@ -215,20 +214,9 @@ begin
 
         when S_BUFFERED_SAMPLE =>
           if ((Buffered_frame_ack.sample_valid = '1') and (Buffered_frame_ack.sample_last = '1')) then
-            if (r_words_in_msg < (ESM_MAX_WORDS_PER_PACKET - 1)) then
-              s_state <= S_PULSE_PAD;
-            else
-              s_state <= S_PDW_READ;
-            end if;
-          else
-            s_state <= S_BUFFERED_SAMPLE;
-          end if;
-
-        when S_PULSE_PAD =>
-          if (r_words_in_msg = (ESM_MAX_WORDS_PER_PACKET - 1)) then
             s_state <= S_PDW_READ;
           else
-            s_state <= S_PULSE_PAD;
+            s_state <= S_BUFFERED_SAMPLE;
           end if;
 
         when S_PDW_READ =>
@@ -262,7 +250,7 @@ begin
         when S_SUMMARY_ACK_DELAY_SAMPLE_PROC =>
           s_state <= S_SUMMARY_PAD;
         when S_SUMMARY_PAD =>
-          if (r_words_in_msg = (ESM_MAX_WORDS_PER_PACKET - 1)) then
+          if (r_words_in_msg = (ESM_MAX_WORDS_PER_PACKET_SMALL - 1)) then -- only pad small packets
             s_state <= S_SUMMARY_DONE;
           else
             s_state <= S_SUMMARY_PAD;
@@ -407,6 +395,7 @@ begin
     when S_BUFFERED_SAMPLE =>
       w_fifo_valid            <= Buffered_frame_ack.sample_valid;
       w_fifo_partial_1_data   <= std_logic_vector(Buffered_frame_data(1)) & std_logic_vector(Buffered_frame_data(0));
+      w_fifo_last             <= Buffered_frame_ack.sample_last;
 
     when S_SUMMARY_HEADER_0 =>
       w_fifo_valid            <= '1';
@@ -452,10 +441,10 @@ begin
       w_fifo_valid            <= '1';
       w_fifo_partial_1_data   <= std_logic_vector(Ack_delay_sample_proc);
 
-    when S_PULSE_PAD | S_SUMMARY_PAD =>
+    when S_SUMMARY_PAD =>
       w_fifo_valid            <= '1';
       w_fifo_partial_1_data   <= (others => '0');
-      w_fifo_last             <= to_stdlogic(r_words_in_msg = (ESM_MAX_WORDS_PER_PACKET - 1));
+      w_fifo_last             <= to_stdlogic(r_words_in_msg = (ESM_MAX_WORDS_PER_PACKET_SMALL - 1));  -- only pad small packets
 
     when others => null;
     end case;

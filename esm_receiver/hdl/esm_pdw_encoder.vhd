@@ -18,12 +18,15 @@ library esm_lib;
 
 entity esm_pdw_encoder is
 generic (
-  AXI_DATA_WIDTH  : natural;
-  DATA_WIDTH      : natural;
-  NUM_CHANNELS    : natural;
-  MODULE_ID       : unsigned;
-  WIDE_BANDWIDTH  : boolean;
-  DEBUG_ENABLE    : boolean
+  AXI_DATA_WIDTH                  : natural;
+  DATA_WIDTH                      : natural;
+  NUM_CHANNELS                    : natural;
+  MODULE_ID                       : unsigned;
+  WIDE_BANDWIDTH                  : boolean;
+  BUFFERED_FRAME_INDEX_WIDTH      : natural;
+  BUFFERED_SAMPLE_INDEX_WIDTH     : natural;
+  BUFFERED_SAMPLES_PER_FRAME      : natural;
+  DEBUG_ENABLE                    : boolean
 );
 port (
   Clk_axi                       : in  std_logic;
@@ -293,7 +296,9 @@ begin
     NUM_CHANNELS                => NUM_CHANNELS,
     CHANNEL_INDEX_WIDTH         => CHANNEL_INDEX_WIDTH,
     DATA_WIDTH                  => IQ_WIDTH,
-    BUFFERED_SAMPLES_PER_FRAME  => ESM_PDW_BUFFERED_SAMPLES_PER_FRAME,
+    BUFFERED_FRAME_INDEX_WIDTH  => BUFFERED_FRAME_INDEX_WIDTH,
+    BUFFERED_SAMPLE_INDEX_WIDTH => BUFFERED_SAMPLE_INDEX_WIDTH,
+    BUFFERED_SAMPLES_PER_FRAME  => BUFFERED_SAMPLES_PER_FRAME,
     BUFFERED_SAMPLE_PADDING     => BUFFERED_SAMPLE_PADDING,
     PDW_FIFO_DEPTH              => PDW_FIFO_DEPTH,
     DEBUG_ENABLE                => DEBUG_ENABLE

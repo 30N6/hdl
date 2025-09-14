@@ -15,8 +15,10 @@ library esm_lib;
 
 entity esm_pdw_sample_buffer is
 generic (
-  DATA_WIDTH        : natural;
-  SAMPLES_PER_FRAME : natural
+  DATA_WIDTH          : natural;
+  FRAME_INDEX_WIDTH   : natural;
+  SAMPLE_INDEX_WIDTH  : natural;
+  SAMPLES_PER_FRAME   : natural
 );
 port (
   Clk                 : in  std_logic;
@@ -45,7 +47,7 @@ end entity esm_pdw_sample_buffer;
 
 architecture rtl of esm_pdw_sample_buffer is
 
-  constant MEM_ADDR_WIDTH         : natural := ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH + ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH;
+  constant MEM_ADDR_WIDTH         : natural := FRAME_INDEX_WIDTH + SAMPLE_INDEX_WIDTH;
   constant MEM_DATA_WIDTH         : natural := 2*DATA_WIDTH;
 
   signal m_buffer                 : std_logic_vector_array_t(2**MEM_ADDR_WIDTH - 1 downto 0)(MEM_DATA_WIDTH - 1 downto 0);
@@ -55,25 +57,25 @@ architecture rtl of esm_pdw_sample_buffer is
   signal w_rd_addr                : unsigned(MEM_ADDR_WIDTH - 1 downto 0);
   signal r_rd_data                : std_logic_vector(MEM_DATA_WIDTH - 1 downto 0);
 
-  signal r_buffer_pending         : std_logic_vector(2**ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
+  signal r_buffer_pending         : std_logic_vector(2**FRAME_INDEX_WIDTH - 1 downto 0);
   signal r_buffer_full            : std_logic;
-  signal w_buffer_next_index      : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
+  signal w_buffer_next_index      : unsigned(FRAME_INDEX_WIDTH - 1 downto 0);
 
-  signal r_buffer_next_index      : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
+  signal r_buffer_next_index      : unsigned(FRAME_INDEX_WIDTH - 1 downto 0);
   signal r_buffer_update_pending  : std_logic;
 
   signal r_output_valid           : std_logic;
-  signal r_output_frame_index     : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
-  signal r_output_sample_index    : unsigned(ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH - 1 downto 0);
+  signal r_output_frame_index     : unsigned(FRAME_INDEX_WIDTH - 1 downto 0);
+  signal r_output_sample_index    : unsigned(SAMPLE_INDEX_WIDTH - 1 downto 0);
   signal r_output_sample_last     : std_logic;
 
   signal r_output_valid_d         : std_logic;
-  signal r_output_sample_index_d  : unsigned(ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH - 1 downto 0);
+  signal r_output_sample_index_d  : unsigned(SAMPLE_INDEX_WIDTH - 1 downto 0);
   signal r_output_sample_last_d   : std_logic;
 
 begin
 
-  w_wr_addr <= Input_frame_index & Input_sample_index;
+  w_wr_addr <= Input_frame_index(FRAME_INDEX_WIDTH - 1 downto 0) & Input_sample_index(SAMPLE_INDEX_WIDTH - 1 downto 0);
   w_wr_data <= std_logic_vector(Input_data(1)) & std_logic_vector(Input_data(0));
 
   process(Clk)
@@ -86,12 +88,12 @@ begin
   end process;
 
   process(all)
-    variable v_next_index : unsigned(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1 downto 0);
+    variable v_next_index : unsigned(FRAME_INDEX_WIDTH - 1 downto 0);
   begin
     v_next_index := (others => '0');
-    for i in 0 to (2**ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH - 1) loop
+    for i in 0 to (2**FRAME_INDEX_WIDTH - 1) loop
       if (r_buffer_pending(i) = '0') then
-        v_next_index := to_unsigned(i, ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH);
+        v_next_index := to_unsigned(i, FRAME_INDEX_WIDTH);
         exit;
       end if;
     end loop;
@@ -131,7 +133,7 @@ begin
 
   Buffer_empty      <= not(or_reduce(r_buffer_pending));
   Buffer_full       <= r_buffer_full;
-  Buffer_next_index <= r_buffer_next_index;
+  Buffer_next_index <= resize_up(r_buffer_next_index, ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH);
 
   process(Clk)
   begin
@@ -179,7 +181,7 @@ begin
     if rising_edge(Clk) then
       Output_sample_data(1)           <= signed(r_rd_data(MEM_DATA_WIDTH - 1 downto DATA_WIDTH));
       Output_sample_data(0)           <= signed(r_rd_data(DATA_WIDTH - 1 downto 0));
-      Output_frame_ack.sample_index   <= r_output_sample_index_d;
+      Output_frame_ack.sample_index   <= resize_up(r_output_sample_index_d, ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH);
       Output_frame_ack.sample_last    <= r_output_sample_last_d;
       Output_frame_ack.sample_valid   <= r_output_valid_d;
     end if;

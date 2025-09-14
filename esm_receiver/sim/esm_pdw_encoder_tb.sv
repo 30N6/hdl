@@ -157,6 +157,18 @@ module esm_pdw_encoder_tb;
   parameter NUM_PULSE_HEADER_WORDS    = ($bits(pdw_pulse_report_header_bits_t) / AXI_DATA_WIDTH);
   parameter NUM_SUMMARY_HEADER_WORDS  = ($bits(pdw_summary_report_header_bits_t) / AXI_DATA_WIDTH);
 
+  parameter BUFFERED_FRAME_INDEX_WIDTH  = (NUM_CHANNELS == 64)  ? esm_pdw_sample_buffer_frame_index_width_narrow   :
+                                          (NUM_CHANNELS == 1)   ? esm_pdw_sample_buffer_frame_index_width_full     :
+                                                                  esm_pdw_sample_buffer_frame_index_width_wide;
+
+  parameter BUFFERED_SAMPLE_INDEX_WIDTH = (NUM_CHANNELS == 64)  ? esm_pdw_sample_buffer_sample_index_width_narrow  :
+                                          (NUM_CHANNELS == 1)   ? esm_pdw_sample_buffer_sample_index_width_full    :
+                                                                  esm_pdw_sample_buffer_sample_index_width_wide;
+
+  parameter BUFFERED_SAMPLES_PER_FRAME  = (NUM_CHANNELS == 64)  ? esm_pdw_buffered_samples_per_frame_narrow        :
+                                          (NUM_CHANNELS == 1)   ? esm_pdw_buffered_samples_per_frame_full          :
+                                                                  esm_pdw_buffered_samples_per_frame_wide;
+
   logic Clk_axi;
   logic Clk;
   logic Rst;
@@ -207,12 +219,15 @@ module esm_pdw_encoder_tb;
 
   esm_pdw_encoder
   #(
-    .AXI_DATA_WIDTH (AXI_DATA_WIDTH),
-    .DATA_WIDTH     (16),
-    .NUM_CHANNELS   (NUM_CHANNELS),
-    .MODULE_ID      (MODULE_ID),
-    .WIDE_BANDWIDTH (NUM_CHANNELS < 64),
-    .DEBUG_ENABLE   (0)
+    .AXI_DATA_WIDTH               (AXI_DATA_WIDTH),
+    .DATA_WIDTH                   (16),
+    .NUM_CHANNELS                 (NUM_CHANNELS),
+    .MODULE_ID                    (MODULE_ID),
+    .WIDE_BANDWIDTH               (NUM_CHANNELS < 64),
+    .BUFFERED_FRAME_INDEX_WIDTH   (BUFFERED_FRAME_INDEX_WIDTH),
+    .BUFFERED_SAMPLE_INDEX_WIDTH  (BUFFERED_SAMPLE_INDEX_WIDTH),
+    .BUFFERED_SAMPLES_PER_FRAME   (BUFFERED_SAMPLES_PER_FRAME),
+    .DEBUG_ENABLE                 (0)
   )
   dut
   (
@@ -407,7 +422,7 @@ module esm_pdw_encoder_tb;
         return 0;
       end
 
-      for (int i = NUM_SUMMARY_HEADER_WORDS; i < esm_max_words_per_packet; i++) begin
+      for (int i = NUM_SUMMARY_HEADER_WORDS; i < esm_max_words_per_packet_small; i++) begin
         if (a[i] !== b[i]) begin
           $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
           return 0;
@@ -550,7 +565,12 @@ module esm_pdw_encoder_tb;
           for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
             r.data.push_back(report_header_packed[(NUM_PULSE_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
           end
-          num_padding_words = esm_max_words_per_packet - r.data.size();
+
+          if (NUM_CHANNELS == 1) begin
+            num_padding_words = 334 - r.data.size();
+          end else begin
+            num_padding_words = 142 - r.data.size();
+          end
           for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
             r.data.push_back(0);
           end
@@ -602,7 +622,7 @@ module esm_pdw_encoder_tb;
       for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
         r.data.push_back(report_header_packed[(NUM_SUMMARY_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
       end
-      num_padding_words = esm_max_words_per_packet - r.data.size();
+      num_padding_words = esm_max_words_per_packet_small - r.data.size();
       for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
         r.data.push_back(0);
       end

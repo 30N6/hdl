@@ -404,12 +404,15 @@ begin
   g_wide_pdw_encoder : if (ENABLE_WIDE_CHANNEL and ENABLE_PDW_ENCODER) generate
     i_pdw_encoder_8 : entity esm_lib.esm_pdw_encoder
     generic map (
-      AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
-      DATA_WIDTH      => CHANNELIZER8_DATA_WIDTH,
-      NUM_CHANNELS    => 8,
-      MODULE_ID       => ESM_MODULE_ID_PDW_WIDE,
-      WIDE_BANDWIDTH  => TRUE,
-      DEBUG_ENABLE    => ENABLE_DEBUG
+      AXI_DATA_WIDTH                  => AXI_DATA_WIDTH,
+      DATA_WIDTH                      => CHANNELIZER8_DATA_WIDTH,
+      NUM_CHANNELS                    => 8,
+      MODULE_ID                       => ESM_MODULE_ID_PDW_WIDE,
+      WIDE_BANDWIDTH                  => TRUE,
+      BUFFERED_FRAME_INDEX_WIDTH      => ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH_WIDE,
+      BUFFERED_SAMPLE_INDEX_WIDTH     => ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH_WIDE,
+      BUFFERED_SAMPLES_PER_FRAME      => ESM_PDW_BUFFERED_SAMPLES_PER_FRAME_WIDE,
+      DEBUG_ENABLE                    => ENABLE_DEBUG
     )
     port map (
       Clk_axi                       => M_axis_clk,
@@ -449,12 +452,15 @@ begin
   g_narrow_pdw_encoder : if (ENABLE_NARROW_CHANNEL and ENABLE_PDW_ENCODER) generate
     i_pdw_encoder_64 : entity esm_lib.esm_pdw_encoder
     generic map (
-      AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
-      DATA_WIDTH      => CHANNELIZER64_DATA_WIDTH,
-      NUM_CHANNELS    => 64,
-      MODULE_ID       => ESM_MODULE_ID_PDW_NARROW,
-      WIDE_BANDWIDTH  => FALSE,
-      DEBUG_ENABLE    => ENABLE_DEBUG
+      AXI_DATA_WIDTH              => AXI_DATA_WIDTH,
+      DATA_WIDTH                  => CHANNELIZER64_DATA_WIDTH,
+      NUM_CHANNELS                => 64,
+      MODULE_ID                   => ESM_MODULE_ID_PDW_NARROW,
+      WIDE_BANDWIDTH              => FALSE,
+      BUFFERED_FRAME_INDEX_WIDTH  => ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH_NARROW,
+      BUFFERED_SAMPLE_INDEX_WIDTH => ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH_NARROW,
+      BUFFERED_SAMPLES_PER_FRAME  => ESM_PDW_BUFFERED_SAMPLES_PER_FRAME_NARROW,
+      DEBUG_ENABLE                => ENABLE_DEBUG
     )
     port map (
       Clk_axi                       => M_axis_clk,
@@ -494,12 +500,15 @@ begin
   g_full_pdw_encoder : if (ENABLE_FULL_CHANNEL and ENABLE_PDW_ENCODER) generate
     i_pdw_encoder_1 : entity esm_lib.esm_pdw_encoder
     generic map (
-      AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
-      DATA_WIDTH      => CHANNELIZER1_DATA_WIDTH,
-      NUM_CHANNELS    => 1,
-      MODULE_ID       => ESM_MODULE_ID_PDW_FULL,
-      WIDE_BANDWIDTH  => TRUE,
-      DEBUG_ENABLE    => ENABLE_DEBUG
+      AXI_DATA_WIDTH              => AXI_DATA_WIDTH,
+      DATA_WIDTH                  => CHANNELIZER1_DATA_WIDTH,
+      NUM_CHANNELS                => 1,
+      MODULE_ID                   => ESM_MODULE_ID_PDW_FULL,
+      WIDE_BANDWIDTH              => TRUE,
+      BUFFERED_FRAME_INDEX_WIDTH  => ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH_FULL,
+      BUFFERED_SAMPLE_INDEX_WIDTH => ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH_FULL,
+      BUFFERED_SAMPLES_PER_FRAME  => ESM_PDW_BUFFERED_SAMPLES_PER_FRAME_FULL,
+      DEBUG_ENABLE                => ENABLE_DEBUG
     )
     port map (
       Clk_axi                       => M_axis_clk,

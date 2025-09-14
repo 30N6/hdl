@@ -21,6 +21,8 @@ generic (
   NUM_CHANNELS                : natural;
   CHANNEL_INDEX_WIDTH         : natural;
   DATA_WIDTH                  : natural;
+  BUFFERED_FRAME_INDEX_WIDTH  : natural;
+  BUFFERED_SAMPLE_INDEX_WIDTH : natural;
   BUFFERED_SAMPLES_PER_FRAME  : natural;
   BUFFERED_SAMPLE_PADDING     : natural;
   PDW_FIFO_DEPTH              : natural;
@@ -454,8 +456,10 @@ begin
 
   i_sample_buffer : entity esm_lib.esm_pdw_sample_buffer
   generic map (
-    DATA_WIDTH        => DATA_WIDTH,
-    SAMPLES_PER_FRAME => BUFFERED_SAMPLES_PER_FRAME
+    DATA_WIDTH          => DATA_WIDTH,
+    FRAME_INDEX_WIDTH   => BUFFERED_FRAME_INDEX_WIDTH,
+    SAMPLE_INDEX_WIDTH  => BUFFERED_SAMPLE_INDEX_WIDTH,
+    SAMPLES_PER_FRAME   => BUFFERED_SAMPLES_PER_FRAME
   )
   port map (
     Clk                 => Clk,

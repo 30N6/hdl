@@ -280,7 +280,7 @@ module esm_status_reporter_tb;
       return 0;
     end
 
-    for (int i = NUM_HEADER_WORDS; i < esm_max_words_per_packet; i++) begin
+    for (int i = NUM_HEADER_WORDS; i < esm_max_words_per_packet_small; i++) begin
       if (a[i] !== b[i]) begin
         $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
         return 0;
@@ -375,7 +375,7 @@ module esm_status_reporter_tb;
       r.data.push_back(report_header_packed[(NUM_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
     end
 
-    num_padding_words = esm_max_words_per_packet - r.data.size();
+    num_padding_words = esm_max_words_per_packet_small - r.data.size();
     for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
       r.data.push_back(0);
     end

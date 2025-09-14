@@ -10,7 +10,8 @@ library dsp_lib;
 
 package esm_pkg is
 
-  constant ESM_MAX_WORDS_PER_PACKET                     : natural := 128;
+  constant ESM_MAX_WORDS_PER_PACKET_SMALL               : natural := 128;
+  constant ESM_MAX_WORDS_PER_PACKET_LARGE               : natural := 360;
   constant ESM_CONTROL_MAGIC_NUM                        : std_logic_vector(31 downto 0) := x"45534D43";
   constant ESM_REPORT_MAGIC_NUM                         : std_logic_vector(31 downto 0) := x"45534D52";
 
@@ -60,12 +61,24 @@ package esm_pkg is
   constant ESM_PDW_POWER_ACCUM_WIDTH                    : natural := 48;
   constant ESM_PDW_CYCLE_COUNT_WIDTH                    : natural := 32;
   constant ESM_PDW_IFM_WIDTH                            : natural := 16;
-  constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH            : natural := 64;
-  constant ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH      : natural := clog2(ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH);
-  constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_DEPTH           : natural := 128;
-  constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH     : natural := clog2(ESM_PDW_SAMPLE_BUFFER_SAMPLE_DEPTH);
-  constant ESM_PDW_BUFFERED_SAMPLES_PER_FRAME           : natural := 112;
-  constant ESM_PDW_BUFFERED_IQ_DELAY_SAMPLES            : natural := 8;
+
+  constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH_NARROW         : natural := 64;
+  constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH_WIDE           : natural := 16;
+  constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH_FULL           : natural := 2;
+  constant ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH_NARROW   : natural := clog2(ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH_NARROW);
+  constant ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH_WIDE     : natural := clog2(ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH_WIDE);
+  constant ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH_FULL     : natural := clog2(ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH_FULL);
+  constant ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH          : natural := maximum(maximum(ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH_NARROW, ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH_WIDE), ESM_PDW_SAMPLE_BUFFER_FRAME_INDEX_WIDTH_FULL);
+
+  constant ESM_PDW_BUFFERED_SAMPLES_PER_FRAME_NARROW        : natural := 128;
+  constant ESM_PDW_BUFFERED_SAMPLES_PER_FRAME_WIDE          : natural := 128;
+  constant ESM_PDW_BUFFERED_SAMPLES_PER_FRAME_FULL          : natural := 320;
+  constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH_NARROW  : natural := clog2(ESM_PDW_BUFFERED_SAMPLES_PER_FRAME_NARROW);
+  constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH_WIDE    : natural := clog2(ESM_PDW_BUFFERED_SAMPLES_PER_FRAME_WIDE);
+  constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH_FULL    : natural := clog2(ESM_PDW_BUFFERED_SAMPLES_PER_FRAME_FULL);
+  constant ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH         : natural := maximum(maximum(ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH_NARROW, ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH_WIDE), ESM_PDW_SAMPLE_BUFFER_SAMPLE_INDEX_WIDTH_FULL);
+
+  constant ESM_PDW_BUFFERED_IQ_DELAY_SAMPLES                : natural := 8;
 
   --type esm_common_header_t is record
   --  magic_num                 : std_logic_vector(31 downto 0);
