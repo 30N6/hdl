@@ -22,6 +22,7 @@ generic (
   DATA_WIDTH                      : natural;
   NUM_CHANNELS                    : natural;
   MODULE_ID                       : unsigned;
+  DURATION_THRESHOLD_SHIFT        : natural;
   WIDE_BANDWIDTH                  : boolean;
   BUFFERED_FRAME_INDEX_WIDTH      : natural;
   BUFFERED_SAMPLE_INDEX_WIDTH     : natural;
@@ -407,10 +408,11 @@ begin
 
   i_reporter : entity esm_lib.esm_pdw_reporter
   generic map (
-    AXI_DATA_WIDTH      => AXI_DATA_WIDTH,
-    CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
-    DATA_WIDTH          => IQ_WIDTH,
-    MODULE_ID           => MODULE_ID
+    AXI_DATA_WIDTH            => AXI_DATA_WIDTH,
+    CHANNEL_INDEX_WIDTH       => CHANNEL_INDEX_WIDTH,
+    DATA_WIDTH                => IQ_WIDTH,
+    MODULE_ID                 => MODULE_ID,
+    DURATION_THRESHOLD_SHIFT  => DURATION_THRESHOLD_SHIFT
   )
   port map (
     Clk_axi               => Clk_axi,

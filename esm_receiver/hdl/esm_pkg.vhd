@@ -62,6 +62,10 @@ package esm_pkg is
   constant ESM_PDW_CYCLE_COUNT_WIDTH                    : natural := 32;
   constant ESM_PDW_IFM_WIDTH                            : natural := 16;
 
+  constant ESM_PDW_DURATION_THRESHOLD_SHIFT_NARROW          : natural := 0; -- x1
+  constant ESM_PDW_DURATION_THRESHOLD_SHIFT_WIDE            : natural := 2; -- x4 - threshold is halved compared to narrow channel
+  constant ESM_PDW_DURATION_THRESHOLD_SHIFT_FULL            : natural := 5; -- x32 - threshold is halved compared to narrow channel
+
   constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH_NARROW         : natural := 64;
   constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH_WIDE           : natural := 16;
   constant ESM_PDW_SAMPLE_BUFFER_FRAME_DEPTH_FULL           : natural := 2;

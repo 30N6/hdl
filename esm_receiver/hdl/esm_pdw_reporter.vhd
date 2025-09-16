@@ -15,10 +15,11 @@ library esm_lib;
 
 entity esm_pdw_reporter is
 generic (
-  AXI_DATA_WIDTH      : natural;
-  CHANNEL_INDEX_WIDTH : natural;
-  DATA_WIDTH          : natural;
-  MODULE_ID           : unsigned
+  AXI_DATA_WIDTH            : natural;
+  CHANNEL_INDEX_WIDTH       : natural;
+  DATA_WIDTH                : natural;
+  MODULE_ID                 : unsigned;
+  DURATION_THRESHOLD_SHIFT  : natural
 );
 port (
   Clk_axi               : in  std_logic;
@@ -57,9 +58,10 @@ end entity esm_pdw_reporter;
 
 architecture rtl of esm_pdw_reporter is
 
-  constant FIFO_DEPTH             : natural := 4096;
-  constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - ESM_MAX_WORDS_PER_PACKET_LARGE - 10;
-  constant TIMEOUT_CYCLES         : natural := 1024;
+  constant FIFO_DEPTH                   : natural := 4096;
+  constant FIFO_ALMOST_FULL_LEVEL       : natural := FIFO_DEPTH - ESM_MAX_WORDS_PER_PACKET_LARGE - 10;
+  constant TIMEOUT_CYCLES               : natural := 1024;
+  constant MIN_DURATION_THRESHOLD_WIDTH : natural := ESM_MIN_DURATION_WIDTH + DURATION_THRESHOLD_SHIFT;
 
   type state_t is
   (
@@ -107,31 +109,32 @@ architecture rtl of esm_pdw_reporter is
     S_REPORT_ACK
   );
 
-  signal s_state                : state_t;
+  signal s_state                  : state_t;
 
-  signal r_packet_seq_num       : unsigned(31 downto 0);
-  signal r_words_in_msg         : unsigned(clog2(ESM_MAX_WORDS_PER_PACKET_LARGE) - 1 downto 0);
+  signal r_packet_seq_num         : unsigned(31 downto 0);
+  signal r_words_in_msg           : unsigned(clog2(ESM_MAX_WORDS_PER_PACKET_LARGE) - 1 downto 0);
 
-  signal r_min_duration_valid   : std_logic;
+  signal r_min_duration_threshold : unsigned(MIN_DURATION_THRESHOLD_WIDTH - 1 downto 0);
+  signal r_min_duration_valid     : std_logic;
 
-  signal w_fifo_almost_full     : std_logic;
-  signal w_fifo_ready           : std_logic;
+  signal w_fifo_almost_full       : std_logic;
+  signal w_fifo_ready             : std_logic;
 
-  signal w_fifo_valid           : std_logic;
-  signal w_fifo_valid_opt       : std_logic;
-  signal w_fifo_last            : std_logic;
-  signal w_fifo_partial_0_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal w_fifo_partial_1_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_fifo_valid             : std_logic;
+  signal w_fifo_valid_opt         : std_logic;
+  signal w_fifo_last              : std_logic;
+  signal w_fifo_partial_0_data    : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_fifo_partial_1_data    : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
 
-  signal r_fifo_valid           : std_logic;
-  signal r_fifo_last            : std_logic;
-  signal r_fifo_partial_0_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  signal r_fifo_partial_1_data  : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal r_fifo_valid             : std_logic;
+  signal r_fifo_last              : std_logic;
+  signal r_fifo_partial_0_data    : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal r_fifo_partial_1_data    : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
 
-  signal r_pulse_count          : unsigned(31 downto 0);
-  signal r_drop_count           : unsigned(31 downto 0);
+  signal r_pulse_count            : unsigned(31 downto 0);
+  signal r_drop_count             : unsigned(31 downto 0);
 
-  signal r_timeout              : unsigned(clog2(TIMEOUT_CYCLES) - 1 downto 0);
+  signal r_timeout                : unsigned(clog2(TIMEOUT_CYCLES) - 1 downto 0);
 
 begin
 
@@ -276,7 +279,10 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_min_duration_valid <= to_stdlogic(Pdw_data.duration >= Dwell_data.min_pulse_duration);
+      r_min_duration_threshold <= (others => '0');
+      r_min_duration_threshold(MIN_DURATION_THRESHOLD_WIDTH - 1 downto DURATION_THRESHOLD_SHIFT) <= Dwell_data.min_pulse_duration;
+
+      r_min_duration_valid <= to_stdlogic(Pdw_data.duration >= r_min_duration_threshold);
     end if;
   end process;
 

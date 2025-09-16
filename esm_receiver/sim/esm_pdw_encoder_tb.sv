@@ -223,6 +223,7 @@ module esm_pdw_encoder_tb;
     .DATA_WIDTH                   (16),
     .NUM_CHANNELS                 (NUM_CHANNELS),
     .MODULE_ID                    (MODULE_ID),
+    .DURATION_THRESHOLD_SHIFT     (0),
     .WIDE_BANDWIDTH               (NUM_CHANNELS < 64),
     .BUFFERED_FRAME_INDEX_WIDTH   (BUFFERED_FRAME_INDEX_WIDTH),
     .BUFFERED_SAMPLE_INDEX_WIDTH  (BUFFERED_SAMPLE_INDEX_WIDTH),
