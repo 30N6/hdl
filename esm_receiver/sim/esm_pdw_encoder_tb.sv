@@ -17,15 +17,17 @@ typedef dwell_channel_data_t dwell_channel_array_t [];
 
 interface dwell_data_tx_intf (input logic Clk);
   logic                                         dwell_active = 0;
-  esm_dwell_metadata_t                          dwell_data;
+  esm_dwell_entry_t                             dwell_data;
   logic [esm_dwell_sequence_num_width - 1 : 0]  dwell_sequence_num;
 
   channelizer_control_t                         input_ctrl = {valid:0, default:0};
   logic [chan_power_width - 1 : 0]              input_power;
   logic signed [15:0]                           input_iq [1:0];
 
-  task write(esm_dwell_metadata_t data, int unsigned seq_num, dwell_channel_data_t input_data []);
+  task write(esm_dwell_entry_t data, int unsigned seq_num, dwell_channel_data_t input_data [], bit single_channel_mode);
     automatic dwell_channel_data_t d;
+    automatic int invalid_min = single_channel_mode ? 3 : 0;
+    automatic int invalid_max = single_channel_mode ? 3 : 1;
 
     dwell_active        = 1;
     dwell_data          = data;
@@ -51,7 +53,7 @@ interface dwell_data_tx_intf (input logic Clk);
       input_power           = '0;
       input_iq[0]           = 'x;
       input_iq[1]           = 'x;
-      repeat($urandom_range(1,0)) @(posedge Clk);
+      repeat($urandom_range(invalid_max,invalid_min)) @(posedge Clk);
     end
 
     dwell_active        = 0;
@@ -151,10 +153,21 @@ module esm_pdw_encoder_tb;
   typedef bit [$bits(esm_pdw_pulse_report_header_t) - 1 : 0]    pdw_pulse_report_header_bits_t;
   typedef bit [$bits(esm_pdw_summary_report_header_t) - 1 : 0]  pdw_summary_report_header_bits_t;
 
-  parameter MAX_WORDS_PER_PACKET      = 64;
   parameter NUM_HEADER_WORDS          = ($bits(pdw_report_header_bits_t) / AXI_DATA_WIDTH);
   parameter NUM_PULSE_HEADER_WORDS    = ($bits(pdw_pulse_report_header_bits_t) / AXI_DATA_WIDTH);
   parameter NUM_SUMMARY_HEADER_WORDS  = ($bits(pdw_summary_report_header_bits_t) / AXI_DATA_WIDTH);
+
+  parameter BUFFERED_FRAME_INDEX_WIDTH  = (NUM_CHANNELS == 64)  ? esm_pdw_sample_buffer_frame_index_width_narrow   :
+                                          (NUM_CHANNELS == 1)   ? esm_pdw_sample_buffer_frame_index_width_full     :
+                                                                  esm_pdw_sample_buffer_frame_index_width_wide;
+
+  parameter BUFFERED_SAMPLE_INDEX_WIDTH = (NUM_CHANNELS == 64)  ? esm_pdw_sample_buffer_sample_index_width_narrow  :
+                                          (NUM_CHANNELS == 1)   ? esm_pdw_sample_buffer_sample_index_width_full    :
+                                                                  esm_pdw_sample_buffer_sample_index_width_wide;
+
+  parameter BUFFERED_SAMPLES_PER_FRAME  = (NUM_CHANNELS == 64)  ? esm_pdw_buffered_samples_per_frame_narrow        :
+                                          (NUM_CHANNELS == 1)   ? esm_pdw_buffered_samples_per_frame_full          :
+                                                                  esm_pdw_buffered_samples_per_frame_wide;
 
   logic Clk_axi;
   logic Clk;
@@ -206,12 +219,16 @@ module esm_pdw_encoder_tb;
 
   esm_pdw_encoder
   #(
-    .AXI_DATA_WIDTH (AXI_DATA_WIDTH),
-    .DATA_WIDTH     (16),
-    .NUM_CHANNELS   (NUM_CHANNELS),
-    .MODULE_ID      (MODULE_ID),
-    .WIDE_BANDWIDTH (NUM_CHANNELS < 64),
-    .DEBUG_ENABLE   (0)
+    .AXI_DATA_WIDTH               (AXI_DATA_WIDTH),
+    .DATA_WIDTH                   (16),
+    .NUM_CHANNELS                 (NUM_CHANNELS),
+    .MODULE_ID                    (MODULE_ID),
+    .DURATION_THRESHOLD_SHIFT     (0),
+    .WIDE_BANDWIDTH               (NUM_CHANNELS < 64),
+    .BUFFERED_FRAME_INDEX_WIDTH   (BUFFERED_FRAME_INDEX_WIDTH),
+    .BUFFERED_SAMPLE_INDEX_WIDTH  (BUFFERED_SAMPLE_INDEX_WIDTH),
+    .BUFFERED_SAMPLES_PER_FRAME   (BUFFERED_SAMPLES_PER_FRAME),
+    .DEBUG_ENABLE                 (0)
   )
   dut
   (
@@ -406,7 +423,7 @@ module esm_pdw_encoder_tb;
         return 0;
       end
 
-      for (int i = NUM_SUMMARY_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
+      for (int i = NUM_SUMMARY_HEADER_WORDS; i < esm_max_words_per_packet_small; i++) begin
         if (a[i] !== b[i]) begin
           $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
           return 0;
@@ -453,7 +470,7 @@ module esm_pdw_encoder_tb;
         return 0;
       end*/
 
-      /*for (int i = NUM_PULSE_HEADER_WORDS; i < MAX_WORDS_PER_PACKET; i++) begin
+      /*for (int i = NUM_PULSE_HEADER_WORDS; i < esm_max_words_per_packet; i++) begin
         if (a[i] !== b[i]) begin
           $display("trailer mismatch [%0d]: %X %X", i, a[i], b[i]);
           return 0;
@@ -501,7 +518,7 @@ module esm_pdw_encoder_tb;
     end
   end
 
-  function automatic void expect_reports(esm_dwell_metadata_t dwell_data, int unsigned dwell_seq_num, dwell_channel_data_t dwell_input []);
+  function automatic void expect_reports(esm_dwell_entry_t dwell_data, int unsigned dwell_seq_num, dwell_channel_data_t dwell_input []);
     int num_padding_words = 0;
     bit [NUM_CHANNELS - 1 : 0]  pulse_active = '0;
     longint unsigned            pulse_power_accum [NUM_CHANNELS] = {default:0};
@@ -549,7 +566,12 @@ module esm_pdw_encoder_tb;
           for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
             r.data.push_back(report_header_packed[(NUM_PULSE_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
           end
-          num_padding_words = MAX_WORDS_PER_PACKET - r.data.size();
+
+          if (NUM_CHANNELS == 1) begin
+            num_padding_words = 334 - r.data.size();
+          end else begin
+            num_padding_words = 142 - r.data.size();
+          end
           for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
             r.data.push_back(0);
           end
@@ -601,7 +623,7 @@ module esm_pdw_encoder_tb;
       for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
         r.data.push_back(report_header_packed[(NUM_SUMMARY_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
       end
-      num_padding_words = MAX_WORDS_PER_PACKET - r.data.size();
+      num_padding_words = esm_max_words_per_packet_small - r.data.size();
       for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
         r.data.push_back(0);
       end
@@ -611,8 +633,8 @@ module esm_pdw_encoder_tb;
 
   endfunction
 
-  function automatic esm_dwell_metadata_t randomize_dwell_metadata();
-    esm_dwell_metadata_t r;
+  function automatic esm_dwell_entry_t randomize_dwell_entry();
+    esm_dwell_entry_t r;
     r.tag                     = $urandom;
     r.frequency               = $urandom;
     r.duration                = $urandom;
@@ -636,7 +658,7 @@ module esm_pdw_encoder_tb;
     return r;
   endfunction
 
-  function automatic dwell_channel_array_t randomize_dwell_input(esm_dwell_metadata_t dwell_data);
+  function automatic dwell_channel_array_t randomize_dwell_input(esm_dwell_entry_t dwell_data);
     dwell_channel_array_t r;
     dwell_channel_array_t channel_data [NUM_CHANNELS];
     int pulse_start_time [NUM_CHANNELS][$];
@@ -653,7 +675,7 @@ module esm_pdw_encoder_tb;
 
       if ($urandom_range(99) < 50) begin
         int num_pulses = $urandom_range(10, 1);
-        time_offset[i] = $urandom_range(400, 200);
+        time_offset[i] = $urandom_range(500, 300); //must have enough time for threshold calc to be valid before sending pulses
 
         for (int p = 0; p < num_pulses; p++) begin
           pulse_start_time[i].push_back(time_offset[i]);
@@ -742,11 +764,11 @@ module esm_pdw_encoder_tb;
 
       for (int i_dwell = 0; i_dwell < NUM_DWELLS; i_dwell++) begin
         int unsigned          dwell_seq_num   = $urandom;
-        esm_dwell_metadata_t  dwell_data      = randomize_dwell_metadata();
+        esm_dwell_entry_t     dwell_data      = randomize_dwell_entry();
         dwell_channel_data_t  dwell_input []  = randomize_dwell_input(dwell_data);
 
         expect_reports(dwell_data, dwell_seq_num, dwell_input);
-        dwell_tx_intf.write(dwell_data, dwell_seq_num, dwell_input);
+        dwell_tx_intf.write(dwell_data, dwell_seq_num, dwell_input, NUM_CHANNELS == 1);
 
         repeat(1000) @(posedge Clk);
 

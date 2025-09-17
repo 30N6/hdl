@@ -6,7 +6,7 @@ set tb_lib      ecm_lib
 set tb_name     ecm_status_reporter_tb
 set top_level   $tb_lib.$tb_name
 
-set xilinx_dir  C:/Xilinx/Vivado/2022.2/data/verilog/src
+set xilinx_dir  C:/Xilinx/Vivado/2023.2/data/verilog/src
 
 set library_file_list [list \
   glbl [list \

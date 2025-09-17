@@ -18,12 +18,16 @@ library esm_lib;
 
 entity esm_pdw_encoder is
 generic (
-  AXI_DATA_WIDTH  : natural;
-  DATA_WIDTH      : natural;
-  NUM_CHANNELS    : natural;
-  MODULE_ID       : unsigned;
-  WIDE_BANDWIDTH  : boolean;
-  DEBUG_ENABLE    : boolean
+  AXI_DATA_WIDTH                  : natural;
+  DATA_WIDTH                      : natural;
+  NUM_CHANNELS                    : natural;
+  MODULE_ID                       : unsigned;
+  DURATION_THRESHOLD_SHIFT        : natural;
+  WIDE_BANDWIDTH                  : boolean;
+  BUFFERED_FRAME_INDEX_WIDTH      : natural;
+  BUFFERED_SAMPLE_INDEX_WIDTH     : natural;
+  BUFFERED_SAMPLES_PER_FRAME      : natural;
+  DEBUG_ENABLE                    : boolean
 );
 port (
   Clk_axi                       : in  std_logic;
@@ -33,7 +37,7 @@ port (
   Enable                        : in  std_logic;
 
   Dwell_active                  : in  std_logic;
-  Dwell_data                    : in  esm_dwell_metadata_t;
+  Dwell_data                    : in  esm_dwell_entry_t;
   Dwell_sequence_num            : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   Input_ctrl                    : in  channelizer_control_t;
@@ -60,7 +64,7 @@ end entity esm_pdw_encoder;
 
 architecture rtl of esm_pdw_encoder is
 
-  constant CHANNEL_INDEX_WIDTH        : natural := clog2(NUM_CHANNELS);
+  constant CHANNEL_INDEX_WIDTH        : natural := clog2_min1bit(NUM_CHANNELS);
   constant DWELL_STOP_WAIT_CYCLES     : natural := NUM_CHANNELS * 4;
   constant IQ_WIDTH                   : natural := 16;
   constant THRESHOLD_LATENCY          : natural := 4;
@@ -83,10 +87,10 @@ architecture rtl of esm_pdw_encoder is
 
   signal s_state                    : state_t;
   signal r_stop_wait_count          : unsigned(clog2(DWELL_STOP_WAIT_CYCLES) - 1 downto 0);
-  signal r_clear_index              : unsigned(clog2(NUM_CHANNELS) - 1 downto 0);
+  signal r_clear_index              : unsigned(clog2_min1bit(NUM_CHANNELS) - 1 downto 0);
 
   signal r_dwell_active             : std_logic;
-  signal r_dwell_data               : esm_dwell_metadata_t;
+  signal r_dwell_data               : esm_dwell_entry_t;
   signal r_dwell_sequence_num       : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
   signal r_dwell_timestamp          : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
   signal r_dwell_duration           : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
@@ -221,13 +225,13 @@ begin
     end if;
   end process;
 
-  assert (DATA_WIDTH >= IQ_WIDTH)
-    report "DATA_WIDTH expected to be >= IQ_WIDTH."
-    severity failure;
-
-  --TODO: test scaling in TB - try wider data_width
-  w_iq_scaled(0) <= Input_data(0)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
-  w_iq_scaled(1) <= Input_data(1)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
+  g_iq_scaling : if (DATA_WIDTH >= IQ_WIDTH) generate
+    w_iq_scaled(0) <= Input_data(0)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
+    w_iq_scaled(1) <= Input_data(1)(DATA_WIDTH - 1 downto (DATA_WIDTH - IQ_WIDTH));
+  else generate
+    w_iq_scaled(0) <= resize_up(Input_data(0), IQ_WIDTH);
+    w_iq_scaled(1) <= resize_up(Input_data(1), IQ_WIDTH);
+  end generate g_iq_scaling;
 
   w_threshold_shift <= Dwell_data.threshold_shift_wide when WIDE_BANDWIDTH else Dwell_data.threshold_shift_narrow;
 
@@ -281,7 +285,7 @@ begin
   begin
     if rising_edge(Clk) then
       if (WIDE_BANDWIDTH) then
-        r_dwell_channel_mask <= r_dwell_data.channel_mask_wide;
+        r_dwell_channel_mask <= r_dwell_data.channel_mask_wide(NUM_CHANNELS - 1 downto 0);
       else
         r_dwell_channel_mask <= r_dwell_data.channel_mask_narrow;
       end if;
@@ -290,9 +294,12 @@ begin
 
   i_sample_processor : entity esm_lib.esm_pdw_sample_processor
   generic map (
+    NUM_CHANNELS                => NUM_CHANNELS,
     CHANNEL_INDEX_WIDTH         => CHANNEL_INDEX_WIDTH,
     DATA_WIDTH                  => IQ_WIDTH,
-    BUFFERED_SAMPLES_PER_FRAME  => ESM_PDW_BUFFERED_SAMPLES_PER_FRAME,
+    BUFFERED_FRAME_INDEX_WIDTH  => BUFFERED_FRAME_INDEX_WIDTH,
+    BUFFERED_SAMPLE_INDEX_WIDTH => BUFFERED_SAMPLE_INDEX_WIDTH,
+    BUFFERED_SAMPLES_PER_FRAME  => BUFFERED_SAMPLES_PER_FRAME,
     BUFFERED_SAMPLE_PADDING     => BUFFERED_SAMPLE_PADDING,
     PDW_FIFO_DEPTH              => PDW_FIFO_DEPTH,
     DEBUG_ENABLE                => DEBUG_ENABLE
@@ -328,8 +335,8 @@ begin
     Error_fifo_overflow     => w_pdw_fifo_overflow,
     Error_fifo_underflow    => w_pdw_fifo_underflow,
     Error_buffer_busy       => w_sample_buffer_busy,
-    Error_buffer_underflow  => w_sample_buffer_overflow,
-    Error_buffer_overflow   => w_sample_buffer_underflow
+    Error_buffer_underflow  => w_sample_buffer_underflow,
+    Error_buffer_overflow   => w_sample_buffer_overflow
   );
 
   process(Clk)
@@ -401,10 +408,11 @@ begin
 
   i_reporter : entity esm_lib.esm_pdw_reporter
   generic map (
-    AXI_DATA_WIDTH      => AXI_DATA_WIDTH,
-    CHANNEL_INDEX_WIDTH => CHANNEL_INDEX_WIDTH,
-    DATA_WIDTH          => IQ_WIDTH,
-    MODULE_ID           => MODULE_ID
+    AXI_DATA_WIDTH            => AXI_DATA_WIDTH,
+    CHANNEL_INDEX_WIDTH       => CHANNEL_INDEX_WIDTH,
+    DATA_WIDTH                => IQ_WIDTH,
+    MODULE_ID                 => MODULE_ID,
+    DURATION_THRESHOLD_SHIFT  => DURATION_THRESHOLD_SHIFT
   )
   port map (
     Clk_axi               => Clk_axi,

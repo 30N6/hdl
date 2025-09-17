@@ -22,13 +22,13 @@ port (
   Rst                   : in  std_logic;
 
   Enable_status         : in  std_logic;
-  Enable_channelizer    : in  std_logic_vector(1 downto 0);
-  Enable_pdw_encoder    : in  std_logic_vector(1 downto 0);
+  Enable_channelizer    : in  std_logic_vector(2 downto 0);
+  Enable_pdw_encoder    : in  std_logic_vector(2 downto 0);
 
-  Channelizer_warnings  : in  esm_channelizer_warnings_array_t(1 downto 0);
-  Channelizer_errors    : in  esm_channelizer_errors_array_t(1 downto 0);
-  Dwell_stats_errors    : in  esm_dwell_stats_errors_array_t(1 downto 0);
-  Pdw_encoder_errors    : in  esm_pdw_encoder_errors_array_t(1 downto 0);
+  Channelizer_warnings  : in  esm_channelizer_warnings_array_t(2 downto 0);
+  Channelizer_errors    : in  esm_channelizer_errors_array_t(2 downto 0);
+  Dwell_stats_errors    : in  esm_dwell_stats_errors_array_t(2 downto 0);
+  Pdw_encoder_errors    : in  esm_pdw_encoder_errors_array_t(2 downto 0);
 
   Axis_ready            : in  std_logic;
   Axis_valid            : out std_logic;
@@ -40,9 +40,7 @@ end entity esm_status_reporter;
 architecture rtl of esm_status_reporter is
 
   constant FIFO_DEPTH             : natural := 256;
-  constant MAX_WORDS_PER_PACKET   : natural := 64;
-  constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - MAX_WORDS_PER_PACKET - 10;
-
+  constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - ESM_MAX_WORDS_PER_PACKET_SMALL - 10;
   constant TIMEOUT_CYCLES         : natural := 1024;
 
   type state_t is
@@ -57,6 +55,7 @@ architecture rtl of esm_status_reporter is
     S_ENABLES,
     S_STATUS_PATH_0,
     S_STATUS_PATH_1,
+    S_STATUS_PATH_2,
     S_STATUS_REPORTER,
     S_TIMESTAMP_0,
     S_TIMESTAMP_1,
@@ -70,17 +69,17 @@ architecture rtl of esm_status_reporter is
   signal r_timestamp                : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
 
   signal r_enable_status            : std_logic;
-  signal r_enable_channelizer       : std_logic_vector(1 downto 0);
-  signal r_enable_pdw_encoder       : std_logic_vector(1 downto 0);
-  signal r_channelizer_warnings     : esm_channelizer_warnings_array_t(1 downto 0);
-  signal r_channelizer_errors       : esm_channelizer_errors_array_t(1 downto 0);
-  signal r_dwell_stats_errors       : esm_dwell_stats_errors_array_t(1 downto 0);
-  signal r_pdw_encoder_errors       : esm_pdw_encoder_errors_array_t(1 downto 0);
+  signal r_enable_channelizer       : std_logic_vector(2 downto 0);
+  signal r_enable_pdw_encoder       : std_logic_vector(2 downto 0);
+  signal r_channelizer_warnings     : esm_channelizer_warnings_array_t(2 downto 0);
+  signal r_channelizer_errors       : esm_channelizer_errors_array_t(2 downto 0);
+  signal r_dwell_stats_errors       : esm_dwell_stats_errors_array_t(2 downto 0);
+  signal r_pdw_encoder_errors       : esm_pdw_encoder_errors_array_t(2 downto 0);
 
-  signal w_status_flags             : esm_path_status_flags_array_t(1 downto 0);
-  signal w_status_flags_packed      : std_logic_vector_array_t(1 downto 0)(ESM_PATH_STATUS_FLAGS_WIDTH - 1 downto 0);
-  signal r_status_flags_latched     : std_logic_vector_array_t(1 downto 0)(ESM_PATH_STATUS_FLAGS_WIDTH - 1 downto 0);
-  signal w_status_read              : std_logic_vector(1 downto 0);
+  signal w_status_flags             : esm_path_status_flags_array_t(2 downto 0);
+  signal w_status_flags_packed      : std_logic_vector_array_t(2 downto 0)(ESM_PATH_STATUS_FLAGS_WIDTH - 1 downto 0);
+  signal r_status_flags_latched     : std_logic_vector_array_t(2 downto 0)(ESM_PATH_STATUS_FLAGS_WIDTH - 1 downto 0);
+  signal w_status_read              : std_logic_vector(2 downto 0);
 
   signal w_reporter_errors          : esm_status_reporter_errors_t;
   signal w_reporter_errors_packed   : std_logic_vector(ESM_STATUS_REPORTER_ERRORS_WIDTH - 1 downto 0);
@@ -92,7 +91,7 @@ architecture rtl of esm_status_reporter is
   signal r_packet_seq_num           : unsigned(31 downto 0);
   signal r_trigger_timestamp        : unsigned(ESM_TIMESTAMP_WIDTH - 1 downto 0);
 
-  signal r_words_in_msg             : unsigned(clog2(MAX_WORDS_PER_PACKET) - 1 downto 0);
+  signal r_words_in_msg             : unsigned(clog2(ESM_MAX_WORDS_PER_PACKET_SMALL) - 1 downto 0);
 
   signal w_fifo_almost_full         : std_logic;
   signal w_fifo_ready               : std_logic;
@@ -137,7 +136,6 @@ begin
           r_status_timer <= (others => '0');
         else
           r_status_timer <= r_status_timer + 1;
-
         end if;
       end if;
     end if;
@@ -152,8 +150,9 @@ begin
 
   w_status_read(0) <= to_stdlogic(s_state = S_STATUS_PATH_0);
   w_status_read(1) <= to_stdlogic(s_state = S_STATUS_PATH_1);
+  w_status_read(2) <= to_stdlogic(s_state = S_STATUS_PATH_2);
 
-  g_path_loop : for i in 0 to 1 generate
+  g_path_loop : for i in 0 to 2 generate
     w_status_flags(i).channelizer_warnings  <= r_channelizer_warnings(i);
     w_status_flags(i).channelizer_errors    <= r_channelizer_errors(i);
     w_status_flags(i).dwell_stats_errors    <= r_dwell_stats_errors(i);
@@ -261,6 +260,8 @@ begin
         when S_STATUS_PATH_0 =>
           s_state <= S_STATUS_PATH_1;
         when S_STATUS_PATH_1 =>
+          s_state <= S_STATUS_PATH_2;
+        when S_STATUS_PATH_2 =>
           s_state <= S_STATUS_REPORTER;
         when S_STATUS_REPORTER =>
           s_state <= S_TIMESTAMP_0;
@@ -270,7 +271,7 @@ begin
           s_state <= S_PAD;
 
         when S_PAD =>
-          if (r_words_in_msg = (MAX_WORDS_PER_PACKET - 1)) then
+          if (r_words_in_msg = (ESM_MAX_WORDS_PER_PACKET_SMALL - 1)) then
             s_state <= S_DONE;
           else
             s_state <= S_PAD;
@@ -316,7 +317,7 @@ begin
 
     when S_ENABLES =>
       w_fifo_valid  <= '1';
-      w_fifo_data   <= x"000000" & "000" & r_enable_pdw_encoder & r_enable_channelizer & r_enable_status;
+      w_fifo_data   <= x"000000" & "0" & r_enable_pdw_encoder & r_enable_channelizer & r_enable_status;
 
     when S_STATUS_PATH_0 =>
       w_fifo_valid  <= '1';
@@ -325,6 +326,10 @@ begin
     when S_STATUS_PATH_1 =>
       w_fifo_valid  <= '1';
       w_fifo_data   <= resize_up(r_status_flags_latched(1), 32);
+
+    when S_STATUS_PATH_2 =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= resize_up(r_status_flags_latched(2), 32);
 
     when S_STATUS_REPORTER =>
       w_fifo_valid  <= '1';
@@ -341,7 +346,7 @@ begin
     when S_PAD =>
       w_fifo_valid  <= '1';
       w_fifo_data   <= (others => '0');
-      w_fifo_last   <= to_stdlogic(r_words_in_msg = (MAX_WORDS_PER_PACKET - 1));
+      w_fifo_last   <= to_stdlogic(r_words_in_msg = (ESM_MAX_WORDS_PER_PACKET_SMALL - 1));
 
     when others => null;
     end case;

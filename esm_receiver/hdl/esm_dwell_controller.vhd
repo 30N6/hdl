@@ -23,7 +23,7 @@ port (
   Ad9361_status       : in  std_logic_vector(7 downto 0);
 
   Dwell_active        : out std_logic;
-  Dwell_data          : out esm_dwell_metadata_t;
+  Dwell_data          : out esm_dwell_entry_t;
   Dwell_sequence_num  : out unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0)
 );
 end entity esm_dwell_controller;
@@ -53,18 +53,18 @@ architecture rtl of esm_dwell_controller is
 
   signal w_dwell_entry_valid        : std_logic;
   signal w_dwell_entry_index        : unsigned(ESM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
-  signal w_dwell_entry_data         : esm_dwell_metadata_t;
+  signal w_dwell_entry_data         : esm_dwell_entry_t;
 
   signal w_dwell_instruction_valid  : std_logic;
   signal w_dwell_instruction_index  : unsigned(ESM_DWELL_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
   signal w_dwell_instruction_data   : esm_dwell_instruction_t;
 
   signal w_dwell_program_valid      : std_logic;
-  signal w_dwell_program_data       : esm_message_dwell_program_header_t;
+  signal w_dwell_program_data       : esm_dwell_program_header_t;
 
-  signal m_dwell_entry              : esm_dwell_metadata_array_t(ESM_NUM_DWELL_ENTRIES - 1 downto 0);
+  signal m_dwell_entry              : esm_dwell_entry_array_t(ESM_NUM_DWELL_ENTRIES - 1 downto 0);
   signal m_dwell_instruction        : esm_dwell_instruction_array_t(ESM_NUM_DWELL_INSTRUCTIONS - 1 downto 0);
-  signal r_dwell_program_data       : esm_message_dwell_program_header_t;
+  signal r_dwell_program_data       : esm_dwell_program_header_t;
   signal r_dwell_program_valid      : std_logic;
 
   signal r_pll_pre_lock_cycles      : unsigned(clog2(PLL_PRE_LOCK_DELAY_CYCLES) - 1 downto 0);
@@ -87,8 +87,8 @@ architecture rtl of esm_dwell_controller is
   signal r_dwell_repeat             : unsigned(3 downto 0);
   signal r_instruction_index        : unsigned(ESM_DWELL_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
   signal r_instruction_data         : esm_dwell_instruction_t;
-  signal r_dwell_entry              : esm_dwell_metadata_t;
-  signal r_dwell_entry_d            : esm_dwell_metadata_t;
+  signal r_dwell_entry              : esm_dwell_entry_t;
+  signal r_dwell_entry_d            : esm_dwell_entry_t;
   signal r_dwell_active             : std_logic;
   signal r_dwell_sequence_num       : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 

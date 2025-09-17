@@ -28,7 +28,7 @@ port (
   Enable                  : in  std_logic;
 
   Dwell_active            : in  std_logic;
-  Dwell_data              : in  esm_dwell_metadata_t;
+  Dwell_data              : in  esm_dwell_entry_t;
   Dwell_sequence_num      : in  unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   Input_ctrl              : in  channelizer_control_t;
@@ -65,7 +65,7 @@ architecture rtl of esm_dwell_stats is
   signal r_enable                     : std_logic;
 
   signal r_dwell_active               : std_logic;
-  signal r_dwell_data                 : esm_dwell_metadata_t;
+  signal r_dwell_data                 : esm_dwell_entry_t;
   signal r_dwell_sequence_num         : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   signal r_input_ctrl                 : channelizer_control_t;

@@ -17,23 +17,23 @@ port (
 
   Dwell_entry_valid       : out std_logic;
   Dwell_entry_index       : out unsigned(ESM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
-  Dwell_entry_data        : out esm_dwell_metadata_t;
+  Dwell_entry_data        : out esm_dwell_entry_t;
 
   Dwell_instruction_valid : out std_logic;
   Dwell_instruction_index : out unsigned(ESM_DWELL_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
   Dwell_instruction_data  : out esm_dwell_instruction_t;
 
   Dwell_program_valid     : out std_logic;
-  Dwell_program_data      : out esm_message_dwell_program_header_t
+  Dwell_program_data      : out esm_dwell_program_header_t
 );
 end entity esm_dwell_config_decoder;
 
 architecture rtl of esm_dwell_config_decoder is
 
-  constant PACKED_HEADER_WIDTH            : natural := maximum(ESM_MESSAGE_DWELL_ENTRY_PACKED_WIDTH, ESM_MESSAGE_DWELL_PROGRAM_HEADER_PACKED_WIDTH);
+  constant PACKED_HEADER_WIDTH            : natural := maximum(ESM_DWELL_ENTRY_PACKED_WIDTH, ESM_DWELL_PROGRAM_HEADER_PACKED_WIDTH);
   constant NUM_HEADER_WORDS               : natural := PACKED_HEADER_WIDTH / 32;
-  constant NUM_HEADER_WORDS_DWELL_ENTRY   : natural := ESM_MESSAGE_DWELL_ENTRY_PACKED_WIDTH / 32;
-  constant NUM_HEADER_WORDS_DWELL_PROGRAM : natural := ESM_MESSAGE_DWELL_PROGRAM_HEADER_PACKED_WIDTH / 32;
+  constant NUM_HEADER_WORDS_DWELL_ENTRY   : natural := ESM_DWELL_ENTRY_PACKED_WIDTH / 32;
+  constant NUM_HEADER_WORDS_DWELL_PROGRAM : natural := ESM_DWELL_PROGRAM_HEADER_PACKED_WIDTH / 32;
 
   type state_t is
   (
@@ -64,13 +64,11 @@ architecture rtl of esm_dwell_config_decoder is
   signal r_message_type         : message_type_t;
   signal r_header_word_length   : unsigned(clog2(NUM_HEADER_WORDS) - 1 downto 0);
 
+  signal r_address              : unsigned(ESM_CONFIG_ADDRESS_WIDTH - 1 downto 0);
+
   signal r_instruction_index    : unsigned(ESM_DWELL_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
   signal r_instruction_active   : std_logic;
   signal w_instructions_done    : std_logic;
-
-  signal w_dwell_entry          : esm_message_dwell_entry_t;
-  signal w_dwell_instruction    : esm_dwell_instruction_t;
-  signal w_dwell_program_header : esm_message_dwell_program_header_t;
 
 begin
 
@@ -157,6 +155,8 @@ begin
   begin
     if rising_edge(Clk) then
       if (s_state = S_IDLE) then
+        r_address <= r_module_config.address;
+
         if (r_module_config.message_type = ESM_CONTROL_MESSAGE_TYPE_DWELL_ENTRY) then
           r_message_type        <= DWELL_ENTRY;
           r_header_word_length  <= to_unsigned(NUM_HEADER_WORDS_DWELL_ENTRY, r_header_word_length'length);
@@ -174,19 +174,6 @@ begin
   begin
     if rising_edge(Clk) then
       r_header_done <= w_header_done;
-    end if;
-  end process;
-
-  w_dwell_entry           <= unpack(r_packed_data(ESM_MESSAGE_DWELL_ENTRY_PACKED_WIDTH - 1 downto 0));
-  w_dwell_program_header  <= unpack(r_packed_data(ESM_MESSAGE_DWELL_PROGRAM_HEADER_PACKED_WIDTH - 1 downto 0));
-  w_dwell_instruction     <= unpack(r_module_config.data);
-
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      Dwell_entry_valid <= r_header_done and to_stdlogic(r_message_type = DWELL_ENTRY);
-      Dwell_entry_index <= w_dwell_entry.entry_index;
-      Dwell_entry_data  <= w_dwell_entry.entry_data;
     end if;
   end process;
 
@@ -212,17 +199,16 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
+      Dwell_entry_valid       <= r_header_done and to_stdlogic(r_message_type = DWELL_ENTRY);
+      Dwell_entry_index       <= r_address(ESM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
+      Dwell_entry_data        <= unpack(r_packed_data(ESM_DWELL_ENTRY_PACKED_WIDTH - 1 downto 0));
+
       Dwell_instruction_valid <= r_module_config.valid and to_stdlogic(s_state = S_WAIT_DONE) and to_stdlogic(r_message_type = DWELL_PROGRAM);
       Dwell_instruction_index <= r_instruction_index;
-      Dwell_instruction_data  <= w_dwell_instruction;
-    end if;
-  end process;
+      Dwell_instruction_data  <= unpack(r_module_config.data);
 
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      Dwell_program_valid <= r_module_config.valid and r_module_config.last and to_stdlogic(s_state = S_WAIT_DONE) and to_stdlogic(r_message_type = DWELL_PROGRAM);
-      Dwell_program_data  <= w_dwell_program_header;
+      Dwell_program_valid     <= r_module_config.valid and r_module_config.last and to_stdlogic(s_state = S_WAIT_DONE) and to_stdlogic(r_message_type = DWELL_PROGRAM);
+      Dwell_program_data      <= unpack(r_packed_data(ESM_DWELL_PROGRAM_HEADER_PACKED_WIDTH - 1 downto 0));
     end if;
   end process;
 
