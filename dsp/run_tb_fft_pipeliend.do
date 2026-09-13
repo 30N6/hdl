@@ -114,7 +114,27 @@ set last_compile_time $time_now
 #set BreakOnAssertion 2
 #run -all
 
-vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=64 -novopt
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=64 -novopt
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=128 -novopt
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=256 -novopt
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=512 -novopt
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
+vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=1024 -novopt
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all

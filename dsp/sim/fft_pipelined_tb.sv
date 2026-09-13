@@ -270,6 +270,26 @@ module fft_pipelined_tb;
       repeat(100) @(posedge Clk);
       standard_tests("./test_data/fft_test_data_2024_01_22_64_reverse_in.txt", "./test_data/fft_test_data_2024_01_22_64_reverse_out.txt", 1);
       repeat(100) @(posedge Clk);
+    end else if (NUM_POINTS == 128) begin
+      standard_tests("./test_data/fft_test_data_2026_09_12_128_forward_in.txt", "./test_data/fft_test_data_2026_09_12_128_forward_out.txt", 0);
+      repeat(100) @(posedge Clk);
+      standard_tests("./test_data/fft_test_data_2026_09_12_128_reverse_in.txt", "./test_data/fft_test_data_2026_09_12_128_reverse_out.txt", 1);
+      repeat(100) @(posedge Clk);
+    end else if (NUM_POINTS == 256) begin
+      standard_tests("./test_data/fft_test_data_2026_09_12_256_forward_in.txt", "./test_data/fft_test_data_2026_09_12_256_forward_out.txt", 0);
+      repeat(100) @(posedge Clk);
+      standard_tests("./test_data/fft_test_data_2026_09_12_256_reverse_in.txt", "./test_data/fft_test_data_2026_09_12_256_reverse_out.txt", 1);
+      repeat(100) @(posedge Clk);
+    end else if (NUM_POINTS == 512) begin
+      standard_tests("./test_data/fft_test_data_2026_09_12_512_forward_in.txt", "./test_data/fft_test_data_2026_09_12_512_forward_out.txt", 0);
+      repeat(100) @(posedge Clk);
+      standard_tests("./test_data/fft_test_data_2026_09_12_512_reverse_in.txt", "./test_data/fft_test_data_2026_09_12_512_reverse_out.txt", 1);
+      repeat(100) @(posedge Clk);
+    end else if (NUM_POINTS == 1024) begin
+      standard_tests("./test_data/fft_test_data_2026_09_12_1024_forward_in.txt", "./test_data/fft_test_data_2026_09_12_1024_forward_out.txt", 0);
+      repeat(100) @(posedge Clk);
+      standard_tests("./test_data/fft_test_data_2026_09_12_1024_reverse_in.txt", "./test_data/fft_test_data_2026_09_12_1024_reverse_out.txt", 1);
+      repeat(100) @(posedge Clk);
     end
 
     $finish;

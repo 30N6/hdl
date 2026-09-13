@@ -38,7 +38,7 @@ package dsp_pkg is
     valid       : std_logic;
     last        : std_logic;
     reverse     : std_logic;
-    data_index  : unsigned(5 downto 0);
+    data_index  : unsigned(9 downto 0);
     tag         : std_logic_vector(FFT_TAG_WIDTH - 1 downto 0);
   end record;
 
@@ -47,7 +47,7 @@ package dsp_pkg is
   type channelizer_control_t is record
     valid       : std_logic;
     last        : std_logic;
-    data_index  : unsigned(5 downto 0);
+    data_index  : unsigned(9 downto 0);
   end record;
 
   type channelizer_control_array_t is array (natural range <>) of channelizer_control_t;
