@@ -29,12 +29,12 @@ interface pfb_tx_intf #(parameter DATA_WIDTH) (input logic Clk);
   endtask
 endinterface
 
-interface pfb_rx_intf #(parameter DATA_WIDTH) (input logic Clk);
-  logic                             valid;
-  logic                             last;
-  logic [4:0]                       index;
-  logic signed [DATA_WIDTH - 1 : 0] data_i;
-  logic signed [DATA_WIDTH - 1 : 0] data_q;
+interface pfb_rx_intf #(parameter DATA_WIDTH, parameter CHANNEL_INDEX_WIDTH) (input logic Clk);
+  logic                               valid;
+  logic                               last;
+  logic [CHANNEL_INDEX_WIDTH - 1 : 0] index;
+  logic signed [DATA_WIDTH - 1 : 0]   data_i;
+  logic signed [DATA_WIDTH - 1 : 0]   data_q;
 
   task read(output pfb_transaction_t rx);
     logic v;
@@ -63,11 +63,11 @@ module pfb_demux_2x_tb;
   logic Clk;
   logic Rst;
 
-  pfb_tx_intf #(.DATA_WIDTH(DATA_WIDTH))  tx_intf (.*);
-  pfb_rx_intf #(.DATA_WIDTH(DATA_WIDTH))  rx_intf (.*);
-  expect_t                                expected_data [$];
-  int                                     num_received = 0;
-  int                                     num_matched = 0;
+  pfb_tx_intf #(.DATA_WIDTH(DATA_WIDTH))                                            tx_intf (.*);
+  pfb_rx_intf #(.DATA_WIDTH(DATA_WIDTH), .CHANNEL_INDEX_WIDTH(CHANNEL_INDEX_WIDTH)) rx_intf (.*);
+  expect_t                                                                          expected_data [$];
+  int                                                                               num_received = 0;
+  int                                                                               num_matched = 0;
 
   initial begin
     Clk = 0;
@@ -158,19 +158,18 @@ module pfb_demux_2x_tb;
 
   task automatic standard_tests();
     parameter NUM_TESTS = 20;
-    pfb_transaction_t tx_data[] = new[256*32];
-    int output_sample_index [32][512];
+    pfb_transaction_t tx_data[] = new[256*NUM_CHANNELS];
+    int output_sample_index [NUM_CHANNELS][512];
 
-    for (int i_channel = 0; i_channel < 32; i_channel++) begin
+    for (int i_channel = 0; i_channel < NUM_CHANNELS; i_channel++) begin
       for (int i_frame = 0; i_frame < 513; i_frame++) begin
-        int channel_o = (31 - i_channel);
-        output_sample_index[i_channel][i_frame] = channel_o + 16*i_frame;
+        int channel_o = ((NUM_CHANNELS-1) - i_channel);
+        output_sample_index[i_channel][i_frame] = channel_o + (NUM_CHANNELS/2)*i_frame;
       end
     end
 
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
       int wait_cycles;
-      bit [4:0] channel_index = 31;
 
       repeat(10) @(posedge Clk);
       $display("%0t: Standard test started", $time);
@@ -185,10 +184,10 @@ module pfb_demux_2x_tb;
         //$display("tx_data[%0d] = %p", i_sample, tx_data[i_sample]);
       end
 
-      for (int i_output = 0; i_output < tx_data.size() * 2 - 32; i_output++) begin
+      for (int i_output = 0; i_output < tx_data.size() * 2 - NUM_CHANNELS; i_output++) begin
         expect_t e;
-        int output_channel  = (31 - i_output % 32);
-        int output_frame    = i_output / 32;
+        int output_channel  = ((NUM_CHANNELS-1) - i_output % NUM_CHANNELS);
+        int output_frame    = i_output / NUM_CHANNELS;
         int output_sample   = output_sample_index[output_channel][output_frame];
 
         e.data                        = tx_data[output_sample];

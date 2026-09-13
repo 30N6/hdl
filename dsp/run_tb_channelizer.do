@@ -42,6 +42,10 @@ set library_file_list [list \
     ./hdl/channelizer_16.vhd \
     ./hdl/channelizer_32.vhd \
     ./hdl/channelizer_64.vhd \
+    ./hdl/channelizer_128.vhd \
+    ./hdl/channelizer_256.vhd \
+    ./hdl/channelizer_512.vhd \
+    ./hdl/channelizer_1024.vhd \
     ./sim/channelizer_tb.sv \
     ] \
 ]
@@ -119,10 +123,10 @@ set last_compile_time $time_now
 #run -all
 
 #-novopt
-vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=16 -novopt
-set NumericStdNoWarnings 1
-set BreakOnAssertion 2
-run -all
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=16 -novopt
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
 
 #vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=32
 #set NumericStdNoWarnings 1
@@ -130,6 +134,26 @@ run -all
 #run -all
 
 #vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=64  -novopt
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=128 -novopt
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=256 -novopt
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+#
+vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=512 -novopt
+set NumericStdNoWarnings 1
+set BreakOnAssertion 2
+run -all
+
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=1024 -novopt
 #set NumericStdNoWarnings 1
 #set BreakOnAssertion 2
 #run -all

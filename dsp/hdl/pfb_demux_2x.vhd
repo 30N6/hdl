@@ -111,6 +111,74 @@ architecture rtl of pfb_demux_2x is
       for i in 224 to 255 loop
         r(i) := to_unsigned(i - 224, BUFFER_INDEX_WIDTH);
       end loop;
+
+    elsif (NUM_CHANNELS = 128) then
+      for i in 0 to 127 loop
+        r(i) := to_unsigned(i, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 128 to 255 loop
+        r(i) := to_unsigned(i - 64, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 256 to 383 loop
+        r(i) := to_unsigned(i - 128, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 384 to 447 loop
+        r(i) := to_unsigned(i - 192, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 448 to 511 loop
+        r(i) := to_unsigned(i - 448, BUFFER_INDEX_WIDTH);
+      end loop;
+
+    elsif (NUM_CHANNELS = 256) then
+      for i in 0 to 255 loop
+        r(i) := to_unsigned(i, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 256 to 511 loop
+        r(i) := to_unsigned(i - 128, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 512 to 767 loop
+        r(i) := to_unsigned(i - 256, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 768 to 895 loop
+        r(i) := to_unsigned(i - 384, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 896 to 1023 loop
+        r(i) := to_unsigned(i - 896, BUFFER_INDEX_WIDTH);
+      end loop;
+
+    elsif (NUM_CHANNELS = 512) then
+      for i in 0 to 511 loop
+        r(i) := to_unsigned(i, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 512 to 1023 loop
+        r(i) := to_unsigned(i - 256, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 1024 to 1535 loop
+        r(i) := to_unsigned(i - 512, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 1536 to 1791 loop
+        r(i) := to_unsigned(i - 768, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 1792 to 2047 loop
+        r(i) := to_unsigned(i - 1792, BUFFER_INDEX_WIDTH);
+      end loop;
+
+    elsif (NUM_CHANNELS = 1024) then
+      for i in 0 to 1023 loop
+        r(i) := to_unsigned(i, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 1024 to 2047 loop
+        r(i) := to_unsigned(i - 512, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 2048 to 3071 loop
+        r(i) := to_unsigned(i - 1024, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 3072 to 3583 loop
+        r(i) := to_unsigned(i - 1536, BUFFER_INDEX_WIDTH);
+      end loop;
+      for i in 3584 to 4095 loop
+        r(i) := to_unsigned(i - 3584, BUFFER_INDEX_WIDTH);
+      end loop;
     end if;
     return r;
   end function;
@@ -134,6 +202,11 @@ architecture rtl of pfb_demux_2x is
   signal r_input_valid      : std_logic_vector(3 downto 0);
 
 begin
+
+  assert ((NUM_CHANNELS = 8) or (NUM_CHANNELS = 16) or (NUM_CHANNELS = 32) or (NUM_CHANNELS = 64) or
+          (NUM_CHANNELS = 128) or (NUM_CHANNELS = 256) or (NUM_CHANNELS = 512) or (NUM_CHANNELS = 1024))
+    report "Invalid channel count"
+    severity failure;
 
   process(Clk)
   begin

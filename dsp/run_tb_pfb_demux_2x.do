@@ -90,7 +90,32 @@ foreach {library file_list} $library_file_list {
 set last_compile_time $time_now
 
 # Load the simulation
-vsim -suppress 12110 $top_level glbl.glbl   -GCHANNEL_COUNT=32
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=32
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=64
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=128
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=256
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=512
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
+
+vsim -suppress 12110 $top_level glbl.glbl   -GNUM_CHANNELS=1024
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all

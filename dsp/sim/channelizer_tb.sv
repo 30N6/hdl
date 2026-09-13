@@ -73,6 +73,7 @@ module channelizer_tb;
   channelizer_control_t                   w_fft_output_control;
   logic signed [OUTPUT_DATA_WIDTH - 1:0]  w_fft_output_iq [1:0];
 
+  logic signed [INPUT_DATA_WIDTH - 1:0]   r_input_iq [1:0];
   logic [OUTPUT_DATA_WIDTH - 1:0]         r_chan_output_i [NUM_CHANNELS - 1:0];
   logic [OUTPUT_DATA_WIDTH - 1:0]         r_chan_output_q [NUM_CHANNELS - 1:0];
   logic [chan_power_width - 1:0]          r_chan_power    [NUM_CHANNELS - 1:0];
@@ -94,7 +95,99 @@ module channelizer_tb;
   end
 
   generate
-    if (NUM_CHANNELS == 64) begin
+    if (NUM_CHANNELS == 1024) begin
+      channelizer_1024 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut1024
+      (
+        .Clk                    (Clk),
+        .Rst                    (Rst),
+
+        .Input_valid            (tx_intf.valid),
+        .Input_data             (tx_intf.data),
+
+        .Output_chan_ctrl       (w_chan_output_control),
+        .Output_chan_data       (w_chan_output_iq),
+        .Output_chan_pwr        (w_chan_power),
+
+        .Output_fft_ctrl        (w_fft_output_control),
+        .Output_fft_data        (w_fft_output_iq),
+
+        .Warning_demux_gap      (w_warning_demux_gap),
+        .Error_demux_overflow   (w_error_demux_overflow),
+        .Error_filter_overflow  (w_error_filter_overflow),
+        .Error_mux_overflow     (w_error_mux_overflow),
+        .Error_mux_underflow    (w_error_mux_underflow),
+        .Error_mux_collision    (w_error_mux_collision)
+      );
+    end else if (NUM_CHANNELS == 512) begin
+      channelizer_512 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut512
+      (
+        .Clk                    (Clk),
+        .Rst                    (Rst),
+
+        .Input_valid            (tx_intf.valid),
+        .Input_data             (tx_intf.data),
+
+        .Output_chan_ctrl       (w_chan_output_control),
+        .Output_chan_data       (w_chan_output_iq),
+        .Output_chan_pwr        (w_chan_power),
+
+        .Output_fft_ctrl        (w_fft_output_control),
+        .Output_fft_data        (w_fft_output_iq),
+
+        .Warning_demux_gap      (w_warning_demux_gap),
+        .Error_demux_overflow   (w_error_demux_overflow),
+        .Error_filter_overflow  (w_error_filter_overflow),
+        .Error_mux_overflow     (w_error_mux_overflow),
+        .Error_mux_underflow    (w_error_mux_underflow),
+        .Error_mux_collision    (w_error_mux_collision)
+      );
+    end else if (NUM_CHANNELS == 256) begin
+      channelizer_256 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut256
+      (
+        .Clk                    (Clk),
+        .Rst                    (Rst),
+
+        .Input_valid            (tx_intf.valid),
+        .Input_data             (tx_intf.data),
+
+        .Output_chan_ctrl       (w_chan_output_control),
+        .Output_chan_data       (w_chan_output_iq),
+        .Output_chan_pwr        (w_chan_power),
+
+        .Output_fft_ctrl        (w_fft_output_control),
+        .Output_fft_data        (w_fft_output_iq),
+
+        .Warning_demux_gap      (w_warning_demux_gap),
+        .Error_demux_overflow   (w_error_demux_overflow),
+        .Error_filter_overflow  (w_error_filter_overflow),
+        .Error_mux_overflow     (w_error_mux_overflow),
+        .Error_mux_underflow    (w_error_mux_underflow),
+        .Error_mux_collision    (w_error_mux_collision)
+      );
+    end else if (NUM_CHANNELS == 128) begin
+      channelizer_128 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut128
+      (
+        .Clk                    (Clk),
+        .Rst                    (Rst),
+
+        .Input_valid            (tx_intf.valid),
+        .Input_data             (tx_intf.data),
+
+        .Output_chan_ctrl       (w_chan_output_control),
+        .Output_chan_data       (w_chan_output_iq),
+        .Output_chan_pwr        (w_chan_power),
+
+        .Output_fft_ctrl        (w_fft_output_control),
+        .Output_fft_data        (w_fft_output_iq),
+
+        .Warning_demux_gap      (w_warning_demux_gap),
+        .Error_demux_overflow   (w_error_demux_overflow),
+        .Error_filter_overflow  (w_error_filter_overflow),
+        .Error_mux_overflow     (w_error_mux_overflow),
+        .Error_mux_underflow    (w_error_mux_underflow),
+        .Error_mux_collision    (w_error_mux_collision)
+      );
+    end else if (NUM_CHANNELS == 64) begin
       channelizer_64 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut64
       (
         .Clk                    (Clk),
@@ -194,6 +287,11 @@ module channelizer_tb;
   //assign rx_intf.index  = w_output_index;
 
   always_ff @(posedge Clk) begin
+    if (tx_intf.valid) begin
+      r_input_iq[0] <= tx_intf.data[0];
+      r_input_iq[1] <= tx_intf.data[1];
+    end
+
     if (w_chan_output_control.valid) begin
       r_chan_output_i[w_chan_output_control.data_index] <= w_chan_output_iq[0];
       r_chan_output_q[w_chan_output_control.data_index] <= w_chan_output_iq[1];
@@ -279,8 +377,16 @@ module channelizer_tb;
   begin
     wait_for_reset();
 
-    if (NUM_CHANNELS == 64) begin
-      standard_tests("./test_data/channelizer_test_data_2024_01_25_64.txt");
+    if (NUM_CHANNELS == 1024) begin
+      standard_tests("./test_data/channelizer_test_data_2026_09_13_1024.txt");
+    end else if (NUM_CHANNELS == 512) begin
+      standard_tests("./test_data/channelizer_test_data_2026_09_13_512.txt");
+    end else if (NUM_CHANNELS == 256) begin
+      standard_tests("./test_data/channelizer_test_data_2026_09_13_256.txt");
+    end else if (NUM_CHANNELS == 128) begin
+      standard_tests("./test_data/channelizer_test_data_2026_09_13_128.txt");
+    end else if (NUM_CHANNELS == 64) begin
+      standard_tests("./test_data/channelizer_test_data_2026_09_13_64.txt");
     end else if (NUM_CHANNELS == 32) begin
       standard_tests("./test_data/channelizer_test_data_2024_01_25_32.txt");
     end else if (NUM_CHANNELS == 16) begin
