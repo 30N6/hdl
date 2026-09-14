@@ -1,0 +1,380 @@
+library ieee;
+  use ieee.std_logic_1164.all;
+  use ieee.numeric_std.all;
+
+library common_lib;
+  use common_lib.common_pkg.all;
+
+library axi_lib;
+
+library clock_lib;
+
+library dsp_lib;
+  use dsp_lib.dsp_pkg.all;
+
+library intercept_lib;
+  use intercept_lib.intercept_pkg.all;
+
+entity intercept_receiver is
+generic (
+  AXI_DATA_WIDTH  : natural;
+  ADC_WIDTH       : natural;
+  IQ_WIDTH        : natural
+);
+port (
+  Adc_clk         : in  std_logic;
+  Adc_clk_x4      : in  std_logic;
+  Adc_rst         : in  std_logic;
+
+  Ad9361_control  : out std_logic_vector(3 downto 0);
+  Ad9361_status   : in  std_logic_vector(7 downto 0);
+
+  Adc_valid       : in  std_logic;
+  Adc_data_i      : in  signed(ADC_WIDTH - 1 downto 0);
+  Adc_data_q      : in  signed(ADC_WIDTH - 1 downto 0);
+
+  Enable_rx       : out std_logic;
+
+  S_axis_clk      : in  std_logic;
+  S_axis_resetn   : in  std_logic;
+  S_axis_ready    : out std_logic;
+  S_axis_valid    : in  std_logic;
+  S_axis_data     : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  S_axis_last     : in  std_logic;
+
+  M_axis_clk      : in  std_logic;
+  M_axis_resetn   : in  std_logic;
+  M_axis_ready    : in  std_logic;
+  M_axis_valid    : out std_logic;
+  M_axis_data     : out std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  M_axis_last     : out std_logic
+);
+end entity intercept_receiver;
+
+architecture rtl of intercept_receiver is
+
+  constant ENABLE_DEBUG               : boolean := false;
+
+  constant AXI_FIFO_DEPTH             : natural := 64;
+  constant NUM_D2H_MUX_INPUTS         : natural := 3; -- dwell stats + stream encoder + status reporter
+  constant CHANNELIZER_DATA_WIDTH     : natural := IQ_WIDTH + 4 + 9; -- +4 for filter (12 coeffs per channel), +9 for ifft (512 points)
+
+  constant PLL_PRE_LOCK_DELAY_CYCLES  : natural := 2048;
+  constant PLL_POST_LOCK_DELAY_CYCLES : natural := 2048;
+
+  constant AD9361_BIT_PIPE_DEPTH      : natural := 3;
+
+  constant HEARTBEAT_INTERVAL         : natural := 31250000;
+
+  signal w_clk_x4_p0                  : std_logic;
+
+  signal w_config_rst                 : std_logic;
+  signal r_combined_rst               : std_logic;
+
+  signal w_enable_status              : std_logic;
+  signal w_enable_chan                : std_logic;
+  signal w_enable_stream              : std_logic;
+  signal w_module_config              : intercept_config_data_t;
+
+  signal w_ad9361_control             : std_logic_vector(3 downto 0);
+  signal r_ad9361_control             : std_logic_vector_array_t(AD9361_BIT_PIPE_DEPTH - 1 downto 0)(3 downto 0);
+  signal r_ad9361_status              : std_logic_vector_array_t(AD9361_BIT_PIPE_DEPTH - 1 downto 0)(7 downto 0);
+
+  signal w_dwell_active               : std_logic;
+  --signal w_dwell_data                 : intercept_dwell_entry_t;
+  signal w_dwell_sequence_num         : unsigned(INTERCEPT_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+
+  signal r_adc_valid                  : std_logic;
+  signal r_adc_data_i                 : signed(IQ_WIDTH - 1 downto 0);
+  signal r_adc_data_q                 : signed(IQ_WIDTH - 1 downto 0);
+
+  signal r_adc_valid_x4               : std_logic;
+  signal r_adc_data_i_x4              : signed(IQ_WIDTH - 1 downto 0);
+  signal r_adc_data_q_x4              : signed(IQ_WIDTH - 1 downto 0);
+
+  signal w_adc_data_in                : signed_array_t(1 downto 0)(IQ_WIDTH - 1 downto 0);
+
+  signal w_channelizer_control        : channelizer_control_t;
+  signal w_channelizer_data           : signed_array_t(1 downto 0)(CHANNELIZER_DATA_WIDTH - 1 downto 0);
+  signal w_channelizer_pwr            : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+
+  signal w_channelizer_warnings       : intercept_channelizer_warnings_t;
+  signal w_channelizer_errors         : intercept_channelizer_errors_t;
+  signal w_dwell_stats_errors         : intercept_dwell_stats_errors_t;
+  signal w_stream_encoder_errors      : intercept_stream_encoder_errors_t;
+
+  signal w_d2h_fifo_in_ready          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
+  signal w_d2h_fifo_in_valid          : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
+  signal w_d2h_fifo_in_data           : std_logic_vector_array_t(NUM_D2H_MUX_INPUTS -1 downto 0)(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_d2h_fifo_in_last           : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
+
+  signal w_d2h_mux_in_ready           : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
+  signal w_d2h_mux_in_valid           : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
+  signal w_d2h_mux_in_data            : std_logic_vector_array_t(NUM_D2H_MUX_INPUTS -1 downto 0)(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_d2h_mux_in_last            : std_logic_vector(NUM_D2H_MUX_INPUTS - 1 downto 0);
+
+  signal w_d2h_mux_out_ready          : std_logic;
+  signal w_d2h_mux_out_valid          : std_logic;
+  signal w_d2h_mux_out_data           : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  signal w_d2h_mux_out_last           : std_logic;
+
+  attribute ASYNC_REG : string;
+  attribute ASYNC_REG of r_ad9361_status : signal is "TRUE";
+
+begin
+
+  Enable_rx <= '1';
+
+  i_phase_marker : entity common_lib.clk_x4_phase_marker
+  port map (
+    Clk       => Adc_clk,
+    Clk_x4    => Adc_clk_x4,
+
+    Clk_x4_p0 => w_clk_x4_p0,
+    Clk_x4_p1 => open,
+    Clk_x4_p2 => open,
+    Clk_x4_p3 => open
+  );
+
+  process(Adc_clk_x4)
+  begin
+    if rising_edge(Adc_clk_x4) then
+      r_combined_rst <= Adc_rst or w_config_rst;
+    end if;
+  end process;
+
+  i_config : entity intercept_lib.intercept_config
+  generic map (
+    AXI_DATA_WIDTH => AXI_DATA_WIDTH
+  )
+  port map (
+    Clk_x4        => Adc_clk_x4,
+
+    S_axis_clk    => S_axis_clk,
+    S_axis_resetn => S_axis_resetn,
+    S_axis_ready  => S_axis_ready,
+    S_axis_valid  => S_axis_valid,
+    S_axis_data   => S_axis_data,
+    S_axis_last   => S_axis_last,
+
+    Rst_out       => w_config_rst,
+    Enable_status => w_enable_status,
+    Enable_chan   => w_enable_chan,
+    Enable_stream => w_enable_stream,
+
+    Module_config => w_module_config
+  );
+
+  --i_dwell_controller : entity esm_lib.esm_dwell_controller
+  --generic map (
+  --  PLL_PRE_LOCK_DELAY_CYCLES   => PLL_PRE_LOCK_DELAY_CYCLES,
+  --  PLL_POST_LOCK_DELAY_CYCLES  => PLL_POST_LOCK_DELAY_CYCLES
+  --)
+  --port map (
+  --  Clk                 => Adc_clk_x4,
+  --  Rst                 => r_combined_rst,
+  --
+  --  Module_config       => w_module_config,
+  --
+  --  Ad9361_control      => w_ad9361_control,
+  --  Ad9361_status       => r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 1),
+  --
+  --  Dwell_active        => w_dwell_active,
+  --  Dwell_data          => w_dwell_data,
+  --  Dwell_sequence_num  => w_dwell_sequence_num
+  --);
+  w_ad9361_control <= (others => '1');
+
+  process(Adc_clk)
+  begin
+    if rising_edge(Adc_clk) then
+      r_ad9361_control <= r_ad9361_control(AD9361_BIT_PIPE_DEPTH - 2 downto 0)  & w_ad9361_control;
+      r_ad9361_status  <= r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 2 downto 0)   & Ad9361_status;
+      Ad9361_control   <= r_ad9361_control(AD9361_BIT_PIPE_DEPTH - 1);
+    end if;
+  end process;
+
+  process(Adc_clk)
+  begin
+    if rising_edge(Adc_clk) then
+      r_adc_valid   <= Adc_valid;
+      r_adc_data_i  <= Adc_data_i(ADC_WIDTH - 1 downto (ADC_WIDTH - IQ_WIDTH));
+      r_adc_data_q  <= Adc_data_q(ADC_WIDTH - 1 downto (ADC_WIDTH - IQ_WIDTH));
+    end if;
+  end process;
+
+  process(Adc_clk_x4)
+  begin
+    if rising_edge(Adc_clk_x4) then
+      r_adc_valid_x4   <= r_adc_valid and w_clk_x4_p0;
+      r_adc_data_i_x4  <= r_adc_data_i;
+      r_adc_data_q_x4  <= r_adc_data_q;
+    end if;
+  end process;
+
+  w_adc_data_in <= (r_adc_data_q_x4, r_adc_data_i_x4);
+
+  i_channelizer : entity dsp_lib.channelizer_512
+  generic map (
+    INPUT_DATA_WIDTH    => IQ_WIDTH,
+    OUTPUT_DATA_WIDTH   => CHANNELIZER_DATA_WIDTH,
+    BASEBANDING_ENABLE  => true
+  )
+  port map (
+    Clk                   => Adc_clk_x4,
+    Rst                   => r_combined_rst,
+
+    Input_valid           => r_adc_valid_x4,
+    Input_data            => w_adc_data_in,
+
+    Output_chan_ctrl      => w_channelizer_control,
+    Output_chan_data      => w_channelizer_data,
+    Output_chan_pwr       => w_channelizer_pwr,
+
+    Output_fft_ctrl       => open,
+    Output_fft_data       => open,
+
+    Warning_demux_gap     => w_channelizer_warnings.demux_gap,
+    Error_demux_overflow  => w_channelizer_errors.demux_overflow,
+    Error_filter_overflow => w_channelizer_errors.filter_overflow,
+    Error_mux_overflow    => w_channelizer_errors.mux_overflow,
+    Error_mux_underflow   => w_channelizer_errors.mux_underflow,
+    Error_mux_collision   => w_channelizer_errors.mux_collision
+  );
+
+  --i_dwell_stats : entity esm_lib.esm_dwell_stats
+  --generic map (
+  --  AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
+  --  DATA_WIDTH      => CHANNELIZER_DATA_WIDTH,
+  --  NUM_CHANNELS    => INTERCEPT_NUM_CHANNELS,
+  --  MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_NARROW
+  --)
+  --port map (
+  --  Clk_axi                 => M_axis_clk,
+  --  Clk                     => Adc_clk_x4,
+  --  Rst                     => r_combined_rst,
+  --
+  --  Enable                  => w_enable_chan,
+  --
+  --  Dwell_active            => w_dwell_active,
+  --  Dwell_data              => w_dwell_data,
+  --  Dwell_sequence_num      => w_dwell_sequence_num,
+  --
+  --  Input_ctrl              => w_channelizer_control,
+  --  Input_data              => w_channelizer_data,
+  --  Input_pwr               => w_channelizer_pwr,
+  --
+  --  Axis_ready              => w_d2h_fifo_in_ready(0),
+  --  Axis_valid              => w_d2h_fifo_in_valid(0),
+  --  Axis_data               => w_d2h_fifo_in_data(0),
+  --  Axis_last               => w_d2h_fifo_in_last(0),
+  --
+  --  Error_reporter_timeout  => w_dwell_stats_errors.reporter_timeout,
+  --  Error_reporter_overflow => w_dwell_stats_errors.reporter_overflow
+  --);
+  w_d2h_fifo_in_valid(0) <= '0';
+  w_d2h_fifo_in_data(0) <= (others => '0');
+  w_d2h_fifo_in_last(0) <= '0';
+  w_dwell_stats_errors <= (others => '0');
+
+  process(Adc_clk_x4)
+  begin
+    if rising_edge(Adc_clk_x4) then
+      w_dwell_stats_errors.reporter_timeout <= w_channelizer_control.valid or w_channelizer_control.last or or_reduce(std_logic_vector(w_channelizer_control.data_index)) or
+                                               or_reduce(std_logic_vector(w_channelizer_data(0))) or or_reduce(std_logic_vector(w_channelizer_data(1))) or
+                                               or_reduce(std_logic_vector(w_channelizer_pwr));
+    end if;
+  end process;
+
+  --TODO; stream encoder
+  w_d2h_fifo_in_valid(1) <= '0';
+  w_d2h_fifo_in_data(1) <= (others => '0');
+  w_d2h_fifo_in_last(1) <= '0';
+  w_stream_encoder_errors <= (others => '0');
+
+  i_status_reporter : entity intercept_lib.intercept_status_reporter
+  generic map (
+    AXI_DATA_WIDTH        => AXI_DATA_WIDTH,
+    HEARTBEAT_INTERVAL    => HEARTBEAT_INTERVAL
+  )
+  port map (
+    Clk_axi               => M_axis_clk,
+    Clk                   => Adc_clk_x4,
+    Rst                   => r_combined_rst,
+
+    Enable_status         => w_enable_status,
+    Enable_channelizer    => w_enable_chan,
+    Enable_stream_encoder => w_enable_stream,
+
+    Channelizer_warnings  => w_channelizer_warnings,
+    Channelizer_errors    => w_channelizer_errors,
+    Dwell_stats_errors    => w_dwell_stats_errors,
+    Stream_encoder_errors => w_stream_encoder_errors,
+
+    Axis_ready            => w_d2h_fifo_in_ready(2),
+    Axis_valid            => w_d2h_fifo_in_valid(2),
+    Axis_data             => w_d2h_fifo_in_data(2),
+    Axis_last             => w_d2h_fifo_in_last(2)
+  );
+
+  g_d2h_fifo : for i in 0 to (NUM_D2H_MUX_INPUTS - 1) generate
+    i_fifo : entity axi_lib.axis_minififo
+    generic map (
+      AXI_DATA_WIDTH => AXI_DATA_WIDTH
+    )
+    port map (
+      Clk           => M_axis_clk,
+      Rst           => not(M_axis_resetn),
+
+      S_axis_ready  => w_d2h_fifo_in_ready(i),
+      S_axis_valid  => w_d2h_fifo_in_valid(i),
+      S_axis_data   => w_d2h_fifo_in_data(i),
+      S_axis_last   => w_d2h_fifo_in_last(i),
+
+      M_axis_ready  => w_d2h_mux_in_ready(i),
+      M_axis_valid  => w_d2h_mux_in_valid(i),
+      M_axis_data   => w_d2h_mux_in_data(i),
+      M_axis_last   => w_d2h_mux_in_last(i)
+    );
+  end generate g_d2h_fifo;
+
+  i_d2h_mux : entity axi_lib.axis_mux
+  generic map (
+    NUM_INPUTS      => NUM_D2H_MUX_INPUTS,
+    AXI_DATA_WIDTH  => AXI_DATA_WIDTH
+  )
+  port map (
+    Clk             => M_axis_clk,
+    Rst             => not(M_axis_resetn),
+
+    S_axis_ready    => w_d2h_mux_in_ready,
+    S_axis_valid    => w_d2h_mux_in_valid,
+    S_axis_data     => w_d2h_mux_in_data,
+    S_axis_last     => w_d2h_mux_in_last,
+
+    M_axis_ready    => w_d2h_mux_out_ready,
+    M_axis_valid    => w_d2h_mux_out_valid,
+    M_axis_data     => w_d2h_mux_out_data,
+    M_axis_last     => w_d2h_mux_out_last
+  );
+
+  i_mux_fifo : entity axi_lib.axis_minififo
+  generic map (
+    AXI_DATA_WIDTH => AXI_DATA_WIDTH
+  )
+  port map (
+    Clk           => M_axis_clk,
+    Rst           => not(M_axis_resetn),
+
+    S_axis_ready  => w_d2h_mux_out_ready,
+    S_axis_valid  => w_d2h_mux_out_valid,
+    S_axis_data   => w_d2h_mux_out_data,
+    S_axis_last   => w_d2h_mux_out_last,
+
+    M_axis_ready  => M_axis_ready,
+    M_axis_valid  => M_axis_valid,
+    M_axis_data   => M_axis_data,
+    M_axis_last   => M_axis_last
+  );
+
+end architecture rtl;
