@@ -32,7 +32,7 @@ custom_ip_files intercept_receiver [list \
   {"../dsp/hdl/pfb_filter_stage.vhd"          "dsp_lib"}        \
   {"../dsp/hdl/channelizer_power.vhd"         "dsp_lib"}        \
   {"../dsp/hdl/channelizer_common.vhd"        "dsp_lib"}        \
-  {"../dsp/hdl/channelizer_512.vhd"           "dsp_lib"}        \
+  {"../dsp/hdl/channelizer_1024.vhd"          "dsp_lib"}        \
   {"./hdl/intercept_pkg.vhd"                  "intercept_lib"}  \
   {"./hdl/intercept_debug_pkg.vhd"            "intercept_lib"}  \
   {"./hdl/intercept_config.vhd"               "intercept_lib"}  \
@@ -43,8 +43,8 @@ custom_ip_files intercept_receiver [list \
 adi_ip_properties_lite intercept_receiver
 set cc [ipx::current_core]
 set_property company_url {https://github.com/30N6}  $cc
-set_property display_name "Intercept receiver"            $cc
-set_property description  "Intercept receiver"            $cc
+set_property display_name "Intercept receiver"      $cc
+set_property description  "Intercept receiver"      $cc
 
 adi_add_bus "S_axis" "slave"          \
   "xilinx.com:interface:axis_rtl:1.0" \

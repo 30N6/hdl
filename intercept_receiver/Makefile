@@ -31,7 +31,7 @@ GENERIC_DEPS += ../dsp/hdl/pfb_filter_buffer.vhd
 GENERIC_DEPS += ../dsp/hdl/pfb_filter_mult.vhd
 GENERIC_DEPS += ../dsp/hdl/pfb_filter_stage.vhd
 GENERIC_DEPS += ../dsp/hdl/channelizer_power.vhd
-GENERIC_DEPS += ../dsp/hdl/channelizer_512.vhd
+GENERIC_DEPS += ../dsp/hdl/channelizer_1024.vhd
 
 GENERIC_DEPS += ./hdl/intercept_pkg.vhd
 GENERIC_DEPS += ./hdl/intercept_debug_pkg.vhd

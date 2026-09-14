@@ -13,7 +13,8 @@ entity channelizer_128 is
 generic (
   INPUT_DATA_WIDTH    : natural;
   OUTPUT_DATA_WIDTH   : natural;
-  BASEBANDING_ENABLE  : boolean
+  BASEBANDING_ENABLE  : boolean;
+  SATURATE_POWER      : boolean
 );
 port (
   Clk                   : in  std_logic;
@@ -249,7 +250,8 @@ begin
     COEF_WIDTH          => COEF_WIDTH,
     COEF_DATA           => COEF_DATA,
     FFT_PATH_ENABLE     => false,
-    BASEBANDING_ENABLE  => BASEBANDING_ENABLE
+    BASEBANDING_ENABLE  => BASEBANDING_ENABLE,
+    SATURATE_POWER      => SATURATE_POWER
   )
   port map (
     Clk                   => Clk,

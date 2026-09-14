@@ -245,7 +245,8 @@ begin
     generic map (
       INPUT_DATA_WIDTH    => IQ_WIDTH,
       OUTPUT_DATA_WIDTH   => CHANNELIZER8_DATA_WIDTH,
-      BASEBANDING_ENABLE  => true
+      BASEBANDING_ENABLE  => true,
+      SATURATE_POWER      => false
     )
     port map (
       Clk                   => Adc_clk_x4,
@@ -278,7 +279,8 @@ begin
     generic map (
       INPUT_DATA_WIDTH    => IQ_WIDTH,
       OUTPUT_DATA_WIDTH   => CHANNELIZER64_DATA_WIDTH,
-      BASEBANDING_ENABLE  => true
+      BASEBANDING_ENABLE  => true,
+      SATURATE_POWER      => false
     )
     port map (
       Clk                   => Adc_clk_x4,

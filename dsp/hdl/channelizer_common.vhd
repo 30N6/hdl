@@ -18,7 +18,8 @@ generic (
   COEF_WIDTH          : natural;
   COEF_DATA           : signed_array_t(NUM_COEFS - 1 downto 0)(COEF_WIDTH - 1 downto 0);
   FFT_PATH_ENABLE     : boolean;
-  BASEBANDING_ENABLE  : boolean
+  BASEBANDING_ENABLE  : boolean;
+  SATURATE_POWER      : boolean
 );
 port (
   Clk                   : in  std_logic;
@@ -278,8 +279,9 @@ begin
 
   i_power : entity dsp_lib.channelizer_power
   generic map (
-    DATA_WIDTH  => FFT_DATA_WIDTH,
-    LATENCY     => POWER_LATENCY
+    DATA_WIDTH      => FFT_DATA_WIDTH,
+    LATENCY         => POWER_LATENCY,
+    SATURATE_POWER  => SATURATE_POWER
   )
   port map (
     Clk         => Clk,

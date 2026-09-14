@@ -45,6 +45,7 @@ module channelizer_tb;
   parameter INPUT_DATA_WIDTH      = 12;
   parameter OUTPUT_DATA_WIDTH     = 12 + $clog2(NUM_COEFS_PER_CHANNEL) + $clog2(NUM_CHANNELS);
   parameter BASEBANDING_ENABLE    = 1;
+  parameter SATURATE_POWER        = (NUM_CHANNELS > 64);
 
   typedef struct
   {
@@ -96,7 +97,7 @@ module channelizer_tb;
 
   generate
     if (NUM_CHANNELS == 1024) begin
-      channelizer_1024 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut1024
+      channelizer_1024 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE), .SATURATE_POWER(SATURATE_POWER)) dut1024
       (
         .Clk                    (Clk),
         .Rst                    (Rst),
@@ -119,7 +120,7 @@ module channelizer_tb;
         .Error_mux_collision    (w_error_mux_collision)
       );
     end else if (NUM_CHANNELS == 512) begin
-      channelizer_512 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut512
+      channelizer_512 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE), .SATURATE_POWER(SATURATE_POWER)) dut512
       (
         .Clk                    (Clk),
         .Rst                    (Rst),
@@ -142,7 +143,7 @@ module channelizer_tb;
         .Error_mux_collision    (w_error_mux_collision)
       );
     end else if (NUM_CHANNELS == 256) begin
-      channelizer_256 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut256
+      channelizer_256 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE), .SATURATE_POWER(SATURATE_POWER)) dut256
       (
         .Clk                    (Clk),
         .Rst                    (Rst),
@@ -165,7 +166,7 @@ module channelizer_tb;
         .Error_mux_collision    (w_error_mux_collision)
       );
     end else if (NUM_CHANNELS == 128) begin
-      channelizer_128 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut128
+      channelizer_128 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE), .SATURATE_POWER(SATURATE_POWER)) dut128
       (
         .Clk                    (Clk),
         .Rst                    (Rst),
@@ -188,7 +189,7 @@ module channelizer_tb;
         .Error_mux_collision    (w_error_mux_collision)
       );
     end else if (NUM_CHANNELS == 64) begin
-      channelizer_64 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut64
+      channelizer_64 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE), .SATURATE_POWER(SATURATE_POWER)) dut64
       (
         .Clk                    (Clk),
         .Rst                    (Rst),
@@ -211,7 +212,7 @@ module channelizer_tb;
         .Error_mux_collision    (w_error_mux_collision)
       );
     end else if (NUM_CHANNELS == 32) begin
-      channelizer_32 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut32
+      channelizer_32 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE), .SATURATE_POWER(SATURATE_POWER)) dut32
       (
         .Clk                    (Clk),
         .Rst                    (Rst),
@@ -234,7 +235,7 @@ module channelizer_tb;
         .Error_mux_collision    (w_error_mux_collision)
       );
     end else if (NUM_CHANNELS == 16) begin
-      channelizer_16 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut16
+      channelizer_16 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE), .SATURATE_POWER(SATURATE_POWER)) dut16
       (
         .Clk                    (Clk),
         .Rst                    (Rst),
@@ -257,7 +258,7 @@ module channelizer_tb;
         .Error_mux_collision    (w_error_mux_collision)
       );
     end else if (NUM_CHANNELS == 8) begin
-      channelizer_8 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE)) dut8
+      channelizer_8 #(.INPUT_DATA_WIDTH(INPUT_DATA_WIDTH), .OUTPUT_DATA_WIDTH(OUTPUT_DATA_WIDTH), .BASEBANDING_ENABLE(BASEBANDING_ENABLE), .SATURATE_POWER(SATURATE_POWER)) dut8
       (
         .Clk                    (Clk),
         .Rst                    (Rst),

@@ -11,7 +11,8 @@ library dsp_lib;
 entity channelizer_power is
 generic (
   DATA_WIDTH  : natural;
-  LATENCY     : natural
+  LATENCY     : natural;
+  SATURATE_POWER  : boolean
 );
 port (
   Clk         : in  std_logic;
@@ -36,11 +37,13 @@ architecture rtl of channelizer_power is
 
   signal r_full_squared_data_d0   : signed_array_t(1 downto 0)(2*DATA_WIDTH - 1 downto 0);
   signal r_full_squared_data_d1   : signed_array_t(1 downto 0)(2*DATA_WIDTH - 1 downto 0);
+  signal w_full_power             : unsigned(2*DATA_WIDTH - 1 downto 0);
   signal r_full_power             : unsigned(2*DATA_WIDTH - 1 downto 0);
+  signal r_saturated              : std_logic;
 
 begin
 
-  assert (DATA_WIDTH <= MAX_MULT_WIDTH_A)
+  assert ((DATA_WIDTH <= MAX_MULT_WIDTH_A) or SATURATE_POWER)
     report "DATA_WIDTH is too large."
     severity failure;
 
@@ -55,7 +58,45 @@ begin
     end if;
   end process;
 
-  g_mult_type : if (DATA_WIDTH >= MAX_MULT_WIDTH_B) generate
+  g_mult_type : if (SATURATE_POWER) generate
+    g_mult : for i in 0 to 1 generate
+      process(Clk)
+      begin
+        if rising_edge(Clk) then
+          r_full_squared_data_d0(i) <= r_input_data(i) * r_input_data(i);
+          r_full_squared_data_d1(i) <= r_full_squared_data_d0(i);
+        end if;
+      end process;
+    end generate g_mult;
+
+    -- squared data is always positive
+    w_full_power <= unsigned('0' & r_full_squared_data_d1(0)(2*DATA_WIDTH - 2 downto 0)) + unsigned('0' & r_full_squared_data_d1(1)(2*DATA_WIDTH - 2 downto 0));
+
+    process(Clk)
+    begin
+      if rising_edge(Clk) then
+        r_full_power <= w_full_power;
+
+        if (CHAN_POWER_WIDTH > 2*DATA_WIDTH) then
+          r_saturated <= '0';
+        else
+          r_saturated <= or_reduce(std_logic_vector(w_full_power(2*DATA_WIDTH - 1 downto CHAN_POWER_WIDTH)));
+        end if;
+      end if;
+    end process;
+
+    process(all)
+    begin
+      if (r_saturated = '1') then
+        Output_data <= (others => '1');
+      elsif (CHAN_POWER_WIDTH > 2*DATA_WIDTH) then
+        Output_data <= resize_up(r_full_power, CHAN_POWER_WIDTH);
+      else
+        Output_data <= r_full_power(CHAN_POWER_WIDTH - 1 downto 0);
+      end if;
+    end process;
+
+  elsif (DATA_WIDTH >= MAX_MULT_WIDTH_B) generate
     g_mult : for i in 0 to 1 generate
       w_trunc_input_data_a(i) <= r_input_data(i);
       w_trunc_input_data_b(i) <= r_input_data(i)(DATA_WIDTH - 1 downto (DATA_WIDTH - MAX_MULT_WIDTH_B));
@@ -88,7 +129,6 @@ begin
           r_full_squared_data_d1(i) <= r_full_squared_data_d0(i);
         end if;
       end process;
-
     end generate g_mult;
 
     process(Clk)

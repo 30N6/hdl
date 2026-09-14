@@ -52,7 +52,7 @@ set library_file_list [list \
     ../dsp/hdl/pfb_filter.vhd \
     ../dsp/hdl/channelizer_power.vhd \
     ../dsp/hdl/channelizer_common.vhd \
-    ../dsp/hdl/channelizer_512.vhd \
+    ../dsp/hdl/channelizer_1024.vhd \
     ] \
   intercept_lib [list \
     ./hdl/intercept_pkg.vhd \
