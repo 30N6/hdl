@@ -57,7 +57,7 @@ architecture rtl of intercept_receiver is
 
   constant AXI_FIFO_DEPTH             : natural := 64;
   constant NUM_D2H_MUX_INPUTS         : natural := 3; -- dwell stats + stream encoder + status reporter
-  constant CHANNELIZER_DATA_WIDTH     : natural := IQ_WIDTH + 4 + clog2(INTERCEPT_NUM_CHANNELS); -- +4 for filter (12 coeffs per channel), +10 for ifft (1024 points)
+  constant CHANNELIZER_DATA_WIDTH     : natural := IQ_WIDTH + 4 + clog2(INTERCEPT_NUM_CHANNELS); -- +4 for filter (12 coeffs per channel), +9 for ifft (512 points)
 
   constant PLL_PRE_LOCK_DELAY_CYCLES  : natural := 2048;
   constant PLL_POST_LOCK_DELAY_CYCLES : natural := 2048;
@@ -214,7 +214,7 @@ begin
 
   w_adc_data_in <= (r_adc_data_q_x4, r_adc_data_i_x4);
 
-  i_channelizer : entity dsp_lib.channelizer_1024
+  i_channelizer : entity dsp_lib.channelizer_512
   generic map (
     INPUT_DATA_WIDTH    => IQ_WIDTH,
     OUTPUT_DATA_WIDTH   => CHANNELIZER_DATA_WIDTH,

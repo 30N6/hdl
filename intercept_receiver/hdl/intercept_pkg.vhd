@@ -34,7 +34,7 @@ package intercept_pkg is
 
   constant INTERCEPT_CONFIG_ADDRESS_WIDTH                       : natural := 16;
 
-  constant INTERCEPT_NUM_CHANNELS                               : natural := 1024;
+  constant INTERCEPT_NUM_CHANNELS                               : natural := 512;
   constant INTERCEPT_CHANNEL_INDEX_WIDTH                        : natural := clog2(INTERCEPT_NUM_CHANNELS);
 
   constant INTERCEPT_NUM_FAST_LOCK_PROFILES                     : natural := 8;
