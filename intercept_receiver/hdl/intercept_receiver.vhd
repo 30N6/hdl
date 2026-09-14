@@ -275,7 +275,9 @@ begin
   w_d2h_fifo_in_valid(0) <= '0';
   w_d2h_fifo_in_data(0) <= (others => '0');
   w_d2h_fifo_in_last(0) <= '0';
-  w_dwell_stats_errors <= (others => '0');
+  --w_dwell_stats_errors <= (others => '0');
+
+  w_dwell_stats_errors.reporter_overflow <= '0';
 
   process(Adc_clk_x4)
   begin
