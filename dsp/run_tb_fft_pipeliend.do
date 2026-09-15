@@ -129,15 +129,15 @@ set last_compile_time $time_now
 #set BreakOnAssertion 2
 #run -all
 
-#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=512 -novopt
-#set NumericStdNoWarnings 1
-#set BreakOnAssertion 2
-#run -all
-
-vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=1024 -novopt
+vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=512 -novopt
 set NumericStdNoWarnings 1
 set BreakOnAssertion 2
 run -all
+
+#vsim -suppress 12110 $top_level glbl.glbl   -GNUM_POINTS=1024 -novopt
+#set NumericStdNoWarnings 1
+#set BreakOnAssertion 2
+#run -all
 
 # If waves exists
 if [file exist wave.do] {
