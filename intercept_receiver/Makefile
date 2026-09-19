@@ -36,6 +36,9 @@ GENERIC_DEPS += ../dsp/hdl/channelizer_512.vhd
 GENERIC_DEPS += ./hdl/intercept_pkg.vhd
 GENERIC_DEPS += ./hdl/intercept_debug_pkg.vhd
 GENERIC_DEPS += ./hdl/intercept_config.vhd
+GENERIC_DEPS += ./hdl/intercept_dwell_stats_config_decoder.vhd
+GENERIC_DEPS += ./hdl/intercept_dwell_reporter.vhd
+GENERIC_DEPS += ./hdl/intercept_dwell_stats.vhd
 GENERIC_DEPS += ./hdl/intercept_status_reporter.vhd
 GENERIC_DEPS += ./hdl/intercept_receiver.vhd
 

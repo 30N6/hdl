@@ -58,6 +58,9 @@ set library_file_list [list \
     ./hdl/intercept_pkg.vhd \
     ./hdl/intercept_debug_pkg.vhd \
     ./hdl/intercept_config.vhd \
+    ./hdl/intercept_dwell_stats_config_decoder.vhd \
+    ./hdl/intercept_dwell_reporter.vhd \
+    ./hdl/intercept_dwell_stats.vhd \
     ./hdl/intercept_status_reporter.vhd \
     ./hdl/intercept_receiver.vhd \
     ./sim/intercept_receiver_tb.sv \
