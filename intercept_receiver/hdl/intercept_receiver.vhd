@@ -123,7 +123,8 @@ architecture rtl of intercept_receiver is
 
 begin
 
-  Enable_rx <= '1';
+  Enable_rx       <= '1';
+  Ad9361_control  <= (others => '0'); --fast lock profile = 0 - hopping not used
 
   i_phase_marker : entity common_lib.clk_x4_phase_marker
   port map (
@@ -164,35 +165,6 @@ begin
 
     Module_config => w_module_config
   );
-
-  --i_dwell_controller : entity esm_lib.esm_dwell_controller
-  --generic map (
-  --  PLL_PRE_LOCK_DELAY_CYCLES   => PLL_PRE_LOCK_DELAY_CYCLES,
-  --  PLL_POST_LOCK_DELAY_CYCLES  => PLL_POST_LOCK_DELAY_CYCLES
-  --)
-  --port map (
-  --  Clk                 => Adc_clk_x4,
-  --  Rst                 => r_combined_rst,
-  --
-  --  Module_config       => w_module_config,
-  --
-  --  Ad9361_control      => w_ad9361_control,
-  --  Ad9361_status       => r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 1),
-  --
-  --  Dwell_active        => w_dwell_active,
-  --  Dwell_data          => w_dwell_data,
-  --  Dwell_sequence_num  => w_dwell_sequence_num
-  --);
-  w_ad9361_control <= (others => '1');
-
-  process(Adc_clk)
-  begin
-    if rising_edge(Adc_clk) then
-      r_ad9361_control <= r_ad9361_control(AD9361_BIT_PIPE_DEPTH - 2 downto 0)  & w_ad9361_control;
-      r_ad9361_status  <= r_ad9361_status(AD9361_BIT_PIPE_DEPTH - 2 downto 0)   & Ad9361_status;
-      Ad9361_control   <= r_ad9361_control(AD9361_BIT_PIPE_DEPTH - 1);
-    end if;
-  end process;
 
   process(Adc_clk)
   begin
@@ -270,6 +242,7 @@ begin
   --  Axis_data               => w_d2h_fifo_in_data(0),
   --  Axis_last               => w_d2h_fifo_in_last(0),
   --
+  --  Error_reporter_busy     => w_dwell_stats_errors.reporter_busy,
   --  Error_reporter_timeout  => w_dwell_stats_errors.reporter_timeout,
   --  Error_reporter_overflow => w_dwell_stats_errors.reporter_overflow
   --);

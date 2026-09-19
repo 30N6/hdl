@@ -19,14 +19,14 @@ package intercept_pkg is
   constant INTERCEPT_MESSAGE_TYPE_WIDTH                         : natural := 8;
 
   constant INTERCEPT_MODULE_ID_CONTROL                          : unsigned(INTERCEPT_MODULE_ID_WIDTH - 1 downto 0) := x"00";
-  constant INTERCEPT_MODULE_ID_DWELL_CONTROLLER                 : unsigned(INTERCEPT_MODULE_ID_WIDTH - 1 downto 0) := x"01";
-  constant INTERCEPT_MODULE_ID_DWELL_STATS                      : unsigned(INTERCEPT_MODULE_ID_WIDTH - 1 downto 0) := x"02";
+  constant INTERCEPT_MODULE_ID_DWELL_STATS                      : unsigned(INTERCEPT_MODULE_ID_WIDTH - 1 downto 0) := x"01";
+  constant INTERCEPT_MODULE_ID_STREAM_ENCODER                   : unsigned(INTERCEPT_MODULE_ID_WIDTH - 1 downto 0) := x"02";
   constant INTERCEPT_MODULE_ID_STATUS                           : unsigned(INTERCEPT_MODULE_ID_WIDTH - 1 downto 0) := x"07";
 
   constant INTERCEPT_CONTROL_MESSAGE_TYPE_ENABLE                : unsigned(INTERCEPT_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"00";
-  constant INTERCEPT_CONTROL_MESSAGE_TYPE_DWELL_ENTRY           : unsigned(INTERCEPT_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"01";
-  constant INTERCEPT_CONTROL_MESSAGE_TYPE_DWELL_PROGRAM         : unsigned(INTERCEPT_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"02";
-  constant INTERCEPT_CONTROL_MESSAGE_TYPE_DWELL_CHANNEL_CONTROL : unsigned(INTERCEPT_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"03";
+  constant INTERCEPT_CONTROL_MESSAGE_TYPE_DWELL_STATS_CONFIG    : unsigned(INTERCEPT_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"01";
+  constant INTERCEPT_CONTROL_MESSAGE_TYPE_CHANNEL_CONFIG        : unsigned(INTERCEPT_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"02";
+  constant INTERCEPT_CONTROL_MESSAGE_TYPE_STREAM_CONFIG         : unsigned(INTERCEPT_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"03";
 
   constant INTERCEPT_REPORT_MESSAGE_TYPE_DWELL_STATS            : unsigned(INTERCEPT_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"10";
   constant INTERCEPT_REPORT_MESSAGE_TYPE_STREAM                 : unsigned(INTERCEPT_MESSAGE_TYPE_WIDTH - 1 downto 0) := x"20";
@@ -37,143 +37,110 @@ package intercept_pkg is
   constant INTERCEPT_NUM_CHANNELS                               : natural := 512;
   constant INTERCEPT_CHANNEL_INDEX_WIDTH                        : natural := clog2(INTERCEPT_NUM_CHANNELS);
 
-  constant INTERCEPT_NUM_FAST_LOCK_PROFILES                     : natural := 8;
-  constant INTERCEPT_FAST_LOCK_PROFILE_INDEX_WIDTH              : natural := clog2(INTERCEPT_NUM_FAST_LOCK_PROFILES);
-  constant INTERCEPT_NUM_DWELL_ENTRIES                          : natural := 32;
-  constant INTERCEPT_DWELL_ENTRY_INDEX_WIDTH                    : natural := clog2(INTERCEPT_NUM_DWELL_ENTRIES);
-  constant INTERCEPT_NUM_CHANNEL_CONTROL_ENTRIES                : natural := INTERCEPT_NUM_CHANNELS * INTERCEPT_NUM_DWELL_ENTRIES;
-  constant INTERCEPT_DWELL_CHANNEL_CONTROL_ENTRY_INDEX_WIDTH    : natural := clog2(INTERCEPT_NUM_CHANNEL_CONTROL_ENTRIES);
+  constant INTERCEPT_NUM_STREAMS                                : natural := 16;
+  constant INTERCEPT_STREAM_INDEX_WIDTH                         : natural := clog2(INTERCEPT_NUM_STREAMS);
 
-  constant INTERCEPT_DWELL_DURATION_WIDTH                       : natural := 32;
+  constant INTERCEPT_TAG_WIDTH                                  : natural := 16;
+  constant INTERCEPT_DWELL_DURATION_MAX_FRAMES                  : natural := 65535;
+  constant INTERCEPT_DWELL_DURATION_MIN_FRAMES                  : natural := 16;
+  constant INTERCEPT_DWELL_DURATION_WIDTH                       : natural := clog2(INTERCEPT_DWELL_DURATION_MAX_FRAMES);
   constant INTERCEPT_DWELL_SEQUENCE_NUM_WIDTH                   : natural := 32;
+  constant INTERCEPT_DWELL_FREQUENCY_WIDTH                      : natural := 32;
   constant INTERCEPT_TIMESTAMP_WIDTH                            : natural := 48;
-  constant INTERCEPT_MIN_DURATION_WIDTH                         : natural := 16;
+
+  constant INTERCEPT_STREAM_COAST_DURATION_WIDTH                : natural := 24;
+  constant INTERCEPT_STREAM_INTEGRATION_TIME_WIDTH              : natural := 24;
 
 
-  --type intercept_common_header_t is record
-  --  magic_num                 : std_logic_vector(31 downto 0);
-  --  sequence_num              : unsigned(31 downto 0);
-  --  module_id                 : unsigned(INTERCEPT_MODULE_ID_WIDTH - 1 downto 0);
-  --  message_type              : unsigned(INTERCEPT_MESSAGE_TYPE_WIDTH - 1 downto 0);
-  --  address                   : unsigned(INTERCEPT_CONFIG_ADDRESS_WIDTH - 1 downto 0);
-  --end record;
-  constant INTERCEPT_COMMON_HEADER_WIDTH  : natural := 96;
+  type intercept_common_header_t is record
+    magic_num                 : std_logic_vector(31 downto 0);
+    sequence_num              : unsigned(31 downto 0);
+    module_id                 : unsigned(INTERCEPT_MODULE_ID_WIDTH - 1 downto 0);
+    message_type              : unsigned(INTERCEPT_MESSAGE_TYPE_WIDTH - 1 downto 0);
+    address                   : unsigned(INTERCEPT_CONFIG_ADDRESS_WIDTH - 1 downto 0);
+    padding                   : std_logic_vector(31 downto 0);
+  end record;
+  constant INTERCEPT_COMMON_HEADER_WIDTH  : natural := 128;
 
   --type intercept_message_enable_t is record
-  --  header                    : esm_common_header_t;
+  --  header                    : intercept_common_header_t;
   --  reset                     : std_logic;
   --  enable_channelizer        : std_logic;
   --  enable_stream             : std_logic;
   --  enable_status             : std_logic;
   --end record;
 
---TODO: dwell
---  type esm_dwell_entry_t is record
---    tag                       : unsigned(15 downto 0);
---    frequency                 : unsigned(15 downto 0);
---    duration                  : unsigned(ESM_DWELL_DURATION_WIDTH - 1 downto 0);
---    gain                      : unsigned(6 downto 0);
---    fast_lock_profile         : unsigned(ESM_FAST_LOCK_PROFILE_INDEX_WIDTH - 1 downto 0);
---    threshold_shift_narrow    : unsigned(ESM_THRESHOLD_SHIFT_WIDTH - 1 downto 0);
---    threshold_shift_wide      : unsigned(ESM_THRESHOLD_SHIFT_WIDTH - 1 downto 0);
---    channel_mask_narrow       : std_logic_vector(ESM_NUM_CHANNELS_NARROW - 1 downto 0);
---    channel_mask_wide         : std_logic_vector(ESM_NUM_CHANNELS_WIDE - 1 downto 0);
---    min_pulse_duration        : unsigned(ESM_MIN_DURATION_WIDTH - 1 downto 0);
---  end record;
---
---  type esm_dwell_entry_array_t is array (natural range <>) of esm_dwell_entry_t;
---
---  constant ESM_DWELL_ENTRY_PACKED_WIDTH : natural := 224;
---  --type esm_dwell_entry_packed_t is record
---  --  tag                       : unsigned(15 downto 0);
---  --  frequency                 : unsigned(15 downto 0);
---  --  duration                  : unsigned(31 downto 0);
---  --  gain                      : unsigned(7 downto 0);
---  --  fast_lock_profile         : unsigned(7 downto 0);
---  --  padding0                  : std_logic_vector(15 downto 0);
---  --  threshold_shift_narrow    : unsigned(4 downto 0);
---  --  padding_t0                : std_logic_vector(2 downto 0);
---  --  threshold_shift_wide      : unsigned(4 downto 0);
---  --  padding_t1                : std_logic_vector(2 downto 0);
---  --  padding1                  : std_logic_vector(15 downto 0);
---  --  channel_mask_narrow       : std_logic_vector(63 downto 0);
---  --  channel_mask_wide         : std_logic_vector(7 downto 0);
---  --  padding1                  : std_logic_vector(7 downto 0);
---  --  min_pulse_duration        : unsigned(15 downto 0);
---  --end record;
---
---  type esm_dwell_instruction_t is record
---    valid                     : std_logic;
---    global_counter_check      : std_logic;
---    global_counter_dec        : std_logic;
---    skip_pll_prelock_wait     : std_logic;
---    skip_pll_lock_check       : std_logic;
---    skip_pll_postlock_wait    : std_logic;
---    repeat_count              : unsigned(3 downto 0);
---    entry_index               : unsigned(ESM_DWELL_ENTRY_INDEX_WIDTH - 1 downto 0);
---    next_instruction_index    : unsigned(ESM_DWELL_INSTRUCTION_INDEX_WIDTH - 1 downto 0);
---  end record;
---
---  constant ESM_DWELL_INSTRUCTION_PACKED_WIDTH : natural := 32;
---  --type esm_dwell_instruction_packed_t is record
---  --  flags                     : std_logic_vector(7 downto 0);
---  --  repeat_count              : unsigned(7 downto 0);
---  --  entry_index               : unsigned(7 downto 0);
---  --  next_instruction_index    : unsigned(7 downto 0);
---  --end record;
---
---  type esm_dwell_instruction_array_t is array (natural range <>) of esm_dwell_instruction_t;
---
---  type esm_dwell_program_t is record
---    --header                    : esm_common_header_t;
---    enable_program            : std_logic;
---    enable_delayed_start      : std_logic;
---    global_counter_init       : unsigned(31 downto 0);
---    delayed_start_time        : unsigned(63 downto 0);
---    instructions              : esm_dwell_instruction_array_t(ESM_NUM_DWELL_INSTRUCTIONS - 1 downto 0);
---  end record;
---
---  type esm_dwell_program_header_t is record
---    enable_program            : std_logic;
---    enable_delayed_start      : std_logic;
---    global_counter_init       : unsigned(31 downto 0);
---    delayed_start_time        : unsigned(63 downto 0);
---  end record;
---
---  constant ESM_DWELL_PROGRAM_HEADER_PACKED_WIDTH : natural := 128;
---  --type esm_dwell_program_header_packed_t is record
---  --  --header                    : esm_common_header_t;
---  --  enable_program            : std_logic_vector(7 downto 0);
---  --  enable_delayed_start      : std_logic_vector(7 downto 0);
---  --  padding                   : std_logic_vector(15 downto 0);
---  --  global_counter_init       : unsigned(31 downto 0);
---  --  delayed_start_time        : unsigned(63 downto 0);
---  --  --instructions              : esm_dwell_instruction_array_packed_t(ESM_NUM_DWELL_INSTRUCTIONS - 1 downto 0);
---  --end record;
---
---  --TODO: add reporting?
---  --type esm_message_dwell_complete_info_t is record
---  --  header                    : esm_common_header_t;
---  --  dwell_sequence_num        : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
---  --  metadata                  : esm_dwell_entry_t;
---  --
---  --  num_samples               : unsigned(31 downto 0);
---  --  ts_dwell_start            : unsigned(63 downto 0);
---  --  ts_dwell_end              : unsigned(63 downto 0);
---  --end record;
---  --
---  --type esm_message_dwell_complete_stats_t is record
---  --  header                    : esm_common_header_t;
---  --  dwell_sequence_num        : unsigned(ESM_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
---  --  metadata                  : esm_dwell_entry_t;
---  --  duration_actual           : unsigned(31 downto 0);
---  --  num_samples               : unsigned(31 downto 0);
---  --  ts_dwell_start            : unsigned(63 downto 0);
---  --  ts_dwell_end              : unsigned(63 downto 0);
---  --
---  --  -- array of 128 bit entries: index, accum, max
---  --end record;
---  --
+  type intercept_message_dwell_stats_control_t is record
+    enable                      : std_logic;
+    dwell_tag                   : unsigned(INTERCEPT_TAG_WIDTH - 1 downto 0);
+    dwell_frequency             : unsigned(INTERCEPT_DWELL_FREQUENCY_WIDTH - 1 downto 0);
+    window_duration             : unsigned(INTERCEPT_DWELL_DURATION_WIDTH - 1 downto 0);
+  end record;
+
+  type intercept_message_dwell_stats_control_aligned_t is record
+    enable                      : std_logic_vector(7 downto 0);
+    padding0                    : std_logic_vector(7 downto 0);
+    dwell_tag                   : std_logic_vector(15 downto 0);
+    dwell_frequency             : std_logic_vector(31 downto 0);
+    window_duration             : std_logic_vector(31 downto 0);
+  end record;
+  constant INTERCEPT_MESSAGE_DWELL_STATS_CONTROL_ALIGNED_WIDTH : natural := 96;
+
+ --config address is the channel index
+  type intercept_message_stream_encoder_channel_control_t is record
+    enable                      : std_logic;
+    stream_encoder_tag          : unsigned(INTERCEPT_TAG_WIDTH - 1 downto 0);
+    threshold_start             : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+    threshold_continue          : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
+    coast_cycles                : unsigned(INTERCEPT_STREAM_COAST_DURATION_WIDTH - 1 downto 0);
+    integration_cycles          : unsigned(INTERCEPT_STREAM_INTEGRATION_TIME_WIDTH - 1 downto 0);
+  end record;
+
+  type intercept_message_stream_encoder_channel_control_aligned_t is record
+    enable                      : std_logic_vector(7 downto 0);
+    padding0                    : std_logic_vector(7 downto 0);
+    stream_encoder_tag          : std_logic_vector(15 downto 0);
+    threshold_start             : std_logic_vector(31 downto 0);
+    threshold_continue          : std_logic_vector(31 downto 0);
+    coast_cycles                : std_logic_vector(31 downto 0);
+    integration_cycles          : std_logic_vector(31 downto 0);
+  end record;
+  constant INTERCEPT_MESSAGE_STREAM_ENCODER_CHANNEL_CONTROL_ALIGNED_WIDTH : natural := 160;
+
+ --config address is the stream index
+  type intercept_message_stream_encoder_stream_control_t is record
+    enable                      : std_logic;
+    stream_encoder_tag          : unsigned(INTERCEPT_TAG_WIDTH - 1 downto 0);
+    force_trigger               : std_logic;
+    force_channel               : unsigned(INTERCEPT_CHANNEL_INDEX_WIDTH - 1 downto 0);
+  end record;
+
+  type intercept_message_stream_encoder_stream_control_aligned_t is record
+    enable                      : std_logic_vector(7 downto 0);
+    padding0                    : std_logic_vector(7 downto 0);
+    stream_encoder_tag          : std_logic_vector(15 downto 0);
+    force_trigger               : std_logic_vector(7 downto 0);
+    padding1                    : std_logic_vector(7 downto 0);
+    force_channel               : std_logic_vector(15 downto 0);
+  end record;
+  constant INTERCEPT_MESSAGE_STREAM_ENCODER_STREAM_CONTROL_ALIGNED_WIDTH : natural := 64;
+
+  type intercept_dwell_data_t is record
+    sequence_num                : unsigned(INTERCEPT_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+    frequency                   : unsigned(INTERCEPT_DWELL_FREQUENCY_WIDTH - 1 downto 0);
+    tag                         : unsigned(INTERCEPT_TAG_WIDTH - 1 downto 0);
+  end record;
+
+  type intercept_message_dwell_stats_report_t is record
+    header                      : intercept_common_header_t;
+    dwell_data                  : intercept_dwell_data_t;
+    padding0                    : std_logic_vector(15 downto 0);
+    window_sequence_num         : unsigned(INTERCEPT_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
+    window_duration             : unsigned(31 downto 0);
+    window_timestamp            : unsigned(63 downto 0);
+
+    -- array of 128 bit entries: index, accum, max
+  end record;
 
   type intercept_config_data_t is record
     valid                     : std_logic;
@@ -203,11 +170,12 @@ package intercept_pkg is
   constant INTERCEPT_CHANNELIZER_ERRORS_WIDTH : natural := 5;
 
   type intercept_dwell_stats_errors_t is record
+    reporter_busy     : std_logic;
     reporter_timeout  : std_logic;
     reporter_overflow : std_logic;
   end record;
 
-  constant INTERCEPT_DWELL_STATS_ERRORS_WIDTH : natural := 2;
+  constant INTERCEPT_DWELL_STATS_ERRORS_WIDTH : natural := 3;
 
   type intercept_stream_encoder_errors_t is record
     reporter_timeout  : std_logic;
@@ -238,7 +206,10 @@ package intercept_pkg is
   --function unpack(v : std_logic_vector) return esm_dwell_entry_t;
   --function unpack(v : std_logic_vector) return esm_dwell_program_header_t;
   --function unpack(v : std_logic_vector) return esm_dwell_instruction_t;
-  function unpack(v : std_logic_vector) return intercept_config_data_t;
+  function unpack(v : std_logic_vector(INTERCEPT_CONFIG_DATA_WIDTH - 1 downto 0)) return intercept_config_data_t;
+  function unpack_aligned(v : std_logic_vector(INTERCEPT_MESSAGE_DWELL_STATS_CONTROL_ALIGNED_WIDTH - 1 downto 0)) return intercept_message_dwell_stats_control_t;
+  function unpack_aligned(v : std_logic_vector(INTERCEPT_MESSAGE_STREAM_ENCODER_CHANNEL_CONTROL_ALIGNED_WIDTH - 1 downto 0)) return intercept_message_stream_encoder_channel_control_t;
+  function unpack_aligned(v : std_logic_vector(INTERCEPT_MESSAGE_STREAM_ENCODER_STREAM_CONTROL_ALIGNED_WIDTH - 1 downto 0)) return intercept_message_stream_encoder_stream_control_t;
 
   function pack(v : intercept_channelizer_warnings_t) return std_logic_vector;
   function pack(v : intercept_channelizer_errors_t) return std_logic_vector;
@@ -252,66 +223,7 @@ end package intercept_pkg;
 
 package body intercept_pkg is
 
---  function unpack(v : std_logic_vector) return esm_dwell_entry_t is
---    variable vm : std_logic_vector(v'length - 1 downto 0);
---    variable r : esm_dwell_entry_t;
---  begin
---    assert (v'length = ESM_DWELL_ENTRY_PACKED_WIDTH)
---      report "Unexpected length"
---      severity failure;
---
---    vm := v;
---
---    r.tag                     := unsigned(vm(15 downto 0));
---    r.frequency               := unsigned(vm(31 downto 16));
---    r.duration                := unsigned(vm(63 downto 32));
---    r.gain                    := unsigned(vm(70 downto 64));
---    r.fast_lock_profile       := unsigned(vm(74 downto 72));
---    --padding
---    r.threshold_shift_narrow  := unsigned(vm(100 downto 96));
---    r.threshold_shift_wide    := unsigned(vm(108 downto 104));
---    --padding
---    r.channel_mask_narrow     := vm(191 downto 128);
---    r.channel_mask_wide       := vm(199 downto 192);
---    --padding
---    r.min_pulse_duration      := unsigned(vm(223 downto 208));
---    return r;
---  end function;
---
---  function unpack(v : std_logic_vector) return esm_dwell_program_header_t is
---    variable r : esm_dwell_program_header_t;
---  begin
---    assert (v'length = ESM_DWELL_PROGRAM_HEADER_PACKED_WIDTH)
---      report "Unexpected length"
---      severity failure;
---
---    r.enable_program        := v(0);
---    r.enable_delayed_start  := v(8);
---    r.global_counter_init   := unsigned(v(63 downto 32));
---    r.delayed_start_time    := unsigned(v(127 downto 64));
---    return r;
---  end function;
---
---  function unpack(v : std_logic_vector) return esm_dwell_instruction_t is
---    variable r : esm_dwell_instruction_t;
---  begin
---    assert (v'length = ESM_DWELL_INSTRUCTION_PACKED_WIDTH)
---      report "Unexpected length"
---      severity failure;
---
---    r.valid                   := v(0);
---    r.global_counter_check    := v(1);
---    r.global_counter_dec      := v(2);
---    r.skip_pll_prelock_wait   := v(3);
---    r.skip_pll_lock_check     := v(4);
---    r.skip_pll_postlock_wait  := v(5);
---    r.repeat_count            := unsigned(v(11 downto 8));
---    r.entry_index             := unsigned(v(23 downto 16));
---    r.next_instruction_index  := unsigned(v(28 downto 24));
---    return r;
---  end function;
-
-  function unpack(v : std_logic_vector) return intercept_config_data_t is
+  function unpack(v : std_logic_vector(INTERCEPT_CONFIG_DATA_WIDTH - 1 downto 0)) return intercept_config_data_t is
     variable r : intercept_config_data_t;
   begin
     assert (v'length = INTERCEPT_CONFIG_DATA_WIDTH)
@@ -325,6 +237,48 @@ package body intercept_pkg is
     r.module_id     := unsigned(v(35 + INTERCEPT_MODULE_ID_WIDTH - 1 downto 35));
     r.message_type  := unsigned(v(35 + INTERCEPT_MODULE_ID_WIDTH + INTERCEPT_MESSAGE_TYPE_WIDTH - 1 downto 35 + INTERCEPT_MODULE_ID_WIDTH));
     r.address       := unsigned(v(35 + INTERCEPT_MODULE_ID_WIDTH + INTERCEPT_MESSAGE_TYPE_WIDTH + INTERCEPT_CONFIG_ADDRESS_WIDTH - 1 downto 35 + INTERCEPT_MODULE_ID_WIDTH + INTERCEPT_MESSAGE_TYPE_WIDTH));
+
+    return r;
+  end function;
+
+  function unpack_aligned(v : std_logic_vector(INTERCEPT_MESSAGE_DWELL_STATS_CONTROL_ALIGNED_WIDTH - 1 downto 0)) return intercept_message_dwell_stats_control_t is
+    variable p : intercept_message_dwell_stats_control_aligned_t;
+    variable r : intercept_message_dwell_stats_control_t;
+  begin
+    (p.window_duration, p.dwell_frequency, p.dwell_tag, p.padding0, p.enable) := v;
+
+    r.enable          := p.enable(0);
+    r.dwell_tag       := unsigned(p.dwell_tag);
+    r.dwell_frequency := unsigned(p.dwell_frequency);
+    r.window_duration := unsigned(p.window_duration(INTERCEPT_DWELL_DURATION_WIDTH - 1 downto 0));
+    return r;
+  end function;
+
+  function unpack_aligned(v : std_logic_vector(INTERCEPT_MESSAGE_STREAM_ENCODER_CHANNEL_CONTROL_ALIGNED_WIDTH - 1 downto 0)) return intercept_message_stream_encoder_channel_control_t is
+    variable p : intercept_message_stream_encoder_channel_control_aligned_t;
+    variable r : intercept_message_stream_encoder_channel_control_t;
+  begin
+    (p.integration_cycles, p.coast_cycles, p.threshold_continue, p.threshold_start, p.stream_encoder_tag, p.padding0, p.enable) := v;
+
+    r.enable              := p.enable(0);
+    r.stream_encoder_tag  := unsigned(p.stream_encoder_tag);
+    r.threshold_start     := unsigned(p.threshold_start);
+    r.threshold_continue  := unsigned(p.threshold_continue);
+    r.coast_cycles        := unsigned(p.coast_cycles(INTERCEPT_STREAM_COAST_DURATION_WIDTH - 1 downto 0));
+    r.integration_cycles  := unsigned(p.integration_cycles(INTERCEPT_STREAM_INTEGRATION_TIME_WIDTH - 1 downto 0));
+    return r;
+  end function;
+
+  function unpack_aligned(v : std_logic_vector(INTERCEPT_MESSAGE_STREAM_ENCODER_STREAM_CONTROL_ALIGNED_WIDTH - 1 downto 0)) return intercept_message_stream_encoder_stream_control_t is
+    variable p : intercept_message_stream_encoder_stream_control_aligned_t;
+    variable r : intercept_message_stream_encoder_stream_control_t;
+  begin
+    (p.force_channel, p.padding1, p.force_trigger, p.stream_encoder_tag, p.padding0, p.enable) := v;
+
+    r.enable              := p.enable(0);
+    r.stream_encoder_tag  := unsigned(p.stream_encoder_tag);
+    r.force_trigger       := p.force_trigger(0);
+    r.force_channel       := unsigned(p.force_channel(INTERCEPT_CHANNEL_INDEX_WIDTH - 1 downto 0));
 
     return r;
   end function;
@@ -354,7 +308,8 @@ package body intercept_pkg is
   begin
     r := (
           v.reporter_overflow,
-          v.reporter_timeout
+          v.reporter_timeout,
+          v.reporter_busy
          );
     return r;
   end function;
