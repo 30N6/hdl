@@ -215,52 +215,30 @@ begin
     Error_mux_collision   => w_channelizer_errors.mux_collision
   );
 
-  --i_dwell_stats : entity esm_lib.esm_dwell_stats
-  --generic map (
-  --  AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
-  --  DATA_WIDTH      => CHANNELIZER_DATA_WIDTH,
-  --  NUM_CHANNELS    => INTERCEPT_NUM_CHANNELS,
-  --  MODULE_ID       => ESM_MODULE_ID_DWELL_STATS_NARROW
-  --)
-  --port map (
-  --  Clk_axi                 => M_axis_clk,
-  --  Clk                     => Adc_clk_x4,
-  --  Rst                     => r_combined_rst,
-  --
-  --  Enable                  => w_enable_chan,
-  --
-  --  Dwell_active            => w_dwell_active,
-  --  Dwell_data              => w_dwell_data,
-  --  Dwell_sequence_num      => w_dwell_sequence_num,
-  --
-  --  Input_ctrl              => w_channelizer_control,
-  --  Input_data              => w_channelizer_data,
-  --  Input_pwr               => w_channelizer_pwr,
-  --
-  --  Axis_ready              => w_d2h_fifo_in_ready(0),
-  --  Axis_valid              => w_d2h_fifo_in_valid(0),
-  --  Axis_data               => w_d2h_fifo_in_data(0),
-  --  Axis_last               => w_d2h_fifo_in_last(0),
-  --
-  --  Error_reporter_busy     => w_dwell_stats_errors.reporter_busy,
-  --  Error_reporter_timeout  => w_dwell_stats_errors.reporter_timeout,
-  --  Error_reporter_overflow => w_dwell_stats_errors.reporter_overflow
-  --);
-  w_d2h_fifo_in_valid(0) <= '0';
-  w_d2h_fifo_in_data(0) <= (others => '0');
-  w_d2h_fifo_in_last(0) <= '0';
-  --w_dwell_stats_errors <= (others => '0');
+  i_dwell_stats : entity intercept_lib.intercept_dwell_stats
+  generic map (
+    AXI_DATA_WIDTH => AXI_DATA_WIDTH
+  )
+  port map (
+    Clk_axi                 => M_axis_clk,
+    Clk                     => Adc_clk_x4,
+    Rst                     => r_combined_rst,
 
-  w_dwell_stats_errors.reporter_overflow <= '0';
+    Enable                  => w_enable_chan,
+    Module_config           => w_module_config,
 
-  process(Adc_clk_x4)
-  begin
-    if rising_edge(Adc_clk_x4) then
-      w_dwell_stats_errors.reporter_timeout <= w_channelizer_control.valid or w_channelizer_control.last or or_reduce(std_logic_vector(w_channelizer_control.data_index)) or
-                                               or_reduce(std_logic_vector(w_channelizer_data(0))) or or_reduce(std_logic_vector(w_channelizer_data(1))) or
-                                               or_reduce(std_logic_vector(w_channelizer_pwr));
-    end if;
-  end process;
+    Input_ctrl              => w_channelizer_control,
+    Input_pwr               => w_channelizer_pwr,
+
+    Axis_ready              => w_d2h_fifo_in_ready(0),
+    Axis_valid              => w_d2h_fifo_in_valid(0),
+    Axis_data               => w_d2h_fifo_in_data(0),
+    Axis_last               => w_d2h_fifo_in_last(0),
+
+    Error_reporter_busy     => w_dwell_stats_errors.reporter_busy,
+    Error_reporter_timeout  => w_dwell_stats_errors.reporter_timeout,
+    Error_reporter_overflow => w_dwell_stats_errors.reporter_overflow
+  );
 
   --TODO; stream encoder
   w_d2h_fifo_in_valid(1) <= '0';
