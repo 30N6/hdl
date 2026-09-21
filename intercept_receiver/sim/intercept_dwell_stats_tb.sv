@@ -365,8 +365,6 @@ module intercept_dwell_stats_tb;
       end
     end
 
-    //TODO: check channel data!!!
-
     return 1;
   endfunction
 
@@ -461,15 +459,7 @@ module intercept_dwell_stats_tb;
         r.data.push_back(0);
       end
 
-      /*for (int i = 0; i < r.data.size(); i++) begin
-        $display("r.data[%02d]=%X", i, r.data[i]);
-      end*/
-
       expected_data.push_back(r);
-
-      /*$display("report_header: %p", report_header);
-      $display("report_header_packed: %p", report_header_packed);
-      $display("axi report: %p [0]", r.data, r.data[0]);*/
 
       report_seq_num++;
     end
