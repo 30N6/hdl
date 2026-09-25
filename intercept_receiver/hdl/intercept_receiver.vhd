@@ -76,13 +76,12 @@ architecture rtl of intercept_receiver is
   signal w_enable_stream              : std_logic;
   signal w_module_config              : intercept_config_data_t;
 
+  signal w_dwell_data                 : intercept_dwell_data_t;
+  signal w_dwell_active               : std_logic;
+
   signal w_ad9361_control             : std_logic_vector(3 downto 0);
   signal r_ad9361_control             : std_logic_vector_array_t(AD9361_BIT_PIPE_DEPTH - 1 downto 0)(3 downto 0);
   signal r_ad9361_status              : std_logic_vector_array_t(AD9361_BIT_PIPE_DEPTH - 1 downto 0)(7 downto 0);
-
-  signal w_dwell_active               : std_logic;
-  --signal w_dwell_data                 : intercept_dwell_entry_t;
-  signal w_dwell_sequence_num         : unsigned(INTERCEPT_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
 
   signal r_adc_valid                  : std_logic;
   signal r_adc_data_i                 : signed(IQ_WIDTH - 1 downto 0);
@@ -215,6 +214,17 @@ begin
     Error_mux_collision   => w_channelizer_errors.mux_collision
   );
 
+  i_dwell_controller : entity intercept_lib.intercept_dwell_controller
+  port map (
+    Clk           => Adc_clk_x4,
+    Rst           => r_combined_rst,
+
+    Module_config => w_module_config,
+
+    Dwell_data    => w_dwell_data,
+    Dwell_active  => w_dwell_active
+  );
+
   i_dwell_stats : entity intercept_lib.intercept_dwell_stats
   generic map (
     AXI_DATA_WIDTH => AXI_DATA_WIDTH
@@ -225,7 +235,9 @@ begin
     Rst                     => r_combined_rst,
 
     Enable                  => w_enable_chan,
-    Module_config           => w_module_config,
+
+    Dwell_data              => w_dwell_data,
+    Dwell_active            => w_dwell_active,
 
     Input_ctrl              => w_channelizer_control,
     Input_pwr               => w_channelizer_pwr,
@@ -240,11 +252,36 @@ begin
     Error_reporter_overflow => w_dwell_stats_errors.reporter_overflow
   );
 
-  --TODO; stream encoder
-  w_d2h_fifo_in_valid(1) <= '0';
-  w_d2h_fifo_in_data(1) <= (others => '0');
-  w_d2h_fifo_in_last(1) <= '0';
-  w_stream_encoder_errors <= (others => '0');
+  i_stream_encoder : entity intercept_lib.intercept_stream_encoder
+  generic map (
+    AXI_DATA_WIDTH  => AXI_DATA_WIDTH,
+    DATA_WIDTH      => CHANNELIZER_DATA_WIDTH
+  )
+  port map (
+    Clk_axi                 => M_axis_clk,
+    Clk                     => Adc_clk_x4,
+    Rst                     => r_combined_rst,
+
+    Enable                  => w_enable_stream,
+    Module_config           => w_module_config,
+
+    Dwell_data              => w_dwell_data,
+    Dwell_active            => w_dwell_active,
+
+    Input_ctrl              => w_channelizer_control,
+    Input_data              => w_channelizer_data,
+    Input_pwr               => w_channelizer_pwr,
+
+    Axis_ready              => w_d2h_fifo_in_ready(1),
+    Axis_valid              => w_d2h_fifo_in_valid(1),
+    Axis_data               => w_d2h_fifo_in_data(1),
+    Axis_last               => w_d2h_fifo_in_last(1),
+
+    Error_fifo_overflow     => w_stream_encoder_errors.fifo_overflow,
+    Error_fifo_underflow    => w_stream_encoder_errors.fifo_underflow,
+    Error_reporter_timeout  => w_stream_encoder_errors.reporter_timeout,
+    Error_reporter_overflow => w_stream_encoder_errors.reporter_overflow
+  );
 
   i_status_reporter : entity intercept_lib.intercept_status_reporter
   generic map (
