@@ -62,6 +62,7 @@ architecture rtl of intercept_dwell_reporter is
     S_HEADER_0,
     S_HEADER_1,
     S_HEADER_2,
+    S_HEADER_3,
 
     S_DWELL_DATA_0,
     S_DWELL_DATA_1,
@@ -147,6 +148,8 @@ begin
         when S_HEADER_1 =>
           s_state <= S_HEADER_2;
         when S_HEADER_2 =>
+          s_state <= S_HEADER_3;
+        when S_HEADER_3 =>
           s_state <= S_DWELL_DATA_0;
 
         when S_DWELL_DATA_0 =>
@@ -274,6 +277,10 @@ begin
     when S_HEADER_2 =>
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= std_logic_vector(INTERCEPT_MODULE_ID_DWELL_STATS) & std_logic_vector(INTERCEPT_REPORT_MESSAGE_TYPE_DWELL_STATS) & x"0000";
+
+    when S_HEADER_3 =>
+      w_fifo_valid            <= '1';
+      w_fifo_partial_0_data   <= (others => '0');
 
     when S_DWELL_DATA_0 =>
       w_fifo_valid            <= '1';

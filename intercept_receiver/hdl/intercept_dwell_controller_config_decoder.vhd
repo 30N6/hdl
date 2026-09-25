@@ -8,7 +8,7 @@ library common_lib;
 library intercept_lib;
   use intercept_lib.intercept_pkg.all;
 
-entity intercept_dwell_stats_config_decoder is
+entity intercept_dwell_controller_config_decoder is
 port (
   Clk           : in  std_logic;
   Rst           : in  std_logic;
@@ -16,14 +16,14 @@ port (
   Module_config : in  intercept_config_data_t;
 
   Control_valid : out std_logic;
-  Control_data  : out intercept_message_dwell_stats_control_t
+  Control_data  : out intercept_message_dwell_controller_control_t
 );
-end entity intercept_dwell_stats_config_decoder;
+end entity intercept_dwell_controller_config_decoder;
 
-architecture rtl of intercept_dwell_stats_config_decoder is
+architecture rtl of intercept_dwell_controller_config_decoder is
 
-  constant NUM_WORDS_DWELL_STATS_CONTROL  : natural := maximum((INTERCEPT_MESSAGE_DWELL_STATS_CONTROL_ALIGNED_WIDTH + 31) / 32, 2);
-  constant WORD_INDEX_WIDTH               : natural := clog2(NUM_WORDS_DWELL_STATS_CONTROL);
+  constant NUM_WORDS_DWELL_CONTROLLER_CONTROL : natural := maximum((INTERCEPT_MESSAGE_DWELL_CONTROLLER_CONTROL_ALIGNED_WIDTH + 31) / 32, 2);
+  constant WORD_INDEX_WIDTH                   : natural := clog2(NUM_WORDS_DWELL_CONTROLLER_CONTROL);
 
   type state_t is
   (
@@ -33,7 +33,7 @@ architecture rtl of intercept_dwell_stats_config_decoder is
 
   type message_type_t is
   (
-    DWELL_STATS_CONTROL,
+    DWELL_CONTROLLER_CONTROL,
     INVALID
   );
 
@@ -43,7 +43,7 @@ architecture rtl of intercept_dwell_stats_config_decoder is
   signal w_module_id_match        : std_logic;
   signal w_message_type_match     : std_logic;
 
-  signal r_packed_data            : std_logic_vector(32 * NUM_WORDS_DWELL_STATS_CONTROL - 1 downto 0);
+  signal r_packed_data            : std_logic_vector(32 * NUM_WORDS_DWELL_CONTROLLER_CONTROL - 1 downto 0);
   signal r_packed_index           : unsigned(WORD_INDEX_WIDTH - 1 downto 0);
   signal r_message_active         : std_logic;
   signal r_message_type           : message_type_t;
@@ -65,8 +65,8 @@ begin
     end if;
   end process;
 
-  w_module_id_match     <= to_stdlogic(r_module_config.module_id = INTERCEPT_MODULE_ID_DWELL_STATS);
-  w_message_type_match  <= to_stdlogic(r_module_config.message_type = INTERCEPT_CONTROL_MESSAGE_TYPE_DWELL_STATS_CONFIG);
+  w_module_id_match     <= to_stdlogic(r_module_config.module_id = INTERCEPT_MODULE_ID_DWELL_CONTROLLER);
+  w_message_type_match  <= to_stdlogic(r_module_config.message_type = INTERCEPT_CONTROL_MESSAGE_TYPE_DWELL_CONTROLLER_CONFIG);
 
   process(Clk)
   begin
@@ -129,9 +129,9 @@ begin
   begin
     if rising_edge(Clk) then
       if (s_state = S_IDLE) then
-        if (r_module_config.message_type = INTERCEPT_CONTROL_MESSAGE_TYPE_DWELL_STATS_CONFIG) then
-          r_message_type        <= DWELL_STATS_CONTROL;
-          r_message_word_length <= to_unsigned(NUM_WORDS_DWELL_STATS_CONTROL, r_message_word_length'length);
+        if (r_module_config.message_type = INTERCEPT_CONTROL_MESSAGE_TYPE_DWELL_CONTROLLER_CONFIG) then
+          r_message_type        <= DWELL_CONTROLLER_CONTROL;
+          r_message_word_length <= to_unsigned(NUM_WORDS_DWELL_CONTROLLER_CONTROL, r_message_word_length'length);
         else
           r_message_type        <= INVALID;
           r_message_word_length <= to_unsigned(2, r_message_word_length'length);
@@ -152,8 +152,8 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Control_valid <= r_message_done and to_stdlogic(r_message_type = DWELL_STATS_CONTROL);
-      Control_data  <= unpack_aligned(r_packed_data(INTERCEPT_MESSAGE_DWELL_STATS_CONTROL_ALIGNED_WIDTH - 1 downto 0));
+      Control_valid <= r_message_done and to_stdlogic(r_message_type = DWELL_CONTROLLER_CONTROL);
+      Control_data  <= unpack_aligned(r_packed_data(INTERCEPT_MESSAGE_DWELL_CONTROLLER_CONTROL_ALIGNED_WIDTH - 1 downto 0));
     end if;
   end process;
 

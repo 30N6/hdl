@@ -23,7 +23,9 @@ port (
   Rst                     : in  std_logic;
 
   Enable                  : in  std_logic;
-  Module_config           : in  intercept_config_data_t;
+
+  Dwell_data              : in  intercept_dwell_data_t;
+  Dwell_active            : in  std_logic;
 
   Input_ctrl              : in  channelizer_control_t;
   Input_pwr               : in  unsigned(CHAN_POWER_WIDTH - 1 downto 0);
@@ -49,10 +51,8 @@ architecture rtl of intercept_dwell_stats is
   signal r_input_ctrl                 : channelizer_control_t;
   signal r_input_pwr                  : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
-  signal w_control_valid              : std_logic;
-  signal w_control_data               : intercept_message_dwell_stats_control_t;
-
   signal r_dwell_active               : std_logic;
+
   signal r_dwell_data                 : intercept_dwell_data_t;
   signal r_window_duration_minus_two  : unsigned(INTERCEPT_DWELL_DURATION_WIDTH - 1 downto 0);
   signal r_window_seq_num_current     : unsigned(INTERCEPT_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
@@ -123,48 +123,19 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_rst     <= Rst;
-      r_enable  <= Enable;
+      r_rst           <= Rst;
+      r_enable        <= Enable;
+      r_dwell_active  <= Dwell_active;
+      r_dwell_data    <= Dwell_data;
+      r_input_ctrl    <= Input_ctrl;
+      r_input_pwr     <= Input_pwr;
     end if;
   end process;
 
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_input_ctrl  <= Input_ctrl;
-      r_input_pwr   <= Input_pwr;
-    end if;
-  end process;
-
-  i_config : entity intercept_lib.intercept_dwell_stats_config_decoder
-  port map (
-    Clk           => Clk,
-    Rst           => r_rst,
-
-    Module_config => Module_config,
-
-    Control_valid => w_control_valid,
-    Control_data  => w_control_data
-  );
-
-  process(Clk)
-  begin
-    if rising_edge(Clk) then
-      if (r_rst = '1') then
-        r_dwell_active  <= '0';
-        r_dwell_data    <= (sequence_num => (others => '0'), others => (others => '-'));
-      else
-        if (w_control_valid = '1') then
-          r_dwell_active              <= w_control_data.enable;
-          r_dwell_data.frequency      <= w_control_data.dwell_frequency;
-          r_dwell_data.tag            <= w_control_data.dwell_tag;
-          r_window_duration_minus_two <= maximum(w_control_data.window_duration, INTERCEPT_DWELL_DURATION_MIN_FRAMES) - 2;
-
-          if (w_control_data.enable = '1') then
-            r_dwell_data.sequence_num <= r_dwell_data.sequence_num + 1;
-          end if;
-        end if;
-      end if;
+      r_window_duration_minus_two <= r_dwell_data.window_duration - 2;
     end if;
   end process;
 
@@ -176,7 +147,7 @@ begin
         r_dwell_first_frame  <= '0';
         r_dwell_last_frame   <= '0';
       else
-        if ((w_control_valid = '1') or (r_dwell_active = '0')) then
+        if (r_dwell_active = '0') then
           r_dwell_frame_index  <= (others => '0');
           r_dwell_first_frame  <= '1';
           r_dwell_last_frame   <= '0';

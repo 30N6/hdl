@@ -29,7 +29,8 @@ set library_file_list [list \
   intercept_lib [list \
     ./hdl/intercept_pkg.vhd \
     ./hdl/intercept_config.vhd \
-    ./hdl/intercept_dwell_stats_config_decoder.vhd \
+    ./hdl/intercept_dwell_controller_config_decoder.vhd \
+    ./hdl/intercept_dwell_controller.vhd \
     ./hdl/intercept_dwell_reporter.vhd \
     ./hdl/intercept_dwell_stats.vhd \
     ./sim/intercept_dwell_stats_tb.sv \

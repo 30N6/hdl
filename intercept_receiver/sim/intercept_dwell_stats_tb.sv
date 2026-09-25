@@ -99,15 +99,16 @@ module intercept_dwell_stats_tb;
     bit [7:0]   module_id;
     bit [7:0]   message_type;
     bit [15:0]  padding_0;
+    bit [31:0]  padding_1;
 
     bit [31:0]  dwell_seq_num;
     bit [31:0]  dwell_frequency;
     bit [15:0]  dwell_tag;
-    bit [15:0]  padding_1;
+    bit [15:0]  padding_2;
 
     bit [31:0]  window_seq_num;
     bit [15:0]  window_duration;
-    bit [15:0]  padding_2;
+    bit [15:0]  padding_3;
     bit [63:0]  window_timestamp;
   } intercept_dwell_report_header_t;
 
@@ -141,6 +142,8 @@ module intercept_dwell_stats_tb;
   logic                   w_enable_stream;
   logic                   w_enable_status;
   intercept_config_data_t w_module_config;
+  intercept_dwell_data_t  w_dwell_data;
+  logic                   w_dwell_active;
   logic                   r_axi_rx_ready;
   logic                   w_axi_rx_valid;
   logic                   w_error_reporter_busy;
@@ -192,6 +195,17 @@ module intercept_dwell_stats_tb;
     .Module_config  (w_module_config)
   );
 
+  intercept_dwell_controller dwell_ctrl
+  (
+    .Clk            (Clk),
+    .Rst            (Rst),
+
+    .Module_config  (w_module_config),
+
+    .Dwell_data     (w_dwell_data),
+    .Dwell_active   (w_dwell_active)
+  );
+
   intercept_dwell_stats
   #(
     .AXI_DATA_WIDTH (AXI_DATA_WIDTH)
@@ -203,7 +217,9 @@ module intercept_dwell_stats_tb;
     .Rst                      (Rst),
 
     .Enable                   (1'b1),
-    .Module_config            (w_module_config),
+
+    .Dwell_data               (w_dwell_data),
+    .Dwell_active             (w_dwell_active),
 
     .Input_ctrl               (dwell_tx_intf.input_ctrl),
     .Input_pwr                (dwell_tx_intf.input_pwr),
@@ -249,8 +265,8 @@ module intercept_dwell_stats_tb;
     end
   endtask
 
-  function automatic bit [intercept_message_dwell_stats_control_aligned_width - 1 : 0] pack_intercept_message_dwell_stats_control(intercept_message_dwell_stats_control_t data);
-    bit [intercept_message_dwell_stats_control_aligned_width - 1 : 0] r;
+  function automatic bit [intercept_message_dwell_controller_control_aligned_width - 1 : 0] pack_intercept_message_dwell_controller_control(intercept_message_dwell_controller_control_t data);
+    bit [intercept_message_dwell_controller_control_aligned_width - 1 : 0] r;
 
     r[0]      = data.enable;
     r[31:16]  = data.dwell_tag;
@@ -260,8 +276,8 @@ module intercept_dwell_stats_tb;
     return r;
   endfunction
 
-  function automatic intercept_message_dwell_stats_control_t randomize_dwell_stats_control();
-    intercept_message_dwell_stats_control_t r;
+  function automatic intercept_message_dwell_controller_control_t randomize_dwell_controller_control();
+    intercept_message_dwell_controller_control_t r;
     r.enable          = 1;
     r.dwell_tag       = $urandom;
     r.dwell_frequency = $urandom;
@@ -270,18 +286,18 @@ module intercept_dwell_stats_tb;
     return r;
   endfunction
 
-  task automatic send_dwell_stats_control(intercept_message_dwell_stats_control_t data);
-    bit [31:0] config_data [] = new[4 + intercept_message_dwell_stats_control_aligned_width/32];
-    bit [intercept_message_dwell_stats_control_aligned_width - 1 : 0] packed_control = pack_intercept_message_dwell_stats_control(data);
+  task automatic send_dwell_controller_control(intercept_message_dwell_controller_control_t data);
+    bit [31:0] config_data [] = new[4 + intercept_message_dwell_controller_control_aligned_width/32];
+    bit [intercept_message_dwell_controller_control_aligned_width - 1 : 0] packed_control = pack_intercept_message_dwell_controller_control(data);
 
     $display("%0t: sending dwell stats control: %p", $time, data);
 
     config_data[0] = intercept_control_magic_num;
     config_data[1] = config_seq_num++;
-    config_data[2] = {intercept_module_id_dwell_stats, intercept_control_message_type_dwell_stats_config, 16'h0000};
+    config_data[2] = {intercept_module_id_dwell_controller, intercept_control_message_type_dwell_controller_config, 16'h0000};
     config_data[3] = 32'hDEADBEEF;
 
-    for (int i = 0; i < intercept_message_dwell_stats_control_aligned_width/32; i++) begin
+    for (int i = 0; i < intercept_message_dwell_controller_control_aligned_width/32; i++) begin
       config_data[4 + i] = packed_control[i*32 +: 32];
     end
 
@@ -398,7 +414,7 @@ module intercept_dwell_stats_tb;
     end
   end
 
-  function automatic void expect_reports(intercept_message_dwell_stats_control_t control_data, int unsigned dwell_seq_num, int unsigned window_seq_num, dwell_channel_data_t window_data []);
+  function automatic void expect_reports(intercept_message_dwell_controller_control_t control_data, int unsigned dwell_seq_num, int unsigned window_seq_num, dwell_channel_data_t window_data []);
     int channels_per_packet = (intercept_max_words_per_packet_large - NUM_HEADER_WORDS) / 4;
     int num_packets = (intercept_num_channels + channels_per_packet - 1) / channels_per_packet;
     int num_padding_words = 0;
@@ -491,12 +507,12 @@ module intercept_dwell_stats_tb;
 
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
       int num_windows = $urandom_range(20, 3);
-      intercept_message_dwell_stats_control_t control_data = randomize_dwell_stats_control();
+      intercept_message_dwell_controller_control_t control_data = randomize_dwell_controller_control();
 
       dwell_channel_data_t dwell_input [] = randomize_dwell_input(num_windows, control_data.window_duration);
 
       $display("%0t: Test started - max_write_delay=%0d control_data=%p", $time, max_write_delay, control_data);
-      send_dwell_stats_control(control_data);
+      send_dwell_controller_control(control_data);
       repeat(20) @(posedge Clk);
 
       for (int i_window = 0; i_window < num_windows; i_window++) begin
