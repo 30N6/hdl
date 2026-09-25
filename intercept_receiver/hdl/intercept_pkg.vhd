@@ -160,7 +160,7 @@ package intercept_pkg is
     data_i                      : signed(25 downto 0);
     data_q                      : signed(25 downto 0);
   end record;
-  constant INTERCEPT_STREAM_SAMPLE_WIDTH : natural := INTERCEPT_STREAM_TRIGGER_TYPE_WIDTH + INTERCEPT_STREAM_INDEX_WIDTH + INTERCEPT_CHANNEL_INDEX_WIDTH + 2*26;
+  constant INTERCEPT_STREAM_SAMPLE_WIDTH : natural := INTERCEPT_STREAM_TRIGGER_TYPE_WIDTH + INTERCEPT_STREAM_INDEX_WIDTH + INTERCEPT_CHANNEL_INDEX_WIDTH + INTERCEPT_STREAM_SAMPLE_INDEX_WIDTH + 2*26;
 
   type intercept_stream_sample_aligned_t is record
     trigger_type                : unsigned(7 downto 0);
@@ -357,8 +357,7 @@ package body intercept_pkg is
   function pack(v : intercept_stream_sample_t) return std_logic_vector is
     variable r : std_logic_vector(INTERCEPT_STREAM_SAMPLE_WIDTH - 1 downto 0);
   begin
-    r := (std_logic_vector(v.data_q), std_logic_vector(v.data_i), std_logic_vector(v.sample_index), std_logic_vector(v.channel_index),
-          std_logic_vector(v.stream_index), std_logic_vector(v.trigger_type));
+    r := (std_logic_vector(v.data_q), std_logic_vector(v.data_i), std_logic_vector(v.sample_index), std_logic_vector(v.channel_index), std_logic_vector(v.stream_index), std_logic_vector(v.trigger_type));
     return r;
   end function;
 

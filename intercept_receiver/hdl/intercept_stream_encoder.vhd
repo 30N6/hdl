@@ -154,6 +154,9 @@ architecture rtl of intercept_stream_encoder is
   signal w_stream_slot_index            : unsigned(INTERCEPT_STREAM_INDEX_WIDTH - 1 downto 0);
   signal w_stream_slot_ack              : std_logic;
 
+  signal w_error_reporter_timeout       : std_logic;
+  signal w_error_reporter_overflow      : std_logic;
+
 begin
 
   process(Clk)
@@ -216,10 +219,6 @@ begin
     if rising_edge(Clk) then
       if (w_channel_control_wr_en = '1') then
         m_channel_control(to_integer(w_channel_control_wr_index)) <= w_channel_control_wr_data;
-      end if;
-
-      if (w_stream_control_wr_en = '1') then
-        m_stream_control(to_integer(w_stream_control_wr_index)) <= w_stream_control_wr_data;
       end if;
     end if;
   end process;
@@ -346,10 +345,10 @@ begin
   process(all)
   begin
     case r3_context.state is
-      when S_ACTIVE => w3_trigger_type <= INTERCEPT_STREAM_TRIGGER_TYPE_NORMAL;
-      when S_COAST  => w3_trigger_type <= INTERCEPT_STREAM_TRIGGER_TYPE_COAST;
-      when S_FORCE  => w3_trigger_type <= INTERCEPT_STREAM_TRIGGER_TYPE_FORCED;
-      when others   => w3_trigger_type <= INTERCEPT_STREAM_TRIGGER_TYPE_LAST;
+      when S_ACTIVE => w3_trigger_type <= to_unsigned(INTERCEPT_STREAM_TRIGGER_TYPE_NORMAL, INTERCEPT_STREAM_TRIGGER_TYPE_WIDTH);
+      when S_COAST  => w3_trigger_type <= to_unsigned(INTERCEPT_STREAM_TRIGGER_TYPE_COAST, INTERCEPT_STREAM_TRIGGER_TYPE_WIDTH);
+      when S_FORCE  => w3_trigger_type <= to_unsigned(INTERCEPT_STREAM_TRIGGER_TYPE_FORCED, INTERCEPT_STREAM_TRIGGER_TYPE_WIDTH);
+      when others   => w3_trigger_type <= to_unsigned(INTERCEPT_STREAM_TRIGGER_TYPE_LAST, INTERCEPT_STREAM_TRIGGER_TYPE_WIDTH);
     end case;
   end process;
 
@@ -361,7 +360,7 @@ begin
 
       r4_output_data.trigger_type  <= w3_trigger_type;
       r4_output_data.stream_index  <= r3_context.stream_index;
-      r4_output_data.channel_index <= r3_context.channel_index;
+      r4_output_data.channel_index <= r3_input_ctrl.data_index(INTERCEPT_CHANNEL_INDEX_WIDTH - 1 downto 0);
       r4_output_data.sample_index  <= r3_context.sample_index;
       r4_output_data.data_i        <= resize_up(r3_input_data(0), r4_output_data.data_i'length);
       r4_output_data.data_q        <= resize_up(r3_input_data(1), r4_output_data.data_q'length);
@@ -408,13 +407,13 @@ begin
 
     Rd_en         => w_fifo_rd_en,
     Rd_data       => w_fifo_rd_data,
-    Empty         => w_fifo_rd_empty,
+    Empty         => w_fifo_empty,
 
     Overflow      => w_fifo_overflow,
     Underflow     => w_fifo_underflow
   );
 
-  w_stream_req          <= not(w_fifo_rd_empty);
+  w_stream_req          <= not(w_fifo_empty);
   w_stream_sample_data  <= unpack(w_fifo_rd_data(INTERCEPT_STREAM_SAMPLE_WIDTH - 1 downto 0));
   w_stream_dwell_data   <= unpack(w_fifo_rd_data(INTERCEPT_STREAM_SAMPLE_WIDTH + INTERCEPT_DWELL_DATA_WIDTH - 1 downto INTERCEPT_STREAM_SAMPLE_WIDTH));
 
