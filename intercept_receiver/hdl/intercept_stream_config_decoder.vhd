@@ -120,7 +120,7 @@ begin
         r_packed_data   <= (others => '-');
       else
         if (s_state = S_IDLE) then
-          r_header_active             <= '1';
+          r_header_active             <= r_module_config.valid and r_module_config.first and w_module_id_match and w_message_type_match;
           r_packed_data(31 downto 0)  <= r_module_config.data;
           r_header_index              <= to_unsigned(1, r_header_index'length);
         elsif ((r_header_active = '1') and (r_module_config.valid = '1')) then

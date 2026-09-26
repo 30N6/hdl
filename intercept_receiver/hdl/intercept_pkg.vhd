@@ -132,8 +132,9 @@ package intercept_pkg is
     enable                      : std_logic_vector(7 downto 0);
     padding0                    : std_logic_vector(7 downto 0);
     stream_encoder_tag          : std_logic_vector(15 downto 0);
+    padding1                    : std_logic_vector(31 downto 0);  --decoder requires at least two words
   end record;
-  constant INTERCEPT_MESSAGE_STREAM_ENCODER_STREAM_CONTROL_ALIGNED_WIDTH : natural := 32;
+  constant INTERCEPT_MESSAGE_STREAM_ENCODER_STREAM_CONTROL_ALIGNED_WIDTH : natural := 64;
 
   type intercept_dwell_data_t is record
     sequence_num                : unsigned(INTERCEPT_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
@@ -339,7 +340,7 @@ package body intercept_pkg is
     variable p : intercept_message_stream_encoder_stream_control_aligned_t;
     variable r : intercept_message_stream_encoder_stream_control_t;
   begin
-    (p.stream_encoder_tag, p.padding0, p.enable) := v;
+    (p.padding1, p.stream_encoder_tag, p.padding0, p.enable) := v;
 
     r.enable              := p.enable(0);
     r.stream_encoder_tag  := unsigned(p.stream_encoder_tag);

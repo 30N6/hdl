@@ -41,7 +41,8 @@ architecture rtl of intercept_stream_reporter is
 
   constant FIFO_DEPTH             : natural := 4096;
   constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - INTERCEPT_MAX_WORDS_PER_PACKET_LARGE - 10;
-  constant TIMEOUT_CYCLES         : natural := 256 * 1024;
+  constant GLOBAL_TIMEOUT_CYCLES  : natural := 256 * 1024;
+  constant SAMPLE_TIMEOUT_CYCLES  : natural := 4096;
 
   type state_t is
   (
@@ -65,7 +66,8 @@ architecture rtl of intercept_stream_reporter is
     S_SAMPLE_DATA_2,
     S_SAMPLE_DATA_3,
 
-    S_DONE
+    S_DONE,
+    S_ERROR
   );
 
   signal r_timestamp              : unsigned(INTERCEPT_TIMESTAMP_WIDTH - 1 downto 0);
@@ -92,7 +94,8 @@ architecture rtl of intercept_stream_reporter is
   signal r_fifo_partial_0_data    : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
   signal r_fifo_partial_1_data    : std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
 
-  signal r_timeout                : unsigned(clog2(TIMEOUT_CYCLES) - 1 downto 0);
+  signal r_global_timeout         : unsigned(clog2(GLOBAL_TIMEOUT_CYCLES) - 1 downto 0);
+  signal r_sample_timeout         : unsigned(clog2(SAMPLE_TIMEOUT_CYCLES) - 1 downto 0);
 
 begin
 
@@ -148,10 +151,14 @@ begin
           s_state <= S_SAMPLE_CHECK;
 
         when S_SAMPLE_CHECK =>
-          if ((Stream_req = '1') and (r_words_in_msg <= (INTERCEPT_MAX_WORDS_PER_PACKET_LARGE - 5))) then  -- 4 sample words + 1 eof word
-            s_state <= S_SAMPLE_DATA_0;
-          else
+          if (r_words_in_msg > (INTERCEPT_MAX_WORDS_PER_PACKET_LARGE - 5)) then
             s_state <= S_DONE;
+          elsif (Stream_req = '1') then
+            s_state <= S_SAMPLE_DATA_0;
+          elsif (r_sample_timeout = (SAMPLE_TIMEOUT_CYCLES - 1)) then
+            s_state <= S_ERROR;
+          else
+            s_state <= S_SAMPLE_CHECK;
           end if;
 
         when S_SAMPLE_DATA_0 =>
@@ -170,6 +177,9 @@ begin
         when S_DONE =>
           s_state <= S_IDLE;
 
+        when S_ERROR =>
+          s_state <= S_IDLE;
+
         end case;
       end if;
     end if;
@@ -183,7 +193,7 @@ begin
       if (Rst = '1') then
         r_packet_seq_num <= (others => '0');
       else
-        if (s_state = S_DONE) then
+        if ((s_state = S_DONE) or (s_state = S_ERROR)) then
           r_packet_seq_num <= r_packet_seq_num + 1;
         end if;
       end if;
@@ -279,6 +289,11 @@ begin
       w_fifo_last             <= '1';
       w_fifo_partial_1_data   <= x"CAFEF00D";
 
+    when S_ERROR =>
+      w_fifo_valid            <= '1';
+      w_fifo_last             <= '1';
+      w_fifo_partial_1_data   <= x"DEADBEEF";
+
     when others => null;
     end case;
   end process;
@@ -337,9 +352,9 @@ begin
   begin
     if rising_edge(Clk) then
       if (s_state = S_IDLE) then
-        r_timeout <= (others => '0');
+        r_global_timeout <= (others => '0');
       else
-        r_timeout <= r_timeout + 1;
+        r_global_timeout <= r_global_timeout + 1;
       end if;
     end if;
   end process;
@@ -347,7 +362,19 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      Error_timeout   <= to_stdlogic(r_timeout = (TIMEOUT_CYCLES - 1));
+      if (s_state /= S_SAMPLE_CHECK) then
+        r_sample_timeout <= (others => '0');
+      else
+        r_sample_timeout <= r_sample_timeout + 1;
+      end if;
+    end if;
+  end process;
+
+
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      Error_timeout   <= to_stdlogic(r_global_timeout = (GLOBAL_TIMEOUT_CYCLES - 1)) or to_stdlogic(r_sample_timeout = (SAMPLE_TIMEOUT_CYCLES - 1));
       Error_overflow  <= r_fifo_valid and not(w_fifo_ready);
     end if;
   end process;
