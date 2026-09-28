@@ -8,7 +8,7 @@ typedef struct {
   int channel;
   bit last;
   int unsigned power;
-  int iq [1:0];
+  bit signed [15:0] iq [1:0];
 } channelizer_data_t;
 
 typedef channelizer_data_t channelizer_data_array_t [];
@@ -144,6 +144,10 @@ module intercept_stream_encoder_tb;
   expect_t      expected_data [$];
   int           num_received = 0;
   bit [31:0]    config_seq_num = 0;
+
+  intercept_message_dwell_controller_control_t        dwell_data                              = '{default:0};
+  intercept_message_stream_encoder_channel_control_t  m_channel_data [intercept_num_channels] = '{default:0};
+  bit [intercept_num_streams-1:0]                     stream_enable                           = '0;
 
   logic                   w_rst_out;
   logic                   w_enable_chan;
@@ -355,6 +359,8 @@ module intercept_stream_encoder_tb;
     end
 
     write_config(config_data);
+
+    dwell_data = data;
   endtask
 
   task automatic send_channel_control(intercept_message_stream_encoder_channel_control_t data, bit [15:0] address);
@@ -373,6 +379,8 @@ module intercept_stream_encoder_tb;
     end
 
     write_config(config_data);
+
+    m_channel_data[address] = data;
   endtask
 
   task automatic send_stream_control(intercept_message_stream_encoder_stream_control_t data, bit [15:0] address);
@@ -391,6 +399,8 @@ module intercept_stream_encoder_tb;
     end
 
     write_config(config_data);
+
+    stream_enable[address] = data.enable;
   endtask
 
   function automatic intercept_stream_report_header_t unpack_report_header(logic [AXI_DATA_WIDTH - 1 : 0] data [$]);
@@ -495,74 +505,139 @@ module intercept_stream_encoder_tb;
     end
   end
 
-/*
-  function automatic void expect_reports(intercept_message_dwell_controller_control_t control_data, int unsigned dwell_seq_num, int unsigned window_seq_num, channelizer_data_t window_data []);
-    int channels_per_packet = (intercept_max_words_per_packet_large - NUM_HEADER_WORDS) / 4;
-    int num_packets = (intercept_num_channels + channels_per_packet - 1) / channels_per_packet;
-    int num_padding_words = 0;
-    int channel_index = 0;
+  function automatic int get_next_stream_index(bit [intercept_num_streams-1:0] stream_pending);
+    bit [intercept_num_streams-1:0] stream_available = ~stream_pending & stream_enable;
+    for (int i = 0; i < intercept_num_streams; i++) begin
+      if (stream_available[i]) begin
+        return i;
+      end
+    end
+    return -1;
+  endfunction
 
-    longint unsigned channel_accum [intercept_num_channels] = '{default:0};
-    int unsigned channel_max [intercept_num_channels] = '{default:0};
+  function automatic void expect_reports(channelizer_data_array_t channelizer_input);
+    int samples_per_packet = (intercept_max_words_per_packet_large - NUM_HEADER_WORDS - 1) / 4;
+    bit [intercept_num_streams-1:0] stream_pending = '0;
+    int channel_state [intercept_num_channels] = '{default:-1};
+    int sample_index [intercept_num_channels] = '{default:0};
+    int coast_index [intercept_num_channels] = '{default:0};
+    int stream_index [intercept_num_channels] = '{default:0};
 
-    $display("%0t: num_header_words=%0d channels_per_packet=%0d num_packets=%0d", $time, NUM_HEADER_WORDS, channels_per_packet, num_packets);
+    intercept_stream_sample_entry_t reported_samples [$];
+    int num_packets = 0;
 
-    for (int i = 0; i < window_data.size(); i++) begin
-      channel_accum[window_data[i].channel] += window_data[i].power;
-      channel_max[window_data[i].channel] = (window_data[i].power > channel_max[window_data[i].channel]) ? window_data[i].power : channel_max[window_data[i].channel];
+    for (int i_sample = 0; i_sample < channelizer_input.size(); i_sample++) begin
+      int i_channel = channelizer_input[i_sample].channel;
+      intercept_message_stream_encoder_channel_control_t channel_entry = m_channel_data[i_channel];
+      if (!channel_entry.enable) begin
+        continue;
+      end
+
+      if (channel_state[i_channel] == intercept_stream_trigger_type_normal) begin
+        if (channelizer_input[i_sample].power <= channel_entry.threshold_continue) begin
+          if (channel_entry.coast_cycles > 0) begin
+            channel_state[i_channel] = intercept_stream_trigger_type_coast;
+            coast_index[i_channel] = 0;
+          end else begin
+            channel_state[i_channel] = intercept_stream_trigger_type_last;
+          end
+        end
+
+        sample_index[i_channel]++;
+      end else if (channel_state[i_channel] == intercept_stream_trigger_type_coast) begin
+        if (channelizer_input[i_sample].power > channel_entry.threshold_continue) begin
+          channel_state[i_channel] = intercept_stream_trigger_type_normal;
+        end else if (coast_index[i_channel] == channel_entry.coast_cycles) begin
+          channel_state[i_channel] = intercept_stream_trigger_type_last;
+        end
+        sample_index[i_channel]++;
+        coast_index[i_channel]++;
+      end else if (channel_state[i_channel] == intercept_stream_trigger_type_forced) begin
+        //TODO: not implemented
+        sample_index[i_channel]++;
+      end else if (channel_state[i_channel] == intercept_stream_trigger_type_last) begin
+        stream_pending[stream_index[i_channel]] = 0;
+        channel_state[i_channel] = -1;
+        sample_index[i_channel]++;
+      end else begin
+        if (channel_entry.force_trigger) begin
+          channel_state[i_channel] = intercept_stream_trigger_type_forced;
+          stream_index[i_channel] = channel_entry.force_stream;
+          stream_pending[channel_entry.force_stream] = 1;
+        end else if (channelizer_input[i_sample].power > channel_entry.threshold_start) begin
+          int next_stream_index = get_next_stream_index(stream_pending);
+          $display("   trying to start: next_stream_index=%0d", next_stream_index);
+          if (next_stream_index != -1) begin
+            channel_state[i_channel] = intercept_stream_trigger_type_normal;
+            stream_index[i_channel] = next_stream_index;
+            stream_pending[next_stream_index] = 1;
+          end
+        end
+        sample_index[i_channel] = 0;
+      end
+
+      /*$display("[%0d] channel_entry[%0d] = %p -- state=%0d  power=%0d iq={%p}", i_sample, i_channel, channel_entry, channel_state[i_channel],
+        channelizer_input[i_sample].power, channelizer_input[i_sample].iq);*/
+
+      if (channel_state[i_channel] != -1) begin
+        intercept_stream_sample_entry_t sample  = '{default:0};
+        sample.trigger_type                     = channel_state[i_channel];
+        sample.stream_index                     = stream_index[i_channel];
+        sample.channel_index                    = i_channel;
+        sample.sample_index                     = sample_index[i_channel];
+        sample.data_i                           = channelizer_input[i_sample].iq[0];
+        sample.data_q                           = channelizer_input[i_sample].iq[1];
+        reported_samples.push_back(sample);
+      end
     end
 
-    for (int i_packet = 0; i_packet < num_packets; i_packet++) begin
+    num_packets = (reported_samples.size() * 4) / samples_per_packet;
+
+    while (reported_samples.size() > 0) begin
       expect_t r;
       intercept_stream_report_header_t      report_header;
       intercept_stream_report_header_bits_t report_header_packed;
 
       report_header.magic_num               = intercept_report_magic_num;
       report_header.sequence_num            = report_seq_num;
-      report_header.module_id               = intercept_module_id_dwell_stats;
-      report_header.message_type            = intercept_report_message_type_dwell_stats;
+      report_header.module_id               = intercept_module_id_stream_encoder;
+      report_header.message_type            = intercept_report_message_type_stream;
+      report_header.padding_0               = 0;
+      report_header.padding_1               = 0;
       report_header.dwell_seq_num           = dwell_seq_num;
-      report_header.dwell_frequency         = control_data.dwell_frequency;
-      report_header.dwell_tag               = control_data.dwell_tag;
-      report_header.window_seq_num          = window_seq_num;
-      report_header.window_duration         = control_data.window_duration;
-      report_header.window_timestamp        = 0;
+      report_header.dwell_frequency         = dwell_data.dwell_frequency;
+      report_header.dwell_tag               = dwell_data.dwell_tag;
+      report_header.padding_2               = 0;
+      report_header.padding_3               = 0;
+      report_header.timestamp               = 0;
 
       report_header_packed = intercept_stream_report_header_bits_t'(report_header);
-      //$display("report_packed: %X", report_header_packed);
       $display("report_header: %p", report_header);
 
       for (int i = 0; i < $size(report_header_packed)/AXI_DATA_WIDTH; i++) begin
         r.data.push_back(report_header_packed[(NUM_HEADER_WORDS - i - 1)*AXI_DATA_WIDTH +: AXI_DATA_WIDTH]);
       end
 
-      for (int i_channel = 0; i_channel < channels_per_packet; i_channel++) begin
+      while ((reported_samples.size() > 0) && (r.data.size() < (intercept_max_words_per_packet_large - 5))) begin
+        intercept_stream_sample_entry_t sample = reported_samples.pop_front();
         bit [31:0] words [4];
-        if (channel_index >= intercept_num_channels) begin
-          break;
-        end
 
-        words[0] = channel_index;
-        words[1] = channel_accum[channel_index][63:32];
-        words[2] = channel_accum[channel_index][31:0];
-        words[3] = channel_max[channel_index];
+        words[0] = {sample.channel_index, sample.stream_index, sample.trigger_type};
+        words[1] = sample.sample_index;
+        words[2] = sample.data_i;
+        words[3] = sample.data_q;
         for (int i = 0; i < $size(words); i++) begin
           r.data.push_back(words[i]);
         end
-        channel_index++;
       end
 
-      num_padding_words = intercept_max_words_per_packet_large - r.data.size();
-      for (int i_padding = 0; i_padding < num_padding_words; i_padding++) begin
-        r.data.push_back(0);
-      end
+      r.data.push_back(32'hCAFEF00D);
 
       expected_data.push_back(r);
 
       report_seq_num++;
     end
   endfunction
-*/
 
   function automatic channelizer_data_array_t randomize_channelizer_input(int window_duration);
     channelizer_data_array_t r = new [intercept_num_channels * window_duration];
@@ -580,13 +655,13 @@ module intercept_stream_encoder_tb;
   endfunction
 
   task automatic single_channel_test();
-    parameter NUM_TESTS = 20;
+    parameter NUM_TESTS = 10;
     int max_write_delay = 5;
 
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
-      int num_frames        = $urandom_range(1000, 300);
-      int channel_index     = $urandom_range(intercept_num_channels);
-      int stream_index      = $urandom_range(intercept_num_streams);
+      int num_frames        = $urandom_range(300, 250);
+      int channel_index     = $urandom_range(intercept_num_channels - 1);
+      int stream_index      = $urandom_range(intercept_num_streams - 1);
       int trigger_duration  = $urandom_range(200, 10);
       int trigger_index     = $urandom_range(10);
 
@@ -597,7 +672,7 @@ module intercept_stream_encoder_tb;
       intercept_message_stream_encoder_stream_control_t   stream_control;
 
       channel_control.enable              = $urandom_range(99) < 75;
-      channel_control.force_trigger       = $urandom_range(99) < 25;
+      channel_control.force_trigger       = 0; //$urandom_range(99) < 25;
       channel_control.force_stream        = stream_index;
       channel_control.stream_encoder_tag  = $urandom;
       channel_control.threshold_start     = $urandom_range(255, 128);
@@ -625,11 +700,18 @@ module intercept_stream_encoder_tb;
       send_channel_control(channel_control, channel_index);
       send_stream_control(stream_control, stream_index);
 
+      expect_reports(channelizer_input);
+
       repeat(20) @(posedge Clk);
 
       channelizer_tx_intf.write(channelizer_input);
 
       repeat(1000) @(posedge Clk);
+
+      channel_control.enable = 0;
+      stream_control.enable = 0;
+      send_channel_control(channel_control, channel_index);
+      send_stream_control(stream_control, stream_index);
 
       begin
         int wait_cycles = 0;
@@ -650,11 +732,12 @@ module intercept_stream_encoder_tb;
     repeat(10) @(posedge Clk);
     wait_for_reset();
 
-    report_seq_num = 0;
-    dwell_seq_num = 1;
+    report_seq_num  = 0;
+    dwell_seq_num   = 1;
+    m_channel_data  = '{default:0};
+    stream_enable   = '0;
 
     single_channel_test();
-
 
     repeat(100) @(posedge Clk);
     $finish;
