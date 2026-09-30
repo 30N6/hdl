@@ -233,7 +233,7 @@ begin
     INDEX_WIDTH       => CHANNEL_INDEX_WIDTH,
     INPUT_DATA_WIDTH  => FILTER_DATA_WIDTH,
     OUTPUT_DATA_WIDTH => FFT_DATA_WIDTH,
-    INPUT_PIPE_STAGES => 1
+    INPUT_PIPE_STAGES => 3
   )
   port map (
     Clk             => Clk,

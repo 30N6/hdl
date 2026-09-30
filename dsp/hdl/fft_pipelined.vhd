@@ -69,7 +69,7 @@ architecture rtl of fft_pipelined is
   signal w_input_wr_addr            : unsigned(INPUT_BUFFER_ADDR_WIDTH - 1 downto 0);
   signal w_input_wr_valid_last      : std_logic;
 
-  signal w_input_rd_addr            : unsigned(INPUT_BUFFER_ADDR_WIDTH - 1 downto 0);
+  signal r_input_rd_addr            : unsigned(INPUT_BUFFER_ADDR_WIDTH - 1 downto 0);
   signal w_input_rd_data            : std_logic_vector(INPUT_MEM_DATA_WIDTH - 1 downto 0);
   signal w_input_rd_info            : std_logic_vector(INPUT_MEM_INFO_WIDTH - 1 downto 0);
 
@@ -153,32 +153,38 @@ begin
   w_input_wr_valid_last <= r_input_wr_control.valid and r_input_wr_control.last;
   w_input_wr_addr       <= r_write_page_index & r_input_wr_control.data_index(INDEX_WIDTH - 1 downto 0);
 
-  process(all)
+  process(Clk)
   begin
-    if (NUM_POINTS = 8) then
-      w_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_8(to_integer(r_input_index)),  INDEX_WIDTH);
-    elsif (NUM_POINTS = 16) then
-      w_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_16(to_integer(r_input_index)), INDEX_WIDTH);
-    elsif (NUM_POINTS = 32) then
-      w_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_32(to_integer(r_input_index)), INDEX_WIDTH);
-    elsif (NUM_POINTS = 64) then
-      w_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_64(to_integer(r_input_index)), INDEX_WIDTH);
-    elsif (NUM_POINTS = 128) then
-      w_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_128(to_integer(r_input_index)), INDEX_WIDTH);
-    elsif (NUM_POINTS = 256) then
-      w_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_256(to_integer(r_input_index)), INDEX_WIDTH);
-    elsif (NUM_POINTS = 512) then
-      w_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_512(to_integer(r_input_index)), INDEX_WIDTH);
-    elsif (NUM_POINTS = 1024) then
-      w_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_1024(to_integer(r_input_index)), INDEX_WIDTH);
+    if rising_edge(Clk) then
+      if (NUM_POINTS = 8) then
+        r_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_8(to_integer(r_input_index)),  INDEX_WIDTH);
+      elsif (NUM_POINTS = 16) then
+        r_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_16(to_integer(r_input_index)), INDEX_WIDTH);
+      elsif (NUM_POINTS = 32) then
+        r_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_32(to_integer(r_input_index)), INDEX_WIDTH);
+      elsif (NUM_POINTS = 64) then
+        r_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_64(to_integer(r_input_index)), INDEX_WIDTH);
+      elsif (NUM_POINTS = 128) then
+        r_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_128(to_integer(r_input_index)), INDEX_WIDTH);
+      elsif (NUM_POINTS = 256) then
+        r_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_256(to_integer(r_input_index)), INDEX_WIDTH);
+      elsif (NUM_POINTS = 512) then
+        r_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_512(to_integer(r_input_index)), INDEX_WIDTH);
+      elsif (NUM_POINTS = 1024) then
+        r_input_rd_addr <= r_read_page_index  & to_unsigned(INPUT_READ_INDEX_1024(to_integer(r_input_index)), INDEX_WIDTH);
+      end if;
     end if;
   end process;
+
+  assert (INPUT_PIPE_STAGES > 1)
+    report "INPUT_PIPE_STAGES must be greater than 1."
+    severity failure;
 
   i_data_buffer_s0 : entity mem_lib.ram_sdp
   generic map (
     ADDR_WIDTH  => INPUT_BUFFER_ADDR_WIDTH,
     DATA_WIDTH  => INPUT_MEM_DATA_WIDTH,
-    LATENCY     => INPUT_PIPE_STAGES
+    LATENCY     => INPUT_PIPE_STAGES - 1
   )
   port map (
     Clk       => Clk,
@@ -189,7 +195,7 @@ begin
 
     Rd_en     => '1',
     Rd_reg_ce => '1',
-    Rd_addr   => w_input_rd_addr,
+    Rd_addr   => r_input_rd_addr,
     Rd_data   => w_input_rd_data
   );
 
