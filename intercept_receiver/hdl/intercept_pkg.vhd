@@ -70,12 +70,20 @@ package intercept_pkg is
   end record;
   constant INTERCEPT_COMMON_HEADER_WIDTH  : natural := 128;
 
-  --type intercept_message_enable_t is record
+  --type intercept_message_enable_aligned_t is record
   --  header                    : intercept_common_header_t;
-  --  reset                     : std_logic;
-  --  enable_channelizer        : std_logic;
-  --  enable_stream             : std_logic;
-  --  enable_status             : std_logic;
+  --  reset                     : std_logic_vector(7 downto 0);
+  --  enable_channelizer        : std_logic_vector(7 downto 0);
+  --  enable_stream             : std_logic_vector(7 downto 0);
+  --  enable_status             : std_logic_vector(7 downto 0);
+  --end record;
+
+  --type intercept_message_status_aligned_t is record
+  --  header                    : intercept_common_header_t;
+  --  enables                   : std_logic_vector(31 downto 0);
+  --  status_flags              : std_logic_vector(31 downto 0);
+  --  reporter_errors           : std_logic_vector(31 downto 0);
+  --  timestamp                 : std_logic_vector(63 downto 0);
   --end record;
 
   type intercept_message_dwell_controller_control_t is record

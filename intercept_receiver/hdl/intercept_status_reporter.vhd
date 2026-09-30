@@ -50,6 +50,7 @@ architecture rtl of intercept_status_reporter is
     S_HEADER_0,
     S_HEADER_1,
     S_HEADER_2,
+    S_HEADER_3,
 
     S_ENABLES,
     S_STATUS_PATH_0,
@@ -243,6 +244,8 @@ begin
         when S_HEADER_1 =>
           s_state <= S_HEADER_2;
         when S_HEADER_2 =>
+          s_state <= S_HEADER_3;
+        when S_HEADER_3 =>
           s_state <= S_ENABLES;
 
         when S_ENABLES =>
@@ -300,6 +303,10 @@ begin
     when S_HEADER_2 =>
       w_fifo_valid  <= '1';
       w_fifo_data   <= std_logic_vector(INTERCEPT_MODULE_ID_STATUS) & std_logic_vector(INTERCEPT_REPORT_MESSAGE_TYPE_STATUS) & x"0000";
+
+    when S_HEADER_3 =>
+      w_fifo_valid  <= '1';
+      w_fifo_data   <= (others => '0');
 
     when S_ENABLES =>
       w_fifo_valid  <= '1';

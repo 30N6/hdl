@@ -90,6 +90,7 @@ module intercept_status_reporter_tb;
     bit [7:0]   module_id;
     bit [7:0]   message_type;
     bit [15:0]  padding_0;
+    bit [31:0]  padding_1;
 
     bit [31:0]  enables;
     bit [31:0]  status_path_0;
@@ -110,9 +111,12 @@ module intercept_status_reporter_tb;
 
     bit error_dwell_stats_overflow;
     bit error_dwell_stats_timeout;
+    bit error_dwell_stats_busy;
 
     bit error_stream_encoder_overflow;
     bit error_stream_encoder_timeout;
+    bit error_stream_encoder_fifo_underflow;
+    bit error_stream_encoder_fifo_overflow;
 
     bit error_chan_mux_collision;
     bit error_chan_mux_underflow;
@@ -330,14 +334,14 @@ module intercept_status_reporter_tb;
     status_flags.error_chan_mux_underflow               = input_data.channelizer_errors.mux_underflow;
     status_flags.error_chan_mux_collision               = input_data.channelizer_errors.mux_collision;
 
+    status_flags.error_stream_encoder_fifo_overflow     = input_data.stream_encoder_errors.fifo_overflow;
+    status_flags.error_stream_encoder_fifo_underflow    = input_data.stream_encoder_errors.fifo_underflow;
     status_flags.error_stream_encoder_timeout           = input_data.stream_encoder_errors.reporter_timeout;
     status_flags.error_stream_encoder_overflow          = input_data.stream_encoder_errors.reporter_overflow;
 
     status_flags.error_dwell_stats_timeout              = input_data.dwell_stats_errors.reporter_timeout;
     status_flags.error_dwell_stats_overflow             = input_data.dwell_stats_errors.reporter_overflow;
-
-    //status_flags.error_dwell_controller_fifo_overflow   = input_data.dwell_controller_errors.program_fifo_overflow;
-    //status_flags.error_dwell_controller_fifo_underflow  = input_data.dwell_controller_errors.program_fifo_underflow;
+    status_flags.error_dwell_stats_busy                 = input_data.dwell_stats_errors.reporter_busy;
 
     status_flags_packed = intercept_status_flags_packed_bits_t'(status_flags);
 
@@ -399,12 +403,13 @@ module intercept_status_reporter_tb;
       r[i].channelizer_errors.mux_overflow                = $urandom_range(1);
       r[i].channelizer_errors.mux_underflow               = $urandom_range(1);
       r[i].channelizer_errors.mux_collision               = $urandom_range(1);
+      r[i].stream_encoder_errors.fifo_overflow            = $urandom_range(1);
+      r[i].stream_encoder_errors.fifo_underflow           = $urandom_range(1);
       r[i].stream_encoder_errors.reporter_timeout         = $urandom_range(1);
       r[i].stream_encoder_errors.reporter_overflow        = $urandom_range(1);
+      r[i].dwell_stats_errors.reporter_busy               = $urandom_range(1);
       r[i].dwell_stats_errors.reporter_timeout            = $urandom_range(1);
       r[i].dwell_stats_errors.reporter_overflow           = $urandom_range(1);
-      //r[i].dwell_controller_errors.program_fifo_overflow  = $urandom_range(1);
-      //r[i].dwell_controller_errors.program_fifo_underflow = $urandom_range(1);
 
       r[i].status_reporter_errors.reporter_overflow       = 0;
       r[i].status_reporter_errors.reporter_timeout        = 0;
