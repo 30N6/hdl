@@ -88,7 +88,6 @@ architecture rtl of fft_radix2_stage is
 
   signal w_buf_wr_addr            : unsigned(MEM_ADDR_WIDTH - 1 downto 0);
   signal w_buf_wr_data            : std_logic_vector(BUFFER_DATA_WIDTH - 1 downto 0);
-  signal r1_buf_rd_addr           : unsigned_array_t(1 downto 0)(MEM_ADDR_WIDTH - 1 downto 0);
   signal w_buf_rd_data            : std_logic_vector_array_t(1 downto 0)(BUFFER_DATA_WIDTH - 1 downto 0);
   signal w_buf_rd_data_i          : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
   signal w_buf_rd_data_q          : signed_array_t(1 downto 0)(INPUT_DATA_WIDTH - 1 downto 0);
@@ -106,6 +105,13 @@ architecture rtl of fft_radix2_stage is
   signal r1_calc_active           : std_logic;
   signal r1_calc_index            : unsigned(CYCLE_INDEX_WIDTH - 1 downto 0);
   signal r1_read_index            : unsigned(CYCLE_INDEX_WIDTH - 1 downto 0);
+  signal r1_buf_rd_addr           : unsigned_array_t(1 downto 0)(MEM_ADDR_WIDTH - 1 downto 0);
+
+  signal r2_input_control         : fft_control_t;
+  signal r2_calc_active           : std_logic;
+  signal r2_calc_index            : unsigned(CYCLE_INDEX_WIDTH - 1 downto 0);
+  signal r2_read_index            : unsigned(CYCLE_INDEX_WIDTH - 1 downto 0);
+  signal r2_buf_rd_addr           : unsigned_array_t(1 downto 0)(MEM_ADDR_WIDTH - 1 downto 0);
 
   signal r_calc_active_pipe       : std_logic_vector(OUTPUT_PIPE_DEPTH - 1 downto 0);
   signal r_calc_index_pipe        : unsigned_array_t(OUTPUT_PIPE_DEPTH - 1 downto 0)(CYCLE_INDEX_WIDTH - 1 downto 0);
@@ -176,6 +182,17 @@ begin
     end if;
   end process;
 
+  process(Clk)
+  begin
+    if rising_edge(Clk) then
+      r2_buf_rd_addr    <= r1_buf_rd_addr;
+      r2_input_control  <= r1_input_control;
+      r2_calc_active    <= r1_calc_active;
+      r2_calc_index     <= r1_calc_index;
+      r2_read_index     <= r1_read_index;
+    end if;
+  end process;
+
   g_buffer : for i in 0 to 1 generate
     i_buffer : entity mem_lib.ram_sdp
     generic map (
@@ -192,7 +209,7 @@ begin
 
       Rd_en     => '1',
       Rd_reg_ce => '1',
-      Rd_addr   => r1_buf_rd_addr(i),
+      Rd_addr   => r2_buf_rd_addr(i),
       Rd_data   => w_buf_rd_data(i)
     );
 
@@ -211,7 +228,7 @@ begin
   port map (
     Clk                 => Clk,
 
-    Read_index          => r1_read_index,
+    Read_index          => r2_read_index,
     Read_data_c         => w_twiddle_fac_c,
     Read_data_c_plus_d  => w_twiddle_fac_c_plus_d,
     Read_data_d_minus_c => w_twiddle_fac_d_minus_c
@@ -220,9 +237,9 @@ begin
   process(Clk)
   begin
     if rising_edge(Clk) then
-      r_calc_active_pipe <= r_calc_active_pipe(OUTPUT_PIPE_DEPTH - 2 downto 0) & r1_calc_active;
-      r_calc_index_pipe  <= r_calc_index_pipe(OUTPUT_PIPE_DEPTH - 2 downto 0)  & r1_calc_index;
-      r_control_pipe     <= r_control_pipe(OUTPUT_PIPE_DEPTH - 2 downto 0)     & r1_input_control;
+      r_calc_active_pipe <= r_calc_active_pipe(OUTPUT_PIPE_DEPTH - 2 downto 0) & r2_calc_active;
+      r_calc_index_pipe  <= r_calc_index_pipe(OUTPUT_PIPE_DEPTH - 2 downto 0)  & r2_calc_index;
+      r_control_pipe     <= r_control_pipe(OUTPUT_PIPE_DEPTH - 2 downto 0)     & r2_input_control;
     end if;
   end process;
 
