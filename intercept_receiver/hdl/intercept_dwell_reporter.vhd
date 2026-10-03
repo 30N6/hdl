@@ -25,7 +25,6 @@ port (
   Dwell_data          : in  intercept_dwell_data_t;
   Window_done         : in  std_logic;
   Window_sequence_num : in  unsigned(INTERCEPT_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
-  Window_duration     : in  unsigned(INTERCEPT_DWELL_DURATION_WIDTH - 1 downto 0);
   Window_timestamp    : in  unsigned(INTERCEPT_TIMESTAMP_WIDTH - 1 downto 0);
 
   Read_req            : out std_logic;
@@ -69,7 +68,6 @@ architecture rtl of intercept_dwell_reporter is
     S_DWELL_DATA_2,
 
     S_WINDOW_SEQ_NUM,
-    S_WINDOW_DURATION,
     S_WINDOW_TIMESTAMP_0,
     S_WINDOW_TIMESTAMP_1,
 
@@ -160,8 +158,6 @@ begin
           s_state <= S_WINDOW_SEQ_NUM;
 
         when S_WINDOW_SEQ_NUM =>
-          s_state <= S_WINDOW_DURATION;
-        when S_WINDOW_DURATION =>
           s_state <= S_WINDOW_TIMESTAMP_0;
         when S_WINDOW_TIMESTAMP_0 =>
           s_state <= S_WINDOW_TIMESTAMP_1;
@@ -292,15 +288,11 @@ begin
 
     when S_DWELL_DATA_2 =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(Dwell_data.tag) & x"0000";
+      w_fifo_partial_0_data   <= std_logic_vector(Dwell_data.tag) & std_logic_vector(Dwell_data.window_duration);
 
     when S_WINDOW_SEQ_NUM =>
       w_fifo_valid            <= '1';
       w_fifo_partial_0_data   <= std_logic_vector(Window_sequence_num);
-
-    when S_WINDOW_DURATION =>
-      w_fifo_valid            <= '1';
-      w_fifo_partial_0_data   <= std_logic_vector(Window_duration) & x"0000";
 
     when S_WINDOW_TIMESTAMP_0 =>
       w_fifo_valid            <= '1';

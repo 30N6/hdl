@@ -111,7 +111,6 @@ architecture rtl of intercept_dwell_stats is
 
   signal r_timestamp                  : unsigned(INTERCEPT_TIMESTAMP_WIDTH - 1 downto 0);
   signal r_window_timestamp           : unsigned(INTERCEPT_TIMESTAMP_WIDTH - 1 downto 0);
-  signal r_window_duration            : unsigned(INTERCEPT_DWELL_DURATION_WIDTH - 1 downto 0);
 
   signal w_window_done                : std_logic;
 
@@ -262,8 +261,7 @@ begin
   begin
     if rising_edge(Clk) then
       if ((r_input_ctrl.valid = '1') and (r_input_ctrl.last = '1') and (r_dwell_last_frame = '1')) then
-        r_window_timestamp  <= r_timestamp;
-        r_window_duration   <= r_dwell_frame_index + 1;
+        r_window_timestamp <= r_timestamp;
       end if;
     end if;
   end process;
@@ -315,7 +313,6 @@ begin
     Dwell_data          => r_dwell_data,
     Window_done         => w_window_done,
     Window_sequence_num => r_window_seq_num_report,
-    Window_duration     => r_window_duration,
     Window_timestamp    => r_window_timestamp,
 
     Read_req            => w_report_read_req,

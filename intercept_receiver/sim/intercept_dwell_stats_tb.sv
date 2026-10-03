@@ -104,11 +104,9 @@ module intercept_dwell_stats_tb;
     bit [31:0]  dwell_seq_num;
     bit [31:0]  dwell_frequency;
     bit [15:0]  dwell_tag;
-    bit [15:0]  padding_2;
+    bit [15:0]  dwell_window_duration;
 
     bit [31:0]  window_seq_num;
-    bit [15:0]  window_duration;
-    bit [15:0]  padding_3;
     bit [63:0]  window_timestamp;
   } intercept_dwell_report_header_t;
 
@@ -365,12 +363,12 @@ module intercept_dwell_stats_tb;
       $display("dwell_tag mismatch: %X %X", report_a.dwell_tag, report_b.dwell_tag);
       return 0;
     end
-    if (report_a.window_seq_num !== report_b.window_seq_num) begin
-      $display("window_seq_num mismatch: %X %X", report_a.window_seq_num, report_b.window_seq_num);
+    if (report_a.dwell_window_duration !== report_b.dwell_window_duration) begin
+      $display("dwell_window_duration mismatch: %X %X", report_a.dwell_window_duration, report_b.dwell_window_duration);
       return 0;
     end
-    if (report_a.window_duration !== report_b.window_duration) begin
-      $display("window_duration mismatch: %X %X", report_a.window_duration, report_b.window_duration);
+    if (report_a.window_seq_num !== report_b.window_seq_num) begin
+      $display("window_seq_num mismatch: %X %X", report_a.window_seq_num, report_b.window_seq_num);
       return 0;
     end
 
@@ -442,8 +440,8 @@ module intercept_dwell_stats_tb;
       report_header.dwell_seq_num           = dwell_seq_num;
       report_header.dwell_frequency         = control_data.dwell_frequency;
       report_header.dwell_tag               = control_data.dwell_tag;
+      report_header.dwell_window_duration   = control_data.window_duration;
       report_header.window_seq_num          = window_seq_num;
-      report_header.window_duration         = control_data.window_duration;
       report_header.window_timestamp        = 0;
 
       report_header_packed = dwell_report_header_bits_t'(report_header);
