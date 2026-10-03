@@ -112,7 +112,9 @@ module intercept_dwell_stats_tb;
 
   typedef struct packed
   {
-    bit [31:0]  channel_index;
+    bit [7:0]   channel_valid;
+    bit [7:0]   padding_0;
+    bit [15:0]  channel_index;
     bit [63:0]  channel_accum;
     bit [31:0]  channel_max;
   } intercept_dwell_report_channel_entry_t;
@@ -416,7 +418,7 @@ module intercept_dwell_stats_tb;
     int channels_per_packet = (intercept_max_words_per_packet_large - NUM_HEADER_WORDS) / 4;
     int num_packets = (intercept_num_channels + channels_per_packet - 1) / channels_per_packet;
     int num_padding_words = 0;
-    int channel_index = 0;
+    bit [15:0] channel_index = 0;
 
     longint unsigned channel_accum [intercept_num_channels] = '{default:0};
     int unsigned channel_max [intercept_num_channels] = '{default:0};
@@ -458,7 +460,7 @@ module intercept_dwell_stats_tb;
           break;
         end
 
-        words[0] = channel_index;
+        words[0] = {8'h01, 8'h00, channel_index};
         words[1] = channel_accum[channel_index][63:32];
         words[2] = channel_accum[channel_index][31:0];
         words[3] = channel_max[channel_index];

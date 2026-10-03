@@ -158,7 +158,7 @@ package intercept_pkg is
     window_sequence_num         : unsigned(INTERCEPT_DWELL_SEQUENCE_NUM_WIDTH - 1 downto 0);
     window_timestamp            : unsigned(63 downto 0);
 
-    -- array of 128 bit entries: index, accum, max
+    -- array of 128 bit entries: valid, index, accum, max
   end record;
 
   type intercept_stream_sample_t is record
