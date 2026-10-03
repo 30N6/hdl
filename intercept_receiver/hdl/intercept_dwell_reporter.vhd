@@ -304,7 +304,7 @@ begin
 
     when S_CHANNEL_INDEX =>
       w_fifo_valid            <= '1';
-      w_fifo_partial_1_data   <= x"0100" & std_logic_vector(resize_up(r_channel_index, 16));
+      w_fifo_partial_1_data   <= std_logic_vector(resize_up(r_channel_index, 16)) & x"0001";
 
     when S_CHANNEL_ACCUM_0 =>
       w_fifo_valid            <= '1';

@@ -460,7 +460,7 @@ module intercept_dwell_stats_tb;
           break;
         end
 
-        words[0] = {8'h01, 8'h00, channel_index};
+        words[0] = {channel_index, 8'h00, 8'h01};
         words[1] = channel_accum[channel_index][63:32];
         words[2] = channel_accum[channel_index][31:0];
         words[3] = channel_max[channel_index];
