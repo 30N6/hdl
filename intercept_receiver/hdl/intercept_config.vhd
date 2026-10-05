@@ -12,24 +12,27 @@ library mem_lib;
 
 entity intercept_config is
 generic (
-  AXI_DATA_WIDTH : natural
+  AXI_DATA_WIDTH          : natural;
+  WATCHDOG_TIMEOUT_CYCLES : natural
 );
 port (
-  Clk_x4        : in  std_logic;
+  Clk_x4            : in  std_logic;
 
-  S_axis_clk    : in  std_logic;
-  S_axis_resetn : in  std_logic;
-  S_axis_ready  : out std_logic;
-  S_axis_valid  : in  std_logic;
-  S_axis_data   : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
-  S_axis_last   : in  std_logic;
+  S_axis_clk        : in  std_logic;
+  S_axis_resetn     : in  std_logic;
+  S_axis_ready      : out std_logic;
+  S_axis_valid      : in  std_logic;
+  S_axis_data       : in  std_logic_vector(AXI_DATA_WIDTH - 1 downto 0);
+  S_axis_last       : in  std_logic;
 
-  Rst_out       : out std_logic;
-  Enable_status : out std_logic;
-  Enable_chan   : out std_logic;
-  Enable_stream : out std_logic;
+  Rst_out           : out std_logic;
+  Enable_status     : out std_logic;
+  Enable_chan       : out std_logic;
+  Enable_stream     : out std_logic;
 
-  Module_config : out intercept_config_data_t
+  Module_config     : out intercept_config_data_t;
+
+  Watchdog_timeout  : out std_logic
 );
 end entity intercept_config;
 
@@ -74,17 +77,24 @@ architecture rtl of intercept_config is
   signal r_enable_chan          : std_logic;
   signal r_enable_stream        : std_logic;
 
+  signal r_watchdog_clear       : std_logic;
+  signal r_watchdog_counter     : unsigned(clog2(WATCHDOG_TIMEOUT_CYCLES) - 1 downto 0);
+  signal r_watchdog_timeout     : std_logic;
+
   signal r_module_config_x4     : intercept_config_data_t; --from cdc fifo
   signal r_rst_out_x4           : std_logic_vector(CDC_STAGES - 1 downto 0);
   signal r_enable_chan_x4       : std_logic_vector(CDC_STAGES - 1 downto 0);
   signal r_enable_stream_x4     : std_logic_vector(CDC_STAGES - 1 downto 0);
   signal r_enable_status_x4     : std_logic_vector(CDC_STAGES - 1 downto 0);
+  signal r_watchdog_timeout_x4  : std_logic_vector(CDC_STAGES - 1 downto 0);
 
   attribute ASYNC_REG : string;
-  attribute ASYNC_REG of r_rst_out_x4         : signal is "TRUE";
-  attribute ASYNC_REG of r_enable_chan_x4     : signal is "TRUE";
-  attribute ASYNC_REG of r_enable_stream_x4   : signal is "TRUE";
-  attribute ASYNC_REG of r_enable_status_x4   : signal is "TRUE";
+  attribute ASYNC_REG of r_rst_out_x4           : signal is "TRUE";
+  attribute ASYNC_REG of r_enable_chan_x4       : signal is "TRUE";
+  attribute ASYNC_REG of r_enable_stream_x4     : signal is "TRUE";
+  attribute ASYNC_REG of r_enable_status_x4     : signal is "TRUE";
+  attribute ASYNC_REG of r_watchdog_timeout_x4  : signal is "TRUE";
+
 
 begin
 
@@ -238,23 +248,59 @@ begin
           r_enable_stream <= r_axis_data(8);
           r_enable_status <= r_axis_data(0);
         end if;
+
+        if (r_watchdog_timeout = '1') then
+          r_enable_chan   <= '0';
+          r_enable_stream <= '0';
+        end if;
       end if;
+    end if;
+  end process;
+
+  process(S_axis_clk)
+  begin
+    if rising_edge(S_axis_clk) then
+      r_watchdog_clear <= r_axis_valid and r_first and to_stdlogic(s_state = S_ACTIVE_CONFIG_CONTROL) and to_stdlogic(r_message_type = INTERCEPT_CONTROL_MESSAGE_TYPE_ENABLE);
+    end if;
+  end process;
+
+  process(S_axis_clk)
+  begin
+    if rising_edge(S_axis_clk) then
+      if (S_axis_resetn = '0') then
+        r_watchdog_counter <= (others => '0');
+      else
+        if (r_watchdog_clear = '1') then
+          r_watchdog_counter <= (others => '0');
+        else
+          r_watchdog_counter <= r_watchdog_counter + 1;
+        end if;
+      end if;
+    end if;
+  end process;
+
+  process(S_axis_clk)
+  begin
+    if rising_edge(S_axis_clk) then
+      r_watchdog_timeout <= to_stdlogic(r_watchdog_counter = (WATCHDOG_TIMEOUT_CYCLES - 1));
     end if;
   end process;
 
   process(Clk_x4)
   begin
     if rising_edge(Clk_x4) then
-      r_rst_out_x4        <= r_rst_out_x4(CDC_STAGES - 2 downto 0)        & r_rst_out;
-      r_enable_chan_x4    <= r_enable_chan_x4(CDC_STAGES - 2 downto 0)    & r_enable_chan;
-      r_enable_stream_x4  <= r_enable_stream_x4(CDC_STAGES - 2 downto 0)  & r_enable_stream;
-      r_enable_status_x4  <= r_enable_status_x4(CDC_STAGES - 2 downto 0)  & r_enable_status;
+      r_rst_out_x4          <= r_rst_out_x4(CDC_STAGES - 2 downto 0)          & r_rst_out;
+      r_enable_chan_x4      <= r_enable_chan_x4(CDC_STAGES - 2 downto 0)      & r_enable_chan;
+      r_enable_stream_x4    <= r_enable_stream_x4(CDC_STAGES - 2 downto 0)    & r_enable_stream;
+      r_enable_status_x4    <= r_enable_status_x4(CDC_STAGES - 2 downto 0)    & r_enable_status;
+      r_watchdog_timeout_x4 <= r_watchdog_timeout_x4(CDC_STAGES - 2 downto 0) & r_watchdog_timeout; -- assuming S_axis_clk is slower than Clk_x4
     end if;
   end process;
 
-  Rst_out       <= r_rst_out_x4(CDC_STAGES - 1);
-  Enable_chan   <= r_enable_chan_x4(CDC_STAGES - 1);
-  Enable_stream <= r_enable_stream_x4(CDC_STAGES - 1);
-  Enable_status <= r_enable_status_x4(CDC_STAGES - 1);
+  Rst_out           <= r_rst_out_x4(CDC_STAGES - 1);
+  Enable_chan       <= r_enable_chan_x4(CDC_STAGES - 1);
+  Enable_stream     <= r_enable_stream_x4(CDC_STAGES - 1);
+  Enable_status     <= r_enable_status_x4(CDC_STAGES - 1);
+  Watchdog_timeout  <= r_watchdog_timeout_x4(CDC_STAGES - 1);
 
 end architecture rtl;

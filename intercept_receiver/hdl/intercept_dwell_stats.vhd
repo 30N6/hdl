@@ -146,7 +146,7 @@ begin
         r_dwell_first_frame  <= '0';
         r_dwell_last_frame   <= '0';
       else
-        if (r_dwell_active = '0') then
+        if ((r_dwell_active = '0') or (r_enable = '0')) then
           r_dwell_frame_index  <= (others => '0');
           r_dwell_first_frame  <= '1';
           r_dwell_last_frame   <= '0';

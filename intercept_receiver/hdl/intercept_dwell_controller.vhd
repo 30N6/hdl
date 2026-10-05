@@ -13,6 +13,7 @@ port (
   Clk           : in  std_logic;
   Rst           : in  std_logic;
 
+  Enable        : in  std_logic;
   Module_config : in  intercept_config_data_t;
 
   Dwell_data    : out intercept_dwell_data_t;
@@ -23,6 +24,7 @@ end entity intercept_dwell_controller;
 architecture rtl of intercept_dwell_controller is
 
   signal r_rst            : std_logic;
+  signal r_enable         : std_logic;
   signal r_module_config  : intercept_config_data_t;
 
   signal w_control_valid  : std_logic;
@@ -37,6 +39,7 @@ begin
   begin
     if rising_edge(Clk) then
       r_rst           <= Rst;
+      r_enable        <= Enable;
       r_module_config <= Module_config;
     end if;
   end process;
@@ -68,6 +71,10 @@ begin
           if (w_control_data.enable = '1') then
             r_dwell_data.sequence_num <= r_dwell_data.sequence_num + 1;
           end if;
+        end if;
+
+        if (r_enable = '0') then
+          r_dwell_active <= '0';
         end if;
       end if;
     end if;

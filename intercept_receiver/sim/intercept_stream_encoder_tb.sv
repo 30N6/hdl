@@ -162,6 +162,7 @@ module intercept_stream_encoder_tb;
   logic                   w_error_fifo_underflow;
   logic                   w_error_reporter_timeout;
   logic                   w_error_reporter_overflow;
+  logic                   w_error_watchdog_timeout;
 
   initial begin
     Clk_axi = 0;
@@ -189,23 +190,24 @@ module intercept_stream_encoder_tb;
     r_axi_rx_ready <= $urandom_range(99) < 80;
   end
 
-  intercept_config #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH)) cfg
+  intercept_config #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH), .WATCHDOG_TIMEOUT_CYCLES(1000000)) cfg
   (
-    .Clk_x4         (Clk),
+    .Clk_x4           (Clk),
 
-    .S_axis_clk     (Clk_axi),
-    .S_axis_resetn  (!Rst),
-    .S_axis_ready   (cfg_tx_intf.ready),
-    .S_axis_valid   (cfg_tx_intf.valid),
-    .S_axis_data    (cfg_tx_intf.data),
-    .S_axis_last    (cfg_tx_intf.last),
+    .S_axis_clk       (Clk_axi),
+    .S_axis_resetn    (!Rst),
+    .S_axis_ready     (cfg_tx_intf.ready),
+    .S_axis_valid     (cfg_tx_intf.valid),
+    .S_axis_data      (cfg_tx_intf.data),
+    .S_axis_last      (cfg_tx_intf.last),
 
-    .Rst_out        (w_rst_out),
-    .Enable_status  (w_enable_status),
-    .Enable_chan    (w_enable_chan),
-    .Enable_stream  (w_enable_stream),
+    .Rst_out          (w_rst_out),
+    .Enable_status    (w_enable_status),
+    .Enable_chan      (w_enable_chan),
+    .Enable_stream    (w_enable_stream),
 
-    .Module_config  (w_module_config)
+    .Module_config    (w_module_config),
+    .Watchdog_timeout (w_error_watchdog_timeout)
   );
 
   intercept_dwell_controller dwell_ctrl
@@ -213,6 +215,7 @@ module intercept_stream_encoder_tb;
     .Clk            (Clk),
     .Rst            (Rst),
 
+    .Enable         (w_enable_chan),
     .Module_config  (w_module_config),
 
     .Dwell_data     (w_dwell_data),
@@ -230,7 +233,7 @@ module intercept_stream_encoder_tb;
     .Clk                      (Clk),
     .Rst                      (Rst),
 
-    .Enable                   (1'b1),
+    .Enable                   (w_enable_stream),
     .Module_config            (w_module_config),
 
     .Dwell_data               (w_dwell_data),
@@ -259,6 +262,7 @@ module intercept_stream_encoder_tb;
       if (w_error_fifo_underflow)     $error("fifo underflow");
       if (w_error_reporter_timeout)   $error("reporter timeout");
       if (w_error_reporter_overflow)  $error("reporter overflow");
+      if (w_error_watchdog_timeout)   $error("w_error_watchdog_timeout");
     end
   end
 
@@ -273,6 +277,21 @@ module intercept_stream_encoder_tb;
     @(posedge Clk_axi)
     cfg_tx_intf.write(config_data);
     repeat(10) @(posedge Clk_axi);
+  endtask
+
+  task automatic send_initial_config();
+    bit [31:0] config_data [][] = '{{intercept_control_magic_num, config_seq_num++, 32'h00000000, 32'hDEADBEEF, 32'h01000000, 32'hDEADBEEF},
+                                    {intercept_control_magic_num, config_seq_num++, 32'h00000000, 32'hDEADBEEF, 32'h00010100, 32'hDEADBEEF}};
+    foreach (config_data[i]) begin
+      write_config(config_data[i]);
+    end
+  endtask
+
+  task automatic update_watchdog();
+    bit [31:0] config_data [][] = '{{intercept_control_magic_num, config_seq_num++, 32'h00000000, 32'hDEADBEEF, 32'h00010100, 32'hDEADBEEF}};
+    foreach (config_data[i]) begin
+      write_config(config_data[i]);
+    end
   endtask
 
   function automatic bit [intercept_message_dwell_controller_control_aligned_width - 1 : 0] pack_intercept_message_dwell_controller_control(intercept_message_dwell_controller_control_t data);
@@ -658,6 +677,8 @@ module intercept_stream_encoder_tb;
     parameter NUM_TESTS = 10;
     int max_write_delay = 5;
 
+    send_initial_config();
+
     for (int i_test = 0; i_test < NUM_TESTS; i_test++) begin
       int num_frames        = $urandom_range(300, 250);
       int channel_index     = $urandom_range(intercept_num_channels - 1);
@@ -696,6 +717,7 @@ module intercept_stream_encoder_tb;
       end
 
       $display("%0t: Test started - max_write_delay=%0d control_data=%p", $time, max_write_delay, control_data);
+      update_watchdog();
       send_dwell_controller_control(control_data);
       send_channel_control(channel_control, channel_index);
       send_stream_control(stream_control, stream_index);

@@ -97,6 +97,7 @@ architecture rtl of intercept_receiver is
   signal w_channelizer_data           : signed_array_t(1 downto 0)(CHANNELIZER_DATA_WIDTH - 1 downto 0);
   signal w_channelizer_pwr            : unsigned(CHAN_POWER_WIDTH - 1 downto 0);
 
+  signal w_watchdog_timeout           : std_logic;
   signal w_channelizer_warnings       : intercept_channelizer_warnings_t;
   signal w_channelizer_errors         : intercept_channelizer_errors_t;
   signal w_dwell_stats_errors         : intercept_dwell_stats_errors_t;
@@ -145,24 +146,27 @@ begin
 
   i_config : entity intercept_lib.intercept_config
   generic map (
-    AXI_DATA_WIDTH => AXI_DATA_WIDTH
+    AXI_DATA_WIDTH          => AXI_DATA_WIDTH,
+    WATCHDOG_TIMEOUT_CYCLES => INTERCEPT_WATCHDOG_TIMEOUT_CYCLES
   )
   port map (
-    Clk_x4        => Adc_clk_x4,
+    Clk_x4            => Adc_clk_x4,
 
-    S_axis_clk    => S_axis_clk,
-    S_axis_resetn => S_axis_resetn,
-    S_axis_ready  => S_axis_ready,
-    S_axis_valid  => S_axis_valid,
-    S_axis_data   => S_axis_data,
-    S_axis_last   => S_axis_last,
+    S_axis_clk        => S_axis_clk,
+    S_axis_resetn     => S_axis_resetn,
+    S_axis_ready      => S_axis_ready,
+    S_axis_valid      => S_axis_valid,
+    S_axis_data       => S_axis_data,
+    S_axis_last       => S_axis_last,
 
-    Rst_out       => w_config_rst,
-    Enable_status => w_enable_status,
-    Enable_chan   => w_enable_chan,
-    Enable_stream => w_enable_stream,
+    Rst_out           => w_config_rst,
+    Enable_status     => w_enable_status,
+    Enable_chan       => w_enable_chan,
+    Enable_stream     => w_enable_stream,
 
-    Module_config => w_module_config
+    Module_config     => w_module_config,
+
+    Watchdog_timeout  => w_watchdog_timeout
   );
 
   process(Adc_clk)
@@ -219,6 +223,7 @@ begin
     Clk           => Adc_clk_x4,
     Rst           => r_combined_rst,
 
+    Enable        => w_enable_chan,
     Module_config => w_module_config,
 
     Dwell_data    => w_dwell_data,
@@ -297,6 +302,7 @@ begin
     Enable_channelizer    => w_enable_chan,
     Enable_stream_encoder => w_enable_stream,
 
+    Watchdog_timeout      => w_watchdog_timeout,
     Channelizer_warnings  => w_channelizer_warnings,
     Channelizer_errors    => w_channelizer_errors,
     Dwell_stats_errors    => w_dwell_stats_errors,

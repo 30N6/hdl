@@ -10,6 +10,8 @@ library dsp_lib;
 
 package intercept_pkg is
 
+  constant INTERCEPT_WATCHDOG_TIMEOUT_CYCLES                    : natural := 200000000;
+
   constant INTERCEPT_MAX_WORDS_PER_PACKET_SMALL                 : natural := 128;
   constant INTERCEPT_MAX_WORDS_PER_PACKET_LARGE                 : natural := 360;
   constant INTERCEPT_CONTROL_MAGIC_NUM                          : std_logic_vector(31 downto 0) := x"494E5443";
@@ -242,13 +244,15 @@ package intercept_pkg is
   constant INTERCEPT_STATUS_REPORTER_ERRORS_WIDTH : natural := 2;
 
   type intercept_path_status_flags_t is record
+    watchdog_timeout      : std_logic;
     channelizer_warnings  : intercept_channelizer_warnings_t;
     channelizer_errors    : intercept_channelizer_errors_t;
     stream_encoder_errors : intercept_stream_encoder_errors_t;
     dwell_stats_errors    : intercept_dwell_stats_errors_t;
   end record;
 
-  constant INTERCEPT_PATH_STATUS_FLAGS_WIDTH : natural := INTERCEPT_CHANNELIZER_WARNINGS_WIDTH +
+  constant INTERCEPT_PATH_STATUS_FLAGS_WIDTH : natural := 1 +
+                                                          INTERCEPT_CHANNELIZER_WARNINGS_WIDTH +
                                                           INTERCEPT_CHANNELIZER_ERRORS_WIDTH +
                                                           INTERCEPT_STREAM_ENCODER_ERRORS_WIDTH +
                                                           INTERCEPT_DWELL_STATS_ERRORS_WIDTH;
@@ -438,7 +442,8 @@ package body intercept_pkg is
           pack(v.dwell_stats_errors),
           pack(v.stream_encoder_errors),
           pack(v.channelizer_errors),
-          pack(v.channelizer_warnings)
+          pack(v.channelizer_warnings),
+          v.watchdog_timeout
          );
     return r;
   end function;

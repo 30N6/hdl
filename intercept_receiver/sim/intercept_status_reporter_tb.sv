@@ -6,6 +6,7 @@ import intercept_pkg::*;
 typedef struct {
   bit                                 enable_channelizer;
   bit                                 enable_stream_encoder;
+  bit                                 watchdog_timeout;
   intercept_channelizer_warnings_t    channelizer_warnings;
   intercept_channelizer_errors_t      channelizer_errors;
   intercept_stream_encoder_errors_t   stream_encoder_errors;
@@ -19,6 +20,7 @@ typedef intercept_status_data_t intercept_status_data_array_t [];
 interface intercept_status_tx_intf (input logic Clk);
   bit                                 enable_channelizer;
   bit                                 enable_stream_encoder;
+  bit                                 watchdog_timeout;
   intercept_channelizer_warnings_t    channelizer_warnings;
   intercept_channelizer_errors_t      channelizer_errors;
   intercept_stream_encoder_errors_t   stream_encoder_errors;
@@ -28,6 +30,7 @@ interface intercept_status_tx_intf (input logic Clk);
   task clear();
     enable_channelizer      = 0;
     enable_stream_encoder   = 0;
+    watchdog_timeout        = 0;
     channelizer_warnings    = '{default:0};
     channelizer_errors      = '{default:0};
     stream_encoder_errors   = '{default:0};
@@ -39,12 +42,14 @@ interface intercept_status_tx_intf (input logic Clk);
     repeat(input_data.pre_write_delay) @(posedge Clk);
     enable_channelizer      = input_data.enable_channelizer;
     enable_stream_encoder   = input_data.enable_stream_encoder;
+    watchdog_timeout        = input_data.watchdog_timeout;
     channelizer_warnings    = input_data.channelizer_warnings;
     channelizer_errors      = input_data.channelizer_errors;
     stream_encoder_errors   = input_data.stream_encoder_errors;
     dwell_stats_errors      = input_data.dwell_stats_errors;
     //dwell_controller_errors = input_data.dwell_controller_errors;
     @(posedge Clk);
+    watchdog_timeout        = '0;
     channelizer_warnings    = '{default:0};
     channelizer_errors      = '{default:0};
     stream_encoder_errors   = '{default:0};
@@ -125,6 +130,8 @@ module intercept_status_reporter_tb;
     bit error_chan_demux_overflow;
 
     bit warning_demux_gap;
+
+    bit watchdog_timeout;
   } intercept_status_flags_packed_t;
 
   typedef bit [$bits(intercept_status_report_header_t) - 1 : 0]           intercept_status_report_header_bits_t;
@@ -187,6 +194,7 @@ module intercept_status_reporter_tb;
     .Enable_channelizer       (status_tx_intf.enable_channelizer),
     .Enable_stream_encoder    (status_tx_intf.enable_stream_encoder),
 
+    .Watchdog_timeout         (status_tx_intf.watchdog_timeout),
     .Channelizer_warnings     (status_tx_intf.channelizer_warnings),
     .Channelizer_errors       (status_tx_intf.channelizer_errors),
     .Stream_encoder_errors    (status_tx_intf.stream_encoder_errors),
@@ -326,6 +334,8 @@ module intercept_status_reporter_tb;
     reporter_errors.error_status_reporter_overflow      = input_data.status_reporter_errors.reporter_overflow;
     reporter_errors.error_status_reporter_timeout       = input_data.status_reporter_errors.reporter_timeout;
 
+    status_flags.watchdog_timeout                       = input_data.watchdog_timeout;
+
     status_flags.warning_demux_gap                      = input_data.channelizer_warnings.demux_gap;
 
     status_flags.error_chan_demux_overflow              = input_data.channelizer_errors.demux_overflow;
@@ -397,6 +407,7 @@ module intercept_status_reporter_tb;
       r[i].enable_channelizer                             = $urandom_range(1);
       r[i].enable_stream_encoder                          = $urandom_range(1);
 
+      r[i].watchdog_timeout                               = $urandom_range(1);
       r[i].channelizer_warnings.demux_gap                 = $urandom_range(1);
       r[i].channelizer_errors.demux_overflow              = $urandom_range(1);
       r[i].channelizer_errors.filter_overflow             = $urandom_range(1);

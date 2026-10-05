@@ -149,6 +149,7 @@ module intercept_dwell_stats_tb;
   logic                   w_error_reporter_busy;
   logic                   w_error_reporter_timeout;
   logic                   w_error_reporter_overflow;
+  logic                   w_error_watchdog_timeout;
 
   initial begin
     Clk_axi = 0;
@@ -176,23 +177,25 @@ module intercept_dwell_stats_tb;
     r_axi_rx_ready <= $urandom_range(99) < 80;
   end
 
-  intercept_config #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH)) cfg
+  intercept_config #(.AXI_DATA_WIDTH(AXI_DATA_WIDTH), .WATCHDOG_TIMEOUT_CYCLES(1000000)) cfg
   (
-    .Clk_x4         (Clk),
+    .Clk_x4           (Clk),
 
-    .S_axis_clk     (Clk_axi),
-    .S_axis_resetn  (!Rst),
-    .S_axis_ready   (cfg_tx_intf.ready),
-    .S_axis_valid   (cfg_tx_intf.valid),
-    .S_axis_data    (cfg_tx_intf.data),
-    .S_axis_last    (cfg_tx_intf.last),
+    .S_axis_clk       (Clk_axi),
+    .S_axis_resetn    (!Rst),
+    .S_axis_ready     (cfg_tx_intf.ready),
+    .S_axis_valid     (cfg_tx_intf.valid),
+    .S_axis_data      (cfg_tx_intf.data),
+    .S_axis_last      (cfg_tx_intf.last),
 
-    .Rst_out        (w_rst_out),
-    .Enable_status  (w_enable_status),
-    .Enable_chan    (w_enable_chan),
-    .Enable_stream  (w_enable_stream),
+    .Rst_out          (w_rst_out),
+    .Enable_status    (w_enable_status),
+    .Enable_chan      (w_enable_chan),
+    .Enable_stream    (w_enable_stream),
 
-    .Module_config  (w_module_config)
+    .Module_config    (w_module_config),
+
+    .Watchdog_timeout (w_error_watchdog_timeout)
   );
 
   intercept_dwell_controller dwell_ctrl
@@ -200,6 +203,7 @@ module intercept_dwell_stats_tb;
     .Clk            (Clk),
     .Rst            (Rst),
 
+    .Enable         (1'b1),
     .Module_config  (w_module_config),
 
     .Dwell_data     (w_dwell_data),
@@ -241,6 +245,7 @@ module intercept_dwell_stats_tb;
       if (w_error_reporter_busy)      $error("reporter busy");
       if (w_error_reporter_timeout)   $error("reporter timeout");
       if (w_error_reporter_overflow)  $error("reporter overflow");
+      if (w_error_watchdog_timeout)   $error("watchdog timeout");
     end
   end
 
@@ -260,6 +265,13 @@ module intercept_dwell_stats_tb;
   task automatic send_initial_config();
     bit [31:0] config_data [][] = '{{intercept_control_magic_num, config_seq_num++, 32'h00000000, 32'hDEADBEEF, 32'h01000000, 32'hDEADBEEF},
                                     {intercept_control_magic_num, config_seq_num++, 32'h00000000, 32'hDEADBEEF, 32'h00010100, 32'hDEADBEEF}};
+    foreach (config_data[i]) begin
+      write_config(config_data[i]);
+    end
+  endtask
+
+  task automatic update_watchdog();
+    bit [31:0] config_data [][] = '{{intercept_control_magic_num, config_seq_num++, 32'h00000000, 32'hDEADBEEF, 32'h00010100, 32'hDEADBEEF}};
     foreach (config_data[i]) begin
       write_config(config_data[i]);
     end
@@ -512,6 +524,7 @@ module intercept_dwell_stats_tb;
       dwell_channel_data_t dwell_input [] = randomize_dwell_input(num_windows, control_data.window_duration);
 
       $display("%0t: Test started - max_write_delay=%0d control_data=%p", $time, max_write_delay, control_data);
+      update_watchdog();
       send_dwell_controller_control(control_data);
       repeat(20) @(posedge Clk);
 

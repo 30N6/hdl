@@ -24,6 +24,7 @@ port (
   Enable_channelizer    : in  std_logic;
   Enable_stream_encoder : in  std_logic;
 
+  Watchdog_timeout      : in  std_logic;
   Channelizer_warnings  : in  intercept_channelizer_warnings_t;
   Channelizer_errors    : in  intercept_channelizer_errors_t;
   Dwell_stats_errors    : in  intercept_dwell_stats_errors_t;
@@ -69,6 +70,7 @@ architecture rtl of intercept_status_reporter is
   signal r_enable_status            : std_logic;
   signal r_enable_channelizer       : std_logic;
   signal r_enable_stream_encoder    : std_logic;
+  signal r_watchdog_timeout         : std_logic;
   signal r_channelizer_warnings     : intercept_channelizer_warnings_t;
   signal r_channelizer_errors       : intercept_channelizer_errors_t;
   signal r_dwell_stats_errors       : intercept_dwell_stats_errors_t;
@@ -116,6 +118,7 @@ begin
       r_enable_status         <= Enable_status;
       r_enable_channelizer    <= Enable_channelizer;
       r_enable_stream_encoder <= Enable_stream_encoder;
+      r_watchdog_timeout      <= Watchdog_timeout;
       r_channelizer_warnings  <= Channelizer_warnings;
       r_channelizer_errors    <= Channelizer_errors;
       r_dwell_stats_errors    <= Dwell_stats_errors;
@@ -145,6 +148,7 @@ begin
     end if;
   end process;
 
+  w_status_flags.watchdog_timeout       <= r_watchdog_timeout;
   w_status_flags.channelizer_warnings   <= r_channelizer_warnings;
   w_status_flags.channelizer_errors     <= r_channelizer_errors;
   w_status_flags.dwell_stats_errors     <= r_dwell_stats_errors;
