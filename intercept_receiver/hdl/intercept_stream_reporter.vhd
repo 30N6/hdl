@@ -97,6 +97,29 @@ architecture rtl of intercept_stream_reporter is
   signal r_global_timeout         : unsigned(clog2(GLOBAL_TIMEOUT_CYCLES) - 1 downto 0);
   signal r_sample_timeout         : unsigned(clog2(SAMPLE_TIMEOUT_CYCLES) - 1 downto 0);
 
+  attribute MARK_DEBUG                          : string;
+  attribute DONT_TOUCH                          : string;
+  attribute MARK_DEBUG of s_state  : signal is "TRUE";
+  attribute DONT_TOUCH of s_state  : signal is "TRUE";
+  attribute MARK_DEBUG of r_words_in_msg  : signal is "TRUE";
+  attribute DONT_TOUCH of r_words_in_msg  : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_almost_full  : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_almost_full  : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_ready  : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_ready  : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_valid_opt  : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_valid_opt  : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_last  : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_last  : signal is "TRUE";
+  attribute MARK_DEBUG of r_fifo_valid  : signal is "TRUE";
+  attribute DONT_TOUCH of r_fifo_valid  : signal is "TRUE";
+  attribute MARK_DEBUG of r_fifo_last  : signal is "TRUE";
+  attribute DONT_TOUCH of r_fifo_last  : signal is "TRUE";
+  attribute MARK_DEBUG of r_fifo_partial_0_data  : signal is "TRUE";
+  attribute DONT_TOUCH of r_fifo_partial_0_data  : signal is "TRUE";
+  attribute MARK_DEBUG of r_fifo_partial_1_data  : signal is "TRUE";
+  attribute DONT_TOUCH of r_fifo_partial_1_data  : signal is "TRUE";
+
 begin
 
   assert (AXI_DATA_WIDTH = 32)
