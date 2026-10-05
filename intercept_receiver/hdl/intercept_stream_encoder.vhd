@@ -49,7 +49,7 @@ end entity intercept_stream_encoder;
 
 architecture rtl of intercept_stream_encoder is
 
-  constant SAMPLE_FIFO_DEPTH  : natural := 2048;
+  constant SAMPLE_FIFO_DEPTH  : natural := 512;
 
   type channel_state_t is
   (
@@ -145,6 +145,8 @@ architecture rtl of intercept_stream_encoder is
   signal w_fifo_empty                   : std_logic;
   signal w_fifo_overflow                : std_logic;
   signal w_fifo_underflow               : std_logic;
+  signal w_fifo_almost_full             : std_logic;
+  signal w_fifo_full                    : std_logic;
 
   signal w_stream_sample_data           : intercept_stream_sample_t;
   signal w_stream_dwell_data            : intercept_dwell_data_t;
@@ -156,6 +158,43 @@ architecture rtl of intercept_stream_encoder is
 
   signal w_error_reporter_timeout       : std_logic;
   signal w_error_reporter_overflow      : std_logic;
+
+  attribute MARK_DEBUG                          : string;
+  attribute DONT_TOUCH                          : string;
+  attribute MARK_DEBUG of r4_output_valid  : signal is "TRUE";
+  attribute DONT_TOUCH of r4_output_valid  : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_almost_full  : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_almost_full  : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_full  : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_full  : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_empty  : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_empty  : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_rd_en  : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_rd_en  : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_overflow  : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_overflow  : signal is "TRUE";
+  attribute MARK_DEBUG of w_fifo_underflow  : signal is "TRUE";
+  attribute DONT_TOUCH of w_fifo_underflow  : signal is "TRUE";
+  attribute MARK_DEBUG of w_stream_req  : signal is "TRUE";
+  attribute DONT_TOUCH of w_stream_req  : signal is "TRUE";
+  attribute MARK_DEBUG of r4_output_data : signal is "TRUE";
+  attribute DONT_TOUCH of r4_output_data : signal is "TRUE";
+  attribute MARK_DEBUG of r_dwell_data  : signal is "TRUE";
+  attribute DONT_TOUCH of r_dwell_data  : signal is "TRUE";
+
+  attribute MARK_DEBUG of r3_context : signal is "TRUE";
+  attribute DONT_TOUCH of r3_context : signal is "TRUE";
+  attribute MARK_DEBUG of r3_context_wr_valid  : signal is "TRUE";
+  attribute DONT_TOUCH of r3_context_wr_valid  : signal is "TRUE";
+
+  attribute MARK_DEBUG of w_stream_slot_valid  : signal is "TRUE";
+  attribute DONT_TOUCH of w_stream_slot_valid  : signal is "TRUE";
+  attribute MARK_DEBUG of w_stream_slot_index  : signal is "TRUE";
+  attribute DONT_TOUCH of w_stream_slot_index  : signal is "TRUE";
+  attribute MARK_DEBUG of w_stream_slot_ack : signal is "TRUE";
+  attribute DONT_TOUCH of w_stream_slot_ack : signal is "TRUE";
+  attribute MARK_DEBUG of r4_stream_release_valid  : signal is "TRUE";
+  attribute DONT_TOUCH of r4_stream_release_valid  : signal is "TRUE";
 
 begin
 
@@ -402,8 +441,8 @@ begin
 
     Wr_en         => r4_output_valid,
     Wr_data       => w_fifo_wr_data,
-    Almost_full   => open,
-    Full          => open,
+    Almost_full   => w_fifo_almost_full,
+    Full          => w_fifo_full,
 
     Rd_en         => w_fifo_rd_en,
     Rd_data       => w_fifo_rd_data,

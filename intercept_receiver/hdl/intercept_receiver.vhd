@@ -121,6 +121,19 @@ architecture rtl of intercept_receiver is
   attribute ASYNC_REG : string;
   attribute ASYNC_REG of r_ad9361_status : signal is "TRUE";
 
+  attribute MARK_DEBUG                          : string;
+  attribute DONT_TOUCH                          : string;
+  attribute MARK_DEBUG of w_d2h_fifo_in_ready  : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_fifo_in_ready  : signal is "TRUE";
+  attribute MARK_DEBUG of w_d2h_fifo_in_valid  : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_fifo_in_valid  : signal is "TRUE";
+  attribute MARK_DEBUG of w_d2h_fifo_in_last  : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_fifo_in_last  : signal is "TRUE";
+  attribute MARK_DEBUG of w_d2h_fifo_in_data  : signal is "TRUE";
+  attribute DONT_TOUCH of w_d2h_fifo_in_data  : signal is "TRUE";
+  attribute MARK_DEBUG of w_stream_encoder_errors  : signal is "TRUE";
+  attribute DONT_TOUCH of w_stream_encoder_errors  : signal is "TRUE";
+
 begin
 
   Enable_rx       <= '1';
