@@ -49,7 +49,7 @@ end entity intercept_stream_encoder;
 
 architecture rtl of intercept_stream_encoder is
 
-  constant SAMPLE_FIFO_DEPTH  : natural := 2048;
+  constant SAMPLE_FIFO_DEPTH  : natural := 512;
 
   type channel_state_t is
   (
