@@ -46,7 +46,7 @@ end entity intercept_dwell_reporter;
 
 architecture rtl of intercept_dwell_reporter is
 
-  constant FIFO_DEPTH             : natural := 1024;
+  constant FIFO_DEPTH             : natural := 4095;
   constant FIFO_ALMOST_FULL_LEVEL : natural := FIFO_DEPTH - INTERCEPT_MAX_WORDS_PER_PACKET_LARGE - 10;
 
   constant TIMEOUT_CYCLES         : natural := 65535;
