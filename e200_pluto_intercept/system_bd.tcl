@@ -377,7 +377,7 @@ ad_ip_parameter int_top   CONFIG.ADC_WIDTH          16
 ad_ip_parameter int_top   CONFIG.IQ_WIDTH           12
 ad_ip_parameter udp_intf  CONFIG.AXI_DATA_WIDTH     32
 ad_ip_parameter udp_intf  CONFIG.OUTPUT_FIFO_DEPTH  1024
-ad_ip_parameter udp_intf  CONFIG.TX_THROTTLE_CYCLES 2048
+ad_ip_parameter udp_intf  CONFIG.TX_THROTTLE_CYCLES 3125
 
 ad_connect udp_intf/Sys_clk       sys_cpu_clk
 ad_connect udp_intf/Sys_rst       sys_cpu_reset
